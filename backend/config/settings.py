@@ -70,16 +70,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database Configuration - PostgreSQL for production, SQLite for development
-DATABASES = {
-    'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
-        'NAME': config('DB_NAME', default='db.sqlite3'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# Railway provides DATABASE_URL automatically, otherwise use individual variables
+import dj_database_url
+
+if 'DATABASE_URL' in os.environ:
+    # Railway and other platforms provide DATABASE_URL
+    DATABASES = {
+        'default': dj_database_url.config(
+            default='sqlite:///db.sqlite3',
+            conn_max_age=600
+        )
     }
-}
+else:
+    # Local development
+    DATABASES = {
+        'default': {
+            'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
+            'NAME': config('DB_NAME', default='db.sqlite3'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 # Connection pooling for Railway
 if not DEBUG:
