@@ -207,7 +207,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     Permissions:
         - IsAuthenticated: User must be logged in
-        - IsAdminOrReadOnly: Only staff can create/modify
 
     Query Parameters:
         - search: Search by name, role, or department
@@ -219,7 +218,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     """
     queryset = Employee.objects.all().select_related('user')
     serializer_class = EmployeeSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['department', 'is_active', 'is_subcontracted_material']
@@ -463,7 +462,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     """
     queryset = Project.objects.all().select_related('project_manager')
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['facility']
@@ -741,7 +740,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         .select_related('employee', 'project')
     )
     serializer_class = AssignmentSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['employee', 'project', 'week_start_date', 'stage']
@@ -1101,7 +1100,7 @@ class DepartmentStageConfigViewSet(viewsets.ModelViewSet):
         .select_related('project')
     )
     serializer_class = DepartmentStageConfigSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['project', 'department']
@@ -1142,7 +1141,7 @@ class ProjectBudgetViewSet(viewsets.ModelViewSet):
         .select_related('project')
     )
     serializer_class = ProjectBudgetSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['project', 'department']
