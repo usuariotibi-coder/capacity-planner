@@ -167,6 +167,11 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
+# Allow all railway.app subdomains
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.railway\.app$",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 # Security Settings

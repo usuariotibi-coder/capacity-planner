@@ -1,131 +1,82 @@
 import { create } from 'zustand';
 import type { Employee } from '../types';
+import { employeesApi, isAuthenticated } from '../services/api';
 
 interface EmployeeStore {
   employees: Employee[];
-  addEmployee: (employee: Employee) => void;
+  isLoading: boolean;
+  error: string | null;
+  hasFetched: boolean;
+  fetchEmployees: () => Promise<void>;
+  addEmployee: (employee: Omit<Employee, 'id'>) => Promise<void>;
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
+  deleteEmployee: (id: string) => Promise<void>;
 }
 
-const mockEmployees: Employee[] = [
-  // HD Department
-  {
-    id: '1',
-    name: 'María García',
-    role: 'Design Engineer',
-    department: 'HD',
-    capacity: 40,
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: 'José Manuel',
-    role: 'Senior Designer',
-    department: 'HD',
-    capacity: 40,
-    isActive: true,
-  },
-  // MED Department
-  {
-    id: '3',
-    name: 'Laura Pérez',
-    role: 'Mechanical Engineer',
-    department: 'MED',
-    capacity: 40,
-    isActive: true,
-  },
-  {
-    id: '4',
-    name: 'Fernando Ruiz',
-    role: 'Design Specialist',
-    department: 'MED',
-    capacity: 40,
-    isActive: true,
-  },
-  // PRG Department
-  {
-    id: '5',
-    name: 'Carlos López',
-    role: 'Programmer',
-    department: 'PRG',
-    capacity: 40,
-    isActive: true,
-  },
-  {
-    id: '6',
-    name: 'Ana Rodríguez',
-    role: 'Senior Programmer',
-    department: 'PRG',
-    capacity: 40,
-    isActive: true,
-  },
-  // PM Department
-  {
-    id: '7',
-    name: 'Roberto García',
-    role: 'Project Manager',
-    department: 'PM',
-    capacity: 35,
-    isActive: true,
-  },
-  // MFG Department
-  {
-    id: '8',
-    name: 'Patricia Martínez',
-    role: 'Manufacturing Engineer',
-    department: 'MFG',
-    capacity: 40,
-    isActive: true,
-  },
-  // BUILD Department
-  {
-    id: '9',
-    name: 'Miguel Sánchez',
-    role: 'Build Engineer',
-    department: 'BUILD',
-    capacity: 40,
-    isActive: true,
-  },
-];
+export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
+  employees: [],
+  isLoading: false,
+  error: null,
+  hasFetched: false,
 
-export const useEmployeeStore = create<EmployeeStore>((set) => ({
-  // Initial state: load employees from localStorage or use mock employees
-  employees: (() => {
-    const saved = localStorage.getItem('employees');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading employees from localStorage', e);
-      }
+  fetchEmployees: async () => {
+    if (!isAuthenticated()) return;
+    if (get().hasFetched) return; // Already fetched
+
+    set({ isLoading: true, error: null });
+    try {
+      const data = await employeesApi.getAll();
+      set({ employees: data, isLoading: false, hasFetched: true });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Error al cargar empleados',
+        isLoading: false
+      });
     }
-    return mockEmployees;
-  })(),
+  },
 
-  // Add a new employee and persist to localStorage
-  addEmployee: (employee) =>
-    set((state) => {
-      const updatedEmployees = [...state.employees, employee];
-      localStorage.setItem('employees', JSON.stringify(updatedEmployees));
-      return { employees: updatedEmployees };
-    }),
+  addEmployee: async (employee) => {
+    try {
+      const newEmployee = await employeesApi.create(employee);
+      set((state) => ({ employees: [...state.employees, newEmployee] }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Error al crear empleado' });
+      throw error;
+    }
+  },
 
-  // Update an existing employee and persist to localStorage
-  updateEmployee: (id, updates) =>
-    set((state) => {
-      const updatedEmployees = state.employees.map((emp) =>
+  updateEmployee: async (id, updates) => {
+    // Optimistic update
+    set((state) => ({
+      employees: state.employees.map((emp) =>
         emp.id === id ? { ...emp, ...updates } : emp
-      );
-      localStorage.setItem('employees', JSON.stringify(updatedEmployees));
-      return { employees: updatedEmployees };
-    }),
+      ),
+    }));
 
-  // Delete an employee and persist to localStorage
-  deleteEmployee: (id) =>
-    set((state) => {
-      const updatedEmployees = state.employees.filter((emp) => emp.id !== id);
-      localStorage.setItem('employees', JSON.stringify(updatedEmployees));
-      return { employees: updatedEmployees };
-    }),
+    try {
+      await employeesApi.update(id, updates);
+    } catch (error) {
+      // Revert on error - refetch
+      get().fetchEmployees();
+      set({ error: error instanceof Error ? error.message : 'Error al actualizar empleado' });
+    }
+  },
+
+  deleteEmployee: async (id) => {
+    const originalEmployees = get().employees;
+
+    // Optimistic update
+    set((state) => ({
+      employees: state.employees.filter((emp) => emp.id !== id),
+    }));
+
+    try {
+      await employeesApi.delete(id);
+    } catch (error) {
+      // Revert on error
+      set({ employees: originalEmployees });
+      set({ error: error instanceof Error ? error.message : 'Error al eliminar empleado' });
+      throw error;
+    }
+  },
 }));

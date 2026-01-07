@@ -1,111 +1,86 @@
 import { create } from 'zustand';
 import type { Assignment } from '../types';
+import { assignmentsApi, isAuthenticated } from '../services/api';
 
 interface AssignmentStore {
   assignments: Assignment[];
-  addAssignment: (assignment: Assignment) => void;
+  isLoading: boolean;
+  error: string | null;
+  hasFetched: boolean;
+  fetchAssignments: () => Promise<void>;
+  addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
   updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
-  deleteAssignment: (id: string) => void;
+  deleteAssignment: (id: string) => Promise<void>;
   getAssignmentsByEmployee: (employeeId: string) => Assignment[];
   getAssignmentsByWeek: (weekStartDate: string) => Assignment[];
 }
 
-const mockAssignments: Assignment[] = [
-  {
-    id: '1',
-    employeeId: '1',
-    projectId: '1',
-    weekStartDate: '2025-01-15',
-    hours: 20,
-    stage: 'SWITCH_LAYOUT_REVISION',
-  },
-  {
-    id: '2',
-    employeeId: '1',
-    projectId: '2',
-    weekStartDate: '2025-01-15',
-    hours: 15,
-    stage: 'CONTROLS_DESIGN',
-  },
-  {
-    id: '3',
-    employeeId: '3',
-    projectId: '1',
-    weekStartDate: '2025-01-15',
-    hours: 30,
-    stage: 'CONCEPT',
-  },
-  {
-    id: '4',
-    employeeId: '3',
-    projectId: '3',
-    weekStartDate: '2025-01-15',
-    hours: 10,
-    stage: 'DETAIL_DESIGN',
-  },
-  {
-    id: '5',
-    employeeId: '1',
-    projectId: '1',
-    weekStartDate: '2025-01-22',
-    hours: 35,
-    stage: 'RELEASE',
-  },
-  {
-    id: '6',
-    employeeId: '5',
-    projectId: '2',
-    weekStartDate: '2025-01-22',
-    hours: 20,
-    stage: 'ONLINE',
-  },
-];
-
 export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
-  // Initial state: load assignments from localStorage or use mock assignments
-  assignments: (() => {
-    const saved = localStorage.getItem('assignments');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading assignments from localStorage', e);
-      }
+  assignments: [],
+  isLoading: false,
+  error: null,
+  hasFetched: false,
+
+  fetchAssignments: async () => {
+    if (!isAuthenticated()) return;
+    if (get().hasFetched) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      const data = await assignmentsApi.getAll();
+      set({ assignments: data, isLoading: false, hasFetched: true });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Error al cargar asignaciones',
+        isLoading: false
+      });
     }
-    return mockAssignments;
-  })(),
+  },
 
-  // Add a new assignment and persist to localStorage
-  addAssignment: (assignment) =>
-    set((state) => {
-      const updatedAssignments = [...state.assignments, assignment];
-      localStorage.setItem('assignments', JSON.stringify(updatedAssignments));
-      return { assignments: updatedAssignments };
-    }),
+  addAssignment: async (assignment) => {
+    try {
+      const newAssignment = await assignmentsApi.create(assignment);
+      set((state) => ({ assignments: [...state.assignments, newAssignment] }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Error al crear asignación' });
+      throw error;
+    }
+  },
 
-  // Update an existing assignment and persist to localStorage
-  updateAssignment: (id, updates) =>
-    set((state) => {
-      const updatedAssignments = state.assignments.map((assign) =>
+  updateAssignment: async (id, updates) => {
+    set((state) => ({
+      assignments: state.assignments.map((assign) =>
         assign.id === id ? { ...assign, ...updates } : assign
-      );
-      localStorage.setItem('assignments', JSON.stringify(updatedAssignments));
-      return { assignments: updatedAssignments };
-    }),
+      ),
+    }));
 
-  // Delete an assignment and persist to localStorage
-  deleteAssignment: (id) =>
-    set((state) => {
-      const updatedAssignments = state.assignments.filter((assign) => assign.id !== id);
-      localStorage.setItem('assignments', JSON.stringify(updatedAssignments));
-      return { assignments: updatedAssignments };
-    }),
+    try {
+      await assignmentsApi.update(id, updates);
+    } catch (error) {
+      get().fetchAssignments();
+      set({ error: error instanceof Error ? error.message : 'Error al actualizar asignación' });
+    }
+  },
 
-  // Get assignments by employee
+  deleteAssignment: async (id) => {
+    const originalAssignments = get().assignments;
+
+    set((state) => ({
+      assignments: state.assignments.filter((assign) => assign.id !== id),
+    }));
+
+    try {
+      await assignmentsApi.delete(id);
+    } catch (error) {
+      set({ assignments: originalAssignments });
+      set({ error: error instanceof Error ? error.message : 'Error al eliminar asignación' });
+      throw error;
+    }
+  },
+
   getAssignmentsByEmployee: (employeeId) =>
     get().assignments.filter((assign) => assign.employeeId === employeeId),
 
-  // Get assignments by week
   getAssignmentsByWeek: (weekStartDate) =>
     get().assignments.filter((assign) => assign.weekStartDate === weekStartDate),
 }));

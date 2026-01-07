@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
-import { Users, Briefcase, Grid3x3, Menu, X } from 'lucide-react';
+import LoginPage from './pages/LoginPage';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
+import { useAuth } from './context/AuthContext';
+import { useDataLoader } from './hooks/useDataLoader';
 
 type Page = 'resources' | 'projects' | 'capacity';
 type DepartmentFilter = 'General' | Department;
@@ -18,6 +21,24 @@ function App() {
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('General');
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
+  const { isLoggedIn, isLoading, logout } = useAuth();
+
+  // Load data from API when authenticated
+  useDataLoader();
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isLoggedIn) {
+    return <LoginPage />;
+  }
 
   const navItems: Array<{ id: Page; label: string; icon: React.ReactNode }> = [
     { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={20} /> },
@@ -99,8 +120,15 @@ function App() {
           </div>
         )}
 
-        <div className="p-4 border-t border-slate-700 text-xs text-slate-400">
-          <p>{t.teamCapacityPlanner} v1.1.0</p>
+        <div className="p-4 border-t border-slate-700">
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-2"
+          >
+            <LogOut size={16} />
+            Cerrar Sesión
+          </button>
+          <p className="text-xs text-slate-400">{t.teamCapacityPlanner} v1.1.0</p>
         </div>
       </div>
 
