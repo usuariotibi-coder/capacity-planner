@@ -4,7 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
 import type { Project, Department, DepartmentStageConfig } from '../types';
 import { generateId } from '../utils/id';
-import { getDepartmentIcon } from '../utils/departmentIcons';
+import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear } from '../utils/dateUtils';
 import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -464,7 +464,7 @@ export function ProjectsPage() {
                           <div key={dept} className="bg-white p-2.5 rounded-lg border border-indigo-200 flex flex-col gap-2">
                             <div className="flex items-center gap-1.5">
                               <span className={deptInfo.color}>{deptInfo.icon}</span>
-                              <span className="font-semibold text-xs text-gray-800">{deptInfo.label}</span>
+                              <span className="font-semibold text-xs text-gray-800">{getDepartmentLabel(dept, t)}</span>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
@@ -495,7 +495,7 @@ export function ProjectsPage() {
                       <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-200 col-span-2 flex items-center gap-2">
                         <span className={`${getDepartmentIcon('PM').color} text-lg`}>{getDepartmentIcon('PM').icon}</span>
                         <div className="flex-1">
-                          <span className="font-semibold text-xs text-blue-900">{getDepartmentIcon('PM').label}</span>
+                          <span className="font-semibold text-xs text-blue-900">{getDepartmentLabel('PM', t)}</span>
                           <div className="text-xs text-gray-500">{t.usesProjectDates}</div>
                         </div>
                       </div>

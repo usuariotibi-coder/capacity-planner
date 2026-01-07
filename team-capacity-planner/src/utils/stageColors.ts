@@ -14,52 +14,94 @@ import type { Stage } from '../types';
  *
  * @property bg - Tailwind background color class
  * @property text - Tailwind text color class
- * @property label - Human-readable stage name
  */
-export const stageColors: Record<string, { bg: string; text: string; label: string }> = {
+export const stageColors: Record<string, { bg: string; text: string }> = {
   // ========== HD DEPARTMENT STAGES ==========
-  SWITCH_LAYOUT_REVISION: { bg: 'bg-purple-100', text: 'text-purple-900', label: 'Switch Layout Revision' },
-  CONTROLS_DESIGN: { bg: 'bg-indigo-100', text: 'text-indigo-900', label: 'Controls Design' },
+  SWITCH_LAYOUT_REVISION: { bg: 'bg-purple-100', text: 'text-purple-900' },
+  CONTROLS_DESIGN: { bg: 'bg-indigo-100', text: 'text-indigo-900' },
 
   // ========== MED DEPARTMENT STAGES ==========
-  CONCEPT: { bg: 'bg-sky-100', text: 'text-sky-900', label: 'Concept' },
-  DETAIL_DESIGN: { bg: 'bg-cyan-100', text: 'text-cyan-900', label: 'Detail Design' },
+  CONCEPT: { bg: 'bg-sky-100', text: 'text-sky-900' },
+  DETAIL_DESIGN: { bg: 'bg-cyan-100', text: 'text-cyan-900' },
 
   // ========== BUILD DEPARTMENT STAGES ==========
-  CABINETS_FRAMES: { bg: 'bg-blue-100', text: 'text-blue-900', label: 'Cabinets / Frames' },
-  OVERALL_ASSEMBLY: { bg: 'bg-purple-200', text: 'text-purple-900', label: 'Overall Assembly' },
-  FINE_TUNING: { bg: 'bg-pink-100', text: 'text-pink-900', label: 'Fine Tuning' },
+  CABINETS_FRAMES: { bg: 'bg-blue-100', text: 'text-blue-900' },
+  OVERALL_ASSEMBLY: { bg: 'bg-purple-200', text: 'text-purple-900' },
+  FINE_TUNING: { bg: 'bg-pink-100', text: 'text-pink-900' },
 
   // ========== PRG DEPARTMENT STAGES ==========
-  OFFLINE: { bg: 'bg-lime-100', text: 'text-lime-900', label: 'Offline' },
-  ONLINE: { bg: 'bg-green-100', text: 'text-green-900', label: 'Online' },
-  DEBUG: { bg: 'bg-amber-100', text: 'text-amber-900', label: 'Debug' },
-  COMMISSIONING: { bg: 'bg-orange-100', text: 'text-orange-900', label: 'Commissioning' },
+  OFFLINE: { bg: 'bg-lime-100', text: 'text-lime-900' },
+  ONLINE: { bg: 'bg-green-100', text: 'text-green-900' },
+  DEBUG: { bg: 'bg-amber-100', text: 'text-amber-900' },
+  COMMISSIONING: { bg: 'bg-orange-100', text: 'text-orange-900' },
 
   // ========== COMMON STAGES (ALL DEPARTMENTS) ==========
-  RELEASE: { bg: 'bg-emerald-100', text: 'text-emerald-900', label: 'Release' },
-  RED_LINES: { bg: 'bg-red-100', text: 'text-red-900', label: 'Red Lines' },
-  SUPPORT: { bg: 'bg-slate-100', text: 'text-slate-900', label: 'Support' },
-  SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-stone-100', text: 'text-stone-900', label: 'Support/Manuals/Flow Charts' },
-  ROBOT_SIMULATION: { bg: 'bg-zinc-100', text: 'text-zinc-900', label: 'Robot Simulation' },
-  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-neutral-100', text: 'text-neutral-900', label: 'Standards Rev/Programming Concept' },
+  RELEASE: { bg: 'bg-emerald-100', text: 'text-emerald-900' },
+  RED_LINES: { bg: 'bg-red-100', text: 'text-red-900' },
+  SUPPORT: { bg: 'bg-slate-100', text: 'text-slate-900' },
+  SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-stone-100', text: 'text-stone-900' },
+  ROBOT_SIMULATION: { bg: 'bg-zinc-100', text: 'text-zinc-900' },
+  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-neutral-100', text: 'text-neutral-900' },
 };
+
+/**
+ * Stage label keys for translations
+ * Maps stage codes to translation keys
+ */
+export const stageLabelKeys: Record<string, string> = {
+  SWITCH_LAYOUT_REVISION: 'stageSwitchLayoutRevision',
+  CONTROLS_DESIGN: 'stageControlsDesign',
+  CONCEPT: 'stageConcept',
+  DETAIL_DESIGN: 'stageDetailDesign',
+  CABINETS_FRAMES: 'stageCabinetsFrames',
+  OVERALL_ASSEMBLY: 'stageOverallAssembly',
+  FINE_TUNING: 'stageFineTuning',
+  OFFLINE: 'stageOffline',
+  ONLINE: 'stageOnline',
+  DEBUG: 'stageDebug',
+  COMMISSIONING: 'stageCommissioning',
+  RELEASE: 'stageRelease',
+  RED_LINES: 'stageRedLines',
+  SUPPORT: 'stageSupport',
+  SUPPORT_MANUALS_FLOW_CHARTS: 'stageSupportManualsFlowCharts',
+  ROBOT_SIMULATION: 'stageRobotSimulation',
+  STANDARDS_REV_PROGRAMING_CONCEPT: 'stageStandardsRevProgrammingConcept',
+};
+
+/**
+ * Get translated stage label
+ *
+ * @param stage - The stage code
+ * @param t - Translation object from useTranslation hook
+ * @returns Translated stage label
+ */
+export function getStageLabel(stage: Stage, t: Record<string, string>): string {
+  if (!stage) {
+    return t.stageNone || 'No Stage';
+  }
+  const key = stageLabelKeys[stage];
+  if (key && t[key]) {
+    return t[key];
+  }
+  // Fallback: convert underscores to spaces and capitalize
+  return stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
 
 /**
  * Get Tailwind color classes for a specific stage
  *
  * @param stage - The stage to get colors for (or null for default)
- * @returns Object with bg, text color classes and human-readable label
+ * @returns Object with bg and text color classes
  *
  * @example
  * const colors = getStageColor('ONLINE');
- * // Returns: { bg: 'bg-green-100', text: 'text-green-900', label: 'Online' }
+ * // Returns: { bg: 'bg-green-100', text: 'text-green-900' }
  */
-export function getStageColor(stage: Stage): { bg: string; text: string; label: string } {
+export function getStageColor(stage: Stage): { bg: string; text: string } {
   if (!stage) {
-    return { bg: 'bg-gray-100', text: 'text-gray-900', label: 'No Stage' };
+    return { bg: 'bg-gray-100', text: 'text-gray-900' };
   }
-  return stageColors[stage] || { bg: 'bg-gray-100', text: 'text-gray-900', label: stage };
+  return stageColors[stage] || { bg: 'bg-gray-100', text: 'text-gray-900' };
 }
 
 /**

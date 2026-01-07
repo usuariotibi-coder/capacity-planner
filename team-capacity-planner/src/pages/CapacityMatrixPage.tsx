@@ -6,7 +6,7 @@ import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
-import { getDepartmentIcon } from '../utils/departmentIcons';
+import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -199,7 +199,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const handleCreateQuickProject = () => {
     if (!quickProjectForm.name || !quickProjectForm.client || !quickProjectForm.startDate || !quickProjectForm.numberOfWeeks) {
-      alert('Por favor completa todos los campos');
+      alert(t.completeAllFields);
       return;
     }
 
@@ -616,13 +616,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const isGeneralView = departmentFilter === 'General';
 
     // Get project info for tooltip
-    const projectStartDate = project?.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'N/A';
+    const projectStartDate = project?.startDate ? new Date(project.startDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US') : 'N/A';
     const deptDisplayDate = deptStartDate
-      ? new Date(deptStartDate).toLocaleDateString('es-ES')
-      : 'No configurado';
+      ? new Date(deptStartDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')
+      : t.notConfigured;
 
     // Build tooltip text, including comment if present
-    let tooltipText = `📅 Proyecto: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
+    let tooltipText = `📅 ${t.projectTooltip}: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
     if (cellComment) {
       tooltipText += `\n\n💬 ${cellComment}`;
     }
@@ -651,7 +651,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           cellTextClass = 'text-orange-600';
           indicatorContent = (
             <div className="flex flex-col items-center gap-0.5">
-              <span className="font-bold">Inicia</span>
+              <span className="font-bold">{t.starts}</span>
               <span className="text-xs opacity-75">{deptStartDate}</span>
             </div>
           );
@@ -661,7 +661,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           indicatorContent = (
             <div className="flex flex-col items-center gap-0.5">
               <span className="font-bold text-base">{deptConsecutiveWeek}</span>
-              <span className="text-xs opacity-75">sem</span>
+              <span className="text-xs opacity-75">{t.sem}</span>
             </div>
           );
         }
@@ -671,7 +671,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         <div
           onClick={() => canEdit && handleEditCell(department, weekStart, projectId)}
           className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
-          title={canEdit ? 'Click to add hours' : ''}
+          title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
             indicatorContent
@@ -755,7 +755,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {/* Header */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-800">
-              Editar Asignación - Sem {weekNum}/{year}
+              {t.editAssignment} - {t.weekAbbr} {weekNum}/{year}
             </h3>
             <button
               onClick={() => {
@@ -838,7 +838,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {/* Stage selection dropdown */}
           {stageOptions.length > 0 && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Etapa</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.stage}</label>
               <select
                 value={(editingStage || '') as string}
                 onChange={(e) => {
@@ -847,10 +847,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Sin etapa</option>
+                <option value="">{t.noStage}</option>
                 {stageOptions.map((stage) => (
                   <option key={stage} value={stage}>
-                    {stage.replace(/_/g, ' ')}
+                    {(t as Record<string, string>)[`stage${stage.split('_').map(word => word.charAt(0) + word.slice(1).toLowerCase()).join('')}`] || stage.replace(/_/g, ' ')}
                   </option>
                 ))}
               </select>
@@ -894,18 +894,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           </span>
                         ) : (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
-                            🏠 Interno
+                            🏠 {t.internal}
                           </span>
                         )
                       )}
-                      <span className="text-xs text-gray-500 ml-auto">{emp.capacity}h/sem</span>
+                      <span className="text-xs text-gray-500 ml-auto">{emp.capacity}{t.hoursPerSemWeek}</span>
                     </label>
                   );
                 })}
               </div>
               {selectedEmployees.size > 0 && (
                 <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
-                  ✓ {selectedEmployees.size} recurso{selectedEmployees.size !== 1 ? 's' : ''} seleccionado{selectedEmployees.size !== 1 ? 's' : ''}
+                  ✓ {selectedEmployees.size} {selectedEmployees.size !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
             </div>
@@ -935,13 +935,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
             >
-              Cancelar
+              {t.cancel}
             </button>
             <button
               onClick={handleSaveCell}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
             >
-              Guardar
+              {t.save}
             </button>
           </div>
         </div>
@@ -1022,7 +1022,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             <button
               onClick={() => setShowQuickProjectModal(true)}
               className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
-              title="Crear Proyecto"
+              title={t.createProject}
             >
               <Plus size={12} />
               <span>{t.create}</span>
@@ -1202,7 +1202,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                     setActiveTeams(newTeams);
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title={`Eliminar ${company}`}
+                                  title={`${t.removeTeamTitle} ${company}`}
                                 >
                                   <Minus size={8} className="text-white font-bold" />
                                 </button>
@@ -1254,9 +1254,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             <button
                               onClick={() => setIsBuildModalOpen(true)}
                               className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all"
-                              title="Click para agregar equipo subcontratado"
+                              title={t.clickToAddSubcontractedTeam}
                             >
-                              Agregar
+                              {t.addButton}
                             </button>
                           </div>
                         </>
@@ -1278,7 +1278,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                     setPRGActiveTeams(newTeams);
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title={`Eliminar ${team}`}
+                                  title={`${t.removeTeamTitle} ${team}`}
                                 >
                                   <Minus size={8} className="text-white font-bold" />
                                 </button>
@@ -1330,9 +1330,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             <button
                               onClick={() => setIsPRGModalOpen(true)}
                               className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all"
-                              title="Click para agregar equipo externo"
+                              title={t.clickToAddExternalTeam}
                             >
-                              Agregar
+                              {t.addButton}
                             </button>
                           </div>
                         </>
@@ -1662,7 +1662,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
                                   <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
                                   <div>
-                                    <div className="text-base font-bold text-slate-100">{deptInfo.label}</div>
+                                    <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
                                     <div className="text-xs text-slate-400">{t.editUsedHours}</div>
                                   </div>
                                 </div>
@@ -1729,7 +1729,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
                                   <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
                                   <div>
-                                    <div className="text-base font-bold text-slate-100">{deptInfo.label}</div>
+                                    <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
                                     <div className="text-xs text-slate-400">{t.editForecastedHours}</div>
                                   </div>
                                 </div>
@@ -2318,7 +2318,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">➕ Crear Proyecto</h2>
+                <h2 className="text-lg font-bold">➕ {t.createProject}</h2>
                 <button
                   onClick={() => setShowQuickProjectModal(false)}
                   className="hover:bg-blue-700 p-1 rounded transition"
@@ -2455,14 +2455,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 rounded-t-lg">
-                  <h2 className="text-lg font-semibold text-gray-800">Agregar Equipo PRG</h2>
+                  <h2 className="text-lg font-semibold text-gray-800">{t.addPrgTeam}</h2>
                   <button
                     onClick={() => {
                       setIsPRGModalOpen(false);
                       setPRGTeamName('');
                     }}
                     className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                    title="Cerrar"
+                    title={t.close}
                   >
                     <X size={20} />
                   </button>
@@ -2484,13 +2484,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 >
                   {/* Team Name Field */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Proveedor</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.providerName}</label>
                     <input
                       type="text"
                       value={prgTeamName}
                       onChange={(e) => setPRGTeamName(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Ej. Proveedor ABC"
+                      placeholder={t.egProviderAbc}
                       autoFocus
                     />
                   </div>
@@ -2505,14 +2505,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       }}
                       className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                     >
-                      Cancelar
+                      {t.cancel}
                     </button>
                     <button
                       type="submit"
                       disabled={!prgTeamName.trim()}
                       className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
                     >
-                      Agregar
+                      {t.addButton}
                     </button>
                   </div>
                 </form>
@@ -2537,14 +2537,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg">
-                  <h2 className="text-lg font-semibold text-gray-800">Agregar Equipo BUILD</h2>
+                  <h2 className="text-lg font-semibold text-gray-800">{t.addBuildTeam}</h2>
                   <button
                     onClick={() => {
                       setIsBuildModalOpen(false);
                       setBuildTeamName('');
                     }}
                     className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                    title="Cerrar"
+                    title={t.close}
                   >
                     <X size={20} />
                   </button>
@@ -2566,13 +2566,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 >
                   {/* Team Name Field */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Subcontratista</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.subcontractorName}</label>
                     <input
                       type="text"
                       value={buildTeamName}
                       onChange={(e) => setBuildTeamName(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="Ej. Empresa XYZ"
+                      placeholder={t.egCompanyXyz}
                       autoFocus
                     />
                   </div>
@@ -2587,14 +2587,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       }}
                       className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                     >
-                      Cancelar
+                      {t.cancel}
                     </button>
                     <button
                       type="submit"
                       disabled={!buildTeamName.trim()}
                       className="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
                     >
-                      Agregar
+                      {t.addButton}
                     </button>
                   </div>
                 </form>

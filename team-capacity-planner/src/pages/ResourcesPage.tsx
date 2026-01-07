@@ -270,20 +270,20 @@ export function ResourcesPage() {
                         className="w-4 h-4 text-teal-600 rounded focus:ring-2 focus:ring-teal-500"
                       />
                       <label htmlFor="isExternalTeam" className="text-sm font-medium text-gray-700 cursor-pointer">
-                        Es Equipo Externo
+                        {t.isExternalTeam}
                       </label>
                     </div>
 
                     {/* Team Selection - Show only if external team and in PRG department */}
                     {formData.isSubcontractedMaterial && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Equipo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{t.selectTeam}</label>
                         <select
                           value={formData.subcontractCompany || ''}
                           onChange={(e) => setFormData({ ...formData, subcontractCompany: e.target.value })}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                         >
-                          <option value="">-- Seleccionar Equipo --</option>
+                          <option value="">{t.selectTeamPlaceholder}</option>
                           {Array.from(prgActiveTeams).map((team) => (
                             <option key={team} value={team}>{team}</option>
                           ))}
@@ -390,7 +390,7 @@ export function ResourcesPage() {
                                   </span>
                                 ) : (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
-                                    🏠 Interno
+                                    🏠 {t.internal}
                                   </span>
                                 )
                               )}

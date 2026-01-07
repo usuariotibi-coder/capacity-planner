@@ -110,7 +110,7 @@ function App() {
               onChange={(e) => setDepartmentFilter(e.target.value as DepartmentFilter)}
               className="w-full bg-slate-700 text-white text-sm rounded px-2 py-2 border border-slate-600 hover:border-blue-500 transition"
             >
-              <option value="">-- Selecciona Departamento --</option>
+              <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept}
@@ -126,7 +126,7 @@ function App() {
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-2"
           >
             <LogOut size={16} />
-            Cerrar Sesión
+            {t.logout}
           </button>
           <p className="text-xs text-slate-400">{t.teamCapacityPlanner} v1.1.0</p>
         </div>

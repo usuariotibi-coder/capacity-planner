@@ -1,39 +1,69 @@
 import { Cog, Zap, Cpu, Factory, Wrench, Microchip } from 'lucide-react';
 import type { Department } from '../types';
 
-export const departmentIcons: Record<Department, { icon: React.ReactNode; color: string; label: string }> = {
+/**
+ * Department icons and colors configuration
+ */
+export const departmentIcons: Record<Department, { icon: React.ReactNode; color: string }> = {
   'MED': {
     icon: <Cog size={18} />,
     color: 'text-blue-600',
-    label: 'Diseño Mecánico'
   },
   'HD': {
     icon: <Zap size={18} />,
     color: 'text-yellow-600',
-    label: 'Hardware Design'
   },
   'PM': {
     icon: <Cpu size={18} />,
     color: 'text-purple-600',
-    label: 'Project Manager'
   },
   'MFG': {
     icon: <Factory size={18} />,
     color: 'text-orange-600',
-    label: 'Manufactura'
   },
   'BUILD': {
     icon: <Wrench size={18} />,
     color: 'text-red-600',
-    label: 'Ensamble'
   },
   'PRG': {
     icon: <Microchip size={18} />,
     color: 'text-green-600',
-    label: 'Programación PLC'
   },
 };
 
+/**
+ * Department label translation keys
+ */
+export const departmentLabelKeys: Record<Department, string> = {
+  'MED': 'mechanicalDesign',
+  'HD': 'hardwareDesign',
+  'PM': 'projectManager',
+  'MFG': 'manufacturing',
+  'BUILD': 'assembly',
+  'PRG': 'programmingPLC',
+};
+
+/**
+ * Get translated department label
+ *
+ * @param dept - The department code
+ * @param t - Translation object from useTranslation hook
+ * @returns Translated department label
+ */
+export function getDepartmentLabel(dept: Department, t: Record<string, string>): string {
+  const key = departmentLabelKeys[dept];
+  if (key && t[key]) {
+    return t[key];
+  }
+  return dept;
+}
+
+/**
+ * Get department icon and color
+ *
+ * @param dept - The department code
+ * @returns Object with icon and color
+ */
 export function getDepartmentIcon(dept: Department) {
-  return departmentIcons[dept] || { icon: null, color: 'text-gray-600', label: dept };
+  return departmentIcons[dept] || { icon: null, color: 'text-gray-600' };
 }
