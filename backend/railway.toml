@@ -1,0 +1,25 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+numReplicas = 1
+restartPolicyType = "always"
+
+[[services]]
+name = "web"
+buildContext = "."
+dockerfile = "Dockerfile"
+port = 8000
+healthcheckPath = "/api/"
+healthcheckTimeout = 10
+
+[[services]]
+name = "postgres"
+image = "postgres:15"
+plan = "shared-cpu-1x"
+memory = 256
+
+[services.postgres.env]
+POSTGRES_DB = "capacity_planner"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "your-secure-password"

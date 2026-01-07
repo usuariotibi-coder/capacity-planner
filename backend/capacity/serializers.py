@@ -1,0 +1,1176 @@
+"""
+Serializers for Team Capacity Planner
+
+This module defines all serializers for the Team Capacity Planner API.
+It includes serializers for employees, projects, assignments, departments,
+budgets, and activity logs with proper validation and nested relationships.
+"""
+
+from rest_framework import serializers
+from django.contrib.auth.models import User
+from django.utils import timezone
+from .models import (
+    Employee,
+    Project,
+    Assignment,
+    DepartmentStageConfig,
+    ProjectBudget,
+    ActivityLog,
+    Department,
+    Facility,
+    Stage,
+    SubcontractCompany,
+)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Django User model.
+    Used for user information in related serializers.
+    """
+
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'first_name', 'last_name', 'email')
+        read_only_fields = ('id',)
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Employee model.
+
+    Provides basic employee information including department, capacity,
+    and active status. Includes validation for employee data.
+    """
+
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="User ID to associate with employee"
+    )
+    department_display = serializers.CharField(
+        source='get_department_display',
+        read_only=True,
+        help_text="Human-readable department name"
+    )
+    is_subcontracted = serializers.BooleanField(
+        source='is_subcontracted_material',
+        help_text="Whether this is subcontracted material"
+    )
+
+    class Meta:
+        model = Employee
+        fields = (
+            'id',
+            'user',
+            'user_id',
+            'name',
+            'role',
+            'department',
+            'department_display',
+            'capacity',
+            'is_active',
+            'is_subcontracted',
+            'is_subcontracted_material',
+            'subcontract_company',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def validate_capacity(self, value):
+        """
+        Validate that capacity is a non-negative number.
+
+        Args:
+            value: The capacity value to validate
+
+        Returns:
+            The validated capacity value
+
+        Raises:
+            ValidationError: If capacity is negative
+        """
+        if value < 0:
+            raise serializers.ValidationError(
+                "Capacity cannot be negative."
+            )
+        if value > 168:  # Maximum hours in a week
+            raise serializers.ValidationError(
+                "Capacity cannot exceed 168 hours per week."
+            )
+        return value
+
+    def validate_subcontract_company(self, value):
+        """
+        Validate subcontract company field.
+        Only required if is_subcontracted_material is True.
+
+        Args:
+            value: The subcontract company value
+
+        Returns:
+            The validated value
+        """
+        if self.initial_data.get('is_subcontracted_material') and not value:
+            raise serializers.ValidationError(
+                "Subcontract company is required for subcontracted material."
+            )
+        return value
+
+    def validate_department(self, value):
+        """
+        Validate department selection.
+
+        Args:
+            value: The department value
+
+        Returns:
+            The validated department value
+
+        Raises:
+            ValidationError: If invalid department
+        """
+        valid_departments = [dept[0] for dept in Department.choices]
+        if value not in valid_departments:
+            raise serializers.ValidationError(
+                f"Invalid department. Must be one of: {', '.join(valid_departments)}"
+            )
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new employee instance.
+
+        Args:
+            validated_data: Validated data from serializer
+
+        Returns:
+            Created Employee instance
+        """
+        user_id = validated_data.pop('user_id', None)
+        if user_id:
+            try:
+                validated_data['user_id'] = user_id
+            except User.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"user_id": "User with this ID does not exist."}
+                )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing employee instance.
+
+        Args:
+            instance: The employee instance to update
+            validated_data: Validated data from serializer
+
+        Returns:
+            Updated Employee instance
+        """
+        validated_data.pop('user_id', None)
+        return super().update(instance, validated_data)
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Project model.
+
+    Includes project details with related manager information
+    and basic statistics. Handles complex relationships with
+    departments and assignments.
+    """
+
+    project_manager = EmployeeSerializer(read_only=True)
+    project_manager_id = serializers.UUIDField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="UUID of project manager employee"
+    )
+    facility_display = serializers.CharField(
+        source='get_facility_display',
+        read_only=True,
+        help_text="Human-readable facility name"
+    )
+    assignment_count = serializers.SerializerMethodField(
+        help_text="Total number of assignments for this project"
+    )
+    active_assignments = serializers.SerializerMethodField(
+        help_text="Number of assignments in current week"
+    )
+
+    class Meta:
+        model = Project
+        fields = (
+            'id',
+            'name',
+            'client',
+            'start_date',
+            'end_date',
+            'facility',
+            'facility_display',
+            'number_of_weeks',
+            'project_manager',
+            'project_manager_id',
+            'assignment_count',
+            'active_assignments',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at', 'assignment_count', 'active_assignments')
+
+    def get_assignment_count(self, obj):
+        """
+        Get total number of assignments for the project.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Total count of assignments
+        """
+        return obj.assignments.count()
+
+    def get_active_assignments(self, obj):
+        """
+        Get number of assignments in the current week.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Count of assignments in current week
+        """
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        week_start = today - timedelta(days=today.weekday())
+        return obj.assignments.filter(week_start_date=week_start).count()
+
+    def validate(self, data):
+        """
+        Validate project data.
+        Ensures end_date is after start_date.
+
+        Args:
+            data: Data dictionary from serializer
+
+        Returns:
+            Validated data
+
+        Raises:
+            ValidationError: If dates are invalid
+        """
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if start_date and end_date and start_date >= end_date:
+            raise serializers.ValidationError(
+                {"end_date": "End date must be after start date."}
+            )
+        return data
+
+    def validate_number_of_weeks(self, value):
+        """
+        Validate number of weeks.
+
+        Args:
+            value: The number of weeks value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If weeks is invalid
+        """
+        if value < 1:
+            raise serializers.ValidationError(
+                "Number of weeks must be at least 1."
+            )
+        if value > 260:  # Max 5 years
+            raise serializers.ValidationError(
+                "Number of weeks cannot exceed 260 (5 years)."
+            )
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new project instance.
+
+        Args:
+            validated_data: Validated data from serializer
+
+        Returns:
+            Created Project instance
+        """
+        manager_id = validated_data.pop('project_manager_id', None)
+        if manager_id:
+            try:
+                validated_data['project_manager_id'] = manager_id
+            except Employee.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"project_manager_id": "Employee with this ID does not exist."}
+                )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing project instance.
+
+        Args:
+            instance: The project instance to update
+            validated_data: Validated data from serializer
+
+        Returns:
+            Updated Project instance
+        """
+        manager_id = validated_data.pop('project_manager_id', None)
+        if manager_id is not None:
+            try:
+                validated_data['project_manager_id'] = manager_id
+            except Employee.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"project_manager_id": "Employee with this ID does not exist."}
+                )
+        return super().update(instance, validated_data)
+
+
+class AssignmentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Assignment model.
+
+    Handles employee-project assignments with hours tracking.
+    Includes validation for hours allocation and related data.
+    Supports both READ and WRITE operations with appropriate
+    read-only fields.
+    """
+
+    employee = EmployeeSerializer(read_only=True)
+    employee_id = serializers.UUIDField(
+        write_only=True,
+        help_text="UUID of the employee"
+    )
+    project = ProjectSerializer(read_only=True)
+    project_id = serializers.UUIDField(
+        write_only=True,
+        help_text="UUID of the project"
+    )
+    stage_display = serializers.CharField(
+        source='get_stage_display',
+        read_only=True,
+        required=False,
+        help_text="Human-readable stage name"
+    )
+    employee_capacity = serializers.SerializerMethodField(
+        help_text="Employee's total capacity (hours per week)"
+    )
+    week_number = serializers.SerializerMethodField(
+        help_text="ISO week number for the assignment week"
+    )
+    total_hours = serializers.SerializerMethodField(
+        help_text="Total hours (scio + external)"
+    )
+
+    class Meta:
+        model = Assignment
+        fields = (
+            'id',
+            'employee',
+            'employee_id',
+            'project',
+            'project_id',
+            'week_start_date',
+            'week_number',
+            'hours',
+            'scio_hours',
+            'external_hours',
+            'total_hours',
+            'stage',
+            'stage_display',
+            'comment',
+            'employee_capacity',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'created_at',
+            'updated_at',
+            'employee_capacity',
+            'week_number',
+            'total_hours',
+            'stage_display',
+        )
+
+    def get_employee_capacity(self, obj):
+        """
+        Get the employee's total capacity.
+
+        Args:
+            obj: The Assignment instance
+
+        Returns:
+            Employee's capacity in hours per week
+        """
+        return obj.employee.capacity if obj.employee else None
+
+    def get_week_number(self, obj):
+        """
+        Get ISO week number for the assignment.
+
+        Args:
+            obj: The Assignment instance
+
+        Returns:
+            ISO week number (1-53)
+        """
+        return obj.week_start_date.isocalendar()[1]
+
+    def get_total_hours(self, obj):
+        """
+        Calculate total hours from scio and external hours.
+        Falls back to main hours field if breakdown not available.
+
+        Args:
+            obj: The Assignment instance
+
+        Returns:
+            Total hours allocated
+        """
+        if obj.scio_hours is not None and obj.external_hours is not None:
+            return obj.scio_hours + obj.external_hours
+        return obj.hours
+
+    def validate(self, data):
+        """
+        Validate assignment data.
+        Ensures hours allocation is consistent and valid.
+
+        Args:
+            data: Data dictionary from serializer
+
+        Returns:
+            Validated data
+
+        Raises:
+            ValidationError: If data is invalid
+        """
+        hours = data.get('hours')
+        scio_hours = data.get('scio_hours')
+        external_hours = data.get('external_hours')
+
+        # If scio_hours and external_hours are both provided,
+        # their sum should equal total hours
+        if scio_hours is not None and external_hours is not None:
+            total = scio_hours + external_hours
+            if hours != total:
+                raise serializers.ValidationError(
+                    {
+                        "hours": (
+                            f"Total hours ({hours}) must equal "
+                            f"scio_hours ({scio_hours}) + "
+                            f"external_hours ({external_hours})"
+                        )
+                    }
+                )
+
+        return data
+
+    def validate_hours(self, value):
+        """
+        Validate total hours allocation.
+
+        Args:
+            value: The hours value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If hours is invalid
+        """
+        if value < 0:
+            raise serializers.ValidationError(
+                "Hours cannot be negative."
+            )
+        if value > 168:  # Maximum hours in a week
+            raise serializers.ValidationError(
+                "Hours cannot exceed 168 hours in a week."
+            )
+        return value
+
+    def validate_scio_hours(self, value):
+        """
+        Validate SCIO hours (internal hours).
+
+        Args:
+            value: The scio_hours value
+
+        Returns:
+            The validated value
+        """
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                "SCIO hours cannot be negative."
+            )
+        return value
+
+    def validate_external_hours(self, value):
+        """
+        Validate external/subcontracted hours.
+
+        Args:
+            value: The external_hours value
+
+        Returns:
+            The validated value
+        """
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                "External hours cannot be negative."
+            )
+        return value
+
+    def validate_week_start_date(self, value):
+        """
+        Validate week start date.
+        Should be a Monday (ISO week start).
+
+        Args:
+            value: The week_start_date value
+
+        Returns:
+            The validated value
+        """
+        # ISO weekday: 1=Monday, 7=Sunday
+        if value.weekday() != 0:  # 0 = Monday
+            raise serializers.ValidationError(
+                "Week start date must be a Monday."
+            )
+        return value
+
+
+class DepartmentStageConfigSerializer(serializers.ModelSerializer):
+    """
+    Serializer for DepartmentStageConfig model.
+
+    Manages department-specific stage configurations for projects.
+    Includes validation for week ranges and date consistency.
+    """
+
+    project = ProjectSerializer(read_only=True)
+    project_id = serializers.UUIDField(
+        write_only=True,
+        help_text="UUID of the project"
+    )
+    department_display = serializers.CharField(
+        source='get_department_display',
+        read_only=True,
+        help_text="Human-readable department name"
+    )
+    stage_display = serializers.CharField(
+        source='get_stage_display',
+        read_only=True,
+        required=False,
+        help_text="Human-readable stage name"
+    )
+    duration_weeks = serializers.SerializerMethodField(
+        help_text="Duration in weeks calculated from week_start to week_end"
+    )
+
+    class Meta:
+        model = DepartmentStageConfig
+        fields = (
+            'id',
+            'project',
+            'project_id',
+            'department',
+            'department_display',
+            'stage',
+            'stage_display',
+            'week_start',
+            'week_end',
+            'department_start_date',
+            'duration_weeks',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'created_at',
+            'updated_at',
+            'department_display',
+            'stage_display',
+            'duration_weeks',
+        )
+
+    def get_duration_weeks(self, obj):
+        """
+        Calculate duration in weeks from week_start to week_end.
+
+        Args:
+            obj: The DepartmentStageConfig instance
+
+        Returns:
+            Duration in weeks (inclusive)
+        """
+        return obj.week_end - obj.week_start + 1
+
+    def validate(self, data):
+        """
+        Validate department stage configuration.
+        Ensures week ranges are valid and dates are consistent.
+
+        Args:
+            data: Data dictionary from serializer
+
+        Returns:
+            Validated data
+
+        Raises:
+            ValidationError: If data is invalid
+        """
+        week_start = data.get('week_start')
+        week_end = data.get('week_end')
+        department_start_date = data.get('department_start_date')
+        duration_weeks = data.get('duration_weeks')
+
+        # Validate week range
+        if week_start and week_end and week_start > week_end:
+            raise serializers.ValidationError(
+                {
+                    "week_end": (
+                        "End week must be greater than or equal to start week."
+                    )
+                }
+            )
+
+        # Validate duration_weeks against week range
+        if week_start and week_end and duration_weeks:
+            calculated_duration = week_end - week_start + 1
+            if duration_weeks != calculated_duration:
+                raise serializers.ValidationError(
+                    {
+                        "duration_weeks": (
+                            f"Duration weeks ({duration_weeks}) does not match "
+                            f"calculated duration from week_start to "
+                            f"week_end ({calculated_duration})"
+                        )
+                    }
+                )
+
+        return data
+
+    def validate_week_start(self, value):
+        """
+        Validate week start number.
+
+        Args:
+            value: The week_start value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If week number is invalid
+        """
+        if value < 1 or value > 53:
+            raise serializers.ValidationError(
+                "Week number must be between 1 and 53."
+            )
+        return value
+
+    def validate_week_end(self, value):
+        """
+        Validate week end number.
+
+        Args:
+            value: The week_end value
+
+        Returns:
+            The validated value
+        """
+        if value < 1 or value > 53:
+            raise serializers.ValidationError(
+                "Week number must be between 1 and 53."
+            )
+        return value
+
+
+class ProjectBudgetSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ProjectBudget model.
+
+    Handles budget tracking and utilization calculations.
+    Provides read-only computed fields for analysis.
+    """
+
+    project = ProjectSerializer(read_only=True)
+    project_id = serializers.UUIDField(
+        write_only=True,
+        help_text="UUID of the project"
+    )
+    department_display = serializers.CharField(
+        source='get_department_display',
+        read_only=True,
+        help_text="Human-readable department name"
+    )
+    utilization_percent = serializers.SerializerMethodField(
+        help_text="Utilization percentage (utilized + forecast / allocated * 100)"
+    )
+    available_hours = serializers.SerializerMethodField(
+        help_text="Remaining available hours (allocated - utilized - forecast)"
+    )
+    budget_status = serializers.SerializerMethodField(
+        help_text="Budget status: 'within', 'near', or 'exceeded'"
+    )
+
+    class Meta:
+        model = ProjectBudget
+        fields = (
+            'id',
+            'project',
+            'project_id',
+            'department',
+            'department_display',
+            'hours_allocated',
+            'hours_utilized',
+            'hours_forecast',
+            'utilization_percent',
+            'available_hours',
+            'budget_status',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'created_at',
+            'updated_at',
+            'utilization_percent',
+            'available_hours',
+            'budget_status',
+            'department_display',
+        )
+
+    def get_utilization_percent(self, obj):
+        """
+        Calculate utilization percentage.
+        Formula: (utilized + forecast) / allocated * 100
+
+        Args:
+            obj: The ProjectBudget instance
+
+        Returns:
+            Utilization percentage (0-100+)
+        """
+        if obj.hours_allocated == 0:
+            return 0
+        total_used = obj.hours_utilized + obj.hours_forecast
+        return round((total_used / obj.hours_allocated) * 100, 2)
+
+    def get_available_hours(self, obj):
+        """
+        Calculate available/remaining hours.
+        Formula: allocated - utilized - forecast
+
+        Args:
+            obj: The ProjectBudget instance
+
+        Returns:
+            Available hours (can be negative if over budget)
+        """
+        total_used = obj.hours_utilized + obj.hours_forecast
+        available = obj.hours_allocated - total_used
+        return round(available, 2)
+
+    def get_budget_status(self, obj):
+        """
+        Determine budget status based on utilization.
+
+        Returns budget status:
+        - 'within': Less than 80% utilized
+        - 'near': 80-100% utilized
+        - 'exceeded': Over 100% utilized
+
+        Args:
+            obj: The ProjectBudget instance
+
+        Returns:
+            Status string: 'within', 'near', or 'exceeded'
+        """
+        utilization = self.get_utilization_percent(obj)
+        if utilization >= 100:
+            return 'exceeded'
+        elif utilization >= 80:
+            return 'near'
+        else:
+            return 'within'
+
+    def validate_hours_allocated(self, value):
+        """
+        Validate allocated hours.
+
+        Args:
+            value: The hours_allocated value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If hours is invalid
+        """
+        if value < 0:
+            raise serializers.ValidationError(
+                "Allocated hours cannot be negative."
+            )
+        return value
+
+    def validate_hours_utilized(self, value):
+        """
+        Validate utilized hours.
+
+        Args:
+            value: The hours_utilized value
+
+        Returns:
+            The validated value
+        """
+        if value < 0:
+            raise serializers.ValidationError(
+                "Utilized hours cannot be negative."
+            )
+        return value
+
+    def validate_hours_forecast(self, value):
+        """
+        Validate forecasted hours.
+
+        Args:
+            value: The hours_forecast value
+
+        Returns:
+            The validated value
+        """
+        if value < 0:
+            raise serializers.ValidationError(
+                "Forecast hours cannot be negative."
+            )
+        return value
+
+    def validate(self, data):
+        """
+        Validate budget data consistency.
+
+        Args:
+            data: Data dictionary from serializer
+
+        Returns:
+            Validated data
+
+        Raises:
+            ValidationError: If data is inconsistent
+        """
+        hours_allocated = data.get('hours_allocated', self.instance.hours_allocated if self.instance else None)
+        hours_utilized = data.get('hours_utilized', self.instance.hours_utilized if self.instance else 0)
+        hours_forecast = data.get('hours_forecast', self.instance.hours_forecast if self.instance else 0)
+
+        if hours_allocated is not None and hours_utilized + hours_forecast > hours_allocated * 1.5:
+            raise serializers.ValidationError(
+                {
+                    "hours_utilized": (
+                        "Combined utilized and forecast hours exceed "
+                        "150% of allocated hours. Please review."
+                    )
+                }
+            )
+
+        return data
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ActivityLog model.
+
+    Provides audit trail information for tracking changes.
+    Includes user and timestamp information for compliance.
+    """
+
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="User ID performing the action"
+    )
+    changes = serializers.JSONField(
+        required=False,
+        allow_null=True,
+        help_text="JSON object describing changes made"
+    )
+    formatted_created_at = serializers.SerializerMethodField(
+        help_text="Human-readable timestamp"
+    )
+
+    class Meta:
+        model = ActivityLog
+        fields = (
+            'id',
+            'user',
+            'user_id',
+            'action',
+            'model_name',
+            'object_id',
+            'changes',
+            'created_at',
+            'formatted_created_at',
+        )
+        read_only_fields = (
+            'id',
+            'created_at',
+            'user',
+            'formatted_created_at',
+        )
+
+    def get_formatted_created_at(self, obj):
+        """
+        Get human-readable timestamp.
+        Formats as ISO format with timezone information.
+
+        Args:
+            obj: The ActivityLog instance
+
+        Returns:
+            Formatted timestamp string
+        """
+        return obj.created_at.isoformat()
+
+    def validate_action(self, value):
+        """
+        Validate action description.
+
+        Args:
+            value: The action value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If action is invalid
+        """
+        valid_actions = ['created', 'updated', 'deleted', 'viewed']
+        if value.lower() not in valid_actions:
+            raise serializers.ValidationError(
+                f"Action must be one of: {', '.join(valid_actions)}"
+            )
+        return value
+
+    def validate_model_name(self, value):
+        """
+        Validate model name.
+        Must correspond to an actual model.
+
+        Args:
+            value: The model_name value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If model name is invalid
+        """
+        valid_models = [
+            'Employee',
+            'Project',
+            'Assignment',
+            'DepartmentStageConfig',
+            'ProjectBudget',
+        ]
+        if value not in valid_models:
+            raise serializers.ValidationError(
+                f"Model must be one of: {', '.join(valid_models)}"
+            )
+        return value
+
+    def validate_object_id(self, value):
+        """
+        Validate object ID format.
+        Should be a valid UUID string.
+
+        Args:
+            value: The object_id value
+
+        Returns:
+            The validated value
+
+        Raises:
+            ValidationError: If UUID format is invalid
+        """
+        import uuid
+        try:
+            uuid.UUID(value)
+        except ValueError:
+            raise serializers.ValidationError(
+                "Object ID must be a valid UUID."
+            )
+        return value
+
+
+class EmployeeDetailSerializer(EmployeeSerializer):
+    """
+    Extended serializer for Employee details.
+    Includes related assignments and projects.
+    Used for detailed employee views.
+    """
+
+    assignments = AssignmentSerializer(many=True, read_only=True)
+    managed_projects = ProjectSerializer(many=True, read_only=True)
+    total_capacity = serializers.SerializerMethodField()
+    total_allocated = serializers.SerializerMethodField()
+    utilization = serializers.SerializerMethodField()
+
+    class Meta(EmployeeSerializer.Meta):
+        fields = EmployeeSerializer.Meta.fields + (
+            'assignments',
+            'managed_projects',
+            'total_capacity',
+            'total_allocated',
+            'utilization',
+        )
+        read_only_fields = EmployeeSerializer.Meta.read_only_fields + (
+            'assignments',
+            'managed_projects',
+            'total_capacity',
+            'total_allocated',
+            'utilization',
+        )
+
+    def get_total_capacity(self, obj):
+        """
+        Get employee's total weekly capacity.
+
+        Args:
+            obj: The Employee instance
+
+        Returns:
+            Weekly capacity in hours
+        """
+        return obj.capacity
+
+    def get_total_allocated(self, obj):
+        """
+        Get total hours allocated this week.
+
+        Args:
+            obj: The Employee instance
+
+        Returns:
+            Total allocated hours for current week
+        """
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        week_start = today - timedelta(days=today.weekday())
+        return sum(
+            a.hours for a in obj.assignments.filter(week_start_date=week_start)
+        )
+
+    def get_utilization(self, obj):
+        """
+        Get current week utilization percentage.
+
+        Args:
+            obj: The Employee instance
+
+        Returns:
+            Utilization percentage
+        """
+        from datetime import datetime, timedelta
+        today = datetime.now().date()
+        week_start = today - timedelta(days=today.weekday())
+        total_allocated = sum(
+            a.hours for a in obj.assignments.filter(week_start_date=week_start)
+        )
+        if obj.capacity == 0:
+            return 0
+        return round((total_allocated / obj.capacity) * 100, 2)
+
+
+class ProjectDetailSerializer(ProjectSerializer):
+    """
+    Extended serializer for Project details.
+    Includes assignments, budget, and department configurations.
+    Used for detailed project views and comprehensive data.
+    """
+
+    assignments = AssignmentSerializer(many=True, read_only=True)
+    department_stages = DepartmentStageConfigSerializer(many=True, read_only=True)
+    budget = ProjectBudgetSerializer(read_only=True)
+    total_hours_allocated = serializers.SerializerMethodField()
+    total_hours_utilized = serializers.SerializerMethodField()
+    overall_utilization = serializers.SerializerMethodField()
+
+    class Meta(ProjectSerializer.Meta):
+        fields = ProjectSerializer.Meta.fields + (
+            'assignments',
+            'department_stages',
+            'budget',
+            'total_hours_allocated',
+            'total_hours_utilized',
+            'overall_utilization',
+        )
+        read_only_fields = ProjectSerializer.Meta.read_only_fields + (
+            'assignments',
+            'department_stages',
+            'budget',
+            'total_hours_allocated',
+            'total_hours_utilized',
+            'overall_utilization',
+        )
+
+    def get_total_hours_allocated(self, obj):
+        """
+        Get total allocated hours across all assignments.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Sum of all assignment hours
+        """
+        return sum(a.hours for a in obj.assignments.all())
+
+    def get_total_hours_utilized(self, obj):
+        """
+        Get total utilized hours from budget tracking.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Total utilized hours
+        """
+        try:
+            return obj.budget.hours_utilized
+        except AttributeError:
+            return 0
+
+    def get_overall_utilization(self, obj):
+        """
+        Get overall project utilization percentage.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Overall utilization percentage
+        """
+        try:
+            budget = obj.budget
+            if budget.hours_allocated == 0:
+                return 0
+            total_used = budget.hours_utilized + budget.hours_forecast
+            return round((total_used / budget.hours_allocated) * 100, 2)
+        except AttributeError:
+            return 0

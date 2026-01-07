@@ -1,0 +1,2607 @@
+import { useState, useEffect, useRef } from 'react';
+import { useEmployeeStore } from '../stores/employeeStore';
+import { useAssignmentStore } from '../stores/assignmentStore';
+import { useProjectStore } from '../stores/projectStore';
+import { useBuildTeamsStore } from '../stores/buildTeamsStore';
+import { usePRGTeamsStore } from '../stores/prgTeamsStore';
+import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
+import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
+import { getDepartmentIcon } from '../utils/departmentIcons';
+import { generateId } from '../utils/id';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { useTranslation } from '../utils/translations';
+import type { Department, Stage } from '../types';
+
+type DepartmentFilter = 'General' | Department;
+
+const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+
+const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
+  'HD': ['SWITCH_LAYOUT_REVISION', 'CONTROLS_DESIGN', 'RELEASE', 'RED_LINES', 'SUPPORT'],
+  'MED': ['CONCEPT', 'DETAIL_DESIGN', 'RELEASE', 'RED_LINES', 'SUPPORT'],
+  'BUILD': ['CABINETS_FRAMES', 'OVERALL_ASSEMBLY', 'FINE_TUNING', 'COMMISSIONING', 'SUPPORT'],
+  'PRG': ['OFFLINE', 'ONLINE', 'DEBUG', 'COMMISSIONING', 'SUPPORT_MANUALS_FLOW_CHARTS', 'ROBOT_SIMULATION', 'STANDARDS_REV_PROGRAMING_CONCEPT'],
+  'PM': [],
+  'MFG': [],
+};
+
+interface CellEditState {
+  department: Department;
+  weekStart: string;
+  projectId?: string;
+}
+
+interface CapacityMatrixPageProps {
+  departmentFilter: DepartmentFilter;
+}
+
+export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
+  const employees = useEmployeeStore((state) => state.employees);
+  const assignments = useAssignmentStore((state) => state.assignments);
+  const projects = useProjectStore((state) => state.projects);
+  const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
+  const addAssignment = useAssignmentStore((state) => state.addAssignment);
+  const updateProject = useProjectStore((state) => state.updateProject);
+  const addProject = useProjectStore((state) => state.addProject);
+  const { language } = useLanguage();
+  const t = useTranslation(language);
+
+  const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
+  const [editingHours, setEditingHours] = useState<number>(0);
+  const [editingScioHours, setEditingScioHours] = useState<number>(0);
+  const [editingExternalHours, setEditingExternalHours] = useState<number>(0);
+  const [editingStage, setEditingStage] = useState<Stage>(null);
+  const [editingComment, setEditingComment] = useState<string>('');
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [zoom, setZoom] = useState<number>(100);
+  const [showLegend, setShowLegend] = useState<boolean>(false);
+  const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
+
+  // SCIO Team Members state - store capacity per department and per week
+  // Structure: { dept: { weekDate: hours } }
+  // Use lazy initialization to load from localStorage on first render
+  const [scioTeamMembers, setScioTeamMembers] = useState<Record<Department, Record<string, number>>>(() => {
+    const saved = localStorage.getItem('scioTeamMembers');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading scioTeamMembers from localStorage', e);
+      }
+    }
+    return {
+      'PM': {},
+      'MED': {},
+      'HD': {},
+      'MFG': {},
+      'BUILD': {},
+      'PRG': {},
+    };
+  });
+
+  // Subcontracted Personnel state - store subcontracted company members per week (BUILD dept only)
+  // Structure: { company: { weekDate: count } } where company is 'AMI' | 'VICER' | 'ITAX' | 'MCI' | 'MG Electrical'
+  // Use lazy initialization to load from localStorage on first render
+  const [subcontractedPersonnel, setSubcontractedPersonnel] = useState<Record<string, Record<string, number | undefined>>>(() => {
+    const saved = localStorage.getItem('subcontractedPersonnel');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading subcontractedPersonnel from localStorage', e);
+      }
+    }
+    return {
+      'AMI': {},
+      'VICER': {},
+      'ITAX': {},
+      'MCI': {},
+      'MG Electrical': {},
+    };
+  });
+
+  // Active subcontracted teams for BUILD department - Use global store
+  const { activeTeams, setActiveTeams } = useBuildTeamsStore();
+
+  // Active external teams for PRG department - Use global store
+  const { activeTeams: prgActiveTeams, setActiveTeams: setPRGActiveTeams } = usePRGTeamsStore();
+
+  // External Personnel state for PRG department
+  // Structure: { teamName: { weekDate: count } }
+  // Use lazy initialization to load from localStorage on first render
+  const [prgExternalPersonnel, setPRGExternalPersonnel] = useState<Record<string, Record<string, number | undefined>>>(() => {
+    const saved = localStorage.getItem('prgExternalPersonnel');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading prgExternalPersonnel from localStorage', e);
+      }
+    }
+    return {};
+  });
+
+  // Modal state for adding PRG external teams
+  const [isPRGModalOpen, setIsPRGModalOpen] = useState(false);
+  const [prgTeamName, setPRGTeamName] = useState('');
+
+  // Modal state for adding BUILD subcontracted teams
+  const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
+  const [buildTeamName, setBuildTeamName] = useState('');
+
+  // Per-project zoom levels
+  const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
+
+  // Utilized hours editing state (Used Hours)
+  const [editingUtilized, setEditingUtilized] = useState<{ projectId: string; department: Department } | null>(null);
+  const [utilizedHours, setUtilizedHours] = useState<string>('');
+
+  // Forecasted hours editing state (Forecasted Hours)
+  const [editingForecast, setEditingForecast] = useState<{ projectId: string; department: Department } | null>(null);
+  const [forecastHours, setForecastHours] = useState<string>('');
+
+  // Quick project creation modal state
+  const [showQuickProjectModal, setShowQuickProjectModal] = useState(false);
+  const [quickProjectForm, setQuickProjectForm] = useState({
+    name: '',
+    client: '',
+    startDate: '',
+    numberOfWeeks: '' as any,
+    facility: 'AL' as 'AL' | 'MI',
+    budgetHours: 0,
+  });
+
+  // Initialize with all projects expanded by default
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
+    projects.reduce((acc, proj) => ({ ...acc, [proj.id]: true }), {})
+  );
+
+  // Save scioTeamMembers to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('scioTeamMembers', JSON.stringify(scioTeamMembers));
+  }, [scioTeamMembers]);
+
+  // Save subcontractedPersonnel to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('subcontractedPersonnel', JSON.stringify(subcontractedPersonnel));
+  }, [subcontractedPersonnel]);
+
+  // Save prgExternalPersonnel to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('prgExternalPersonnel', JSON.stringify(prgExternalPersonnel));
+  }, [prgExternalPersonnel]);
+
+  // Refs for table containers
+  const departmentsTableRef = useRef<HTMLDivElement>(null);
+  const projectsTableRef = useRef<HTMLDivElement>(null);
+  const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const allWeeksData = getAllWeeksWithNextYear(selectedYear);
+  const currentDate = formatToISO(new Date());
+
+  // Find the current week - it's the week that contains today's date
+  const currentDateWeekIndex = allWeeksData.findIndex((w) => {
+    const weekStart = new Date(w.date);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const today = new Date(currentDate);
+    return today >= weekStart && today <= weekEnd;
+  });
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setExpandedProjects((prev) => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  };
+
+  const handleCreateQuickProject = () => {
+    if (!quickProjectForm.name || !quickProjectForm.client || !quickProjectForm.startDate || !quickProjectForm.numberOfWeeks) {
+      alert('Por favor completa todos los campos');
+      return;
+    }
+
+    const dept = departmentFilter as Department;
+    const startDateISO = quickProjectForm.startDate;
+    const numberOfWeeks = quickProjectForm.numberOfWeeks as number;
+
+    // Calculate end date based on start date and number of weeks
+    const endDate = new Date(startDateISO);
+    endDate.setDate(endDate.getDate() + (numberOfWeeks * 7) - 1);
+    const endDateISO = formatToISO(endDate);
+
+    const newProject = {
+      id: generateId(),
+      name: quickProjectForm.name,
+      client: quickProjectForm.client,
+      startDate: startDateISO,
+      endDate: endDateISO,
+      numberOfWeeks: numberOfWeeks,
+      facility: quickProjectForm.facility,
+      departmentConfigs: {
+        PM: { startDate: null, duration: 0 },
+        MED: { startDate: null, duration: 0 },
+        HD: { startDate: null, duration: 0 },
+        MFG: { startDate: null, duration: 0 },
+        BUILD: { startDate: null, duration: 0 },
+        PRG: { startDate: null, duration: 0 },
+        [dept]: { startDate: startDateISO, duration: numberOfWeeks },
+      },
+      departmentHoursAllocated: {
+        PM: 0,
+        MED: 0,
+        HD: 0,
+        MFG: 0,
+        BUILD: 0,
+        PRG: 0,
+        [dept]: quickProjectForm.budgetHours,
+      },
+      departmentHoursUtilized: {
+        PM: 0,
+        MED: 0,
+        HD: 0,
+        MFG: 0,
+        BUILD: 0,
+        PRG: 0,
+      },
+      visibleInDepartments: [dept],
+    };
+
+    addProject(newProject);
+    setShowQuickProjectModal(false);
+    setQuickProjectForm({
+      name: '',
+      client: '',
+      startDate: '',
+      numberOfWeeks: '',
+      facility: 'AL',
+      budgetHours: 0,
+    });
+  };
+
+  const getProjectZoom = (projectId: string): number => {
+    return projectZooms[projectId] || 100;
+  };
+
+  const setProjectZoom = (projectId: string, zoomLevel: number) => {
+    setProjectZooms((prev) => ({
+      ...prev,
+      [projectId]: zoomLevel,
+    }));
+  };
+
+  // Effect to reset scroll to first week when departmentFilter changes
+  useEffect(() => {
+    // Reset scroll position to start of year (first week)
+    if (departmentsTableRef.current) {
+      departmentsTableRef.current.scrollLeft = 0;
+    }
+    if (projectsTableRef.current) {
+      projectsTableRef.current.scrollLeft = 0;
+    }
+  }, [departmentFilter]);
+
+  // Get total hours and stage for a department in a week (optionally filtered by project)
+  const getDepartmentWeekData = (department: Department, weekStart: string, projectId?: string) => {
+    // Filter assignments by week AND by department (through employee)
+    const deptAssignments = assignments.filter((a) => {
+      if (a.weekStartDate !== weekStart) return false;
+      if (projectId && a.projectId !== projectId) return false;
+      const emp = employees.find((e) => e.id === a.employeeId);
+      return emp && emp.department === department;
+    });
+
+    const totalHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+    const talent = calculateTalent(totalHours);
+    const stage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
+
+    return { totalHours, talent, assignments: deptAssignments, stage };
+  };
+
+  // Calculate utilization percentage for a department in a project
+  // Formula: (Used Hours + Forecasted Hours / Quoted Hours) * 100
+  // Used Hours = departmentHoursUtilized (manually entered)
+  // Forecasted Hours = departmentHoursForecast (manually entered)
+  // Quoted Hours = departmentHoursAllocated (budget)
+  const getUtilizationPercent = (department: Department, projectId: string): number => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return 0;
+
+    // Get utilized hours (manually entered)
+    const utilizedHoursValue = project.departmentHoursUtilized?.[department] || 0;
+
+    // Get forecasted hours (manually entered)
+    const forecastedHoursValue = project.departmentHoursForecast?.[department] || 0;
+
+    // Get quoted hours (budget)
+    const quotedHours = project.departmentHoursAllocated?.[department] || 0;
+    if (quotedHours === 0) return 0;
+
+    return Math.round(((utilizedHoursValue + forecastedHoursValue) / quotedHours) * 100);
+  };
+
+  // Get utilized hours (manually entered) for a department in a project
+  const getUtilizedHours = (department: Department, projectId: string): number => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.departmentHoursUtilized?.[department] || 0;
+  };
+
+  // Get forecasted hours (manually entered) for a department in a project
+  const getForecastedHours = (department: Department, projectId: string): number => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.departmentHoursForecast?.[department] || 0;
+  };
+
+  // Get quoted hours (budget) for a department in a project
+  const getQuotedHours = (department: Department, projectId: string): number => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.departmentHoursAllocated?.[department] || 0;
+  };
+
+  // Check if a week is within a project's date range
+  const isWeekInProjectRange = (weekStart: string, project: typeof projects[0]) => {
+    return weekStart >= project.startDate && weekStart <= project.endDate;
+  };
+
+  const handleEditCell = (department: Department, weekStart: string, projectId?: string) => {
+    if (departmentFilter === 'General') return; // No edit in General view
+
+    const { totalHours, assignments: deptAssignments } = getDepartmentWeekData(department, weekStart, projectId);
+    const firstAssignmentStage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
+    const firstAssignmentComment = deptAssignments.length > 0 ? deptAssignments[0].comment || '' : '';
+
+    // Initialize selected employees from existing assignments
+    const assignedEmployeeIds = new Set(deptAssignments.map(a => a.employeeId));
+
+    // For BUILD and PRG departments, initialize SCIO and external hours separately
+    let totalScioHours = 0;
+    let totalExternalHours = 0;
+
+    if ((department === 'BUILD' || department === 'PRG') && deptAssignments.length > 0) {
+      const firstAssignment = deptAssignments[0];
+      totalScioHours = firstAssignment.scioHours || 0;
+      totalExternalHours = firstAssignment.externalHours || 0;
+    }
+
+    setEditingCell({ department, weekStart, projectId });
+    setEditingHours(totalHours);
+    setEditingScioHours(totalScioHours);
+    setEditingExternalHours(totalExternalHours);
+    setEditingStage(firstAssignmentStage);
+    setEditingComment(firstAssignmentComment);
+    setSelectedEmployees(assignedEmployeeIds);
+  };
+
+  const handleSaveCell = () => {
+    // For BUILD and PRG, use separate SCIO and external hours
+    const isBuildOrPRG = editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG');
+    const totalHours = isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours;
+
+    if (!editingCell || totalHours === 0) {
+      setEditingCell(null);
+      setEditingStage(null);
+      setEditingComment('');
+      setEditingScioHours(0);
+      setEditingExternalHours(0);
+      setSelectedEmployees(new Set());
+      return;
+    }
+
+    const { assignments: deptAssignments } = getDepartmentWeekData(
+      editingCell.department,
+      editingCell.weekStart,
+      editingCell.projectId
+    );
+
+    // If user selected specific employees, use those; otherwise use existing assignments
+    const targetEmployeeIds = selectedEmployees.size > 0
+      ? Array.from(selectedEmployees)
+      : deptAssignments.map(a => a.employeeId);
+
+    if (targetEmployeeIds.length > 0) {
+      // Update or create assignments for selected employees
+      targetEmployeeIds.forEach((employeeId) => {
+        const existingAssign = deptAssignments.find(a => a.employeeId === employeeId);
+        const hoursPerEmployee = Math.round((totalHours / targetEmployeeIds.length) * 100) / 100;
+
+        // For BUILD and PRG, split hours proportionally
+        let scioHours = editingScioHours;
+        let externalHours = editingExternalHours;
+        if (targetEmployeeIds.length > 1) {
+          scioHours = Math.round((editingScioHours / targetEmployeeIds.length) * 100) / 100;
+          externalHours = Math.round((editingExternalHours / targetEmployeeIds.length) * 100) / 100;
+        }
+
+        const updateData: any = {
+          hours: hoursPerEmployee,
+          stage: editingStage,
+          comment: editingComment || undefined,
+        };
+
+        // Add SCIO and external hours for BUILD and PRG departments
+        if (isBuildOrPRG) {
+          updateData.scioHours = scioHours;
+          updateData.externalHours = externalHours;
+        }
+
+        if (existingAssign) {
+          // Update existing assignment
+          updateAssignment(existingAssign.id, updateData);
+        } else {
+          // Create new assignment
+          if (editingCell.projectId) {
+            const newAssignment: any = {
+              id: generateId(),
+              employeeId,
+              projectId: editingCell.projectId,
+              weekStartDate: editingCell.weekStart,
+              hours: hoursPerEmployee,
+              stage: editingStage,
+              comment: editingComment || undefined,
+            };
+
+            // Add SCIO and external hours for BUILD and PRG departments
+            if (isBuildOrPRG) {
+              newAssignment.scioHours = scioHours;
+              newAssignment.externalHours = externalHours;
+            }
+
+            addAssignment(newAssignment);
+          }
+        }
+      });
+
+      // Delete assignments for employees that were deselected
+      deptAssignments.forEach((assign) => {
+        if (!targetEmployeeIds.includes(assign.employeeId)) {
+          // Note: We don't have a deleteAssignment function, so we'll set hours to 0
+          // This is a limitation of the current data model
+          updateAssignment(assign.id, {
+            hours: 0,
+            stage: editingStage,
+          });
+        }
+      });
+    } else {
+      // Create new assignment for first available employee in department
+      const availableEmployee = employees.find(
+        (emp) => emp.department === editingCell.department && emp.isActive
+      );
+
+      if (availableEmployee && editingCell.projectId) {
+        const newAssignment: any = {
+          id: generateId(),
+          employeeId: availableEmployee.id,
+          projectId: editingCell.projectId,
+          weekStartDate: editingCell.weekStart,
+          hours: totalHours,
+          stage: editingStage,
+          comment: editingComment || undefined,
+        };
+
+        // Add SCIO and external hours for BUILD and PRG departments
+        if (isBuildOrPRG) {
+          newAssignment.scioHours = editingScioHours;
+          newAssignment.externalHours = editingExternalHours;
+        }
+
+        addAssignment(newAssignment);
+      }
+    }
+
+    setEditingCell(null);
+    setEditingStage(null);
+    setEditingComment('');
+    setEditingScioHours(0);
+    setEditingExternalHours(0);
+    setSelectedEmployees(new Set());
+  };
+
+  // Handlers for editing utilized hours (Used Hours)
+  const handleEditUtilized = (projectId: string, department: Department, currentHours: number) => {
+    setEditingUtilized({ projectId, department });
+    setUtilizedHours(currentHours.toString());
+  };
+
+  const handleSaveUtilized = () => {
+    if (!editingUtilized) return;
+
+    const project = projects.find(p => p.id === editingUtilized.projectId);
+    if (!project) return;
+
+    const updatedHoursUtilized: Record<Department, number> = {
+      PM: project.departmentHoursUtilized?.PM || 0,
+      MED: project.departmentHoursUtilized?.MED || 0,
+      HD: project.departmentHoursUtilized?.HD || 0,
+      MFG: project.departmentHoursUtilized?.MFG || 0,
+      BUILD: project.departmentHoursUtilized?.BUILD || 0,
+      PRG: project.departmentHoursUtilized?.PRG || 0,
+    };
+    updatedHoursUtilized[editingUtilized.department] = parseInt(utilizedHours) || 0;
+
+    updateProject(editingUtilized.projectId, {
+      ...project,
+      departmentHoursUtilized: updatedHoursUtilized,
+    });
+
+    setEditingUtilized(null);
+    setUtilizedHours('');
+  };
+
+  const handleCancelUtilized = () => {
+    setEditingUtilized(null);
+    setUtilizedHours('');
+  };
+
+  // Handlers for editing forecasted hours (Forecasted Hours)
+  const handleEditForecast = (projectId: string, department: Department, currentHours: number) => {
+    setEditingForecast({ projectId, department });
+    setForecastHours(currentHours.toString());
+  };
+
+  const handleSaveForecast = () => {
+    if (!editingForecast) return;
+
+    const project = projects.find(p => p.id === editingForecast.projectId);
+    if (!project) return;
+
+    const updatedHoursForecast: Record<Department, number> = {
+      PM: project.departmentHoursForecast?.PM || 0,
+      MED: project.departmentHoursForecast?.MED || 0,
+      HD: project.departmentHoursForecast?.HD || 0,
+      MFG: project.departmentHoursForecast?.MFG || 0,
+      BUILD: project.departmentHoursForecast?.BUILD || 0,
+      PRG: project.departmentHoursForecast?.PRG || 0,
+    };
+    updatedHoursForecast[editingForecast.department] = parseInt(forecastHours) || 0;
+
+    updateProject(editingForecast.projectId, {
+      ...project,
+      departmentHoursForecast: updatedHoursForecast,
+    });
+
+    setEditingForecast(null);
+    setForecastHours('');
+  };
+
+  const handleCancelForecast = () => {
+    setEditingForecast(null);
+    setForecastHours('');
+  };
+
+  const renderCellContent = (department: Department, weekStart: string, projectId?: string) => {
+    const { totalHours, talent, stage, assignments: cellAssignments } = getDepartmentWeekData(department, weekStart, projectId);
+    const weekData = allWeeksData.find((w) => w.date === weekStart);
+    const weekNum = weekData?.weekNum || 1;
+
+    // Get comment from first assignment (comments are shared across assignments in same cell)
+    const cellComment = cellAssignments.length > 0 ? cellAssignments[0].comment : undefined;
+
+    // Get project and department stage info for visual indicators
+    const project = projects.find(p => p.id === projectId);
+
+    // Special case for PM: use project start date and total duration
+    // PM department spans the entire project lifecycle
+    let deptStartDate: string | undefined;
+    let deptDuration: number;
+
+    if (department === 'PM' && project) {
+      // PM uses the project's start date and total number of weeks
+      deptStartDate = project.startDate;
+      deptDuration = project.numberOfWeeks || 0;
+    } else {
+      // Other departments use their specific configuration
+      const deptStages = project?.departmentStages?.[department];
+      const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
+      deptStartDate = deptFirstStage?.departmentStartDate;
+      deptDuration = deptFirstStage?.durationWeeks || 0;
+    }
+
+    // Calculate department end date by adding weeks to start date
+    let deptEndDate = '';
+    if (deptStartDate && deptDuration > 0) {
+      const endDate = new Date(deptStartDate);
+      endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
+      deptEndDate = endDate.toISOString().split('T')[0];
+    }
+
+    // Check if current week is within department range using date comparison
+    const isDeptWeekInRange = deptStartDate && deptEndDate && weekStart >= deptStartDate && weekStart <= deptEndDate;
+    const isDeptFirstWeek = deptStartDate && weekStart === deptStartDate;
+
+    // Get stage color for styling
+    const stageColor = stage ? getStageColor(stage) : null;
+    const isGeneralView = departmentFilter === 'General';
+
+    // Get project info for tooltip
+    const projectStartDate = project?.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'N/A';
+    const deptDisplayDate = deptStartDate
+      ? new Date(deptStartDate).toLocaleDateString('es-ES')
+      : 'No configurado';
+
+    // Build tooltip text, including comment if present
+    let tooltipText = `📅 Proyecto: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
+    if (cellComment) {
+      tooltipText += `\n\n💬 ${cellComment}`;
+    }
+
+    // Calculate consecutive week number within the department using dates
+    let deptConsecutiveWeek = 0;
+    if (isDeptWeekInRange && deptStartDate) {
+      const startMs = new Date(deptStartDate).getTime();
+      const currentMs = new Date(weekStart).getTime();
+      const weeksDiff = Math.floor((currentMs - startMs) / (7 * 24 * 60 * 60 * 1000));
+      deptConsecutiveWeek = weeksDiff + 1;
+    }
+
+    // Read-only display
+    if (totalHours === 0) {
+      const canEdit = departmentFilter !== 'General';
+
+      // Apply visual indicators for department start/duration (like General view does)
+      let cellBgClass = 'bg-gray-50';
+      let cellTextClass = 'text-gray-400';
+      let indicatorContent = null;
+
+      if (isDeptWeekInRange) {
+        if (isDeptFirstWeek) {
+          cellBgClass = 'bg-orange-100';
+          cellTextClass = 'text-orange-600';
+          indicatorContent = (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="font-bold">Inicia</span>
+              <span className="text-xs opacity-75">{deptStartDate}</span>
+            </div>
+          );
+        } else {
+          cellBgClass = 'bg-purple-100';
+          cellTextClass = 'text-purple-600';
+          indicatorContent = (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="font-bold text-base">{deptConsecutiveWeek}</span>
+              <span className="text-xs opacity-75">sem</span>
+            </div>
+          );
+        }
+      }
+
+      return (
+        <div
+          onClick={() => canEdit && handleEditCell(department, weekStart, projectId)}
+          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
+          title={canEdit ? 'Click to add hours' : ''}
+        >
+          {indicatorContent ? (
+            indicatorContent
+          ) : (
+            <>
+              <div className="font-bold text-xs opacity-60">Week {weekNum}</div>
+              <div>{canEdit ? '+ Add' : '—'}</div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // Calculate utilization for this department in this project (only for project-specific view)
+    let utilizationPercent = 0;
+    let utilizationColor = null;
+    if (projectId) {
+      utilizationPercent = getUtilizationPercent(department, projectId);
+      utilizationColor = getUtilizationColor(utilizationPercent);
+    }
+
+    return (
+      <div
+        className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
+          stageColor ? stageColor.bg : 'bg-blue-100'
+        } ${stageColor ? stageColor.text : 'text-blue-900'}`}
+        title={tooltipText}
+      >
+        {isGeneralView ? (
+          <div className="text-[10px] font-bold leading-tight">{talent}</div>
+        ) : (
+          <>
+            <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
+            <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
+          </>
+        )}
+        {/* Show utilization % in project-specific views */}
+        {projectId && utilizationColor && (
+          <div className={`text-[10px] font-bold px-1 py-0 rounded mt-0.5 leading-tight ${utilizationColor.bg} ${utilizationColor.text}`}>
+            {utilizationPercent}%
+          </div>
+        )}
+        {stage && <div className="text-[10px] opacity-60 font-normal leading-tight">{stage}</div>}
+        {/* Comment indicator - shows when cell has a comment */}
+        {cellComment && (
+          <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
+            💬
+          </div>
+        )}
+        {/* Pencil icon for editing */}
+        <Pencil size={12} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600" />
+      </div>
+    );
+  };
+
+  // Modal for editing cell
+  const renderEditModal = () => {
+    if (!editingCell) return null;
+
+    const stageOptions = STAGE_OPTIONS[editingCell.department] || [];
+    const deptEmployees = employees.filter(emp => emp.department === editingCell.department && emp.isActive);
+    const weekData = allWeeksData.find(w => w.date === editingCell.weekStart);
+    const weekNum = weekData?.weekNum || 1;
+    const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
+
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => {
+            setEditingCell(null);
+            setEditingStage(null);
+            setEditingHours(0);
+            setEditingComment('');
+            setSelectedEmployees(new Set());
+          }}
+        />
+        {/* Modal */}
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl p-6 w-96 z-50 max-h-screen overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800">
+              Editar Asignación - Sem {weekNum}/{year}
+            </h3>
+            <button
+              onClick={() => {
+                setEditingCell(null);
+                setEditingStage(null);
+                setEditingHours(0);
+                setEditingComment('');
+                setSelectedEmployees(new Set());
+              }}
+              className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Hours input - For BUILD and PRG, show separate SCIO and External hours */}
+          {editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG') ? (
+            <div className="mb-4 space-y-3">
+              {/* SCIO Hours input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t.scioHours}</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={editingScioHours || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditingScioHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                    // Update total hours for backward compatibility
+                    setEditingHours((val === '' ? 0 : Math.max(0, parseInt(val) || 0)) + editingExternalHours);
+                  }}
+                  autoFocus
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="0"
+                />
+              </div>
+
+              {/* External Hours input - conditionally shown based on selected external resource */}
+              {selectedEmployees.size > 0 && Array.from(selectedEmployees).some(empId => {
+                const emp = employees.find(e => e.id === empId);
+                return emp?.isSubcontractedMaterial;
+              }) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.enterExternalHours}</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={editingExternalHours || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditingExternalHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                      // Update total hours for backward compatibility
+                      setEditingHours(editingScioHours + (val === '' ? 0 : Math.max(0, parseInt(val) || 0)));
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Standard hours input for other departments */
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editingHours || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditingHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                }}
+                autoFocus
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0"
+              />
+            </div>
+          )}
+
+          {/* Stage selection dropdown */}
+          {stageOptions.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Etapa</label>
+              <select
+                value={(editingStage || '') as string}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditingStage(value === '' ? null : (value as Stage));
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Sin etapa</option>
+                {stageOptions.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Employee selection - Hide for MFG department */}
+          {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">👥 Recursos Disponibles ({deptEmployees.length})</label>
+              <div className="space-y-2 max-h-32 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
+                {deptEmployees.map((emp) => {
+                  const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
+                  const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+                  return (
+                    <label key={emp.id} className={`flex items-center gap-2 cursor-pointer p-1 rounded transition ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50' : 'hover:bg-blue-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedEmployees.has(emp.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedEmployees);
+                          if (e.target.checked) {
+                            newSelected.add(emp.id);
+                          } else {
+                            newSelected.delete(emp.id);
+                          }
+                          setSelectedEmployees(newSelected);
+                        }}
+                        className="w-4 h-4 text-blue-500 rounded cursor-pointer"
+                      />
+                      <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
+                      {/* Show badge for BUILD and PRG departments */}
+                      {isBuildOrPRG && (
+                        isExternal ? (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                            editingCell.department === 'BUILD'
+                              ? 'bg-violet-200 text-violet-800'
+                              : 'bg-cyan-200 text-cyan-800'
+                          }`}>
+                            🏢 {emp.subcontractCompany}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
+                            🏠 Interno
+                          </span>
+                        )
+                      )}
+                      <span className="text-xs text-gray-500 ml-auto">{emp.capacity}h/sem</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {selectedEmployees.size > 0 && (
+                <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
+                  ✓ {selectedEmployees.size} recurso{selectedEmployees.size !== 1 ? 's' : ''} seleccionado{selectedEmployees.size !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Comment input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.comment}</label>
+            <textarea
+              value={editingComment}
+              onChange={(e) => setEditingComment(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              placeholder={t.commentPlaceholder}
+              rows={2}
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setEditingCell(null);
+                setEditingStage(null);
+                setEditingHours(0);
+                setEditingComment('');
+                setSelectedEmployees(new Set());
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveCell}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
+      {/* Edit Cell Modal */}
+      {renderEditModal()}
+      {/* Sticky Header - Minimal */}
+      <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+        <div className="px-2 py-1 flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            {departmentFilter === 'General' ? (
+              <h1 className="text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent truncate">
+                {t.generalView}
+              </h1>
+            ) : (
+              <h1 className="text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent truncate">
+                {departmentFilter}
+              </h1>
+            )}
+          </div>
+
+          {/* Zoom controls - ultra compact */}
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5 flex-shrink-0">
+            <button
+              onClick={() => setZoom(Math.max(50, zoom - 10))}
+              className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
+              title={t.zoomOut}
+            >
+              <ZoomOut size={14} />
+            </button>
+            <span className="text-[10px] font-semibold text-gray-700 w-8 text-center">{zoom}%</span>
+            <button
+              onClick={() => setZoom(Math.min(200, zoom + 10))}
+              className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
+              title={t.zoomIn}
+            >
+              <ZoomIn size={14} />
+            </button>
+          </div>
+
+          {/* Year selector - ultra compact */}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="border border-blue-300 rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex-shrink-0"
+          >
+            <option value={2024}>2024</option>
+            <option value={2025}>2025</option>
+            <option value={2026}>2026</option>
+            <option value={2027}>2027</option>
+          </select>
+
+          {/* Current Week Info - ultra compact */}
+          {currentDateWeekIndex >= 0 && (
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-1.5 py-0.5 rounded-md shadow-sm flex items-center gap-1 text-[10px] flex-shrink-0">
+              <span className="font-bold">🎯</span>
+              <span className="font-bold">W{currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.weekNum : '-'}</span>
+            </div>
+          )}
+
+          {/* Legend Toggle Button - ultra compact */}
+          <button
+            onClick={() => setShowLegend(!showLegend)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+            title={t.toggleLegend}
+          >
+            <span>{showLegend ? '▼' : '▶'}</span>
+            <span>{t.legend}</span>
+          </button>
+
+          {/* Create Project Button - Only in department view (except PM) */}
+          {departmentFilter !== 'General' && departmentFilter !== 'PM' && (
+            <button
+              onClick={() => setShowQuickProjectModal(true)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+              title="Crear Proyecto"
+            >
+              <Plus size={12} />
+              <span>{t.create}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-2">
+
+        {/* Tabla de Departamentos - Only show for department-specific views */}
+        {departmentFilter !== 'General' && (
+          <>
+            {/* Department Weekly Occupancy Summary Panel */}
+            {(() => {
+              const dept = departmentFilter as Department;
+              const deptIcon = getDepartmentIcon(dept);
+
+              return (
+                <div className="sticky top-0 z-40 mb-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-2 shadow-sm">
+                  <h2 className="text-xs font-bold mb-1 text-indigo-800 flex items-center gap-1">
+                    <span className={deptIcon.color}>{deptIcon.icon}</span>
+                    <span>{dept} - {t.weeklyOccupancyTotal}</span>
+                  </h2>
+
+                  {/* Weekly occupancy calendar */}
+                  <div className="overflow-x-auto">
+                    <div className="inline-block min-w-full">
+                      {/* Week headers row */}
+                      <div className="flex gap-0.5 mb-0.5">
+                        {/* Empty cell for label column */}
+                        <div className="w-14 flex-shrink-0 text-[8px] font-bold text-indigo-700 flex items-center justify-center">
+                          {t.people}
+                        </div>
+
+                        {/* Week number headers */}
+                        {allWeeksData.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
+                          return (
+                            <div
+                              key={`dept-header-${weekData.date}`}
+                              className={`w-10 flex-shrink-0 text-center text-[8px] font-bold px-1 py-0.5 rounded-md border-1.5 ${
+                                isCurrentWeek
+                                  ? 'bg-red-300 text-red-900 border-red-500'
+                                  : 'bg-blue-100 text-blue-900 border-blue-300'
+                              }`}
+                            >
+                              W{weekData.weekNum}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Total row - sum of occupied people in that week (or hours for MFG) */}
+                      <div className="flex gap-0.5 mb-0.5">
+                        {/* Label */}
+                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-orange-100 to-orange-50 text-orange-800 border-orange-300">
+                          {t.totalLabel}
+                        </div>
+
+                        {/* Week cells */}
+                        {allWeeksData.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
+
+                          // Calculate total occupied people for this department in this week
+                          const deptAssignments = assignments.filter(a => {
+                            const emp = employees.find(e => e.id === a.employeeId);
+                            return a.weekStartDate === weekData.date && emp?.department === dept;
+                          });
+
+                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+
+                          // For MFG, show hours directly. For other departments, convert to people
+                          const isMFG = dept === 'MFG';
+                          const displayValue = isMFG ? totalWeekHours : totalWeekHours / 45;
+                          const unit = isMFG ? 'h' : 'people';
+
+                          // Determine color based on occupied people/hours
+                          let bgColor = 'bg-green-300 border-green-400';
+                          let textColor = 'text-green-900';
+
+                          if (isMFG) {
+                            // For MFG: color based on hours (different thresholds)
+                            if (totalWeekHours >= 360) {
+                              bgColor = 'bg-red-500 border-red-600';
+                              textColor = 'text-white';
+                            } else if (totalWeekHours >= 225) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (totalWeekHours >= 112.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            }
+                          } else {
+                            // For other departments: color based on people
+                            if (displayValue >= 8) {
+                              bgColor = 'bg-red-500 border-red-600';
+                              textColor = 'text-white';
+                            } else if (displayValue >= 5) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (displayValue >= 2.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={`total-${dept}-${weekData.date}`}
+                              className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
+                                isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
+                              }`}
+                              title={`${t.totalLabel} - W${weekData.weekNum}: ${displayValue.toFixed(2)} ${unit}`}
+                            >
+                              <div className={`${textColor} font-bold text-[9px]`}>
+                                {displayValue.toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* SCIO Team Members / Hours per Week row - edit capacity per week */}
+                      <div className="flex gap-0.5 mb-0.5">
+                        {/* Label */}
+                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300">
+                          {dept === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
+                        </div>
+
+                        {/* Week inputs for SCIO capacity */}
+                        <div className="flex gap-0.5">
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
+                            return (
+                              <input
+                                key={`scio-${dept}-${weekData.date}`}
+                                type="number"
+                                step="0.1"
+                                value={scioTeamMembers[dept][weekData.date] || ''}
+                                onChange={(e) => {
+                                  const newCapacity = parseFloat(e.target.value) || 0;
+                                  setScioTeamMembers({
+                                    ...scioTeamMembers,
+                                    [dept]: {
+                                      ...scioTeamMembers[dept],
+                                      [weekData.date]: newCapacity,
+                                    },
+                                  });
+                                }}
+                                className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 ${
+                                  isCurrentWeek ? 'ring-2 ring-red-600 shadow-md border-red-500 bg-gradient-to-b from-red-50 to-orange-50' : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
+                                }`}
+                                placeholder="0"
+                                title={`Capacidad para la semana ${weekData.weekNum}`}
+                                min="0"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Subcontracted Personnel rows - Only for BUILD department */}
+                      {dept === 'BUILD' && (
+                        <>
+                          {/* Company rows - Only show active teams */}
+                          {Array.from(activeTeams).map((company) => (
+                            <div key={`subcontract-${company}`} className="flex gap-0.5 mb-0.5 group">
+                              {/* Company Label with delete button */}
+                              <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border-violet-400 shadow-sm hover:shadow-md transition-all">
+                                <span className="truncate max-w-[40px]" title={company}>{company}</span>
+                                <button
+                                  onClick={() => {
+                                    const newTeams = new Set(activeTeams);
+                                    newTeams.delete(company);
+                                    setActiveTeams(newTeams);
+                                  }}
+                                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title={`Eliminar ${company}`}
+                                >
+                                  <Minus size={8} className="text-white font-bold" />
+                                </button>
+                              </div>
+
+                              {/* Week inputs for subcontracted personnel - Smaller size */}
+                              <div className="flex gap-0.5">
+                                {allWeeksData.map((weekData, idx) => {
+                                  const isCurrentWeek = idx === currentDateWeekIndex;
+                                  return (
+                                    <div
+                                      key={`subcontract-${company}-${weekData.date}`}
+                                      className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
+                                        isCurrentWeek
+                                          ? 'ring-2 ring-red-500 shadow-md border-red-400 bg-gradient-to-b from-red-50 to-orange-50'
+                                          : 'border-violet-300 bg-gradient-to-b from-violet-50 to-violet-25 hover:border-violet-400'
+                                      }`}
+                                    >
+                                      <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : ''}
+                                        onChange={(e) => {
+                                          const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
+                                          setSubcontractedPersonnel({
+                                            ...subcontractedPersonnel,
+                                            [company]: {
+                                              ...subcontractedPersonnel[company],
+                                              [weekData.date]: newCount,
+                                            },
+                                          });
+                                        }}
+                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-violet-900"
+                                        style={{textAlign: 'center'}}
+                                        placeholder="0"
+                                        title={`${company} - ${t.week} ${weekData.weekNum}`}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Add Team button - clicking label opens popup */}
+                          <div className="flex gap-0.5 mb-0.5">
+                            {/* Label column - clickable to open popup */}
+                            <button
+                              onClick={() => setIsBuildModalOpen(true)}
+                              className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all"
+                              title="Click para agregar equipo subcontratado"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Add External Team button row - Only for PRG department */}
+                      {dept === 'PRG' && (
+                        <>
+                          {/* Team rows - Only show active teams */}
+                          {Array.from(prgActiveTeams).map((team) => (
+                            <div key={`prg-external-${team}`} className="flex gap-0.5 mb-0.5 group">
+                              {/* Team Label with delete button */}
+                              <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all">
+                                <span className="truncate max-w-[40px]" title={team}>{team}</span>
+                                <button
+                                  onClick={() => {
+                                    const newTeams = new Set(prgActiveTeams);
+                                    newTeams.delete(team);
+                                    setPRGActiveTeams(newTeams);
+                                  }}
+                                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title={`Eliminar ${team}`}
+                                >
+                                  <Minus size={8} className="text-white font-bold" />
+                                </button>
+                              </div>
+
+                              {/* Week inputs for external personnel */}
+                              <div className="flex gap-0.5">
+                                {allWeeksData.map((weekData, idx) => {
+                                  const isCurrentWeek = idx === currentDateWeekIndex;
+                                  return (
+                                    <div
+                                      key={`prg-external-${team}-${weekData.date}`}
+                                      className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
+                                        isCurrentWeek
+                                          ? 'ring-2 ring-red-500 shadow-md border-red-400 bg-gradient-to-b from-red-50 to-orange-50'
+                                          : 'border-cyan-300 bg-gradient-to-b from-cyan-50 to-cyan-25 hover:border-cyan-400'
+                                      }`}
+                                    >
+                                      <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : ''}
+                                        onChange={(e) => {
+                                          const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
+                                          setPRGExternalPersonnel({
+                                            ...prgExternalPersonnel,
+                                            [team]: {
+                                              ...prgExternalPersonnel[team],
+                                              [weekData.date]: newCount,
+                                            },
+                                          });
+                                        }}
+                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900"
+                                        style={{textAlign: 'center'}}
+                                        placeholder="0"
+                                        title={`${team} - ${t.week} ${weekData.weekNum}`}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Add External Team button - clicking label opens popup */}
+                          <div className="flex gap-0.5 mb-0.5">
+                            {/* Label column - clickable to open popup */}
+                            <button
+                              onClick={() => setIsPRGModalOpen(true)}
+                              className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all"
+                              title="Click para agregar equipo externo"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      {/* External Hours row - For BUILD and PRG departments only */}
+                      {(dept === 'BUILD' || dept === 'PRG') && (
+                        <div className="flex gap-0.5 mb-0.5">
+                          {/* Label */}
+                          <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300">
+                            {dept === 'BUILD' ? '🏢 Ext' : '👥 Ext'}
+                          </div>
+
+                          {/* Week cells */}
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
+
+                            // Calculate total external hours for this week across ALL projects
+                            const deptAssignments = assignments.filter(a => {
+                              const emp = employees.find(e => e.id === a.employeeId);
+                              return a.weekStartDate === weekData.date && emp?.department === dept;
+                            });
+
+                            const totalExternalHours = deptAssignments.reduce((sum, a) => sum + (a.externalHours || 0), 0);
+
+                            return (
+                              <div
+                                key={`external-${dept}-${weekData.date}`}
+                                className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold text-purple-700 transition-all ${
+                                  totalExternalHours > 0
+                                    ? 'bg-purple-200 border-purple-400 shadow-sm'
+                                    : 'bg-purple-50 border-purple-300'
+                                } ${isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''}`}
+                                title={`Horas externas - ${totalExternalHours}h`}
+                              >
+                                <div className="font-black text-[9px]">
+                                  {totalExternalHours > 0 ? totalExternalHours : '-'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Capacity row - department capacity minus occupied (hours for MFG, people for others) */}
+                      <div className="flex gap-0.5 mb-0.5">
+                        {/* Label */}
+                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-green-100 to-green-50 text-green-800 border-green-300">
+                          {t.capacityLabel}
+                        </div>
+
+                        {/* Week cells */}
+                        {allWeeksData.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
+
+                          // Get SCIO Team Members / Hours per Week capacity for this week
+                          const weekCapacity = scioTeamMembers[dept][weekData.date] || 0;
+
+                          // Calculate total hours occupied for this department this week
+                          const deptAssignments = assignments.filter(a => {
+                            const emp = employees.find(e => e.id === a.employeeId);
+                            return a.weekStartDate === weekData.date && emp?.department === dept;
+                          });
+
+                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+
+                          // For MFG: use hours directly. For other departments: convert to people
+                          const isMFG = dept === 'MFG';
+                          const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
+
+                          // For BUILD department: include all subcontracted personnel in capacity calculation
+                          // For PRG department: include external teams in capacity calculation
+                          let totalCapacity = weekCapacity;
+                          if (dept === 'BUILD') {
+                            // Sum all subcontracted teams: predefined teams + custom teams added by user
+                            // Predefined teams (AMI, VICER, ITAX, MCI, MG Electrical) use subcontractedPersonnel
+                            // Custom teams use activeTeams with their own data in subcontractedPersonnel
+                            const subcontractSum = Array.from(activeTeams).reduce((sum, company) => {
+                              return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
+                            }, 0);
+
+                            // Also add any predefined teams that might have data but aren't in activeTeams
+                            const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
+                            const predefinedSum = predefinedTeams.reduce((sum, company) => {
+                              // Only count if not already in activeTeams (to avoid double counting)
+                              if (!activeTeams.has(company)) {
+                                return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
+                              }
+                              return sum;
+                            }, 0);
+
+                            totalCapacity = weekCapacity + subcontractSum + predefinedSum;
+                          } else if (dept === 'PRG') {
+                            const externalSum = Array.from(prgActiveTeams).reduce((sum, team) => {
+                              return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
+                            }, 0);
+                            totalCapacity = weekCapacity + externalSum;
+                          }
+
+                          const availableCapacity = totalCapacity - occupiedValue;
+                          const unit = isMFG ? 'h' : 'people';
+
+                          // Determine color based on available capacity
+                          let bgColor = 'bg-gray-200 border-gray-400';
+                          let textColor = 'text-gray-700';
+
+                          // If no capacity set, show gray
+                          if (totalCapacity === 0) {
+                            bgColor = 'bg-gray-200 border-gray-400';
+                            textColor = 'text-gray-700';
+                          } else if (availableCapacity <= 0) {
+                            // Red: Over-allocated or fully occupied
+                            bgColor = 'bg-red-500 border-red-600';
+                            textColor = 'text-white';
+                          } else if (isMFG) {
+                            // For MFG: use percentage-based thresholds on available hours
+                            if (availableCapacity < totalCapacity * 0.25) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (availableCapacity < totalCapacity * 0.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            } else {
+                              bgColor = 'bg-green-300 border-green-400';
+                              textColor = 'text-green-900';
+                            }
+                          } else {
+                            // For other departments: use percentage-based thresholds on available people
+                            if (availableCapacity < totalCapacity * 0.25) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (availableCapacity < totalCapacity * 0.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            } else {
+                              bgColor = 'bg-green-300 border-green-400';
+                              textColor = 'text-green-900';
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={`capacity-${dept}-${weekData.date}-${assignments.length}-${JSON.stringify(subcontractedPersonnel)}`}
+                              className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
+                                isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
+                              }`}
+                              title={`${t.capacityLabel} - W${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
+                            >
+                              <div className={`${textColor} font-bold text-[9px]`}>
+                                {availableCapacity.toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">{t.projectsSection}</h2>
+
+            {/* Global zoom controls for departments view */}
+            <div className="flex items-center gap-1.5 mb-2 p-1.5 bg-blue-50 rounded-lg border border-blue-200">
+              <span className="text-xs font-semibold text-blue-900">{t.zoomLabel}</span>
+              <button onClick={() => setZoom(Math.max(50, zoom - 10))} className="p-0.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition" title={t.zoomOut}>
+                <ZoomOut size={14} />
+              </button>
+              <input
+                type="range"
+                min="50"
+                max="200"
+                step="10"
+                value={zoom}
+                onChange={(e) => setZoom(parseInt(e.target.value))}
+                className="w-20 cursor-pointer h-1.5"
+              />
+              <button onClick={() => setZoom(Math.min(200, zoom + 10))} className="p-0.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition" title={t.zoomIn}>
+                <ZoomIn size={14} />
+              </button>
+              <span className="text-xs font-semibold text-blue-900">{zoom}%</span>
+            </div>
+
+            {/* Projects in department view - each with individual zoom controls */}
+            {projects.map((proj) => {
+              const dept = departmentFilter as Department;
+
+              return (
+                <div key={proj.id} className="mb-2 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+                  {/* Per-project zoom controls and summary */}
+                  <div className="flex items-center justify-between gap-3 p-1.5 bg-indigo-50 border-b border-indigo-200 flex-wrap">
+                    {/* Per-project summary panel - FIRST (left side) */}
+                    {(() => {
+                      const dept = departmentFilter as Department;
+                      const quotedHoursValue = getQuotedHours(dept, proj.id);
+                      const utilizedHoursValue = getUtilizedHours(dept, proj.id);
+                      const forecastedHoursValue = getForecastedHours(dept, proj.id);
+                      const utilizationPercent = getUtilizationPercent(dept, proj.id);
+                      const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+
+                      return (
+                        <div className="flex items-center gap-1 px-2 border-r border-indigo-300">
+                          {/* Quoted Hours (budget) */}
+                          <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center min-w-fit">
+                            <div className="text-xs text-blue-700 font-bold">{t.quotedLabel}</div>
+                            <div className="text-xs font-black text-blue-700">{quotedHoursValue}h</div>
+                          </div>
+
+                          {/* Used Hours (manually entered) with Edit Button */}
+                          <div className="bg-purple-100 rounded px-2 py-0.5 border border-purple-300 relative min-w-fit">
+                            <button
+                              onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
+                              className="absolute top-0.5 left-0.5 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded transition"
+                              title={t.editUsedHours}
+                            >
+                              <Pencil size={8} />
+                            </button>
+                            <div className="text-center pl-3">
+                              <div className="text-xs text-purple-700 font-bold">{t.usedLabel}</div>
+                              <div className="text-xs font-black text-purple-700">{utilizedHoursValue}h</div>
+                            </div>
+                          </div>
+
+                          {/* Forecasted Hours (manually entered) with Edit Button */}
+                          <div className="bg-orange-100 rounded px-2 py-0.5 border border-orange-300 relative min-w-fit">
+                            <button
+                              onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
+                              className="absolute top-0.5 left-0.5 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded transition"
+                              title={t.editForecastedHours}
+                            >
+                              <Pencil size={8} />
+                            </button>
+                            <div className="text-center pl-3">
+                              <div className="text-xs text-orange-700 font-bold">{t.pronosticado}</div>
+                              <div className="text-xs font-black text-orange-700">{forecastedHoursValue}h</div>
+                            </div>
+                          </div>
+
+                          {/* Utilization % = (Used + Forecasted / Quoted) * 100 */}
+                          <div className={`rounded px-1.5 py-0.5 border text-center min-w-fit ${utilizationColorInfo.bg}`}>
+                            <div className={`text-xs font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
+                            <div className={`text-xs font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Zoom controls */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-semibold text-indigo-900">Z:</span>
+                      <button
+                        onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut size={12} />
+                      </button>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="10"
+                        value={getProjectZoom(proj.id)}
+                        onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                        className="w-12 cursor-pointer h-1.5"
+                      />
+                      <button
+                        onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                        title="Zoom In"
+                      >
+                        <ZoomIn size={12} />
+                      </button>
+                      <span className="text-xs font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
+                    </div>
+                  </div>
+
+                  <div style={{ zoom: `${getProjectZoom(proj.id) / 100}` }}>
+                    <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
+                      <table className="border-collapse text-xs w-full">
+                        <thead>
+                        <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                          <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs">
+                            {proj.name}
+                          </th>
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
+                            return (
+                              <th
+                                key={weekData.date}
+                                data-week-index={idx}
+                                className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
+                                  isCurrentWeek
+                                    ? 'bg-gradient-to-b from-red-500 via-orange-500 to-red-600 text-white border-2 border-red-700 shadow-lg ring-2 ring-red-300'
+                                    : weekData.isNextYear
+                                      ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
+                                      : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
+                                }`}
+                              >
+                                <div className={`font-bold text-xs leading-none`}>W{weekData.weekNum}</div>
+                              </th>
+                            );
+                          })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                      {/* Utilized Hours editing modal - floating overlay centered on screen */}
+                      {(() => {
+                        const dept = departmentFilter as Department;
+                        const isEditingThisUtilized = editingUtilized?.projectId === proj.id && editingUtilized?.department === dept;
+                        const deptInfo = getDepartmentIcon(dept);
+
+                        if (!isEditingThisUtilized) return null;
+
+                        return (
+                          <>
+                            {/* Backdrop */}
+                            <div
+                              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                              onClick={handleCancelUtilized}
+                            />
+                            {/* Modal */}
+                            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+                              <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                                {/* Header */}
+                                <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                                  <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                  <div>
+                                    <div className="text-base font-bold text-slate-100">{deptInfo.label}</div>
+                                    <div className="text-xs text-slate-400">{t.editUsedHours}</div>
+                                  </div>
+                                </div>
+
+                                {/* Input field */}
+                                <div>
+                                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={utilizedHours}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === '' || /^\d+$/.test(val)) {
+                                        setUtilizedHours(val);
+                                      }
+                                    }}
+                                    className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
+                                    autoFocus
+                                    placeholder="0"
+                                  />
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                                  <button
+                                    onClick={handleCancelUtilized}
+                                    className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                                  >
+                                    ✗ {t.cancel}
+                                  </button>
+                                  <button
+                                    onClick={handleSaveUtilized}
+                                    className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                                  >
+                                    ✓ {t.save}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+
+                      {/* Forecasted Hours editing modal - floating overlay centered on screen */}
+                      {(() => {
+                        const dept = departmentFilter as Department;
+                        const isEditingThisForecast = editingForecast?.projectId === proj.id && editingForecast?.department === dept;
+                        const deptInfo = getDepartmentIcon(dept);
+
+                        if (!isEditingThisForecast) return null;
+
+                        return (
+                          <>
+                            {/* Backdrop */}
+                            <div
+                              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                              onClick={handleCancelForecast}
+                            />
+                            {/* Modal */}
+                            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+                              <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                                {/* Header */}
+                                <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                                  <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                  <div>
+                                    <div className="text-base font-bold text-slate-100">{deptInfo.label}</div>
+                                    <div className="text-xs text-slate-400">{t.editForecastedHours}</div>
+                                  </div>
+                                </div>
+
+                                {/* Input field */}
+                                <div>
+                                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={forecastHours}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === '' || /^\d+$/.test(val)) {
+                                        setForecastHours(val);
+                                      }
+                                    }}
+                                    className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
+                                    autoFocus
+                                    placeholder="0"
+                                  />
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                                  <button
+                                    onClick={handleCancelForecast}
+                                    className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                                  >
+                                    ✗ {t.cancel}
+                                  </button>
+                                  <button
+                                    onClick={handleSaveForecast}
+                                    className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                                  >
+                                    ✓ {t.save}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+
+                      {/* Department row for this project */}
+                      <tr className="hover:bg-gray-50">
+                        <td className="border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5">
+                          <div className="flex items-center justify-between gap-0.5">
+                            <div className="flex items-center gap-0.5">
+                              <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
+                                {getDepartmentIcon(dept).icon}
+                              </span>
+                              <span className="font-medium text-xs leading-none">{dept}</span>
+                            </div>
+
+                          </div>
+                        </td>
+                        {allWeeksData.map((weekData, weekIdx) => {
+                          const week = weekData.date;
+                          const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
+                          return (
+                            <td
+                              key={`${proj.id}-${dept}-${week}`}
+                              data-week-index={weekIdx}
+                              onClick={() => handleEditCell(dept, week, proj.id)}
+                              className={`border p-0 relative text-xs cursor-pointer transition-all hover:shadow-md ${
+                                isCurrentWeekColumn
+                                  ? 'border-red-500 border-2 shadow-md bg-gradient-to-b from-red-50 to-orange-50'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {renderCellContent(dept, week, proj.id)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                    </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            </>
+        )}
+
+        {/* Projects Table - Only in General View */}
+        {departmentFilter === 'General' && (
+          <div style={{ zoom: `${zoom / 100}` }}>
+            {/* Global Capacity Summary Panel by Week - Separated by Departments - STICKY */}
+            {showGlobalPanel && (
+              <div className="sticky top-0 z-40 mb-0.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-0.5 shadow-sm">
+                <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
+                  <div className="flex items-center gap-0.5">
+                    <span>💚</span>
+                    <span>Capacity</span>
+                  </div>
+                  <button
+                    onClick={() => setShowGlobalPanel(false)}
+                    className="text-green-600 hover:text-green-800 font-bold text-[10px] cursor-pointer"
+                    title="Hide Capacity panel"
+                  >
+                    ✕
+                  </button>
+                </h2>
+
+              {/* Vertical calendar layout - weeks as columns, departments as rows */}
+              <div className="overflow-x-auto">
+                <div className="inline-block min-w-full">
+                  {/* Week headers row */}
+                  <div className="flex gap-0.5 mb-0.5">
+                    {/* Empty cell for department names column */}
+                    <div className="w-10 flex-shrink-0"></div>
+
+                    {/* Week number headers */}
+                    {allWeeksData.map((weekData, idx) => {
+                      const isCurrentWeek = idx === currentDateWeekIndex;
+                      return (
+                        <div
+                          key={`header-${weekData.date}`}
+                          className={`w-16 flex-shrink-0 text-center text-[8px] font-bold p-0.5 rounded border ${
+                            isCurrentWeek
+                              ? 'bg-red-300 text-red-900 border-red-500'
+                              : 'bg-blue-100 text-blue-900 border-blue-300'
+                          }`}
+                        >
+                          W{weekData.weekNum}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Department rows */}
+                  {DEPARTMENTS.map((dept) => {
+                    const deptIcon = getDepartmentIcon(dept);
+                    return (
+                      <div key={`dept-${dept}`} className="flex gap-0.5 mb-0.5">
+                        {/* Department name column */}
+                        <div className={`w-10 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold p-0.5 rounded border ${deptIcon.color} bg-white`}>
+                          <span title={dept}>{dept}</span>
+                        </div>
+
+                        {/* Week cells for this department */}
+                        {allWeeksData.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
+
+                          // Get SCIO Team Members / Hours per Week capacity for this week
+                          const weekCapacity = scioTeamMembers[dept][weekData.date] || 0;
+
+                          // Calculate total hours occupied for this department this week
+                          const deptAssignments = assignments.filter(a => {
+                            const emp = employees.find(e => e.id === a.employeeId);
+                            return a.weekStartDate === weekData.date && emp?.department === dept;
+                          });
+
+                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+
+                          // For MFG: use hours directly. For other departments: convert to people
+                          const isMFG = dept === 'MFG';
+                          const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
+                          const availableCapacity = weekCapacity - occupiedValue;
+                          const unit = isMFG ? 'h' : 'people';
+
+                          // Determine color based on available capacity
+                          let bgColor = 'bg-gray-200 border-gray-400';
+                          let textColor = 'text-gray-700';
+
+                          // If no capacity set, show gray
+                          if (weekCapacity === 0) {
+                            bgColor = 'bg-gray-200 border-gray-400';
+                            textColor = 'text-gray-700';
+                          } else if (availableCapacity <= 0) {
+                            // Red: Over-allocated or fully occupied
+                            bgColor = 'bg-red-500 border-red-600';
+                            textColor = 'text-white';
+                          } else if (isMFG) {
+                            // For MFG: use percentage-based thresholds on available hours
+                            if (availableCapacity < weekCapacity * 0.25) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (availableCapacity < weekCapacity * 0.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            } else {
+                              bgColor = 'bg-green-300 border-green-400';
+                              textColor = 'text-green-900';
+                            }
+                          } else {
+                            // For other departments: use percentage-based thresholds on available people
+                            if (availableCapacity < weekCapacity * 0.25) {
+                              bgColor = 'bg-orange-400 border-orange-500';
+                              textColor = 'text-white';
+                            } else if (availableCapacity < weekCapacity * 0.5) {
+                              bgColor = 'bg-yellow-300 border-yellow-400';
+                              textColor = 'text-yellow-900';
+                            } else {
+                              bgColor = 'bg-green-300 border-green-400';
+                              textColor = 'text-green-900';
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={`${dept}-${weekData.date}`}
+                              className={`w-16 flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
+                                isCurrentWeek ? 'ring-1 ring-red-600 shadow-md' : ''
+                              }`}
+                              title={`${dept} - W${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: Available: ${availableCapacity.toFixed(2)} ${unit}`}
+                            >
+                              {weekCapacity > 0 ? (
+                                <div className={`${textColor} font-bold text-[7px]`}>
+                                  {availableCapacity.toFixed(2)}
+                                </div>
+                              ) : (
+                                <div className={`${textColor} text-[6px]`}>—</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+            )}
+
+            {/* Toggle button to show Global panel when hidden */}
+            {!showGlobalPanel && (
+              <button
+                onClick={() => setShowGlobalPanel(true)}
+                className="mb-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-lg transition"
+                title="Show Capacity panel"
+              >
+                💚 Show Capacity
+              </button>
+            )}
+
+            <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">Projects Matrix</h2>
+
+              {projects.filter((proj) => {
+                // Filter projects that have activity in the selected year range
+                const yearStart = `${selectedYear}-01-01`;
+                const yearEnd = `${selectedYear + 1}-12-31`; // Include next year weeks too
+
+                // If in General view, exclude quick-created projects (those with visibleInDepartments)
+                if (departmentFilter === 'General' && proj.visibleInDepartments) {
+                  return false;
+                }
+
+                return proj.startDate <= yearEnd && proj.endDate >= yearStart;
+              }).map((proj) => (
+                <div key={proj.id} className="mb-1 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+                  {/* Project header */}
+                  <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                    <div className="flex items-center justify-between gap-1">
+                      {expandedProjects[proj.id] ? (
+                        <ChevronUp size={14} className="text-gray-600" />
+                      ) : (
+                        <ChevronDown size={14} className="text-gray-600" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
+                          <span className="font-bold">{proj.name}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-600">{proj.client}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
+                            {proj.numberOfWeeks} weeks
+                          </span>
+                          {proj.projectManagerId && (
+                            <>
+                              <span className="text-gray-400">•</span>
+                              <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                👨‍💼 {employees.find((e) => e.id === proj.projectManagerId)?.name || 'PM'}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Zoom controls */}
+                      <div className="flex items-center gap-0.5 ml-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs font-semibold text-indigo-900">Z:</span>
+                        <button
+                          onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut size={12} />
+                        </button>
+                        <input
+                          type="range"
+                          min="50"
+                          max="200"
+                          step="10"
+                          value={getProjectZoom(proj.id)}
+                          onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                          className="w-12 cursor-pointer h-1.5"
+                        />
+                        <button
+                          onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                          title="Zoom In"
+                        >
+                          <ZoomIn size={12} />
+                        </button>
+                        <span className="text-xs font-semibold text-indigo-900 ml-0.5">{getProjectZoom(proj.id)}%</span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Expandable content - includes hours panel AND table */}
+                  {expandedProjects[proj.id] && (
+                    <>
+                      {/* Quoted and Used Hours by Department - ALL departments (Read-only in General View) */}
+                      <div className="bg-white rounded p-0 border border-gray-200 m-0.5">
+                        {/* Show ALL 6 departments in 6 columns - NO edit buttons in General view */}
+                        <div className="grid grid-cols-6 gap-0">
+                          {DEPARTMENTS.map((dept) => {
+                            const utilizedHoursValue = proj.departmentHoursUtilized?.[dept] || 0;
+                            const cotizadasHoursValue = proj.departmentHoursAllocated?.[dept] || 0;
+                            const utilizationPercent = getUtilizationPercent(dept, proj.id);
+                            const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+                            const deptInfo = getDepartmentIcon(dept);
+
+                            return (
+                              <div key={dept} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100 text-center">
+                                <div className="flex items-center justify-center gap-0 mb-0">
+                                  <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                </div>
+                                <div className="text-[10px] text-gray-700 mb-0 leading-tight">
+                                  <span className="font-semibold text-[10px]">{cotizadasHoursValue}</span>
+                                  <span className="text-gray-500 text-[10px]">/</span>
+                                  <span className="font-semibold text-[10px]">{utilizedHoursValue}</span>
+                                </div>
+                                <div className={`px-0 py-0 rounded text-[10px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+                                  {utilizationPercent}%
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto" style={{ scrollBehavior: 'smooth', zoom: `${getProjectZoom(proj.id) / 100}` }} ref={(el) => {
+                        if (el) {
+                          projectTableRefs.current.set(proj.id, el);
+                        }
+                      }}>
+                      <table className="border-collapse text-xs w-full">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-20">
+                            <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-xs">
+                              Dpto
+                            </th>
+                            {allWeeksData.map((weekData, idx) => {
+                              const isCurrentWeek = idx === currentDateWeekIndex;
+                              return (
+                                <th
+                                  key={weekData.date}
+                                  data-week-index={idx}
+                                  className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
+                                    isCurrentWeek
+                                      ? 'bg-gradient-to-b from-red-500 via-orange-500 to-red-600 text-white border-2 border-red-700 shadow-lg ring-2 ring-red-300'
+                                      : weekData.isNextYear
+                                        ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
+                                        : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
+                                  }`}
+                                >
+                                  {isCurrentWeek && (
+                                    <>
+                                      <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-red-700 text-white px-0.5 py-0 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
+                                        🎯
+                                      </div>
+                                    </>
+                                  )}
+                                  <div className={`font-bold text-xs leading-none`}>W{weekData.weekNum}</div>
+                                </th>
+                              );
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Show ALL 6 departments in the calendar */}
+                          {DEPARTMENTS.map((dept) => {
+                            return (
+                              <tr key={`${proj.id}-${dept}`} className="hover:bg-gray-50">
+                                <td className="border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5">
+                                  <div className="flex items-center gap-0.5">
+                                    <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
+                                      {getDepartmentIcon(dept).icon}
+                                    </span>
+                                    <span className="font-medium text-xs leading-none">{dept}</span>
+                                  </div>
+                                </td>
+                                {allWeeksData.map((weekData, weekIdx) => {
+                                  const week = weekData.date;
+                                  const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
+
+                                  // Get hours for this specific project-department-week combination
+                                  const projectDeptAssignments = assignments.filter((a) => {
+                                    if (a.projectId !== proj.id || a.weekStartDate !== week) return false;
+                                    const emp = employees.find((e) => e.id === a.employeeId);
+                                    return emp && emp.department === dept;
+                                  });
+
+                                  const totalHours = projectDeptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                                  const talent = calculateTalent(totalHours);
+                                  const isInRange = isWeekInProjectRange(week, proj);
+
+                                  // Get the stage from actual assignments (what was selected when adding hours)
+                                  const assignmentStage = projectDeptAssignments.length > 0 ? projectDeptAssignments[0].stage : null;
+                                  const stageColor = assignmentStage ? getStageColor(assignmentStage) : null;
+
+                                  // Get department-specific start and duration info
+                                  const deptStages = proj.departmentStages?.[dept];
+                                  const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
+
+                                  // Calculate the actual week index from the department's start date
+                                  const deptStartDate = deptFirstStage?.departmentStartDate;
+                                  const deptDuration = deptFirstStage?.durationWeeks || 0;
+
+                                  // Calculate department end date by adding weeks to start date
+                                  let deptEndDate = '';
+                                  if (deptStartDate && deptDuration > 0) {
+                                    const endDate = new Date(deptStartDate);
+                                    endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
+                                    deptEndDate = endDate.toISOString().split('T')[0];
+                                  }
+
+                                  // Check if current week is within department range using date comparison
+                                  // For departments WITHOUT specific departmentStages, use project dates instead
+                                  const effectiveDeptStartDate = deptStartDate || proj.startDate;
+                                  const effectiveDeptEndDate = deptEndDate || proj.endDate;
+                                  const isDeptWeekInRange = week >= effectiveDeptStartDate && week <= effectiveDeptEndDate;
+                                  const isDeptFirstWeek = week === effectiveDeptStartDate;
+
+                                  // Calculate consecutive week number within the department (1, 2, 3, etc.)
+                                  let deptConsecutiveWeek = 0;
+                                  if (isDeptWeekInRange) {
+                                    const startMs = new Date(effectiveDeptStartDate).getTime();
+                                    const currentMs = new Date(week).getTime();
+                                    const weeksDiff = Math.floor((currentMs - startMs) / (7 * 24 * 60 * 60 * 1000));
+                                    deptConsecutiveWeek = weeksDiff + 1;
+                                  }
+
+                                  return (
+                                    <td
+                                      key={`${proj.id}-${dept}-${week}`}
+                                      data-week-index={weekIdx}
+                                      className={`border p-0 relative text-xs ${
+                                        isCurrentWeekColumn
+                                          ? 'border-red-500 border-2 shadow-md bg-gradient-to-b from-red-50 to-orange-50'
+                                          : 'border-gray-300'
+                                      } ${
+                                        stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50'
+                                      }`}
+                                    >
+                                      {totalHours === 0 ? (
+                                        <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight ${
+                                          stageColor
+                                            ? `${stageColor.text}`
+                                            : isDeptWeekInRange
+                                              ? isDeptFirstWeek
+                                                ? 'text-orange-600 bg-orange-100'
+                                                : 'text-purple-600 bg-purple-100'
+                                              : isInRange
+                                                ? 'text-green-600 bg-green-50'
+                                                : 'text-gray-400'
+                                        }`}>
+                                          {stageColor && assignmentStage ? (
+                                            <span className="font-semibold text-[7px]">{assignmentStage}</span>
+                                          ) : isDeptWeekInRange ? (
+                                            <>
+                                              {isDeptFirstWeek ? (
+                                                <span className="text-[10px] font-bold">Init</span>
+                                              ) : (
+                                                <span className="font-bold text-[10px]">{deptConsecutiveWeek}</span>
+                                              )}
+                                            </>
+                                          ) : isInRange ? (
+                                            <span className="text-[10px]">○</span>
+                                          ) : (
+                                            '—'
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
+                                          stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
+                                        } ${!isDeptWeekInRange ? 'border border-dashed border-red-500 bg-red-50' : ''}`}>
+                                          {!isDeptWeekInRange && (
+                                            <div className="absolute -top-1 -left-1 text-red-600 font-bold text-[10px]">⚠</div>
+                                          )}
+                                          <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
+                                          <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
+                                          {stageColor && assignmentStage && (
+                                            <div className="text-[7px] font-semibold leading-tight">{assignmentStage}</div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+        )}
+      </div>
+
+      {/* Leyenda - Expandable in place */}
+      {showLegend && (
+        <div className="mx-2 my-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            {departmentFilter === 'General' && (
+              <>
+                <h3 className="text-xs font-bold text-indigo-900 mb-2">Global Panel - Colors by Utilization</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-green-300 rounded border border-green-400 flex-shrink-0"></div>
+                    <span className="text-gray-700 font-medium">0-50% (Low)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-yellow-300 rounded border border-yellow-400 flex-shrink-0"></div>
+                    <span className="text-gray-700 font-medium">50-75% (Moderate)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-orange-400 rounded border border-orange-500 flex-shrink-0"></div>
+                    <span className="text-gray-700 font-medium">75-100% (High)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-red-500 rounded border border-red-600 flex-shrink-0"></div>
+                    <span className="text-gray-700 font-medium">100%+ (Critical)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gray-100 rounded border border-gray-300 flex-shrink-0"></div>
+                    <span className="text-gray-700 font-medium">No data</span>
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-blue-100 rounded border border-blue-300 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">h</div>
+                <span className="text-gray-700 font-medium">Hours</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-gray-400 flex-shrink-0">—</div>
+                <span className="text-gray-700 font-medium">No assignments</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-green-100 rounded border border-green-300 flex items-center justify-center text-green-600 text-sm flex-shrink-0">○</div>
+                <span className="text-gray-700 font-medium">Within range</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-yellow-400 rounded border border-yellow-500 flex items-center justify-center text-xs font-bold flex-shrink-0">S</div>
+                <span className="text-gray-700 font-medium">Current week</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-red-50 rounded border border-dashed border-red-500 flex items-center justify-center text-red-600 text-sm font-bold flex-shrink-0">⚠</div>
+                <span className="text-gray-700 font-medium">Out of range</span>
+              </div>
+            </div>
+            <div className="text-xs text-blue-900">
+              {departmentFilter === 'General' && (
+                <span>📌 Read-only view. Select a department to edit. Colors in the Global panel represent weekly capacity utilization per department.</span>
+              )}
+              {departmentFilter !== 'General' && (
+                <span>💡 Background colors indicate project stages.</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Project Creation Modal */}
+        {showQuickProjectModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h2 className="text-lg font-bold">➕ Crear Proyecto</h2>
+                <button
+                  onClick={() => setShowQuickProjectModal(false)}
+                  className="hover:bg-blue-700 p-1 rounded transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateQuickProject(); }} className="p-6 space-y-4">
+                {/* Job */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.job}</label>
+                  <input
+                    type="text"
+                    value={quickProjectForm.name}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, name: e.target.value })}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                    placeholder={t.egRefreshDashboard}
+                  />
+                </div>
+
+                {/* Customer */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">👥 {t.customer}</label>
+                  <input
+                    type="text"
+                    value={quickProjectForm.client}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, client: e.target.value })}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                    placeholder={t.egAcmeCorpDesign}
+                  />
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
+                  <input
+                    type="date"
+                    value={quickProjectForm.startDate}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, startDate: e.target.value })}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                  />
+                </div>
+
+                {/* Number of Weeks */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">⏱️ {t.numberOfWeeks}</label>
+                  <input
+                    type="text"
+                    value={quickProjectForm.numberOfWeeks}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        const num = value === '' ? '' : parseInt(value);
+                        if (num === '' || (num >= 1 && num <= 52)) {
+                          setQuickProjectForm({ ...quickProjectForm, numberOfWeeks: num });
+                        } else if (num < 1) {
+                          setQuickProjectForm({ ...quickProjectForm, numberOfWeeks: 1 });
+                        } else if (num > 52) {
+                          setQuickProjectForm({ ...quickProjectForm, numberOfWeeks: 52 });
+                        }
+                      }
+                    }}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                    placeholder="4"
+                  />
+                </div>
+
+                {/* Facility - Only MI and AL */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">🏭 {t.facility}</label>
+                  <select
+                    value={quickProjectForm.facility}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, facility: e.target.value as 'AL' | 'MI' })}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                  >
+                    <option value="AL">AL</option>
+                    <option value="MI">MI</option>
+                  </select>
+                </div>
+
+                {/* Budget Hours */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">💚 {t.budgetHours || 'Horas Presupuestadas'}</label>
+                  <input
+                    type="text"
+                    value={quickProjectForm.budgetHours}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        const num = value === '' ? 0 : parseInt(value);
+                        setQuickProjectForm({ ...quickProjectForm, budgetHours: num });
+                      }
+                    }}
+                    className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                    placeholder="0"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickProjectModal(false)}
+                    className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition"
+                  >
+                    {t.create}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* PRG External Team Modal */}
+        {isPRGModalOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={() => {
+                setIsPRGModalOpen(false);
+                setPRGTeamName('');
+              }}
+            />
+            {/* Modal */}
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+              <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 rounded-t-lg">
+                  <h2 className="text-lg font-semibold text-gray-800">Agregar Equipo PRG</h2>
+                  <button
+                    onClick={() => {
+                      setIsPRGModalOpen(false);
+                      setPRGTeamName('');
+                    }}
+                    className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
+                    title="Cerrar"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Form Content */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (prgTeamName.trim()) {
+                      const newTeams = new Set(prgActiveTeams);
+                      newTeams.add(prgTeamName.trim());
+                      setPRGActiveTeams(newTeams);
+                      setPRGTeamName('');
+                      setIsPRGModalOpen(false);
+                    }
+                  }}
+                  className="p-4 space-y-4"
+                >
+                  {/* Team Name Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Proveedor</label>
+                    <input
+                      type="text"
+                      value={prgTeamName}
+                      onChange={(e) => setPRGTeamName(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Ej. Proveedor ABC"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPRGModalOpen(false);
+                        setPRGTeamName('');
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!prgTeamName.trim()}
+                      className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+                    >
+                      Agregar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* BUILD Subcontracted Team Modal */}
+        {isBuildModalOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={() => {
+                setIsBuildModalOpen(false);
+                setBuildTeamName('');
+              }}
+            />
+            {/* Modal */}
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+              <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg">
+                  <h2 className="text-lg font-semibold text-gray-800">Agregar Equipo BUILD</h2>
+                  <button
+                    onClick={() => {
+                      setIsBuildModalOpen(false);
+                      setBuildTeamName('');
+                    }}
+                    className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
+                    title="Cerrar"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Form Content */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (buildTeamName.trim()) {
+                      const newTeams = new Set(activeTeams);
+                      newTeams.add(buildTeamName.trim());
+                      setActiveTeams(newTeams);
+                      setBuildTeamName('');
+                      setIsBuildModalOpen(false);
+                    }
+                  }}
+                  className="p-4 space-y-4"
+                >
+                  {/* Team Name Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Subcontratista</label>
+                    <input
+                      type="text"
+                      value={buildTeamName}
+                      onChange={(e) => setBuildTeamName(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Ej. Empresa XYZ"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsBuildModalOpen(false);
+                        setBuildTeamName('');
+                      }}
+                      className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!buildTeamName.trim()}
+                      className="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+                    >
+                      Agregar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </>
+        )}
+    </div>
+  );
+}
