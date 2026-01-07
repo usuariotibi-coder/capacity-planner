@@ -5,6 +5,8 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from capacity.views import (
     EmployeeViewSet,
     ProjectViewSet,
@@ -23,16 +25,36 @@ router.register(r'department-stages', DepartmentStageConfigViewSet, basename='de
 router.register(r'project-budgets', ProjectBudgetViewSet, basename='project-budget')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 
+class RootView(APIView):
+    def get(self, request):
+        return Response({
+            'message': 'Team Capacity Planner API',
+            'version': '1.0',
+            'endpoints': {
+                'employees': '/employees/',
+                'projects': '/projects/',
+                'assignments': '/assignments/',
+                'department-stages': '/department-stages/',
+                'project-budgets': '/project-budgets/',
+                'activity-logs': '/activity-logs/',
+                'token': '/token/',
+                'token-refresh': '/token/refresh/',
+            }
+        })
+
 urlpatterns = [
     # Admin panel
     path('admin/', admin.site.urls),
 
+    # Root API endpoint
+    path('', RootView.as_view(), name='root'),
+
     # Authentication endpoints
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # API endpoints
-    path('', include(router.urls)),
+    path('api/', include(router.urls)),
 
     # Default authentication endpoints
     path('api-auth/', include('rest_framework.urls')),
