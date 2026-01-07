@@ -171,10 +171,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Security Settings
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Railway handles SSL termination, so we don't need Django to redirect
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_SECURITY_POLICY = {
-        'DEFAULT_SRC': ("'self'",),
-    }
