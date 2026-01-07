@@ -56,12 +56,9 @@ RUN chmod +x /app/entrypoint.sh
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
+# Expose port (Railway uses dynamic PORT)
 EXPOSE 8000
 
-# Health check - simple TCP check instead of HTTP
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import socket; socket.create_connection(('localhost', 8000), timeout=5)"
-
-# Run entrypoint script which handles migrations, data loading, and gunicorn
+# No health check - let Railway handle it
+# CMD will use entrypoint.sh which binds to $PORT
 CMD ["/app/entrypoint.sh"]
