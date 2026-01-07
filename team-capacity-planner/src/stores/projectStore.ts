@@ -15,7 +15,7 @@ interface ProjectStore {
   error: string | null;
   hasFetched: boolean;
   fetchProjects: () => Promise<void>;
-  addProject: (project: Omit<Project, 'id'>) => Promise<void>;
+  addProject: (project: Project) => Promise<Project>;
   updateProject: (id: string, project: Partial<Project>) => void;
   deleteProject: (id: string) => Promise<void>;
 }
@@ -44,8 +44,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   addProject: async (project) => {
     try {
-      const newProject = await projectsApi.create(project);
+      // Remove local id, API will generate one
+      const { id: _localId, ...projectData } = project;
+      const newProject = await projectsApi.create(projectData);
       set((state) => ({ projects: [...state.projects, newProject] }));
+      return newProject;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Error al crear proyecto' });
       throw error;

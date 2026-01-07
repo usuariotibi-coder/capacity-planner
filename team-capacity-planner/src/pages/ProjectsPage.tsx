@@ -186,7 +186,6 @@ export function ProjectsPage() {
                 const hoursThisWeek = Math.round((hoursPerEmployee / numberOfWeeks) * 100) / 100;
                 if (hoursThisWeek > 0) {
                   addAssignment({
-                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                     employeeId: emp.id,
                     projectId: newProject.id,
                     weekStartDate: week,
