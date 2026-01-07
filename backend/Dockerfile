@@ -48,6 +48,9 @@ RUN mkdir -p /app/staticfiles
 # Collect static files
 RUN python manage.py collectstatic --noinput --clear
 
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
+
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
@@ -57,7 +60,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/', timeout=5)"
+    CMD python -c "import requests; requests.get('http://localhost:8000', timeout=5)"
 
-# Run gunicorn
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--threads", "2", "--worker-class", "gthread"]
+# Run entrypoint script which handles migrations, data loading, and gunicorn
+CMD ["/app/entrypoint.sh"]
