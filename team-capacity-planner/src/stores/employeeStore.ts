@@ -46,6 +46,8 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
   },
 
   updateEmployee: async (id, updates) => {
+    const originalEmployees = get().employees;
+
     // Optimistic update
     set((state) => ({
       employees: state.employees.map((emp) =>
@@ -56,8 +58,8 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
     try {
       await employeesApi.update(id, updates);
     } catch (error) {
-      // Revert on error - refetch
-      get().fetchEmployees();
+      // Revert on error
+      set({ employees: originalEmployees });
       set({ error: error instanceof Error ? error.message : 'Error al actualizar empleado' });
     }
   },

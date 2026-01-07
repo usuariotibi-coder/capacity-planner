@@ -56,6 +56,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateProject: async (id, updates) => {
+    const originalProjects = get().projects;
+
     // Optimistic update
     set((state) => ({
       projects: state.projects.map((proj) =>
@@ -66,7 +68,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     try {
       await projectsApi.update(id, updates);
     } catch (error) {
-      get().fetchProjects();
+      // Revert on error
+      set({ projects: originalProjects });
       set({ error: error instanceof Error ? error.message : 'Error al actualizar proyecto' });
     }
   },

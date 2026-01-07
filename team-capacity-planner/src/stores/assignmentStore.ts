@@ -48,6 +48,9 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   },
 
   updateAssignment: async (id, updates) => {
+    const originalAssignments = get().assignments;
+
+    // Optimistic update
     set((state) => ({
       assignments: state.assignments.map((assign) =>
         assign.id === id ? { ...assign, ...updates } : assign
@@ -57,7 +60,8 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     try {
       await assignmentsApi.update(id, updates);
     } catch (error) {
-      get().fetchAssignments();
+      // Revert on error
+      set({ assignments: originalAssignments });
       set({ error: error instanceof Error ? error.message : 'Error al actualizar asignación' });
     }
   },
