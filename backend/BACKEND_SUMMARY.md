@@ -86,9 +86,8 @@ python manage.py load_initial_data
 python manage.py runserver
 ```
 
-### Default Credentials
-- **Username**: admin
-- **Password**: admin
+### Credentials
+Credentials are configured by the system administrator. Contact your admin for access.
 
 ## 📊 API Overview
 
@@ -116,10 +115,10 @@ python manage.py runserver
 ### Authentication
 
 ```bash
-# Get token
+# Get token (replace with your credentials)
 curl -X POST http://localhost:8000/api/token/ \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
+  -d '{"username":"YOUR_USERNAME","password":"YOUR_PASSWORD"}'
 
 # Use token
 curl -H "Authorization: Bearer <TOKEN>" \

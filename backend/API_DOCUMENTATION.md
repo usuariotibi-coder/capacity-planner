@@ -349,11 +349,12 @@ The API uses **JWT (JSON Web Tokens)** for stateless authentication.
 
 **cURL Example**:
 ```bash
+# Replace with your actual credentials
 curl -X POST http://localhost:8000/api/token/ \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
-    "password": "password123"
+    "username": "YOUR_USERNAME",
+    "password": "YOUR_PASSWORD"
   }'
 ```
 

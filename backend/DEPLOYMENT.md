@@ -137,10 +137,10 @@ After deployment is complete:
 # Test API availability
 curl https://your-app.railway.app/api/
 
-# Test authentication endpoint
+# Test authentication endpoint (replace with your credentials)
 curl -X POST https://your-app.railway.app/api/token/ \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password"}'
+  -d '{"username": "YOUR_USERNAME", "password": "YOUR_PASSWORD"}'
 
 # Test with token
 curl -H "Authorization: Bearer <your-token>" \

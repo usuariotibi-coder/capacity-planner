@@ -89,7 +89,7 @@ const LoginPage: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Usuario por defecto: admin / admin</p>
+          <p>Contacta al administrador para obtener credenciales</p>
         </div>
       </div>
     </div>
