@@ -103,6 +103,12 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
       ...options.headers,
     };
 
+    // Debug logging
+    console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
+    if (options.body) {
+      console.log('[API] Request body:', options.body);
+    }
+
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
@@ -122,16 +128,28 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `HTTP error ${response.status}`);
+    const errorText = await response.text();
+    console.error(`[API] Error ${response.status}:`, errorText);
+    let errorData = {};
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { detail: errorText || `HTTP error ${response.status}` };
+    }
+    const errorMessage = (errorData as any).detail ||
+                         Object.values(errorData).flat().join(', ') ||
+                         `HTTP error ${response.status}`;
+    throw new Error(errorMessage);
   }
 
   // Handle 204 No Content (DELETE responses)
   if (response.status === 204) {
+    console.log('[API] Success: 204 No Content');
     return null;
   }
 
   const data = await response.json();
+  console.log('[API] Response:', data);
   return transformKeysToCamel(data);
 };
 

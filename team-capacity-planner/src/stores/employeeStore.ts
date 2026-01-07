@@ -37,10 +37,15 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
 
   addEmployee: async (employee) => {
     try {
+      console.log('[Store] Creating employee:', employee);
       const newEmployee = await employeesApi.create(employee);
+      console.log('[Store] Employee created:', newEmployee);
       set((state) => ({ employees: [...state.employees, newEmployee] }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Error al crear empleado' });
+      const errorMsg = error instanceof Error ? error.message : 'Error al crear empleado';
+      console.error('[Store] Error creating employee:', errorMsg);
+      set({ error: errorMsg });
+      alert(`Error al crear empleado: ${errorMsg}`);
       throw error;
     }
   },
@@ -56,11 +61,16 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Updating employee:', id, updates);
       await employeesApi.update(id, updates);
+      console.log('[Store] Employee updated successfully');
     } catch (error) {
       // Revert on error
+      const errorMsg = error instanceof Error ? error.message : 'Error al actualizar empleado';
+      console.error('[Store] Error updating employee:', errorMsg);
       set({ employees: originalEmployees });
-      set({ error: error instanceof Error ? error.message : 'Error al actualizar empleado' });
+      set({ error: errorMsg });
+      alert(`Error al actualizar empleado: ${errorMsg}`);
     }
   },
 
@@ -73,11 +83,16 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Deleting employee:', id);
       await employeesApi.delete(id);
+      console.log('[Store] Employee deleted successfully');
     } catch (error) {
       // Revert on error
+      const errorMsg = error instanceof Error ? error.message : 'Error al eliminar empleado';
+      console.error('[Store] Error deleting employee:', errorMsg);
       set({ employees: originalEmployees });
-      set({ error: error instanceof Error ? error.message : 'Error al eliminar empleado' });
+      set({ error: errorMsg });
+      alert(`Error al eliminar empleado: ${errorMsg}`);
       throw error;
     }
   },

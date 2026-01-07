@@ -39,10 +39,15 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   addAssignment: async (assignment) => {
     try {
+      console.log('[Store] Creating assignment:', assignment);
       const newAssignment = await assignmentsApi.create(assignment);
+      console.log('[Store] Assignment created:', newAssignment);
       set((state) => ({ assignments: [...state.assignments, newAssignment] }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Error al crear asignación' });
+      const errorMsg = error instanceof Error ? error.message : 'Error al crear asignación';
+      console.error('[Store] Error creating assignment:', errorMsg);
+      set({ error: errorMsg });
+      alert(`Error al crear asignación: ${errorMsg}`);
       throw error;
     }
   },
@@ -58,11 +63,16 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Updating assignment:', id, updates);
       await assignmentsApi.update(id, updates);
+      console.log('[Store] Assignment updated successfully');
     } catch (error) {
       // Revert on error
+      const errorMsg = error instanceof Error ? error.message : 'Error al actualizar asignación';
+      console.error('[Store] Error updating assignment:', errorMsg);
       set({ assignments: originalAssignments });
-      set({ error: error instanceof Error ? error.message : 'Error al actualizar asignación' });
+      set({ error: errorMsg });
+      alert(`Error al actualizar asignación: ${errorMsg}`);
     }
   },
 
@@ -74,10 +84,15 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Deleting assignment:', id);
       await assignmentsApi.delete(id);
+      console.log('[Store] Assignment deleted successfully');
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error al eliminar asignación';
+      console.error('[Store] Error deleting assignment:', errorMsg);
       set({ assignments: originalAssignments });
-      set({ error: error instanceof Error ? error.message : 'Error al eliminar asignación' });
+      set({ error: errorMsg });
+      alert(`Error al eliminar asignación: ${errorMsg}`);
       throw error;
     }
   },

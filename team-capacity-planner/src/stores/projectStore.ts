@@ -46,11 +46,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     try {
       // Remove local id, API will generate one
       const { id: _localId, ...projectData } = project;
+      console.log('[Store] Creating project:', projectData);
       const newProject = await projectsApi.create(projectData);
+      console.log('[Store] Project created:', newProject);
       set((state) => ({ projects: [...state.projects, newProject] }));
       return newProject;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Error al crear proyecto' });
+      const errorMsg = error instanceof Error ? error.message : 'Error al crear proyecto';
+      console.error('[Store] Error creating project:', errorMsg);
+      set({ error: errorMsg });
+      alert(`Error al crear proyecto: ${errorMsg}`);
       throw error;
     }
   },
@@ -66,11 +71,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Updating project:', id, updates);
       await projectsApi.update(id, updates);
+      console.log('[Store] Project updated successfully');
     } catch (error) {
       // Revert on error
+      const errorMsg = error instanceof Error ? error.message : 'Error al actualizar proyecto';
+      console.error('[Store] Error updating project:', errorMsg);
       set({ projects: originalProjects });
-      set({ error: error instanceof Error ? error.message : 'Error al actualizar proyecto' });
+      set({ error: errorMsg });
+      alert(`Error al actualizar proyecto: ${errorMsg}`);
     }
   },
 
@@ -82,10 +92,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }));
 
     try {
+      console.log('[Store] Deleting project:', id);
       await projectsApi.delete(id);
+      console.log('[Store] Project deleted successfully');
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error al eliminar proyecto';
+      console.error('[Store] Error deleting project:', errorMsg);
       set({ projects: originalProjects });
-      set({ error: error instanceof Error ? error.message : 'Error al eliminar proyecto' });
+      set({ error: errorMsg });
+      alert(`Error al eliminar proyecto: ${errorMsg}`);
       throw error;
     }
   },
