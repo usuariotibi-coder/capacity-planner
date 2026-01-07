@@ -55,10 +55,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         read_only=True,
         help_text="Human-readable department name"
     )
-    is_subcontracted = serializers.BooleanField(
-        source='is_subcontracted_material',
-        help_text="Whether this is subcontracted material"
-    )
 
     class Meta:
         model = Employee
@@ -72,13 +68,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'department_display',
             'capacity',
             'is_active',
-            'is_subcontracted',
             'is_subcontracted_material',
             'subcontract_company',
             'created_at',
             'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'is_subcontracted_material': {'required': False, 'default': False},
+            'subcontract_company': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'is_active': {'required': False, 'default': True},
+        }
 
     def validate_capacity(self, value):
         """
@@ -106,19 +106,15 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def validate_subcontract_company(self, value):
         """
         Validate subcontract company field.
-        Only required if is_subcontracted_material is True.
+        Accepts any text value for flexible team/company names.
 
         Args:
             value: The subcontract company value
 
         Returns:
-            The validated value
+            The validated value (or empty string if None)
         """
-        if self.initial_data.get('is_subcontracted_material') and not value:
-            raise serializers.ValidationError(
-                "Subcontract company is required for subcontracted material."
-            )
-        return value
+        return value or ''
 
     def validate_department(self, value):
         """

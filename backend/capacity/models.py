@@ -77,7 +77,7 @@ class Employee(models.Model):
     capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="Available hours per week")
     is_active = models.BooleanField(default=True)
     is_subcontracted_material = models.BooleanField(default=False, help_text="Whether this is subcontracted material (BUILD dept only)")
-    subcontract_company = models.CharField(max_length=50, choices=SubcontractCompany.choices, null=True, blank=True, help_text="Company name if subcontracted")
+    subcontract_company = models.CharField(max_length=100, null=True, blank=True, help_text="Company/team name if subcontracted")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
