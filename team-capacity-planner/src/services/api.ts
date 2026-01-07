@@ -126,6 +126,11 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
     throw new Error(error.detail || `HTTP error ${response.status}`);
   }
 
+  // Handle 204 No Content (DELETE responses)
+  if (response.status === 204) {
+    return null;
+  }
+
   const data = await response.json();
   return transformKeysToCamel(data);
 };
