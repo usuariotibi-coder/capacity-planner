@@ -102,6 +102,7 @@ class Project(models.Model):
     facility = models.CharField(max_length=10, choices=Facility.choices)
     number_of_weeks = models.IntegerField(validators=[MinValueValidator(1)])
     project_manager = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name='managed_projects')
+    visible_in_departments = models.JSONField(default=list, blank=True, help_text="Departments where this project is visible (for quick-created projects)")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,7 +165,7 @@ class Assignment(models.Model):
 class ProjectBudget(models.Model):
     """Project budget/hours allocation per department"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='budget')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='budgets')
     department = models.CharField(max_length=10, choices=Department.choices)
     hours_allocated = models.FloatField(validators=[MinValueValidator(0)], help_text="Budget hours per department (presupuesto/cotizado)")
     hours_utilized = models.FloatField(default=0, validators=[MinValueValidator(0)], help_text="Hours utilized/used per department")

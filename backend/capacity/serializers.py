@@ -181,10 +181,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     """
 
     project_manager = EmployeeSerializer(read_only=True)
-    project_manager_id = serializers.UUIDField(
-        write_only=True,
-        required=False,
-        allow_null=True,
+    project_manager_id = serializers.SerializerMethodField(
         help_text="UUID of project manager employee"
     )
     facility_display = serializers.CharField(
@@ -197,6 +194,24 @@ class ProjectSerializer(serializers.ModelSerializer):
     )
     active_assignments = serializers.SerializerMethodField(
         help_text="Number of assignments in current week"
+    )
+    department_stages = serializers.SerializerMethodField(
+        help_text="Department stages as Record<Department, DepartmentStageConfig[]>"
+    )
+    department_hours_allocated = serializers.SerializerMethodField(
+        help_text="Budget hours per department as Record<Department, number>"
+    )
+    department_hours_utilized = serializers.SerializerMethodField(
+        help_text="Utilized hours per department as Record<Department, number>"
+    )
+    department_hours_forecast = serializers.SerializerMethodField(
+        help_text="Forecast hours per department as Record<Department, number>"
+    )
+    visible_in_departments = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="Departments where this project is visible"
     )
 
     class Meta:
@@ -214,10 +229,32 @@ class ProjectSerializer(serializers.ModelSerializer):
             'project_manager_id',
             'assignment_count',
             'active_assignments',
+            'department_stages',
+            'department_hours_allocated',
+            'department_hours_utilized',
+            'department_hours_forecast',
+            'visible_in_departments',
             'created_at',
             'updated_at',
         )
-        read_only_fields = ('id', 'created_at', 'updated_at', 'assignment_count', 'active_assignments')
+        read_only_fields = (
+            'id', 'created_at', 'updated_at', 'assignment_count',
+            'active_assignments', 'department_stages',
+            'department_hours_allocated', 'department_hours_utilized',
+            'department_hours_forecast', 'project_manager_id'
+        )
+
+    def get_project_manager_id(self, obj):
+        """
+        Get project manager ID as string.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            UUID string of project manager or None
+        """
+        return str(obj.project_manager.id) if obj.project_manager else None
 
     def get_assignment_count(self, obj):
         """
@@ -245,6 +282,76 @@ class ProjectSerializer(serializers.ModelSerializer):
         today = datetime.now().date()
         week_start = today - timedelta(days=today.weekday())
         return obj.assignments.filter(week_start_date=week_start).count()
+
+    def get_department_stages(self, obj):
+        """
+        Get department stages as Record<Department, DepartmentStageConfig[]>.
+        Groups DepartmentStageConfig by department.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Dict with department keys and list of stage configs as values
+        """
+        result = {}
+        for config in obj.department_stages.all():
+            dept = config.department
+            if dept not in result:
+                result[dept] = []
+            result[dept].append({
+                'stage': config.stage,
+                'weekStart': config.week_start,
+                'weekEnd': config.week_end,
+                'departmentStartDate': config.department_start_date.isoformat() if config.department_start_date else None,
+                'durationWeeks': config.duration_weeks or (config.week_end - config.week_start + 1),
+            })
+        return result
+
+    def get_department_hours_allocated(self, obj):
+        """
+        Get allocated budget hours per department as Record<Department, number>.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Dict with department keys and allocated hours as values
+        """
+        result = {}
+        for budget in obj.budgets.all():
+            result[budget.department] = budget.hours_allocated
+        return result
+
+    def get_department_hours_utilized(self, obj):
+        """
+        Get utilized hours per department as Record<Department, number>.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Dict with department keys and utilized hours as values
+        """
+        result = {}
+        for budget in obj.budgets.all():
+            result[budget.department] = budget.hours_utilized
+        return result
+
+    def get_department_hours_forecast(self, obj):
+        """
+        Get forecast hours per department as Record<Department, number>.
+
+        Args:
+            obj: The Project instance
+
+        Returns:
+            Dict with department keys and forecast hours as values
+        """
+        result = {}
+        for budget in obj.budgets.all():
+            result[budget.department] = budget.hours_forecast
+        return result
 
     def validate(self, data):
         """
@@ -302,7 +409,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         Returns:
             Created Project instance
         """
-        manager_id = validated_data.pop('project_manager_id', None)
+        # Get project_manager_id from initial_data since it's not in validated_data
+        manager_id = self.initial_data.get('project_manager_id')
         if manager_id:
             try:
                 validated_data['project_manager_id'] = manager_id
@@ -323,7 +431,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         Returns:
             Updated Project instance
         """
-        manager_id = validated_data.pop('project_manager_id', None)
+        # Get project_manager_id from initial_data since it's not in validated_data
+        manager_id = self.initial_data.get('project_manager_id')
         if manager_id is not None:
             try:
                 validated_data['project_manager_id'] = manager_id
@@ -345,13 +454,11 @@ class AssignmentSerializer(serializers.ModelSerializer):
     """
 
     employee = EmployeeSerializer(read_only=True)
-    employee_id = serializers.UUIDField(
-        write_only=True,
+    employee_id = serializers.SerializerMethodField(
         help_text="UUID of the employee"
     )
     project = ProjectSerializer(read_only=True)
-    project_id = serializers.UUIDField(
-        write_only=True,
+    project_id = serializers.SerializerMethodField(
         help_text="UUID of the project"
     )
     stage_display = serializers.CharField(
@@ -399,7 +506,33 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'week_number',
             'total_hours',
             'stage_display',
+            'employee_id',
+            'project_id',
         )
+
+    def get_employee_id(self, obj):
+        """
+        Get employee ID as string.
+
+        Args:
+            obj: The Assignment instance
+
+        Returns:
+            UUID string of employee
+        """
+        return str(obj.employee.id) if obj.employee else None
+
+    def get_project_id(self, obj):
+        """
+        Get project ID as string.
+
+        Args:
+            obj: The Assignment instance
+
+        Returns:
+            UUID string of project
+        """
+        return str(obj.project.id) if obj.project else None
 
     def get_employee_capacity(self, obj):
         """
@@ -547,6 +680,49 @@ class AssignmentSerializer(serializers.ModelSerializer):
                 "Week start date must be a Monday."
             )
         return value
+
+    def create(self, validated_data):
+        """
+        Create a new assignment instance.
+
+        Args:
+            validated_data: Validated data from serializer
+
+        Returns:
+            Created Assignment instance
+        """
+        # Get employee_id and project_id from initial_data
+        employee_id = self.initial_data.get('employee_id')
+        project_id = self.initial_data.get('project_id')
+
+        if employee_id:
+            validated_data['employee_id'] = employee_id
+        if project_id:
+            validated_data['project_id'] = project_id
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """
+        Update an existing assignment instance.
+
+        Args:
+            instance: The assignment instance to update
+            validated_data: Validated data from serializer
+
+        Returns:
+            Updated Assignment instance
+        """
+        # Get employee_id and project_id from initial_data if provided
+        employee_id = self.initial_data.get('employee_id')
+        project_id = self.initial_data.get('project_id')
+
+        if employee_id is not None:
+            validated_data['employee_id'] = employee_id
+        if project_id is not None:
+            validated_data['project_id'] = project_id
+
+        return super().update(instance, validated_data)
 
 
 class DepartmentStageConfigSerializer(serializers.ModelSerializer):
@@ -1096,13 +1272,12 @@ class EmployeeDetailSerializer(EmployeeSerializer):
 class ProjectDetailSerializer(ProjectSerializer):
     """
     Extended serializer for Project details.
-    Includes assignments, budget, and department configurations.
+    Includes assignments, budgets, and department configurations.
     Used for detailed project views and comprehensive data.
     """
 
     assignments = AssignmentSerializer(many=True, read_only=True)
-    department_stages = DepartmentStageConfigSerializer(many=True, read_only=True)
-    budget = ProjectBudgetSerializer(read_only=True)
+    budgets = ProjectBudgetSerializer(many=True, read_only=True)
     total_hours_allocated = serializers.SerializerMethodField()
     total_hours_utilized = serializers.SerializerMethodField()
     overall_utilization = serializers.SerializerMethodField()
@@ -1110,16 +1285,14 @@ class ProjectDetailSerializer(ProjectSerializer):
     class Meta(ProjectSerializer.Meta):
         fields = ProjectSerializer.Meta.fields + (
             'assignments',
-            'department_stages',
-            'budget',
+            'budgets',
             'total_hours_allocated',
             'total_hours_utilized',
             'overall_utilization',
         )
         read_only_fields = ProjectSerializer.Meta.read_only_fields + (
             'assignments',
-            'department_stages',
-            'budget',
+            'budgets',
             'total_hours_allocated',
             'total_hours_utilized',
             'overall_utilization',
@@ -1127,15 +1300,15 @@ class ProjectDetailSerializer(ProjectSerializer):
 
     def get_total_hours_allocated(self, obj):
         """
-        Get total allocated hours across all assignments.
+        Get total allocated hours across all budgets.
 
         Args:
             obj: The Project instance
 
         Returns:
-            Sum of all assignment hours
+            Sum of all budget hours allocated
         """
-        return sum(a.hours for a in obj.assignments.all())
+        return sum(b.hours_allocated for b in obj.budgets.all())
 
     def get_total_hours_utilized(self, obj):
         """
@@ -1145,12 +1318,9 @@ class ProjectDetailSerializer(ProjectSerializer):
             obj: The Project instance
 
         Returns:
-            Total utilized hours
+            Total utilized hours across all departments
         """
-        try:
-            return obj.budget.hours_utilized
-        except AttributeError:
-            return 0
+        return sum(b.hours_utilized for b in obj.budgets.all())
 
     def get_overall_utilization(self, obj):
         """
@@ -1162,11 +1332,8 @@ class ProjectDetailSerializer(ProjectSerializer):
         Returns:
             Overall utilization percentage
         """
-        try:
-            budget = obj.budget
-            if budget.hours_allocated == 0:
-                return 0
-            total_used = budget.hours_utilized + budget.hours_forecast
-            return round((total_used / budget.hours_allocated) * 100, 2)
-        except AttributeError:
+        total_allocated = sum(b.hours_allocated for b in obj.budgets.all())
+        if total_allocated == 0:
             return 0
+        total_used = sum(b.hours_utilized + b.hours_forecast for b in obj.budgets.all())
+        return round((total_used / total_allocated) * 100, 2)
