@@ -819,7 +819,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           ) : (
             /* Standard hours input for other departments */
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -838,7 +838,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {/* Stage selection dropdown */}
           {stageOptions.length > 0 && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.stage}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ {t.stage}</label>
               <select
                 value={(editingStage || '') as string}
                 onChange={(e) => {
@@ -860,7 +860,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">👥 Recursos Disponibles ({deptEmployees.length})</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">👥 {t.availableResources} ({deptEmployees.length})</label>
               <div className="space-y-2 max-h-32 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
@@ -913,7 +913,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
           {/* Comment input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.comment}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">💬 {t.comment}</label>
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
