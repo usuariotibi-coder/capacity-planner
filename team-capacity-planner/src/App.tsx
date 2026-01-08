@@ -122,14 +122,14 @@ function App() {
       <div
         className={`${
           sidebarOpen ? 'w-64' : 'w-0'
-        } fixed md:relative z-50 md:z-auto h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg`}
+        } fixed md:relative z-50 md:z-auto h-full bg-slate-800 text-white transition-all duration-300 overflow-y-auto flex flex-col shadow-lg`}
       >
-        <div className="p-6 border-b border-slate-700">
+        <div className="p-6 border-b border-slate-700 flex-shrink-0">
           <h1 className="text-2xl font-bold">{t.teamCapacity}</h1>
           <p className="text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -154,7 +154,7 @@ function App() {
 
         {/* General View Button (only visible in Capacity) */}
         {currentPage === 'capacity' && (
-          <div className="p-4 border-t border-slate-700">
+          <div className="p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
@@ -195,7 +195,7 @@ function App() {
           </div>
         )}
 
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-4 border-t border-slate-700 flex-shrink-0">
           <button
             onClick={logout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-2"
