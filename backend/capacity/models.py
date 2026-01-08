@@ -188,6 +188,66 @@ class ProjectBudget(models.Model):
         return ((self.hours_utilized + self.hours_forecast) / self.hours_allocated) * 100
 
 
+class ScioTeamCapacity(models.Model):
+    """SCIO Team capacity per department and week"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices)
+    week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
+    capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="SCIO team capacity for this week")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'week_start_date']
+        indexes = [
+            models.Index(fields=['department', 'week_start_date']),
+        ]
+        unique_together = ['department', 'week_start_date']
+
+    def __str__(self):
+        return f"{self.department} - {self.week_start_date}: {self.capacity}"
+
+
+class SubcontractedTeamCapacity(models.Model):
+    """Subcontracted team capacity per company and week (BUILD department only)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.CharField(max_length=100, help_text="Company name (e.g., AMI, VICER, ITAX, etc.)")
+    week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
+    capacity = models.IntegerField(validators=[MinValueValidator(0)], help_text="Number of personnel from this company")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['company', 'week_start_date']
+        indexes = [
+            models.Index(fields=['company', 'week_start_date']),
+        ]
+        unique_together = ['company', 'week_start_date']
+
+    def __str__(self):
+        return f"{self.company} - {self.week_start_date}: {self.capacity}"
+
+
+class PrgExternalTeamCapacity(models.Model):
+    """External team capacity for PRG department per week"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    team_name = models.CharField(max_length=100, help_text="External team name")
+    week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
+    capacity = models.IntegerField(validators=[MinValueValidator(0)], help_text="Number of personnel from this team")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['team_name', 'week_start_date']
+        indexes = [
+            models.Index(fields=['team_name', 'week_start_date']),
+        ]
+        unique_together = ['team_name', 'week_start_date']
+
+    def __str__(self):
+        return f"{self.team_name} - {self.week_start_date}: {self.capacity}"
+
+
 class ActivityLog(models.Model):
     """Activity log for audit trail"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

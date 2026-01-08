@@ -20,6 +20,9 @@ from .models import (
     Facility,
     Stage,
     SubcontractCompany,
+    ScioTeamCapacity,
+    SubcontractedTeamCapacity,
+    PrgExternalTeamCapacity,
 )
 
 
@@ -1423,3 +1426,42 @@ class ProjectDetailSerializer(ProjectSerializer):
             return 0
         total_used = sum(b.hours_utilized + b.hours_forecast for b in obj.budgets.all())
         return round((total_used / total_allocated) * 100, 2)
+
+
+class ScioTeamCapacitySerializer(serializers.ModelSerializer):
+    """
+    Serializer for SCIO Team Capacity model.
+
+    Represents team capacity per department and week.
+    """
+
+    class Meta:
+        model = ScioTeamCapacity
+        fields = ('id', 'department', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class SubcontractedTeamCapacitySerializer(serializers.ModelSerializer):
+    """
+    Serializer for Subcontracted Team Capacity model.
+
+    Represents subcontracted team capacity per company and week (BUILD department).
+    """
+
+    class Meta:
+        model = SubcontractedTeamCapacity
+        fields = ('id', 'company', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class PrgExternalTeamCapacitySerializer(serializers.ModelSerializer):
+    """
+    Serializer for PRG External Team Capacity model.
+
+    Represents external team capacity for PRG department per week.
+    """
+
+    class Meta:
+        model = PrgExternalTeamCapacity
+        fields = ('id', 'team_name', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')

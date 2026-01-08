@@ -14,6 +14,9 @@ from capacity.views import (
     DepartmentStageConfigViewSet,
     ProjectBudgetViewSet,
     ActivityLogViewSet,
+    ScioTeamCapacityViewSet,
+    SubcontractedTeamCapacityViewSet,
+    PrgExternalTeamCapacityViewSet,
 )
 
 # Create a router and register viewsets
@@ -24,6 +27,9 @@ router.register(r'assignments', AssignmentViewSet, basename='assignment')
 router.register(r'department-stages', DepartmentStageConfigViewSet, basename='department-stage')
 router.register(r'project-budgets', ProjectBudgetViewSet, basename='project-budget')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
+router.register(r'scio-team-capacity', ScioTeamCapacityViewSet, basename='scio-team-capacity')
+router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
+router.register(r'prg-external-team-capacity', PrgExternalTeamCapacityViewSet, basename='prg-external-team-capacity')
 
 class RootView(APIView):
     def get(self, request):
@@ -37,6 +43,9 @@ class RootView(APIView):
                 'department-stages': '/department-stages/',
                 'project-budgets': '/project-budgets/',
                 'activity-logs': '/activity-logs/',
+                'scio-team-capacity': '/scio-team-capacity/',
+                'subcontracted-team-capacity': '/subcontracted-team-capacity/',
+                'prg-external-team-capacity': '/prg-external-team-capacity/',
                 'token': '/token/',
                 'token-refresh': '/token/refresh/',
             }

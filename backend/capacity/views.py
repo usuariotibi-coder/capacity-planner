@@ -41,13 +41,16 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
     Employee, Project, Assignment, DepartmentStageConfig,
-    ProjectBudget, ActivityLog, Department, Facility, Stage
+    ProjectBudget, ActivityLog, Department, Facility, Stage,
+    ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity
 )
 from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
     ProjectSerializer, ProjectDetailSerializer,
     AssignmentSerializer, DepartmentStageConfigSerializer,
-    ProjectBudgetSerializer, ActivityLogSerializer
+    ProjectBudgetSerializer, ActivityLogSerializer,
+    ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
+    PrgExternalTeamCapacitySerializer
 )
 
 
@@ -1226,3 +1229,57 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
                 pass
 
         return queryset
+
+
+# ==================== SCIO TEAM CAPACITY VIEWSET ====================
+
+class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for SCIO Team Capacity.
+
+    Provides CRUD operations for managing SCIO team capacity per department and week.
+    """
+    queryset = ScioTeamCapacity.objects.all()
+    serializer_class = ScioTeamCapacitySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department', 'week_start_date']
+    ordering_fields = ['department', 'week_start_date', 'capacity']
+    ordering = ['department', 'week_start_date']
+
+
+# ==================== SUBCONTRACTED TEAM CAPACITY VIEWSET ====================
+
+class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Subcontracted Team Capacity.
+
+    Provides CRUD operations for managing subcontracted team capacity per company and week.
+    """
+    queryset = SubcontractedTeamCapacity.objects.all()
+    serializer_class = SubcontractedTeamCapacitySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['company', 'week_start_date']
+    ordering_fields = ['company', 'week_start_date', 'capacity']
+    ordering = ['company', 'week_start_date']
+
+
+# ==================== PRG EXTERNAL TEAM CAPACITY VIEWSET ====================
+
+class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for PRG External Team Capacity.
+
+    Provides CRUD operations for managing external team capacity for PRG department per week.
+    """
+    queryset = PrgExternalTeamCapacity.objects.all()
+    serializer_class = PrgExternalTeamCapacitySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['team_name', 'week_start_date']
+    ordering_fields = ['team_name', 'week_start_date', 'capacity']
+    ordering = ['team_name', 'week_start_date']
