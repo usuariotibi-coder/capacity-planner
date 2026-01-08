@@ -129,31 +129,33 @@ export function ResourcesPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">{t.teamResources}</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-blue-600" />
-            <label className="text-sm font-semibold text-gray-700">{t.year}:</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border-2 border-blue-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
+    <div className="flex flex-col h-screen">
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-md p-8">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">{t.teamResources}</h1>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Calendar size={20} className="text-blue-600" />
+              <label className="text-sm font-semibold text-gray-700">{t.year}:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="border-2 border-blue-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
+              >
+                <option value={2024}>2024</option>
+                <option value={2025}>2025</option>
+                <option value={2026}>2026</option>
+                <option value={2027}>2027</option>
+              </select>
+            </div>
+            <button
+              onClick={() => setIsFormOpen(true)}
+              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
             >
-              <option value={2024}>2024</option>
-              <option value={2025}>2025</option>
-              <option value={2026}>2026</option>
-              <option value={2027}>2027</option>
-            </select>
+              <Plus size={20} />
+              {t.addEmployee}
+            </button>
           </div>
-          <button
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-          >
-            <Plus size={20} />
-            {t.addEmployee}
-          </button>
         </div>
       </div>
 
@@ -340,192 +342,194 @@ export function ResourcesPage() {
         </>
       )}
 
-      {/* Employees grouped by department */}
-      {DEPARTMENTS.map((dept) => {
-        const deptEmployees = employees.filter((e) => e.department === dept);
-        if (deptEmployees.length === 0) return null;
+      <div className="overflow-y-auto flex-1 p-8">
+        {/* Employees grouped by department */}
+        {DEPARTMENTS.map((dept) => {
+          const deptEmployees = employees.filter((e) => e.department === dept);
+          if (deptEmployees.length === 0) return null;
 
-        return (
-          <div key={dept} className={`mb-8 border rounded-lg p-4 ${getDepartmentColor(dept)}`}>
-            <h2 className="text-xl font-bold mb-4 text-gray-800">{dept} {t.departmentLabel}</h2>
-            <div className="space-y-2">
-              {deptEmployees.map((emp) => {
-                const empAssignments = getEmployeeAssignments(emp.id);
-                const isExpanded = expandedEmployees.has(emp.id);
-                const totalAssignedHours = empAssignments.reduce((sum, a) => sum + a.hours, 0);
-                const uniqueProjects = [...new Set(empAssignments.map(a => a.projectId))];
+          return (
+            <div key={dept} className={`mb-8 border rounded-lg p-4 ${getDepartmentColor(dept)}`}>
+              <h2 className="text-xl font-bold mb-4 text-gray-800">{dept} {t.departmentLabel}</h2>
+              <div className="space-y-2">
+                {deptEmployees.map((emp) => {
+                  const empAssignments = getEmployeeAssignments(emp.id);
+                  const isExpanded = expandedEmployees.has(emp.id);
+                  const totalAssignedHours = empAssignments.reduce((sum, a) => sum + a.hours, 0);
+                  const uniqueProjects = [...new Set(empAssignments.map(a => a.projectId))];
 
-                return (
-                  <div key={emp.id} className="bg-white rounded-lg border border-gray-300 overflow-hidden">
-                    {/* Employee Row */}
-                    <div className="flex items-center justify-between p-3 hover:bg-gray-50">
-                      <div className="flex items-center gap-4 flex-1">
-                        {/* Expand/Collapse Button */}
-                        <button
-                          onClick={() => toggleEmployeeCalendar(emp.id)}
-                          className={`p-1.5 rounded transition ${
-                            empAssignments.length > 0
-                              ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                              : 'bg-gray-100 text-gray-400'
-                          }`}
-                          title={empAssignments.length > 0 ? t.viewCalendar : t.noAssignmentsYet}
-                        >
-                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                        </button>
+                  return (
+                    <div key={emp.id} className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+                      {/* Employee Row */}
+                      <div className="flex items-center justify-between p-3 hover:bg-gray-50">
+                        <div className="flex items-center gap-4 flex-1">
+                          {/* Expand/Collapse Button */}
+                          <button
+                            onClick={() => toggleEmployeeCalendar(emp.id)}
+                            className={`p-1.5 rounded transition ${
+                              empAssignments.length > 0
+                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                : 'bg-gray-100 text-gray-400'
+                            }`}
+                            title={empAssignments.length > 0 ? t.viewCalendar : t.noAssignmentsYet}
+                          >
+                            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                          </button>
 
-                        {/* Employee Info */}
-                        <div className="flex-1 grid grid-cols-4 gap-4 items-center">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-gray-800">{emp.name}</span>
-                              {/* External/Subcontracted badge for BUILD and PRG */}
-                              {(emp.department === 'BUILD' || emp.department === 'PRG') && (
-                                emp.isSubcontractedMaterial && emp.subcontractCompany ? (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                                    emp.department === 'BUILD'
-                                      ? 'bg-violet-200 text-violet-800'
-                                      : 'bg-cyan-200 text-cyan-800'
-                                  }`}>
-                                    🏢 {emp.subcontractCompany}
+                          {/* Employee Info */}
+                          <div className="flex-1 grid grid-cols-4 gap-4 items-center">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-800">{emp.name}</span>
+                                {/* External/Subcontracted badge for BUILD and PRG */}
+                                {(emp.department === 'BUILD' || emp.department === 'PRG') && (
+                                  emp.isSubcontractedMaterial && emp.subcontractCompany ? (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                      emp.department === 'BUILD'
+                                        ? 'bg-violet-200 text-violet-800'
+                                        : 'bg-cyan-200 text-cyan-800'
+                                    }`}>
+                                      🏢 {emp.subcontractCompany}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
+                                      🏠 {t.internal}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500">{emp.role}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-sm font-medium">{emp.capacity}h/{language === 'es' ? 'sem' : 'wk'}</div>
+                              <div className="text-xs text-gray-500">{t.capacity.split(' ')[0]}</div>
+                            </div>
+                            <div className="text-center">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                emp.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {emp.isActive ? t.active : t.inactive}
+                              </span>
+                            </div>
+                            <div className="text-center">
+                              {empAssignments.length > 0 ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                    {uniqueProjects.length} {uniqueProjects.length !== 1 ? t.projectsCount : t.projectLabel}
                                   </span>
-                                ) : (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
-                                    🏠 {t.internal}
+                                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                    {totalAssignedHours}h {t.total}
                                   </span>
-                                )
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">{t.noAssignments}</span>
                               )}
                             </div>
-                            <div className="text-xs text-gray-500">{emp.role}</div>
                           </div>
-                          <div className="text-center">
-                            <div className="text-sm font-medium">{emp.capacity}h/{language === 'es' ? 'sem' : 'wk'}</div>
-                            <div className="text-xs text-gray-500">{t.capacity.split(' ')[0]}</div>
-                          </div>
-                          <div className="text-center">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              emp.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {emp.isActive ? t.active : t.inactive}
-                            </span>
-                          </div>
-                          <div className="text-center">
-                            {empAssignments.length > 0 ? (
-                              <div className="flex items-center justify-center gap-2">
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                                  {uniqueProjects.length} {uniqueProjects.length !== 1 ? t.projectsCount : t.projectLabel}
-                                </span>
-                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                                  {totalAssignedHours}h {t.total}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">{t.noAssignments}</span>
-                            )}
-                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEdit(emp)}
+                            className="p-1.5 text-blue-500 hover:bg-blue-100 rounded transition"
+                            title={t.edit}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => deleteEmployee(emp.id)}
+                            className="p-1.5 text-red-500 hover:bg-red-100 rounded transition"
+                            title={t.delete}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleEdit(emp)}
-                          className="p-1.5 text-blue-500 hover:bg-blue-100 rounded transition"
-                          title={t.edit}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => deleteEmployee(emp.id)}
-                          className="p-1.5 text-red-500 hover:bg-red-100 rounded transition"
-                          title={t.delete}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Mini Calendar - Expandable */}
-                    {isExpanded && empAssignments.length > 0 && (
-                      <div className="border-t border-gray-200 bg-gray-50 p-3">
-                        {/* Project Legend */}
-                        <div className="mb-3 flex flex-wrap gap-2">
-                          <span className="text-xs font-semibold text-gray-600">{t.projectsLabelColon}</span>
-                          {uniqueProjects.map((projId) => {
-                            const project = projects.find(p => p.id === projId);
-                            const colorInfo = getProjectColor(projId);
-                            return (
-                              <span
-                                key={projId}
-                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorInfo.bg} ${colorInfo.text} border ${colorInfo.border}`}
-                              >
-                                {project?.name || 'Project'}
-                              </span>
-                            );
-                          })}
-                        </div>
-
-                        {/* Calendar Grid */}
-                        <div className="overflow-x-auto">
-                          <div className="flex gap-0.5 min-w-max">
-                            {allWeeksData.map((weekData) => {
-                              const weekAssignments = empAssignments.filter(a => a.weekStartDate === weekData.date);
-                              const weekTotalHours = weekAssignments.reduce((sum, a) => sum + a.hours, 0);
-                              const hasAssignment = weekAssignments.length > 0;
-
-                              // Get unique projects for this week
-                              const weekProjects = [...new Set(weekAssignments.map(a => a.projectId))];
-
+                      {/* Mini Calendar - Expandable */}
+                      {isExpanded && empAssignments.length > 0 && (
+                        <div className="border-t border-gray-200 bg-gray-50 p-3">
+                          {/* Project Legend */}
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            <span className="text-xs font-semibold text-gray-600">{t.projectsLabelColon}</span>
+                            {uniqueProjects.map((projId) => {
+                              const project = projects.find(p => p.id === projId);
+                              const colorInfo = getProjectColor(projId);
                               return (
-                                <div
-                                  key={weekData.date}
-                                  className={`w-8 h-12 flex flex-col items-center justify-center rounded text-xs border ${
-                                    hasAssignment
-                                      ? weekProjects.length === 1
-                                        ? `${getProjectColor(weekProjects[0]).bg} ${getProjectColor(weekProjects[0]).border}`
-                                        : 'bg-gradient-to-b from-blue-200 to-purple-200 border-purple-300'
-                                      : 'bg-white border-gray-200'
-                                  }`}
-                                  title={hasAssignment
-                                    ? `${t.weekAbbr} ${weekData.weekNum}: ${weekTotalHours}h - ${weekProjects.map(pId => projects.find(p => p.id === pId)?.name).join(', ')}`
-                                    : `${t.weekAbbr} ${weekData.weekNum}: ${t.noAssignment}`
-                                  }
+                                <span
+                                  key={projId}
+                                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorInfo.bg} ${colorInfo.text} border ${colorInfo.border}`}
                                 >
-                                  <span className={`text-xs font-bold ${hasAssignment ? 'text-gray-700' : 'text-gray-400'}`}>
-                                    {weekData.weekNum}
-                                  </span>
-                                  {hasAssignment && (
-                                    <span className="text-xs font-semibold text-gray-600">
-                                      {weekTotalHours}h
-                                    </span>
-                                  )}
-                                </div>
+                                  {project?.name || 'Project'}
+                                </span>
                               );
                             })}
                           </div>
-                        </div>
 
-                        {/* Week Labels */}
-                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                          <span>← {t.week} 1</span>
-                          <span className="flex-1 text-center">{selectedYear}</span>
-                          <span>{t.week} 52+ →</span>
-                        </div>
-                      </div>
-                    )}
+                          {/* Calendar Grid */}
+                          <div className="overflow-x-auto">
+                            <div className="flex gap-0.5 min-w-max">
+                              {allWeeksData.map((weekData) => {
+                                const weekAssignments = empAssignments.filter(a => a.weekStartDate === weekData.date);
+                                const weekTotalHours = weekAssignments.reduce((sum, a) => sum + a.hours, 0);
+                                const hasAssignment = weekAssignments.length > 0;
 
-                    {/* No assignments message */}
-                    {isExpanded && empAssignments.length === 0 && (
-                      <div className="border-t border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
-                        {t.noAssignmentsMessage}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                                // Get unique projects for this week
+                                const weekProjects = [...new Set(weekAssignments.map(a => a.projectId))];
+
+                                return (
+                                  <div
+                                    key={weekData.date}
+                                    className={`w-8 h-12 flex flex-col items-center justify-center rounded text-xs border ${
+                                      hasAssignment
+                                        ? weekProjects.length === 1
+                                          ? `${getProjectColor(weekProjects[0]).bg} ${getProjectColor(weekProjects[0]).border}`
+                                          : 'bg-gradient-to-b from-blue-200 to-purple-200 border-purple-300'
+                                        : 'bg-white border-gray-200'
+                                    }`}
+                                    title={hasAssignment
+                                      ? `${t.weekAbbr} ${weekData.weekNum}: ${weekTotalHours}h - ${weekProjects.map(pId => projects.find(p => p.id === pId)?.name).join(', ')}`
+                                      : `${t.weekAbbr} ${weekData.weekNum}: ${t.noAssignment}`
+                                    }
+                                  >
+                                    <span className={`text-xs font-bold ${hasAssignment ? 'text-gray-700' : 'text-gray-400'}`}>
+                                      {weekData.weekNum}
+                                    </span>
+                                    {hasAssignment && (
+                                      <span className="text-xs font-semibold text-gray-600">
+                                        {weekTotalHours}h
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Week Labels */}
+                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                            <span>← {t.week} 1</span>
+                            <span className="flex-1 text-center">{selectedYear}</span>
+                            <span>{t.week} 52+ →</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No assignments message */}
+                      {isExpanded && empAssignments.length === 0 && (
+                        <div className="border-t border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                          {t.noAssignmentsMessage}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
