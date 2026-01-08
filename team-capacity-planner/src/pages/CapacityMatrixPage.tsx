@@ -180,6 +180,37 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Load BUILD and PRG teams from employees list
+  useEffect(() => {
+    if (employees.length > 0) {
+      // Load BUILD subcontracted teams
+      const buildTeams = new Set<string>();
+      employees
+        .filter(emp => emp.department === 'BUILD' && emp.isSubcontractedMaterial)
+        .forEach(emp => {
+          if (emp.subcontractCompany) {
+            buildTeams.add(emp.subcontractCompany);
+          }
+        });
+      if (buildTeams.size > 0) {
+        setActiveTeams(buildTeams);
+      }
+
+      // Load PRG external teams
+      const prgTeams = new Set<string>();
+      employees
+        .filter(emp => emp.department === 'PRG' && emp.isSubcontractedMaterial)
+        .forEach(emp => {
+          if (emp.subcontractCompany) {
+            prgTeams.add(emp.subcontractCompany);
+          }
+        });
+      if (prgTeams.size > 0) {
+        setPRGActiveTeams(prgTeams);
+      }
+    }
+  }, [employees, setActiveTeams, setPRGActiveTeams]);
+
   // Save scioTeamMembers to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('scioTeamMembers', JSON.stringify(scioTeamMembers));
