@@ -67,6 +67,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [zoom, setZoom] = useState<number>(100);
   const [showLegend, setShowLegend] = useState<boolean>(false);
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
@@ -946,33 +948,68 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             />
           </div>
 
+          {/* Delete Confirmation Dialog */}
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center rounded-lg">
+              <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
+                <h3 className="text-lg font-bold text-red-700 mb-2">⚠️ {t.deleteConfirm || 'Confirmar Eliminación'}</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  {t.deleteAllDataConfirm || '¿Estás seguro de que deseas eliminar estos datos?'}
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsDeleting(true);
+                      try {
+                        if (editingCell) {
+                          // Find and delete the assignment for this cell
+                          const cellAssignments = assignments.filter(
+                            a => a.projectId === editingCell.projectId && a.weekStartDate === editingCell.weekStart
+                          );
+
+                          // Delete all assignments for this cell
+                          for (const assignment of cellAssignments) {
+                            try {
+                              await deleteAssignment(assignment.id);
+                            } catch (error) {
+                              console.error('Error deleting assignment:', error);
+                            }
+                          }
+
+                          // Close modals
+                          setShowDeleteConfirm(false);
+                          setEditingCell(null);
+                          setEditingStage(null);
+                          setEditingHours(0);
+                          setEditingComment('');
+                          setSelectedEmployees(new Set());
+                        }
+                      } finally {
+                        setIsDeleting(false);
+                      }
+                    }}
+                    disabled={isDeleting}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
+                  >
+                    {isDeleting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
+                    {isDeleting ? (t.deletingData || 'Eliminando...') : '🗑️ ' + (t.delete || 'Eliminar')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex gap-3 justify-between pt-4 border-t border-gray-200">
             <button
-              onClick={async () => {
-                if (editingCell) {
-                  // Find and delete the assignment for this cell
-                  const cellAssignments = assignments.filter(
-                    a => a.projectId === editingCell.projectId && a.weekStartDate === editingCell.weekStart
-                  );
-
-                  // Delete all assignments for this cell
-                  for (const assignment of cellAssignments) {
-                    try {
-                      await deleteAssignment(assignment.id);
-                    } catch (error) {
-                      console.error('Error deleting assignment:', error);
-                    }
-                  }
-
-                  // Close modal
-                  setEditingCell(null);
-                  setEditingStage(null);
-                  setEditingHours(0);
-                  setEditingComment('');
-                  setSelectedEmployees(new Set());
-                }
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
               🗑️ {t.delete}
@@ -985,6 +1022,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   setEditingHours(0);
                   setEditingComment('');
                   setSelectedEmployees(new Set());
+                  setShowDeleteConfirm(false);
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
               >
