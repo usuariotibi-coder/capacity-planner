@@ -78,20 +78,22 @@ export function CapacityMatrixMobileView({
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
-      {/* Mobile Header */}
-      <div className="sticky top-0 z-30 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg px-4 py-3">
-        <h1 className="text-base font-bold mb-2">{t.capacityMatrix}</h1>
-        <div className="flex items-center gap-2 justify-between">
-          {departmentFilter !== 'General' && (
-            <div className="flex items-center gap-1.5 text-sm font-medium">
-              {getDepartmentIcon(departmentFilter as Department).icon}
-              <span>{departmentFilter}</span>
-            </div>
-          )}
+      {/* Mobile Header - Compact */}
+      <div className="sticky top-0 z-30 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-sm font-bold truncate">{t.capacityMatrix}</h1>
+            {departmentFilter !== 'General' && (
+              <div className="flex items-center gap-1 text-xs font-medium flex-shrink-0">
+                {getDepartmentIcon(departmentFilter as Department).icon}
+                <span className="hidden sm:inline">{departmentFilter}</span>
+              </div>
+            )}
+          </div>
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="border border-white rounded px-2 py-1 text-xs font-semibold text-blue-700 bg-white"
+            className="border border-white rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-white flex-shrink-0"
           >
             <option value={2024}>2024</option>
             <option value={2025}>2025</option>
@@ -134,14 +136,14 @@ export function CapacityMatrixMobileView({
           </div>
         ) : (
           // Department-specific View - Show detailed capacity matrix
-          <div className="p-2 space-y-2">
+          <div className="p-1.5 space-y-1.5">
             {/* Weekly Occupancy Panel */}
             <div className="bg-white rounded-lg border border-indigo-200 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-2 border-b border-indigo-200">
-                <h3 className="text-xs font-bold text-indigo-800">{t.totalLabel || 'Total'}</h3>
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-2 py-1 border-b border-indigo-200">
+                <h3 className="text-[10px] font-bold text-indigo-800">{t.totalLabel || 'Total'}</h3>
               </div>
               <div className="overflow-x-auto">
-                <div className="flex gap-0.5 p-2 min-w-min">
+                <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
                   {weeksToShow.map((weekData) => {
                     const deptAssignments = assignments.filter((a) => {
                       const emp = employees.find((e) => e.id === a.employeeId);
@@ -164,13 +166,13 @@ export function CapacityMatrixMobileView({
 
             {/* SCIO Team Capacity Panel */}
             <div className="bg-white rounded-lg border border-purple-200 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-purple-50 to-purple-50 px-3 py-2 border-b border-purple-200">
-                <h3 className="text-xs font-bold text-purple-800">
+              <div className="bg-gradient-to-r from-purple-50 to-purple-50 px-2 py-1 border-b border-purple-200">
+                <h3 className="text-[10px] font-bold text-purple-800">
                   {dept === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
                 </h3>
               </div>
               <div className="overflow-x-auto">
-                <div className="flex gap-0.5 p-2 min-w-min">
+                <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
                   {weeksToShow.map((weekData) => {
                     const capacity = scioTeamMembers?.[dept]?.[weekData.date] || 0;
                     return (
@@ -193,11 +195,11 @@ export function CapacityMatrixMobileView({
                   key={`subcontract-${company}`}
                   className="bg-white rounded-lg border border-violet-200 overflow-hidden shadow-sm"
                 >
-                  <div className="bg-gradient-to-r from-violet-50 to-violet-50 px-3 py-2 border-b border-violet-200">
-                    <h3 className="text-xs font-bold text-violet-800 truncate">{company}</h3>
+                  <div className="bg-gradient-to-r from-violet-50 to-violet-50 px-2 py-1 border-b border-violet-200">
+                    <h3 className="text-[10px] font-bold text-violet-800 truncate">{company}</h3>
                   </div>
                   <div className="overflow-x-auto">
-                    <div className="flex gap-0.5 p-2 min-w-min">
+                    <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
                       {weeksToShow.map((weekData) => {
                         const count = subcontractedPersonnel?.[company]?.[weekData.date] || 0;
                         return (
@@ -221,11 +223,11 @@ export function CapacityMatrixMobileView({
                   key={`prg-${team}`}
                   className="bg-white rounded-lg border border-cyan-200 overflow-hidden shadow-sm"
                 >
-                  <div className="bg-gradient-to-r from-cyan-50 to-cyan-50 px-3 py-2 border-b border-cyan-200">
-                    <h3 className="text-xs font-bold text-cyan-800 truncate">{team}</h3>
+                  <div className="bg-gradient-to-r from-cyan-50 to-cyan-50 px-2 py-1 border-b border-cyan-200">
+                    <h3 className="text-[10px] font-bold text-cyan-800 truncate">{team}</h3>
                   </div>
                   <div className="overflow-x-auto">
-                    <div className="flex gap-0.5 p-2 min-w-min">
+                    <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
                       {weeksToShow.map((weekData) => {
                         const count = prgExternalPersonnel?.[team]?.[weekData.date] || 0;
                         return (
@@ -244,9 +246,9 @@ export function CapacityMatrixMobileView({
 
             {/* Projects List */}
             {filteredProjects.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-bold text-gray-800 mb-2 px-1">📋 {t.projects}</h3>
-                <div className="space-y-2">
+              <div className="mt-1.5">
+                <h3 className="text-xs font-bold text-gray-800 mb-1 px-1">📋 {t.projects}</h3>
+                <div className="space-y-1">
                   {filteredProjects.map((project) => {
                     const isExpanded = expandedProjects.has(project.id);
                     const projectAssignments = assignments.filter((a) => a.projectId === project.id);
@@ -259,36 +261,36 @@ export function CapacityMatrixMobileView({
                       >
                         <button
                           onClick={() => toggleProject(project.id)}
-                          className="w-full flex items-center justify-between p-2.5 hover:bg-blue-50 transition"
+                          className="w-full flex items-center justify-between p-1.5 hover:bg-blue-50 transition"
                         >
-                          <div className="flex-1 text-left">
-                            <h4 className="font-semibold text-sm text-gray-900">{project.name}</h4>
-                            <p className="text-xs text-gray-600 mt-0.5">{project.client}</p>
-                            <div className="flex gap-1 mt-1">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                          <div className="flex-1 text-left min-w-0">
+                            <h4 className="font-semibold text-xs text-gray-900 truncate">{project.name}</h4>
+                            <p className="text-[10px] text-gray-600 mt-0.5 truncate">{project.client}</p>
+                            <div className="flex gap-1 mt-0.5">
+                              <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
                                 {projectAssignments.length}
                               </span>
-                              <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
+                              <span className="text-[10px] bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded">
                                 {totalHours}h
                               </span>
                             </div>
                           </div>
                           {isExpanded ? (
-                            <ChevronUp size={18} className="text-blue-600 flex-shrink-0" />
+                            <ChevronUp size={16} className="text-blue-600 flex-shrink-0 ml-1" />
                           ) : (
-                            <ChevronDown size={18} className="text-gray-400 flex-shrink-0" />
+                            <ChevronDown size={16} className="text-gray-400 flex-shrink-0 ml-1" />
                           )}
                         </button>
                         {isExpanded && projectAssignments.length > 0 && (
-                          <div className="border-t border-gray-200 bg-gray-50 p-2 max-h-40 overflow-y-auto">
+                          <div className="border-t border-gray-200 bg-gray-50 p-1.5 max-h-32 overflow-y-auto">
                             <div className="space-y-1">
                               {projectAssignments.map((assignment) => {
                                 const emp = employees.find((e) => e.id === assignment.employeeId);
                                 return (
-                                  <div key={assignment.id} className="text-xs bg-white p-2 rounded border border-gray-100">
+                                  <div key={assignment.id} className="text-[10px] bg-white p-1 rounded border border-gray-100">
                                     <div className="font-medium text-gray-900">{emp?.name}</div>
-                                    <div className="text-gray-600 text-[11px]">{emp?.role}</div>
-                                    <div className="font-bold text-blue-600 mt-1">{assignment.hours}h</div>
+                                    <div className="text-gray-600 text-[9px]">{emp?.role}</div>
+                                    <div className="font-bold text-blue-600 mt-0.5">{assignment.hours}h</div>
                                   </div>
                                 );
                               })}
