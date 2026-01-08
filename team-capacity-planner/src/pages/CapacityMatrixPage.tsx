@@ -1081,6 +1081,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         projects={projects}
         employees={employees}
         assignments={assignments}
+        scioTeamMembers={scioTeamMembers}
+        activeTeams={activeTeams}
+        subcontractedPersonnel={subcontractedPersonnel}
+        prgActiveTeams={prgActiveTeams}
+        prgExternalPersonnel={prgExternalPersonnel}
         onAddAssignment={() => {
           // Placeholder for opening add assignment modal
           setEditingCell({
