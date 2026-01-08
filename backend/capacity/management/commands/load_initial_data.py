@@ -6,10 +6,15 @@ import uuid
 
 
 class Command(BaseCommand):
-    help = 'Load initial mock data for testing'
+    help = 'Load initial mock data for testing (DEPRECATED - Do not use in production)'
 
     def handle(self, *args, **options):
-        self.stdout.write('Loading initial data...')
+        self.stdout.write(self.style.WARNING(
+            'WARNING: load_initial_data is disabled and should not be used in production.\n'
+            'This command was used for development/testing only.\n'
+            'If you need to reload test data, delete all records manually and contact admin.\n'
+        ))
+        return
 
         # Create superuser if not exists
         if not User.objects.filter(username='admin').exists():
