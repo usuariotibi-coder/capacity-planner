@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { Language } from '../utils/translations';
 import { useTranslation } from '../utils/translations';
+import { clearOnlyLocalStorage } from '../utils/storageCleanup';
 
 interface DeleteAllDataModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export function DeleteAllDataModal({
     try {
       setError(null);
       await onConfirm();
+      // Clear localStorage capacity data after backend deletion
+      clearOnlyLocalStorage();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : t.dataDeletedError;
       setError(errorMsg);
@@ -59,6 +62,9 @@ export function DeleteAllDataModal({
             <p className="text-sm text-gray-600">
               {t.deleteAllDataWarning}
             </p>
+            <div className="bg-blue-50 border border-blue-200 rounded px-3 py-2 text-xs text-blue-700">
+              💾 Se eliminarán todos los datos del backend y del cache local (localStorage).
+            </div>
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded px-3 py-2 text-sm text-red-700">
