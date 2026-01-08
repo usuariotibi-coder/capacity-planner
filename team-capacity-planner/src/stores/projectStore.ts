@@ -86,18 +86,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   deleteProject: async (id) => {
     const originalProjects = get().projects;
+    const projectToDelete = originalProjects.find(p => p.id === id);
 
+    console.log('[Store] Starting delete for project:', id, projectToDelete?.name);
+
+    // Optimistic update - remove from UI immediately
     set((state) => ({
       projects: state.projects.filter((proj) => proj.id !== id),
     }));
 
     try {
-      console.log('[Store] Deleting project:', id);
+      console.log('[Store] Sending DELETE request to API for project:', id);
       await projectsApi.delete(id);
-      console.log('[Store] Project deleted successfully');
+      console.log('[Store] ✅ Project deleted successfully from server:', id);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar proyecto';
-      console.error('[Store] Error deleting project:', errorMsg);
+      console.error('[Store] ❌ Error deleting project:', errorMsg);
+      console.error('[Store] Reverting optimistic update...');
       set({ projects: originalProjects });
       set({ error: errorMsg });
       alert(`Error al eliminar proyecto: ${errorMsg}`);

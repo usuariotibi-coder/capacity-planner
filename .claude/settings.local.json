@@ -61,7 +61,10 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(git remote remove:*)",
-      "Bash(del Dockerfile)"
+      "Bash(del Dockerfile)",
+      "Bash(git rm:*)",
+      "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\manage.py\" makemigrations:*)",
+      "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m py_compile:*)"
     ]
   }
 }

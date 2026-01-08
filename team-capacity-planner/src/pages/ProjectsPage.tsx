@@ -583,7 +583,15 @@ export function ProjectsPage() {
                       ✎
                     </button>
                     <button
-                      onClick={() => deleteProject(proj.id)}
+                      onClick={async () => {
+                        if (window.confirm(language === 'es' ? `¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
+                          try {
+                            await deleteProject(proj.id);
+                          } catch (error) {
+                            console.error('Error deleting project:', error);
+                          }
+                        }
+                      }}
                       className="p-2 text-red-600 bg-red-100 hover:bg-red-200 rounded-lg transition transform hover:scale-110 shadow-sm"
                       title={t.delete}
                     >
