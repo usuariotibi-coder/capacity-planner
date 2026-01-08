@@ -11,6 +11,7 @@ import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
+import { CapacityMatrixMobileView } from './CapacityMatrixMobileView';
 import type { Department, Stage } from '../types';
 
 type DepartmentFilter = 'General' | Department;
@@ -46,6 +47,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const addProject = useProjectStore((state) => state.addProject);
   const { language } = useLanguage();
   const t = useTranslation(language);
+
+  const [isMobileView, setIsMobileView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
 
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
@@ -157,6 +165,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, proj) => ({ ...acc, [proj.id]: true }), {})
   );
+
+  // Handle window resize to switch between mobile and desktop views
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Save scioTeamMembers to localStorage whenever it changes
   useEffect(() => {
@@ -952,6 +970,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       </>
     );
   };
+
+  // Show mobile view on small screens
+  if (isMobileView) {
+    return (
+      <CapacityMatrixMobileView
+        departmentFilter={departmentFilter}
+        projects={projects}
+        employees={employees}
+        assignments={assignments}
+        onAddAssignment={() => {
+          // Placeholder for opening add assignment modal
+          setEditingCell({
+            department: 'PM',
+            weekStart: new Date().toISOString().split('T')[0],
+          });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
