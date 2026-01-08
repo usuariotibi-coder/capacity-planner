@@ -271,3 +271,99 @@ export const assignmentsApi = {
     });
   },
 };
+
+// SCIO Team Capacity API
+export const scioTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/scio-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/scio-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Subcontracted Team Capacity API
+export const subcontractedTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/subcontracted-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/subcontracted-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// PRG External Team Capacity API
+export const prgExternalTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/prg-external-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/prg-external-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
