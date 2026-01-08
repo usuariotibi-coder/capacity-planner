@@ -346,7 +346,7 @@ export function ResourcesPage() {
       <div className="overflow-y-auto flex-1 p-8">
         {/* Employees grouped by department */}
         {DEPARTMENTS.map((dept) => {
-          const deptEmployees = employees.filter((e) => e.department === dept);
+          const deptEmployees = employees.filter((e) => e.department === dept && !e.isSubcontractedMaterial);
           if (deptEmployees.length === 0) return null;
 
           return (
