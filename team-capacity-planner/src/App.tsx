@@ -16,7 +16,15 @@ type DepartmentFilter = 'General' | Department;
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('capacity');
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    // Load current page from localStorage if available
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('currentPage');
+      return (saved as Page) || 'capacity';
+    }
+    return 'capacity';
+  });
+
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     // Check if window exists (SSR safety)
     if (typeof window !== 'undefined') {
@@ -24,13 +32,35 @@ function App() {
     }
     return true;
   });
-  const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('General');
+
+  const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>(() => {
+    // Load department filter from localStorage if available
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('departmentFilter');
+      return (saved as DepartmentFilter) || 'General';
+    }
+    return 'General';
+  });
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const { isLoggedIn, isLoading, logout } = useAuth();
 
   // Load data from API when authenticated
   useDataLoader();
+
+  // Save current page to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('currentPage', currentPage);
+    }
+  }, [currentPage]);
+
+  // Save department filter to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('departmentFilter', departmentFilter);
+    }
+  }, [departmentFilter]);
 
   // Handle window resize to auto-close sidebar on mobile
   useEffect(() => {
