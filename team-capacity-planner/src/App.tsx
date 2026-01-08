@@ -3,14 +3,12 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
 import LoginPage from './pages/LoginPage';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut, Trash2 } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
 import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
-import { useDeleteAllData } from './hooks/useDeleteAllData';
-import { DeleteAllDataModal } from './components/DeleteAllDataModal';
 
 type Page = 'resources' | 'projects' | 'capacity';
 type DepartmentFilter = 'General' | Department;
@@ -27,12 +25,9 @@ function App() {
     return true;
   });
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('General');
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingData, setDeletingData] = useState(false);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const { isLoggedIn, isLoading, logout } = useAuth();
-  const { deleteAllData } = useDeleteAllData();
 
   // Load data from API when authenticated
   useDataLoader();
@@ -83,32 +78,8 @@ function App() {
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    setDeletingData(true);
-    try {
-      await deleteAllData();
-      setDeleteModalOpen(false);
-      // Show success message
-      alert(t.dataDeletedSuccess);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : t.dataDeletedError;
-      alert(`${t.dataDeletedError}: ${errorMsg}`);
-    } finally {
-      setDeletingData(false);
-    }
-  };
-
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Delete All Data Modal */}
-      <DeleteAllDataModal
-        isOpen={deleteModalOpen}
-        isLoading={deletingData}
-        language={language}
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteModalOpen(false)}
-      />
-
       {/* Overlay for mobile when sidebar is open */}
       {sidebarOpen && window.innerWidth < 768 && (
         <div
@@ -182,17 +153,10 @@ function App() {
           </div>
         )}
 
-        <div className="p-4 border-t border-slate-700 space-y-2">
-          <button
-            onClick={() => setDeleteModalOpen(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-900 hover:bg-opacity-20 rounded-lg transition"
-          >
-            <Trash2 size={16} />
-            {t.deleteAllData}
-          </button>
+        <div className="p-4 border-t border-slate-700">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-2"
           >
             <LogOut size={16} />
             {t.logout}

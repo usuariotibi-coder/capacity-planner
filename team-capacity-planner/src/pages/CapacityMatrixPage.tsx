@@ -43,6 +43,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projects = useProjectStore((state) => state.projects);
   const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
+  const deleteAssignment = useAssignmentStore((state) => state.deleteAssignment);
   const updateProject = useProjectStore((state) => state.updateProject);
   const addProject = useProjectStore((state) => state.addProject);
   const { language } = useLanguage();
@@ -946,25 +947,56 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+          <div className="flex gap-3 justify-between pt-4 border-t border-gray-200">
             <button
-              onClick={() => {
-                setEditingCell(null);
-                setEditingStage(null);
-                setEditingHours(0);
-                setEditingComment('');
-                setSelectedEmployees(new Set());
+              onClick={async () => {
+                if (editingCell) {
+                  // Find and delete the assignment for this cell
+                  const cellAssignments = assignments.filter(
+                    a => a.projectId === editingCell.projectId && a.weekStartDate === editingCell.weekStart
+                  );
+
+                  // Delete all assignments for this cell
+                  for (const assignment of cellAssignments) {
+                    try {
+                      await deleteAssignment(assignment.id);
+                    } catch (error) {
+                      console.error('Error deleting assignment:', error);
+                    }
+                  }
+
+                  // Close modal
+                  setEditingCell(null);
+                  setEditingStage(null);
+                  setEditingHours(0);
+                  setEditingComment('');
+                  setSelectedEmployees(new Set());
+                }
               }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
-              {t.cancel}
+              🗑️ {t.delete}
             </button>
-            <button
-              onClick={handleSaveCell}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
-            >
-              {t.save}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setEditingCell(null);
+                  setEditingStage(null);
+                  setEditingHours(0);
+                  setEditingComment('');
+                  setSelectedEmployees(new Set());
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleSaveCell}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
+              >
+                {t.save}
+              </button>
+            </div>
           </div>
         </div>
       </>
