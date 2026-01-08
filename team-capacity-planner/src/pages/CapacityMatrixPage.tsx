@@ -1977,7 +1977,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 const yearEnd = `${selectedYear + 1}-12-31`; // Include next year weeks too
 
                 // If in General view, exclude quick-created projects (those with visibleInDepartments)
-                if (departmentFilter === 'General' && proj.visibleInDepartments) {
+                // Check if array has elements, not just that it exists (empty array [] is truthy)
+                if (departmentFilter === 'General' && proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
                   return false;
                 }
 
