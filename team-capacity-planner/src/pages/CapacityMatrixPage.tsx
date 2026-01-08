@@ -39,6 +39,7 @@ interface CapacityMatrixPageProps {
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
+  const addEmployee = useEmployeeStore((state) => state.addEmployee);
   const assignments = useAssignmentStore((state) => state.assignments);
   const projects = useProjectStore((state) => state.projects);
   const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
@@ -2582,14 +2583,31 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                 {/* Form Content */}
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (prgTeamName.trim()) {
-                      const newTeams = new Set(prgActiveTeams);
-                      newTeams.add(prgTeamName.trim());
-                      setPRGActiveTeams(newTeams);
-                      setPRGTeamName('');
-                      setIsPRGModalOpen(false);
+                      try {
+                        // Create employee as subcontracted material for PRG department
+                        await addEmployee({
+                          name: prgTeamName.trim(),
+                          role: 'External Team',
+                          department: 'PRG',
+                          capacity: 0, // External teams don't have internal capacity
+                          isActive: true,
+                          isSubcontractedMaterial: true,
+                          subcontractCompany: prgTeamName.trim(),
+                        });
+
+                        // Add to active teams set
+                        const newTeams = new Set(prgActiveTeams);
+                        newTeams.add(prgTeamName.trim());
+                        setPRGActiveTeams(newTeams);
+                        setPRGTeamName('');
+                        setIsPRGModalOpen(false);
+                      } catch (error) {
+                        console.error('Error adding PRG team:', error);
+                        alert('Error al agregar equipo');
+                      }
                     }
                   }}
                   className="p-4 space-y-4"
@@ -2664,14 +2682,31 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                 {/* Form Content */}
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (buildTeamName.trim()) {
-                      const newTeams = new Set(activeTeams);
-                      newTeams.add(buildTeamName.trim());
-                      setActiveTeams(newTeams);
-                      setBuildTeamName('');
-                      setIsBuildModalOpen(false);
+                      try {
+                        // Create employee as subcontracted material for BUILD department
+                        await addEmployee({
+                          name: buildTeamName.trim(),
+                          role: 'Subcontracted Team',
+                          department: 'BUILD',
+                          capacity: 0, // Subcontracted teams don't have internal capacity
+                          isActive: true,
+                          isSubcontractedMaterial: true,
+                          subcontractCompany: buildTeamName.trim(),
+                        });
+
+                        // Add to active teams set
+                        const newTeams = new Set(activeTeams);
+                        newTeams.add(buildTeamName.trim());
+                        setActiveTeams(newTeams);
+                        setBuildTeamName('');
+                        setIsBuildModalOpen(false);
+                      } catch (error) {
+                        console.error('Error adding BUILD team:', error);
+                        alert('Error al agregar equipo');
+                      }
                     }
                   }}
                   className="p-4 space-y-4"
