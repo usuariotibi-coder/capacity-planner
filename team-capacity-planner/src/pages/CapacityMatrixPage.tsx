@@ -2209,7 +2209,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                           ) : isDeptWeekInRange ? (
                                             <>
                                               {isDeptFirstWeek ? (
-                                                <span className="text-[10px] font-bold">Init</span>
+                                                <span className="text-[10px] font-bold">1</span>
                                               ) : (
                                                 <span className="font-bold text-[10px]">{deptConsecutiveWeek}</span>
                                               )}
