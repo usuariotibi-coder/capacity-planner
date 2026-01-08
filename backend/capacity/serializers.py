@@ -418,7 +418,80 @@ class ProjectSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"project_manager_id": "Employee with this ID does not exist."}
                 )
-        return super().create(validated_data)
+
+        project = super().create(validated_data)
+
+        # Process department_stages if provided
+        department_stages = self.initial_data.get('department_stages')
+        if department_stages and isinstance(department_stages, dict):
+            self._save_department_stages(project, department_stages)
+
+        # Process department_hours_allocated if provided
+        department_hours = self.initial_data.get('department_hours_allocated')
+        if department_hours and isinstance(department_hours, dict):
+            self._save_department_budgets(project, department_hours)
+
+        return project
+
+    def _save_department_stages(self, project, department_stages):
+        """
+        Save department stage configurations for a project.
+
+        Args:
+            project: The Project instance
+            department_stages: Dict with department keys and list of stage configs
+        """
+        # Delete existing department stages for this project
+        project.department_stages.all().delete()
+
+        for dept, stages in department_stages.items():
+            if not stages or not isinstance(stages, list):
+                continue
+
+            for stage_config in stages:
+                if not isinstance(stage_config, dict):
+                    continue
+
+                # Get week_start and week_end (required)
+                week_start = stage_config.get('weekStart') or stage_config.get('week_start')
+                week_end = stage_config.get('weekEnd') or stage_config.get('week_end')
+
+                if not week_start or not week_end:
+                    continue
+
+                # Get optional fields
+                stage = stage_config.get('stage')
+                dept_start_date = stage_config.get('departmentStartDate') or stage_config.get('department_start_date')
+                duration_weeks = stage_config.get('durationWeeks') or stage_config.get('duration_weeks')
+
+                DepartmentStageConfig.objects.create(
+                    project=project,
+                    department=dept,
+                    stage=stage if stage else None,
+                    week_start=week_start,
+                    week_end=week_end,
+                    department_start_date=dept_start_date if dept_start_date else None,
+                    duration_weeks=duration_weeks if duration_weeks else None,
+                )
+
+    def _save_department_budgets(self, project, department_hours):
+        """
+        Save department budget allocations for a project.
+
+        Args:
+            project: The Project instance
+            department_hours: Dict with department keys and hours values
+        """
+        for dept, hours in department_hours.items():
+            if hours is None:
+                hours = 0
+
+            # Update or create budget for this department
+            ProjectBudget.objects.update_or_create(
+                project=project,
+                department=dept,
+                defaults={'hours_allocated': float(hours)}
+            )
 
     def update(self, instance, validated_data):
         """
@@ -440,7 +513,20 @@ class ProjectSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"project_manager_id": "Employee with this ID does not exist."}
                 )
-        return super().update(instance, validated_data)
+
+        project = super().update(instance, validated_data)
+
+        # Process department_stages if provided
+        department_stages = self.initial_data.get('department_stages')
+        if department_stages and isinstance(department_stages, dict):
+            self._save_department_stages(project, department_stages)
+
+        # Process department_hours_allocated if provided
+        department_hours = self.initial_data.get('department_hours_allocated')
+        if department_hours and isinstance(department_hours, dict):
+            self._save_department_budgets(project, department_hours)
+
+        return project
 
 
 class AssignmentSerializer(serializers.ModelSerializer):
