@@ -73,8 +73,8 @@ export function CapacityMatrixMobileView({
             p.visibleInDepartments.includes(departmentFilter)
         );
 
-  // Get weeks to show (only next 8 weeks for mobile to fit)
-  const weeksToShow = allWeeksData.slice(0, 8);
+  // Show all weeks
+  const weeksToShow = allWeeksData;
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
@@ -134,14 +134,14 @@ export function CapacityMatrixMobileView({
           </div>
         ) : (
           // Department-specific View - Show detailed capacity matrix
-          <div className="p-3 space-y-3">
+          <div className="p-2 space-y-2">
             {/* Weekly Occupancy Panel */}
             <div className="bg-white rounded-lg border border-indigo-200 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-2.5 border-b border-indigo-200">
-                <h3 className="text-xs font-bold text-indigo-800">{t.weeklyOccupancyTotal || 'Weekly Occupancy'}</h3>
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-3 py-2 border-b border-indigo-200">
+                <h3 className="text-xs font-bold text-indigo-800">{t.totalLabel || 'Total'}</h3>
               </div>
-              <div className="overflow-x-auto p-2">
-                <div className="flex gap-1.5 min-w-min">
+              <div className="overflow-x-auto">
+                <div className="flex gap-0.5 p-2 min-w-min">
                   {weeksToShow.map((weekData) => {
                     const deptAssignments = assignments.filter((a) => {
                       const emp = employees.find((e) => e.id === a.employeeId);
@@ -150,9 +150,9 @@ export function CapacityMatrixMobileView({
                     const totalHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
                     const displayValue = dept === 'MFG' ? totalHours : totalHours / 45;
                     return (
-                      <div key={`total-${weekData.date}`} className="flex flex-col items-center flex-shrink-0">
-                        <div className="text-[10px] font-bold text-gray-600 mb-1">W{weekData.weekNum}</div>
-                        <div className="bg-orange-300 text-orange-900 rounded text-[10px] font-bold px-2 py-1 min-w-[36px] text-center">
+                      <div key={`total-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                        <div className="text-[9px] font-bold text-gray-700 mb-0.5">W{weekData.weekNum}</div>
+                        <div className="bg-orange-300 text-orange-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                           {displayValue.toFixed(1)}
                         </div>
                       </div>
@@ -164,19 +164,19 @@ export function CapacityMatrixMobileView({
 
             {/* SCIO Team Capacity Panel */}
             <div className="bg-white rounded-lg border border-purple-200 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-purple-50 to-purple-50 p-2.5 border-b border-purple-200">
+              <div className="bg-gradient-to-r from-purple-50 to-purple-50 px-3 py-2 border-b border-purple-200">
                 <h3 className="text-xs font-bold text-purple-800">
                   {dept === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
                 </h3>
               </div>
-              <div className="overflow-x-auto p-2">
-                <div className="flex gap-1.5 min-w-min">
+              <div className="overflow-x-auto">
+                <div className="flex gap-0.5 p-2 min-w-min">
                   {weeksToShow.map((weekData) => {
                     const capacity = scioTeamMembers?.[dept]?.[weekData.date] || 0;
                     return (
-                      <div key={`scio-${weekData.date}`} className="flex flex-col items-center flex-shrink-0">
-                        <div className="text-[10px] font-bold text-gray-600 mb-1">W{weekData.weekNum}</div>
-                        <div className="bg-purple-100 text-purple-900 rounded text-[10px] font-bold px-2 py-1 min-w-[36px] text-center">
+                      <div key={`scio-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                        <div className="text-[9px] font-bold text-gray-700 mb-0.5">W{weekData.weekNum}</div>
+                        <div className="bg-purple-100 text-purple-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                           {capacity.toFixed(1)}
                         </div>
                       </div>
@@ -193,17 +193,17 @@ export function CapacityMatrixMobileView({
                   key={`subcontract-${company}`}
                   className="bg-white rounded-lg border border-violet-200 overflow-hidden shadow-sm"
                 >
-                  <div className="bg-gradient-to-r from-violet-50 to-violet-50 p-2.5 border-b border-violet-200">
+                  <div className="bg-gradient-to-r from-violet-50 to-violet-50 px-3 py-2 border-b border-violet-200">
                     <h3 className="text-xs font-bold text-violet-800 truncate">{company}</h3>
                   </div>
-                  <div className="overflow-x-auto p-2">
-                    <div className="flex gap-1.5 min-w-min">
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-0.5 p-2 min-w-min">
                       {weeksToShow.map((weekData) => {
                         const count = subcontractedPersonnel?.[company]?.[weekData.date] || 0;
                         return (
-                          <div key={`${company}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0">
-                            <div className="text-[10px] font-bold text-gray-600 mb-1">W{weekData.weekNum}</div>
-                            <div className="bg-violet-100 text-violet-900 rounded text-[10px] font-bold px-2 py-1 min-w-[36px] text-center">
+                          <div key={`${company}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                            <div className="text-[9px] font-bold text-gray-700 mb-0.5">W{weekData.weekNum}</div>
+                            <div className="bg-violet-100 text-violet-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                               {count.toFixed(0)}
                             </div>
                           </div>
@@ -221,17 +221,17 @@ export function CapacityMatrixMobileView({
                   key={`prg-${team}`}
                   className="bg-white rounded-lg border border-cyan-200 overflow-hidden shadow-sm"
                 >
-                  <div className="bg-gradient-to-r from-cyan-50 to-cyan-50 p-2.5 border-b border-cyan-200">
+                  <div className="bg-gradient-to-r from-cyan-50 to-cyan-50 px-3 py-2 border-b border-cyan-200">
                     <h3 className="text-xs font-bold text-cyan-800 truncate">{team}</h3>
                   </div>
-                  <div className="overflow-x-auto p-2">
-                    <div className="flex gap-1.5 min-w-min">
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-0.5 p-2 min-w-min">
                       {weeksToShow.map((weekData) => {
                         const count = prgExternalPersonnel?.[team]?.[weekData.date] || 0;
                         return (
-                          <div key={`${team}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0">
-                            <div className="text-[10px] font-bold text-gray-600 mb-1">W{weekData.weekNum}</div>
-                            <div className="bg-cyan-100 text-cyan-900 rounded text-[10px] font-bold px-2 py-1 min-w-[36px] text-center">
+                          <div key={`${team}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                            <div className="text-[9px] font-bold text-gray-700 mb-0.5">W{weekData.weekNum}</div>
+                            <div className="bg-cyan-100 text-cyan-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                               {count.toFixed(0)}
                             </div>
                           </div>
