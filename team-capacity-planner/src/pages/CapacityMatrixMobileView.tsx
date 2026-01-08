@@ -106,28 +106,66 @@ export function CapacityMatrixMobileView({
       {/* Content */}
       <div className="overflow-y-auto flex-1">
         {departmentFilter === 'General' ? (
-          // General View - Show summary of all departments
-          <div className="p-3 space-y-3">
+          // General View - Show matrices for all departments
+          <div className="p-1.5 space-y-1.5">
             {DEPARTMENTS.map((d) => {
               const deptIcon = getDepartmentIcon(d);
-              const deptEmployees = employees.filter((e) => e.department === d && !e.isSubcontractedMaterial);
-              const deptAssignments = assignments.filter((a) => {
-                const emp = employees.find((e) => e.id === a.employeeId);
-                return emp?.department === d;
-              });
-
               return (
-                <div
-                  key={d}
-                  className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`text-2xl ${deptIcon.color}`}>{deptIcon.icon}</span>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-sm text-gray-900">{d}</h3>
-                      <p className="text-xs text-gray-600">
-                        👥 {deptEmployees.length} • 📋 {deptAssignments.reduce((s, a) => s + a.hours, 0).toFixed(0)}h
-                      </p>
+                <div key={d}>
+                  {/* Department Header */}
+                  <div className="flex items-center gap-1.5 px-2 py-1 mb-1">
+                    <span className={`text-base ${deptIcon.color}`}>{deptIcon.icon}</span>
+                    <h3 className="font-bold text-xs text-gray-900">{d}</h3>
+                  </div>
+
+                  {/* Weekly Occupancy Panel */}
+                  <div className="bg-white rounded-lg border border-indigo-200 overflow-hidden shadow-sm mb-1">
+                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-2 py-0.5 border-b border-indigo-200">
+                      <h3 className="text-[9px] font-bold text-indigo-800">{t.totalLabel || 'Total'}</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-0.5 px-1 py-0.5 min-w-min">
+                        {weeksToShow.map((weekData) => {
+                          const deptAssignments = assignments.filter((a) => {
+                            const emp = employees.find((e) => e.id === a.employeeId);
+                            return a.weekStartDate === weekData.date && emp?.department === d;
+                          });
+                          const totalHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                          const displayValue = d === 'MFG' ? totalHours : totalHours / 45;
+                          return (
+                            <div key={`total-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                              <div className="text-[8px] font-bold text-gray-700">W{weekData.weekNum}</div>
+                              <div className="bg-orange-300 text-orange-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
+                                {displayValue.toFixed(1)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SCIO Team Capacity Panel */}
+                  <div className="bg-white rounded-lg border border-purple-200 overflow-hidden shadow-sm">
+                    <div className="bg-gradient-to-r from-purple-50 to-purple-50 px-2 py-0.5 border-b border-purple-200">
+                      <h3 className="text-[9px] font-bold text-purple-800">
+                        {d === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-0.5 px-1 py-0.5 min-w-min">
+                        {weeksToShow.map((weekData) => {
+                          const capacity = scioTeamMembers?.[d]?.[weekData.date] || 0;
+                          return (
+                            <div key={`scio-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
+                              <div className="text-[8px] font-bold text-gray-700">W{weekData.weekNum}</div>
+                              <div className="bg-purple-100 text-purple-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
+                                {capacity.toFixed(1)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
