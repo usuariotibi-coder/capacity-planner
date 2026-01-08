@@ -258,6 +258,13 @@ export const translations = {
     stageRobotSimulation: 'Simulación Robot',
     stageStandardsRevProgrammingConcept: 'Rev. Estándares/Concepto Prog.',
     stageNone: 'Sin Etapa',
+    deleteAllData: 'Eliminar Todos los Datos',
+    deleteAllDataConfirm: '¿Estás seguro de que deseas eliminar todos los datos?',
+    deleteAllDataWarning: 'Esta acción es irreversible. Se eliminarán todos los empleados, proyectos, asignaciones y configuraciones.',
+    deleteConfirm: 'Sí, Eliminar Todo',
+    deletingData: 'Eliminando datos...',
+    dataDeletedSuccess: 'Todos los datos han sido eliminados exitosamente.',
+    dataDeletedError: 'Error al eliminar los datos',
   },
   en: {
     // Navigation
@@ -516,6 +523,13 @@ export const translations = {
     stageRobotSimulation: 'Robot Simulation',
     stageStandardsRevProgrammingConcept: 'Standards Rev/Programming Concept',
     stageNone: 'No Stage',
+    deleteAllData: 'Delete All Data',
+    deleteAllDataConfirm: 'Are you sure you want to delete all data?',
+    deleteAllDataWarning: 'This action is irreversible. All employees, projects, assignments and configurations will be deleted.',
+    deleteConfirm: 'Yes, Delete Everything',
+    deletingData: 'Deleting data...',
+    dataDeletedSuccess: 'All data has been successfully deleted.',
+    dataDeletedError: 'Error deleting data',
   },
 };
 
