@@ -270,7 +270,7 @@ export function ResourcesPage() {
                         className="w-4 h-4 text-teal-600 rounded focus:ring-2 focus:ring-teal-500"
                       />
                       <label htmlFor="isExternalTeam" className="text-sm font-medium text-gray-700 cursor-pointer">
-                        {t.isExternalTeam}
+                        {t.isSubcontractedMaterial}
                       </label>
                     </div>
 
