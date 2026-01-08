@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
@@ -17,7 +17,13 @@ const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('capacity');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    // Check if window exists (SSR safety)
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768; // Desktop (md) or larger
+    }
+    return true;
+  });
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>('General');
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
@@ -25,6 +31,19 @@ function App() {
 
   // Load data from API when authenticated
   useDataLoader();
+
+  // Handle window resize to auto-close sidebar on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarOpen]);
 
   // Show loading spinner while checking auth
   if (isLoading) {
@@ -61,11 +80,19 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Overlay for mobile when sidebar is open */}
+      {sidebarOpen && window.innerWidth < 768 && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <div
         className={`${
           sidebarOpen ? 'w-64' : 'w-0'
-        } bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg`}
+        } fixed md:relative z-50 md:z-auto h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg`}
       >
         <div className="p-6 border-b border-slate-700">
           <h1 className="text-2xl font-bold">{t.teamCapacity}</h1>
@@ -76,7 +103,13 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setCurrentPage(item.id)}
+              onClick={() => {
+                setCurrentPage(item.id);
+                // Auto-close sidebar on mobile after selection
+                if (window.innerWidth < 768) {
+                  setSidebarOpen(false);
+                }
+              }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                 currentPage === item.id
                   ? 'bg-blue-500 text-white'

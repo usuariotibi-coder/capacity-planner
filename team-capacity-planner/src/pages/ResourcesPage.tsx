@@ -130,17 +130,17 @@ export function ResourcesPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-md p-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">{t.teamResources}</h1>
-          <div className="flex items-center gap-4">
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-md px-4 py-4 sm:px-8 sm:py-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{t.teamResources}</h1>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
-              <Calendar size={20} className="text-blue-600" />
-              <label className="text-sm font-semibold text-gray-700">{t.year}:</label>
+              <Calendar size={20} className="text-blue-600 flex-shrink-0" />
+              <label className="text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">{t.year}:</label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="border-2 border-blue-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
+                className="border-2 border-blue-300 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
               >
                 <option value={2024}>2024</option>
                 <option value={2025}>2025</option>
@@ -150,10 +150,11 @@ export function ResourcesPage() {
             </div>
             <button
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+              className="flex items-center justify-center sm:justify-start gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base"
             >
-              <Plus size={20} />
-              {t.addEmployee}
+              <Plus size={18} className="sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">{t.addEmployee}</span>
+              <span className="sm:hidden">+ {t.addEmployee}</span>
             </button>
           </div>
         </div>
@@ -168,8 +169,8 @@ export function ResourcesPage() {
             onClick={handleCancel}
           />
           {/* Modal */}
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-            <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96 max-h-screen overflow-auto">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
+            <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md max-h-screen overflow-auto">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
                 <h2 className="text-xl font-semibold text-gray-800">
@@ -377,7 +378,7 @@ export function ResourcesPage() {
                           </button>
 
                           {/* Employee Info */}
-                          <div className="flex-1 grid grid-cols-4 gap-4 items-center">
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 items-center">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-gray-800">{emp.name}</span>
@@ -467,8 +468,8 @@ export function ResourcesPage() {
                             })}
                           </div>
 
-                          {/* Calendar Grid */}
-                          <div className="overflow-x-auto">
+                          {/* Calendar Grid - Hidden on mobile */}
+                          <div className="hidden md:block overflow-x-auto">
                             <div className="flex gap-0.5 min-w-max">
                               {allWeeksData.map((weekData) => {
                                 const weekAssignments = empAssignments.filter(a => a.weekStartDate === weekData.date);

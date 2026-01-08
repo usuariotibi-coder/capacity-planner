@@ -320,7 +320,7 @@ export function ProjectsPage() {
       {isFormOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 shadow-lg w-full max-w-2xl">
+            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-6 shadow-lg w-full max-w-[95vw] sm:max-w-lg md:max-w-2xl">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-2 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded"></div>
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -331,7 +331,7 @@ export function ProjectsPage() {
               <div className="max-h-[calc(90vh-200px)] overflow-y-auto">
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Row 1: Job and Customer */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.job}</label>
                       <input
@@ -355,7 +355,7 @@ export function ProjectsPage() {
                   </div>
 
                   {/* Row 2: Dates and Weeks */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
                       <input
@@ -424,7 +424,7 @@ export function ProjectsPage() {
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg border-l-4 border-green-600">
                     <h3 className="font-semibold mb-2 text-sm text-green-900">💼 {t.budgetHours}</h3>
                     <p className="text-xs text-green-700 mb-2">{t.defineHours}</p>
-                    <div className="grid grid-cols-6 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                       {DEPARTMENTS.map((dept) => (
                         <div key={dept}>
                           <label className="block text-xs font-medium mb-0.5 text-gray-700">{dept}</label>
@@ -457,7 +457,7 @@ export function ProjectsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {DEPARTMENTS.filter(dept => dept !== 'PM').map((dept) => {
                         const deptInfo = getDepartmentIcon(dept);
                         return (
