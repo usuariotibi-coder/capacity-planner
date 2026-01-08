@@ -156,7 +156,13 @@ function App() {
         {currentPage === 'capacity' && (
           <div className="p-4 border-t border-slate-700">
             <button
-              onClick={() => setDepartmentFilter('General')}
+              onClick={() => {
+                setDepartmentFilter('General');
+                // Auto-close sidebar on mobile after selection
+                if (window.innerWidth < 768) {
+                  setSidebarOpen(false);
+                }
+              }}
               className={`w-full mb-4 px-3 py-2 rounded text-sm font-semibold transition ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
@@ -170,7 +176,13 @@ function App() {
             <label className="block text-xs font-semibold text-slate-400 mb-2">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value as DepartmentFilter)}
+              onChange={(e) => {
+                setDepartmentFilter(e.target.value as DepartmentFilter);
+                // Auto-close sidebar on mobile after selection
+                if (window.innerWidth < 768) {
+                  setSidebarOpen(false);
+                }
+              }}
               className="w-full bg-slate-700 text-white text-sm rounded px-2 py-2 border border-slate-600 hover:border-blue-500 transition"
             >
               <option value="">{t.selectDepartment}</option>
