@@ -2033,7 +2033,35 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           // For MFG: use hours directly. For other departments: convert to people
                           const isMFG = dept === 'MFG';
                           const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
-                          const availableCapacity = weekCapacity - occupiedValue;
+
+                          // For BUILD department: include all subcontracted personnel in capacity calculation
+                          // For PRG department: include external teams in capacity calculation
+                          let totalCapacity = weekCapacity;
+                          if (dept === 'BUILD') {
+                            // Sum all subcontracted teams: predefined teams + custom teams added by user
+                            const subcontractSum = Array.from(activeTeams).reduce((sum, company) => {
+                              return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
+                            }, 0);
+
+                            // Also add any predefined teams that might have data but aren't in activeTeams
+                            const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
+                            const predefinedSum = predefinedTeams.reduce((sum, company) => {
+                              // Only count if not already in activeTeams (to avoid double counting)
+                              if (!activeTeams.has(company)) {
+                                return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
+                              }
+                              return sum;
+                            }, 0);
+
+                            totalCapacity = weekCapacity + subcontractSum + predefinedSum;
+                          } else if (dept === 'PRG') {
+                            const externalSum = Array.from(prgActiveTeams).reduce((sum, team) => {
+                              return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
+                            }, 0);
+                            totalCapacity = weekCapacity + externalSum;
+                          }
+
+                          const availableCapacity = totalCapacity - occupiedValue;
                           const unit = isMFG ? 'h' : 'people';
 
                           // Determine color based on available capacity
@@ -2041,7 +2069,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           let textColor = 'text-gray-700';
 
                           // If no capacity set, show gray
-                          if (weekCapacity === 0) {
+                          if (totalCapacity === 0) {
                             bgColor = 'bg-gray-200 border-gray-400';
                             textColor = 'text-gray-700';
                           } else if (availableCapacity <= 0) {
@@ -2050,10 +2078,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             textColor = 'text-white';
                           } else if (isMFG) {
                             // For MFG: use percentage-based thresholds on available hours
-                            if (availableCapacity < weekCapacity * 0.25) {
+                            if (availableCapacity < totalCapacity * 0.25) {
                               bgColor = 'bg-orange-400 border-orange-500';
                               textColor = 'text-white';
-                            } else if (availableCapacity < weekCapacity * 0.5) {
+                            } else if (availableCapacity < totalCapacity * 0.5) {
                               bgColor = 'bg-yellow-300 border-yellow-400';
                               textColor = 'text-yellow-900';
                             } else {
@@ -2062,10 +2090,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             }
                           } else {
                             // For other departments: use percentage-based thresholds on available people
-                            if (availableCapacity < weekCapacity * 0.25) {
+                            if (availableCapacity < totalCapacity * 0.25) {
                               bgColor = 'bg-orange-400 border-orange-500';
                               textColor = 'text-white';
-                            } else if (availableCapacity < weekCapacity * 0.5) {
+                            } else if (availableCapacity < totalCapacity * 0.5) {
                               bgColor = 'bg-yellow-300 border-yellow-400';
                               textColor = 'text-yellow-900';
                             } else {
@@ -2080,9 +2108,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               className={`w-16 flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
                                 isCurrentWeek ? 'ring-1 ring-red-600 shadow-md' : ''
                               }`}
-                              title={`${dept} - W${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: Available: ${availableCapacity.toFixed(2)} ${unit}`}
+                              title={`${dept} - W${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
-                              {weekCapacity > 0 ? (
+                              {totalCapacity > 0 ? (
                                 <div className={`${textColor} font-bold text-[7px]`}>
                                   {availableCapacity.toFixed(2)}
                                 </div>
