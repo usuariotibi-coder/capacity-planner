@@ -14,7 +14,7 @@ interface ProjectStore {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
-  fetchProjects: () => Promise<void>;
+  fetchProjects: (force?: boolean) => Promise<void>;
   addProject: (project: Project) => Promise<Project>;
   updateProject: (id: string, project: Partial<Project>) => void;
   deleteProject: (id: string) => Promise<void>;
@@ -26,9 +26,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   error: null,
   hasFetched: false,
 
-  fetchProjects: async () => {
+  fetchProjects: async (force = false) => {
     if (!isAuthenticated()) return;
-    if (get().hasFetched) return;
+
+    // Skip if already fetched unless force refresh is requested
+    if (get().hasFetched && !force) return;
 
     set({ isLoading: true, error: null });
     try {

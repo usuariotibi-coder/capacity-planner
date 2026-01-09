@@ -594,7 +594,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       // Refetch projects in the background to sync UI
       console.log('[CapacityMatrix] Refetching projects from backend...');
       const store = useProjectStore.getState();
-      await store.fetchProjects();
+      await store.fetchProjects(true);
       console.log('[CapacityMatrix] ✓ Projects refetched successfully');
 
       // Show brief success message
@@ -649,7 +649,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       // Refetch projects in the background to sync UI
       console.log('[CapacityMatrix] Refetching projects from backend...');
       const store = useProjectStore.getState();
-      await store.fetchProjects();
+      await store.fetchProjects(true);
       console.log('[CapacityMatrix] ✓ Projects refetched successfully');
 
       // Show brief success message

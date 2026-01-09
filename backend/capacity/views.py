@@ -768,15 +768,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
             project_id = response.data['id']
             department_hours_allocated = request.data.get('departmentHoursAllocated', {})
 
-            if department_hours_allocated:
+            # Process all departments, even if they have 0 hours
+            if department_hours_allocated is not None and isinstance(department_hours_allocated, dict):
                 try:
                     project = Project.objects.get(id=project_id)
                     for department, hours in department_hours_allocated.items():
+                        # Ensure hours is a number (int or float), handle None values
+                        hours_value = float(hours) if hours is not None else 0
                         ProjectBudget.objects.get_or_create(
                             project=project,
                             department=department,
                             defaults={
-                                'hours_allocated': hours,
+                                'hours_allocated': hours_value,
                                 'hours_utilized': 0,
                                 'hours_forecast': 0,
                             }
@@ -795,22 +798,25 @@ class ProjectViewSet(viewsets.ModelViewSet):
             project_id = kwargs.get('pk')
             department_hours_allocated = request.data.get('departmentHoursAllocated', {})
 
-            if department_hours_allocated:
+            # Process all departments, even if they have 0 hours
+            if department_hours_allocated is not None and isinstance(department_hours_allocated, dict):
                 try:
                     project = Project.objects.get(id=project_id)
                     for department, hours in department_hours_allocated.items():
+                        # Ensure hours is a number (int or float), handle None values
+                        hours_value = float(hours) if hours is not None else 0
                         budget, created = ProjectBudget.objects.get_or_create(
                             project=project,
                             department=department,
                             defaults={
-                                'hours_allocated': hours,
+                                'hours_allocated': hours_value,
                                 'hours_utilized': 0,
                                 'hours_forecast': 0,
                             }
                         )
-                        # Update hours_allocated if budget already existed
-                        if not created and budget.hours_allocated != hours:
-                            budget.hours_allocated = hours
+                        # Update hours_allocated if budget already existed and value changed
+                        if not created and budget.hours_allocated != hours_value:
+                            budget.hours_allocated = hours_value
                             budget.save()
                 except Exception as e:
                     print(f'Error updating ProjectBudgets: {str(e)}')

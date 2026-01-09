@@ -431,7 +431,7 @@ export function ProjectsPage() {
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={deptHoursAllocated[dept] || ''}
+                            value={deptHoursAllocated[dept] ?? ''}
                             onChange={(e) => {
                               const val = e.target.value;
                               setDeptHoursAllocated({
