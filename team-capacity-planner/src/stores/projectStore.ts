@@ -35,6 +35,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await projectsApi.getAll();
+      console.log('[ProjectStore] Fetched projects:', {
+        count: data?.length,
+        hasData: !!data,
+        firstProjectHasQuoted: data?.[0]?.departmentHoursAllocated ? 'YES' : 'NO',
+        firstProjectQuoted: data?.[0]?.departmentHoursAllocated
+      });
       set({ projects: data, isLoading: false, hasFetched: true });
     } catch (error) {
       set({
