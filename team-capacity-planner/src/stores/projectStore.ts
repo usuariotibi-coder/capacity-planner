@@ -30,19 +30,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!isAuthenticated()) return;
 
     // Skip if already fetched unless force refresh is requested
-    if (get().hasFetched && !force) return;
+    if (get().hasFetched && !force) {
+      console.log('[ProjectStore] Skipping fetch - already fetched and force=false');
+      return;
+    }
 
+    console.log('[ProjectStore] Starting fetch projects (force=' + force + ')');
     set({ isLoading: true, error: null });
     try {
       const data = await projectsApi.getAll();
       console.log('[ProjectStore] Fetched projects:', {
         count: data?.length,
         hasData: !!data,
+        firstProjectName: data?.[0]?.name,
         firstProjectHasQuoted: data?.[0]?.departmentHoursAllocated ? 'YES' : 'NO',
         firstProjectQuoted: data?.[0]?.departmentHoursAllocated
       });
       set({ projects: data, isLoading: false, hasFetched: true });
+      console.log('[ProjectStore] Projects state updated successfully');
     } catch (error) {
+      console.error('[ProjectStore] Error fetching projects:', error);
       set({
         error: error instanceof Error ? error.message : 'Error al cargar proyectos',
         isLoading: false
