@@ -1911,140 +1911,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         </tr>
                     </thead>
                     <tbody>
-                      {/* Utilized Hours editing modal - floating overlay centered on screen */}
-                      {(() => {
-                        const dept = departmentFilter as Department;
-                        const isEditingThisUtilized = editingUtilized?.projectId === proj.id && editingUtilized?.department === dept;
-                        const deptInfo = getDepartmentIcon(dept);
-
-                        if (!isEditingThisUtilized) return null;
-
-                        return (
-                          <>
-                            {/* Backdrop */}
-                            <div
-                              className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                              onClick={handleCancelUtilized}
-                            />
-                            {/* Modal */}
-                            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                              <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
-                                {/* Header */}
-                                <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
-                                  <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                  <div>
-                                    <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
-                                    <div className="text-xs text-slate-400">{t.editUsedHours}</div>
-                                  </div>
-                                </div>
-
-                                {/* Input field */}
-                                <div>
-                                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={utilizedHours}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val === '' || /^\d+$/.test(val)) {
-                                        setUtilizedHours(val);
-                                      }
-                                    }}
-                                    className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
-                                    autoFocus
-                                    placeholder="0"
-                                  />
-                                </div>
-
-                                {/* Action buttons */}
-                                <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
-                                  <button
-                                    onClick={handleCancelUtilized}
-                                    className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
-                                  >
-                                    ✗ {t.cancel}
-                                  </button>
-                                  <button
-                                    onClick={handleSaveUtilized}
-                                    className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
-                                  >
-                                    ✓ {t.save}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
-
-                      {/* Forecasted Hours editing modal - floating overlay centered on screen */}
-                      {(() => {
-                        const dept = departmentFilter as Department;
-                        const isEditingThisForecast = editingForecast?.projectId === proj.id && editingForecast?.department === dept;
-                        const deptInfo = getDepartmentIcon(dept);
-
-                        if (!isEditingThisForecast) return null;
-
-                        return (
-                          <>
-                            {/* Backdrop */}
-                            <div
-                              className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                              onClick={handleCancelForecast}
-                            />
-                            {/* Modal */}
-                            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                              <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
-                                {/* Header */}
-                                <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
-                                  <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                  <div>
-                                    <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
-                                    <div className="text-xs text-slate-400">{t.editForecastedHours}</div>
-                                  </div>
-                                </div>
-
-                                {/* Input field */}
-                                <div>
-                                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={forecastHours}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val === '' || /^\d+$/.test(val)) {
-                                        setForecastHours(val);
-                                      }
-                                    }}
-                                    className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
-                                    autoFocus
-                                    placeholder="0"
-                                  />
-                                </div>
-
-                                {/* Action buttons */}
-                                <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
-                                  <button
-                                    onClick={handleCancelForecast}
-                                    className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
-                                  >
-                                    ✗ {t.cancel}
-                                  </button>
-                                  <button
-                                    onClick={handleSaveForecast}
-                                    className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
-                                  >
-                                    ✓ {t.save}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
-
                       {/* Department row for this project */}
                       <tr className="hover:bg-gray-50">
                         <td className="border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5">
@@ -2082,6 +1948,140 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       </div>
                     </div>
                   )}
+
+                  {/* Utilized Hours editing modal - floating overlay centered on screen */}
+                  {(() => {
+                    const dept = departmentFilter as Department;
+                    const isEditingThisUtilized = editingUtilized?.projectId === proj.id && editingUtilized?.department === dept;
+                    const deptInfo = getDepartmentIcon(dept);
+
+                    if (!isEditingThisUtilized) return null;
+
+                    return (
+                      <>
+                        {/* Backdrop */}
+                        <div
+                          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                          onClick={handleCancelUtilized}
+                        />
+                        {/* Modal */}
+                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+                          <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                              <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                              <div>
+                                <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
+                                <div className="text-xs text-slate-400">{t.editUsedHours}</div>
+                              </div>
+                            </div>
+
+                            {/* Input field */}
+                            <div>
+                              <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={utilizedHours}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^\d+$/.test(val)) {
+                                    setUtilizedHours(val);
+                                  }
+                                }}
+                                className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
+                                autoFocus
+                                placeholder="0"
+                              />
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                              <button
+                                onClick={handleCancelUtilized}
+                                className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                              >
+                                ✗ {t.cancel}
+                              </button>
+                              <button
+                                onClick={handleSaveUtilized}
+                                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                              >
+                                ✓ {t.save}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  {/* Forecasted Hours editing modal - floating overlay centered on screen */}
+                  {(() => {
+                    const dept = departmentFilter as Department;
+                    const isEditingThisForecast = editingForecast?.projectId === proj.id && editingForecast?.department === dept;
+                    const deptInfo = getDepartmentIcon(dept);
+
+                    if (!isEditingThisForecast) return null;
+
+                    return (
+                      <>
+                        {/* Backdrop */}
+                        <div
+                          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                          onClick={handleCancelForecast}
+                        />
+                        {/* Modal */}
+                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+                          <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                            {/* Header */}
+                            <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                              <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                              <div>
+                                <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
+                                <div className="text-xs text-slate-400">{t.editForecastedHours}</div>
+                              </div>
+                            </div>
+
+                            {/* Input field */}
+                            <div>
+                              <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={forecastHours}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^\d+$/.test(val)) {
+                                    setForecastHours(val);
+                                  }
+                                }}
+                                className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
+                                autoFocus
+                                placeholder="0"
+                              />
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                              <button
+                                onClick={handleCancelForecast}
+                                className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                              >
+                                ✗ {t.cancel}
+                              </button>
+                              <button
+                                onClick={handleSaveForecast}
+                                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                              >
+                                ✓ {t.save}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               );
             })}
