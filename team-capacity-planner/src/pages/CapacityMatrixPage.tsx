@@ -146,6 +146,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingForecast, setEditingForecast] = useState<{ projectId: string; department: Department } | null>(null);
   const [forecastHours, setForecastHours] = useState<string>('');
 
+  // Comment view state for General view (read-only comment display)
+  const [viewingComment, setViewingComment] = useState<{ comment: string; projectName: string; department: string } | null>(null);
+
   // Quick project creation modal state
   const [showQuickProjectModal, setShowQuickProjectModal] = useState(false);
   const [quickProjectForm, setQuickProjectForm] = useState({
@@ -2284,6 +2287,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   const assignmentStage = projectDeptAssignments.length > 0 ? projectDeptAssignments[0].stage : null;
                                   const stageColor = assignmentStage ? getStageColor(assignmentStage) : null;
 
+                                  // Get comment from first assignment (comments are shared across assignments in same cell)
+                                  const cellComment = projectDeptAssignments.length > 0 ? projectDeptAssignments[0].comment : undefined;
+
                                   // Get department-specific start and duration info
                                   const deptStages = proj.departmentStages?.[dept];
                                   const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
@@ -2329,7 +2335,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       }`}
                                     >
                                       {totalHours === 0 ? (
-                                        <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight ${
+                                        <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight relative ${
                                           stageColor
                                             ? `${stageColor.text}`
                                             : isDeptWeekInRange
@@ -2340,6 +2346,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                                 ? 'text-green-600 bg-green-50'
                                                 : 'text-gray-400'
                                         }`}>
+                                          {cellComment && (
+                                            <button
+                                              onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
+                                              className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
+                                              title={cellComment}
+                                            >
+                                              💬
+                                            </button>
+                                          )}
                                           {stageColor && assignmentStage ? (
                                             <span className="font-semibold text-[7px]">{assignmentStage}</span>
                                           ) : isDeptWeekInRange ? (
@@ -2362,6 +2377,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         } ${!isDeptWeekInRange ? 'border border-dashed border-red-500 bg-red-50' : ''}`}>
                                           {!isDeptWeekInRange && (
                                             <div className="absolute -top-1 -left-1 text-red-600 font-bold text-[10px]">⚠</div>
+                                          )}
+                                          {cellComment && (
+                                            <button
+                                              onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
+                                              className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
+                                              title={cellComment}
+                                            >
+                                              💬
+                                            </button>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
@@ -2772,6 +2796,51 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               </div>
             </div>
           </>
+        )}
+
+        {/* Comment View Modal for General View */}
+        {viewingComment && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h2 className="text-lg font-bold">💬 {t.comment}</h2>
+                <button
+                  onClick={() => setViewingComment(null)}
+                  className="hover:bg-amber-700 p-1 rounded transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{t.projectTooltip}</p>
+                  <p className="text-sm font-bold text-gray-800">{viewingComment.projectName}</p>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">{t.selectDepartment}</p>
+                  <p className="text-sm font-bold text-gray-800">{viewingComment.department}</p>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t.comment}</p>
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{viewingComment.comment}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setViewingComment(null)}
+                    className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                  >
+                    {t.close}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
     </div>
   );
