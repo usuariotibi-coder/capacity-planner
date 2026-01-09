@@ -2368,7 +2368,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
-                                              className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
+                                              className="absolute top-0.5 right-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
                                               title={cellComment}
                                             >
                                               💬
@@ -2394,9 +2394,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
                                         } ${!isDeptWeekInRange ? 'border border-dashed border-red-500 bg-red-50' : ''}`}>
-                                          {!isDeptWeekInRange && (
-                                            <div className="absolute -top-1 -left-1 text-red-600 font-bold text-[10px]">⚠</div>
-                                          )}
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -2405,6 +2402,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                             >
                                               💬
                                             </button>
+                                          )}
+                                          {!isDeptWeekInRange && (
+                                            <div className="absolute -top-1 -right-1 text-red-600 font-bold text-[10px]">⚠</div>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
