@@ -431,13 +431,34 @@ export function ProjectsPage() {
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={deptHoursAllocated[dept] ?? ''}
+                            value={deptHoursAllocated[dept] === 0 ? '' : (deptHoursAllocated[dept] ?? '')}
                             onChange={(e) => {
                               const val = e.target.value;
-                              setDeptHoursAllocated({
-                                ...deptHoursAllocated,
-                                [dept]: val === '' ? 0 : Math.max(0, parseInt(val) || 0),
-                              });
+                              // Allow empty string while typing, convert to 0 on blur
+                              if (val === '') {
+                                setDeptHoursAllocated({
+                                  ...deptHoursAllocated,
+                                  [dept]: val,
+                                });
+                              } else {
+                                const numVal = parseInt(val);
+                                if (!isNaN(numVal)) {
+                                  setDeptHoursAllocated({
+                                    ...deptHoursAllocated,
+                                    [dept]: Math.max(0, numVal),
+                                  });
+                                }
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const val = e.target.value;
+                              // Convert empty string to 0 when leaving the field
+                              if (val === '' || val === undefined) {
+                                setDeptHoursAllocated({
+                                  ...deptHoursAllocated,
+                                  [dept]: 0,
+                                });
+                              }
                             }}
                             className="w-full border border-green-200 rounded px-2 py-1.5 focus:border-green-400 focus:outline-none text-xs font-semibold"
                             placeholder="0"
