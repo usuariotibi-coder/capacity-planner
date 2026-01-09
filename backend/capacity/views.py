@@ -759,6 +759,64 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=400
             )
 
+    def create(self, request, *args, **kwargs):
+        """Override create to handle ProjectBudgets creation."""
+        response = super().create(request, *args, **kwargs)
+
+        if response.status_code == 201:
+            # Create ProjectBudget entries for each department with allocated hours
+            project_id = response.data['id']
+            department_hours_allocated = request.data.get('departmentHoursAllocated', {})
+
+            if department_hours_allocated:
+                try:
+                    project = Project.objects.get(id=project_id)
+                    for department, hours in department_hours_allocated.items():
+                        ProjectBudget.objects.get_or_create(
+                            project=project,
+                            department=department,
+                            defaults={
+                                'hours_allocated': hours,
+                                'hours_utilized': 0,
+                                'hours_forecast': 0,
+                            }
+                        )
+                except Exception as e:
+                    print(f'Error creating ProjectBudgets: {str(e)}')
+
+        return response
+
+    def update(self, request, *args, **kwargs):
+        """Override update to handle ProjectBudgets update."""
+        response = super().update(request, *args, **kwargs)
+
+        if response.status_code in [200, 202]:
+            # Update ProjectBudget entries for each department
+            project_id = kwargs.get('pk')
+            department_hours_allocated = request.data.get('departmentHoursAllocated', {})
+
+            if department_hours_allocated:
+                try:
+                    project = Project.objects.get(id=project_id)
+                    for department, hours in department_hours_allocated.items():
+                        budget, created = ProjectBudget.objects.get_or_create(
+                            project=project,
+                            department=department,
+                            defaults={
+                                'hours_allocated': hours,
+                                'hours_utilized': 0,
+                                'hours_forecast': 0,
+                            }
+                        )
+                        # Update hours_allocated if budget already existed
+                        if not created and budget.hours_allocated != hours:
+                            budget.hours_allocated = hours
+                            budget.save()
+                except Exception as e:
+                    print(f'Error updating ProjectBudgets: {str(e)}')
+
+        return response
+
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     """
