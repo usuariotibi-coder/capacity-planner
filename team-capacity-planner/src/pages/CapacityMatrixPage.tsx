@@ -1751,10 +1751,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       </button>
                       <span className="text-xs font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
                     </div>
+
+                    {/* Collapse/Expand toggle */}
+                    <button
+                      onClick={() => toggleProjectExpanded(proj.id)}
+                      className="p-1 text-indigo-600 hover:text-indigo-800 font-bold text-lg cursor-pointer transition"
+                      title={expandedProjects[proj.id] ? 'Hide project' : 'Show project'}
+                    >
+                      {expandedProjects[proj.id] ? '▼' : '▶'}
+                    </button>
                   </div>
 
-                  <div style={{ zoom: `${getProjectZoom(proj.id) / 100}` }}>
-                    <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
+                  {expandedProjects[proj.id] && (
+                    <div style={{ zoom: `${getProjectZoom(proj.id) / 100}` }}>
+                      <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
                       <table className="border-collapse text-xs w-full">
                         <thead>
                         <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -1950,8 +1960,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       </tr>
                     </tbody>
                     </table>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
