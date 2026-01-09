@@ -397,7 +397,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Get quoted hours (budget) for a department in a project
   const getQuotedHours = (department: Department, projectId: string): number => {
     const project = projects.find(p => p.id === projectId);
-    return project?.departmentHoursAllocated?.[department] || 0;
+    const quotedHours = project?.departmentHoursAllocated?.[department] || 0;
+    if (project && quotedHours === 0) {
+      console.log(`[getQuotedHours] Project ${project.name}, Dept ${department}: ${quotedHours}`, {
+        projectId,
+        departmentHoursAllocated: project.departmentHoursAllocated
+      });
+    }
+    return quotedHours;
   };
 
   // Check if a week is within a project's date range
