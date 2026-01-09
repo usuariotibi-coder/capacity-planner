@@ -7,6 +7,7 @@ export const clearCapacityStorage = () => {
     'scioTeamMembers',
     'subcontractedPersonnel',
     'prgExternalPersonnel',
+    'departmentWeeklyTotals',
   ];
 
   capacityKeys.forEach((key) => {

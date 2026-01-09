@@ -367,3 +367,35 @@ export const prgExternalTeamCapacityApi = {
     });
   },
 };
+
+// Department Weekly Total API
+export const departmentWeeklyTotalApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/department-weekly-total/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`);
+  },
+
+  create: async (total: any) => {
+    return apiFetch('/api/department-weekly-total/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(total)),
+    });
+  },
+
+  update: async (id: string, total: any) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(total)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};

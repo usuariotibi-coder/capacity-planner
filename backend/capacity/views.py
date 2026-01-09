@@ -42,7 +42,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import (
     Employee, Project, Assignment, DepartmentStageConfig,
     ProjectBudget, ActivityLog, Department, Facility, Stage,
-    ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity
+    ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
+    DepartmentWeeklyTotal
 )
 from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
@@ -50,7 +51,7 @@ from .serializers import (
     AssignmentSerializer, DepartmentStageConfigSerializer,
     ProjectBudgetSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
-    PrgExternalTeamCapacitySerializer
+    PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer
 )
 
 
@@ -1283,3 +1284,20 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     filterset_fields = ['team_name', 'week_start_date']
     ordering_fields = ['team_name', 'week_start_date', 'capacity']
     ordering = ['team_name', 'week_start_date']
+
+
+class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Department Weekly Total.
+
+    Provides CRUD operations for managing weekly occupancy total hours per department.
+    This represents the total hours assigned to a department for a specific week.
+    """
+    queryset = DepartmentWeeklyTotal.objects.all()
+    serializer_class = DepartmentWeeklyTotalSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department', 'week_start_date']
+    ordering_fields = ['department', 'week_start_date', 'total_hours']
+    ordering = ['department', 'week_start_date']

@@ -17,6 +17,7 @@ from capacity.views import (
     ScioTeamCapacityViewSet,
     SubcontractedTeamCapacityViewSet,
     PrgExternalTeamCapacityViewSet,
+    DepartmentWeeklyTotalViewSet,
 )
 
 # Create a router and register viewsets
@@ -30,6 +31,7 @@ router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 router.register(r'scio-team-capacity', ScioTeamCapacityViewSet, basename='scio-team-capacity')
 router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
 router.register(r'prg-external-team-capacity', PrgExternalTeamCapacityViewSet, basename='prg-external-team-capacity')
+router.register(r'department-weekly-total', DepartmentWeeklyTotalViewSet, basename='department-weekly-total')
 
 class RootView(APIView):
     def get(self, request):
@@ -46,6 +48,7 @@ class RootView(APIView):
                 'scio-team-capacity': '/scio-team-capacity/',
                 'subcontracted-team-capacity': '/subcontracted-team-capacity/',
                 'prg-external-team-capacity': '/prg-external-team-capacity/',
+                'department-weekly-total': '/department-weekly-total/',
                 'token': '/token/',
                 'token-refresh': '/token/refresh/',
             }

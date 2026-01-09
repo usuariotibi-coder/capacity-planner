@@ -9,6 +9,7 @@ import {
   scioTeamCapacityApi,
   subcontractedTeamCapacityApi,
   prgExternalTeamCapacityApi,
+  departmentWeeklyTotalApi,
 } from '../services/api';
 
 interface CapacityItem {
@@ -83,6 +84,22 @@ export const useDataLoader = () => {
               // Extract active teams
               const activeTeams = new Set<string>(results.map((item: CapacityItem) => item.teamName));
               setPRGActiveTeams(activeTeams);
+            }
+          }),
+        // Load department weekly totals from backend
+        departmentWeeklyTotalApi.getAll()
+          .then((results: CapacityItem[]) => {
+            if (results && Array.isArray(results)) {
+              // Store in localStorage for quick access
+              localStorage.setItem('departmentWeeklyTotals', JSON.stringify(
+                results.reduce((acc: any, item: CapacityItem) => {
+                  const dept = item.department;
+                  const weekDate = item.weekStartDate;
+                  if (!acc[dept]) acc[dept] = {};
+                  acc[dept][weekDate] = item.totalHours;
+                  return acc;
+                }, {})
+              ));
             }
           }),
       ]).catch(console.error);

@@ -68,7 +68,9 @@
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" manage.py:*)",
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m pip install:*)",
       "Bash(timeout:*)",
-      "Bash(\"venv\\\\Scripts\\\\python.exe\" manage.py runserver 0.0.0.0:8000)"
+      "Bash(\"venv\\\\Scripts\\\\python.exe\" manage.py runserver 0.0.0.0:8000)",
+      "Bash(\"venv\\\\Scripts\\\\python.exe\" manage.py makemigrations:*)",
+      "Bash(\"venv\\\\Scripts\\\\python.exe\" manage.py migrate)"
     ]
   }
 }

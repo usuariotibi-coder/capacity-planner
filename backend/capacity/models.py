@@ -248,6 +248,26 @@ class PrgExternalTeamCapacity(models.Model):
         return f"{self.team_name} - {self.week_start_date}: {self.capacity}"
 
 
+class DepartmentWeeklyTotal(models.Model):
+    """Weekly occupancy total hours per department and week"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices)
+    week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
+    total_hours = models.FloatField(validators=[MinValueValidator(0)], help_text="Total hours assigned for this department/week")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'week_start_date']
+        indexes = [
+            models.Index(fields=['department', 'week_start_date']),
+        ]
+        unique_together = ['department', 'week_start_date']
+
+    def __str__(self):
+        return f"{self.department} - {self.week_start_date}: {self.total_hours}h"
+
+
 class ActivityLog(models.Model):
     """Activity log for audit trail"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

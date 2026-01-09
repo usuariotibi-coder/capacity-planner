@@ -23,6 +23,7 @@ from .models import (
     ScioTeamCapacity,
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
+    DepartmentWeeklyTotal,
 )
 
 
@@ -1464,4 +1465,17 @@ class PrgExternalTeamCapacitySerializer(serializers.ModelSerializer):
     class Meta:
         model = PrgExternalTeamCapacity
         fields = ('id', 'team_name', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class DepartmentWeeklyTotalSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Department Weekly Total model.
+
+    Represents the total hours allocated per department and week (Weekly Occupancy).
+    """
+
+    class Meta:
+        model = DepartmentWeeklyTotal
+        fields = ('id', 'department', 'week_start_date', 'total_hours', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
