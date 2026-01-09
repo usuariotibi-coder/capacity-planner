@@ -60,6 +60,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [zoom, setZoom] = useState<number>(100);
   const [showLegend, setShowLegend] = useState<boolean>(false);
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
+  const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
@@ -1174,13 +1175,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
               return (
                 <div className="sticky top-0 z-40 mb-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-2 shadow-sm">
-                  <h2 className="text-xs font-bold mb-1 text-indigo-800 flex items-center gap-1">
-                    <span className={deptIcon.color}>{deptIcon.icon}</span>
-                    <span>{dept} - {t.weeklyOccupancyTotal}</span>
-                  </h2>
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-xs font-bold text-indigo-800 flex items-center gap-1">
+                      <span className={deptIcon.color}>{deptIcon.icon}</span>
+                      <span>{dept} - {t.weeklyOccupancyTotal}</span>
+                    </h2>
+                    <button
+                      onClick={() => setShowDepartmentPanel(!showDepartmentPanel)}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold text-xs cursor-pointer transition"
+                      title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
+                    >
+                      {showDepartmentPanel ? '▼' : '▶'}
+                    </button>
+                  </div>
 
                   {/* Weekly occupancy calendar */}
-                  <div className="overflow-x-auto">
+                  {showDepartmentPanel && (
+                    <div className="overflow-x-auto">
                     <div className="inline-block min-w-full">
                       {/* Week headers row */}
                       <div className="flex gap-0.5 mb-0.5">
@@ -1619,7 +1630,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         })}
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
