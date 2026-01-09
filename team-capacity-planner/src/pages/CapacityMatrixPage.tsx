@@ -1665,6 +1665,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
               return (
                 <div key={proj.id} className="mb-2 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+                  {/* Project General Info */}
+                  <div className="bg-gradient-to-r from-slate-100 to-slate-50 border-b border-gray-300 px-3 py-2 flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-gray-900 truncate">{proj.name}</h3>
+                        <p className="text-xs text-gray-600 truncate">{proj.client}</p>
+                      </div>
+                      <div className="flex gap-2 items-center flex-shrink-0">
+                        <div className="bg-slate-200 rounded px-2 py-1 text-xs font-semibold text-gray-700">
+                          {proj.startDate} → {proj.endDate}
+                        </div>
+                        {proj.projectManagerId && (() => {
+                          const manager = employees.find(e => e.id === proj.projectManagerId);
+                          return manager ? (
+                            <div className="bg-blue-100 rounded px-2 py-1 text-xs font-semibold text-blue-700">
+                              👤 {manager.name}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Per-project zoom controls and summary */}
                   <div className="flex items-center justify-between gap-3 p-1.5 bg-indigo-50 border-b border-indigo-200 flex-wrap">
                     {/* Per-project summary panel - FIRST (left side) */}
