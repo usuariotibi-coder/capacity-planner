@@ -703,6 +703,52 @@ class ProjectViewSet(viewsets.ModelViewSet):
             'projects': project_list,
         })
 
+    @action(detail=True, methods=['patch'], url_path='update-budget-hours')
+    def update_budget_hours(self, request, pk=None):
+        """
+        Update budget hours (utilized or forecast) for a specific project and department.
+
+        Request body:
+        {
+            "department": "PM",  // Required: Department code
+            "hours_utilized": 100,  // Optional: Hours utilized
+            "hours_forecast": 150   // Optional: Hours forecast
+        }
+
+        Returns the updated ProjectBudget object.
+        """
+        project = self.get_object()
+        department = request.data.get('department')
+        hours_utilized = request.data.get('hours_utilized')
+        hours_forecast = request.data.get('hours_forecast')
+
+        if not department:
+            return Response(
+                {'detail': 'Department is required'},
+                status=400
+            )
+
+        try:
+            budget = ProjectBudget.objects.get(project=project, department=department)
+
+            # Update the fields if provided
+            if hours_utilized is not None:
+                budget.hours_utilized = hours_utilized
+            if hours_forecast is not None:
+                budget.hours_forecast = hours_forecast
+
+            budget.save()
+
+            from capacity.serializers import ProjectBudgetSerializer
+            serializer = ProjectBudgetSerializer(budget)
+            return Response(serializer.data)
+
+        except ProjectBudget.DoesNotExist:
+            return Response(
+                {'detail': f'ProjectBudget not found for department {department}'},
+                status=404
+            )
+
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     """

@@ -4,6 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
+import { projectsApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
@@ -44,7 +45,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
   const deleteAssignment = useAssignmentStore((state) => state.deleteAssignment);
-  const updateProject = useProjectStore((state) => state.updateProject);
   const addProject = useProjectStore((state) => state.addProject);
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -568,28 +568,39 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const handleSaveUtilized = async () => {
     if (!editingUtilized) return;
 
-    const project = projects.find(p => p.id === editingUtilized.projectId);
-    if (!project) return;
-
-    const updatedHoursUtilized: Record<Department, number> = {
-      PM: project.departmentHoursUtilized?.PM || 0,
-      MED: project.departmentHoursUtilized?.MED || 0,
-      HD: project.departmentHoursUtilized?.HD || 0,
-      MFG: project.departmentHoursUtilized?.MFG || 0,
-      BUILD: project.departmentHoursUtilized?.BUILD || 0,
-      PRG: project.departmentHoursUtilized?.PRG || 0,
-    };
-    updatedHoursUtilized[editingUtilized.department] = parseInt(utilizedHours) || 0;
+    const newValue = parseInt(utilizedHours) || 0;
 
     try {
-      await updateProject(editingUtilized.projectId, {
-        ...project,
-        departmentHoursUtilized: updatedHoursUtilized,
+      console.log('[CapacityMatrix] Saving utilized hours:', {
+        projectId: editingUtilized.projectId,
+        department: editingUtilized.department,
+        newValue: newValue,
       });
+
+      // Call the new endpoint that directly updates ProjectBudget hours_utilized
+      await projectsApi.updateBudgetHours(editingUtilized.projectId, {
+        department: editingUtilized.department,
+        hoursUtilized: newValue,
+      });
+
+      console.log('[CapacityMatrix] ✓ Utilized hours saved successfully to backend');
+
+      // Refetch projects to get the updated data
+      const fetchProjects = useProjectStore.getState().fetchProjects;
+      await fetchProjects();
+
       setEditingUtilized(null);
       setUtilizedHours('');
+
+      // Show brief success message
+      const successMsg = `Horas utilizadas guardadas (${editingUtilized.department}: ${newValue}h)`;
+      console.log('[CapacityMatrix] Success:', successMsg);
     } catch (error) {
-      console.error('Error saving utilized hours:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving utilized hours:', errorMsg);
+      alert(`Error al guardar horas utilizadas: ${errorMsg}`);
+      setEditingUtilized(null);
+      setUtilizedHours('');
     }
   };
 
@@ -607,28 +618,39 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const handleSaveForecast = async () => {
     if (!editingForecast) return;
 
-    const project = projects.find(p => p.id === editingForecast.projectId);
-    if (!project) return;
-
-    const updatedHoursForecast: Record<Department, number> = {
-      PM: project.departmentHoursForecast?.PM || 0,
-      MED: project.departmentHoursForecast?.MED || 0,
-      HD: project.departmentHoursForecast?.HD || 0,
-      MFG: project.departmentHoursForecast?.MFG || 0,
-      BUILD: project.departmentHoursForecast?.BUILD || 0,
-      PRG: project.departmentHoursForecast?.PRG || 0,
-    };
-    updatedHoursForecast[editingForecast.department] = parseInt(forecastHours) || 0;
+    const newValue = parseInt(forecastHours) || 0;
 
     try {
-      await updateProject(editingForecast.projectId, {
-        ...project,
-        departmentHoursForecast: updatedHoursForecast,
+      console.log('[CapacityMatrix] Saving forecasted hours:', {
+        projectId: editingForecast.projectId,
+        department: editingForecast.department,
+        newValue: newValue,
       });
+
+      // Call the new endpoint that directly updates ProjectBudget hours_forecast
+      await projectsApi.updateBudgetHours(editingForecast.projectId, {
+        department: editingForecast.department,
+        hoursForecast: newValue,
+      });
+
+      console.log('[CapacityMatrix] ✓ Forecasted hours saved successfully to backend');
+
+      // Refetch projects to get the updated data
+      const fetchProjects = useProjectStore.getState().fetchProjects;
+      await fetchProjects();
+
       setEditingForecast(null);
       setForecastHours('');
+
+      // Show brief success message
+      const successMsg = `Horas pronosticadas guardadas (${editingForecast.department}: ${newValue}h)`;
+      console.log('[CapacityMatrix] Success:', successMsg);
     } catch (error) {
-      console.error('Error saving forecasted hours:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving forecasted hours:', errorMsg);
+      alert(`Error al guardar horas pronosticadas: ${errorMsg}`);
+      setEditingForecast(null);
+      setForecastHours('');
     }
   };
 
@@ -1971,49 +1993,60 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           onClick={handleCancelUtilized}
                         />
                         {/* Modal */}
-                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                          <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
+                          <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md">
                             {/* Header */}
-                            <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
-                              <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                <div>
+                                  <h3 className="text-lg font-bold text-gray-800">{getDepartmentLabel(dept as Department, t)}</h3>
+                                  <div className="text-xs text-gray-600">{t.editUsedHours}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleCancelUtilized}
+                                className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
+                                title={t.cancel}
+                              >
+                                <X size={20} />
+                              </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6 space-y-4">
                               <div>
-                                <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
-                                <div className="text-xs text-slate-400">{t.editUsedHours}</div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={utilizedHours}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '' || /^\d+$/.test(val)) {
+                                      setUtilizedHours(val);
+                                    }
+                                  }}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  autoFocus
+                                  placeholder="0"
+                                />
                               </div>
                             </div>
 
-                            {/* Input field */}
-                            <div>
-                              <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={utilizedHours}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || /^\d+$/.test(val)) {
-                                    setUtilizedHours(val);
-                                  }
-                                }}
-                                className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
-                                autoFocus
-                                placeholder="0"
-                              />
-                            </div>
-
-                            {/* Action buttons */}
-                            <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                            {/* Footer */}
+                            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
                               <button
                                 onClick={handleCancelUtilized}
-                                className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
                               >
-                                ✗ {t.cancel}
+                                {t.cancel}
                               </button>
                               <button
                                 onClick={handleSaveUtilized}
-                                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition"
                               >
-                                ✓ {t.save}
+                                {t.save}
                               </button>
                             </div>
                           </div>
@@ -2038,49 +2071,60 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           onClick={handleCancelForecast}
                         />
                         {/* Modal */}
-                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                          <div className="space-y-4 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-lg border border-slate-600 shadow-2xl min-w-80">
+                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
+                          <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md">
                             {/* Header */}
-                            <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
-                              <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-orange-100">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                <div>
+                                  <h3 className="text-lg font-bold text-gray-800">{getDepartmentLabel(dept as Department, t)}</h3>
+                                  <div className="text-xs text-gray-600">{t.editForecastedHours}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={handleCancelForecast}
+                                className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
+                                title={t.cancel}
+                              >
+                                <X size={20} />
+                              </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6 space-y-4">
                               <div>
-                                <div className="text-base font-bold text-slate-100">{getDepartmentLabel(dept as Department, t)}</div>
-                                <div className="text-xs text-slate-400">{t.editForecastedHours}</div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={forecastHours}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '' || /^\d+$/.test(val)) {
+                                      setForecastHours(val);
+                                    }
+                                  }}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                  autoFocus
+                                  placeholder="0"
+                                />
                               </div>
                             </div>
 
-                            {/* Input field */}
-                            <div>
-                              <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">{t.hours}</label>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={forecastHours}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '' || /^\d+$/.test(val)) {
-                                    setForecastHours(val);
-                                  }
-                                }}
-                                className="w-full border-2 border-slate-500 bg-slate-700 text-white rounded px-3 py-2 text-base focus:border-blue-400 focus:outline-none font-bold focus:ring-1 focus:ring-blue-300"
-                                autoFocus
-                                placeholder="0"
-                              />
-                            </div>
-
-                            {/* Action buttons */}
-                            <div className="flex gap-3 justify-end pt-3 border-t border-slate-700">
+                            {/* Footer */}
+                            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
                               <button
                                 onClick={handleCancelForecast}
-                                className="px-4 py-2 text-sm bg-slate-600 hover:bg-slate-700 text-white rounded font-semibold transition"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
                               >
-                                ✗ {t.cancel}
+                                {t.cancel}
                               </button>
                               <button
                                 onClick={handleSaveForecast}
-                                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-semibold transition"
+                                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 transition"
                               >
-                                ✓ {t.save}
+                                {t.save}
                               </button>
                             </div>
                           </div>

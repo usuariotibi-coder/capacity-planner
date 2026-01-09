@@ -238,6 +238,13 @@ export const projectsApi = {
       method: 'DELETE',
     });
   },
+
+  updateBudgetHours: async (id: string, budgetUpdate: { department: string; hoursUtilized?: number; hoursForecast?: number }) => {
+    return apiFetch(`/api/projects/${id}/update-budget-hours/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(budgetUpdate)),
+    });
+  },
 };
 
 // Assignments API
@@ -395,6 +402,38 @@ export const departmentWeeklyTotalApi = {
 
   delete: async (id: string) => {
     return apiFetch(`/api/department-weekly-total/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Project Budget API
+export const projectBudgetsApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/project-budgets/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/project-budgets/${id}/`);
+  },
+
+  create: async (budget: any) => {
+    return apiFetch('/api/project-budgets/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(budget)),
+    });
+  },
+
+  update: async (id: string, budget: any) => {
+    return apiFetch(`/api/project-budgets/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(budget)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/project-budgets/${id}/`, {
       method: 'DELETE',
     });
   },
