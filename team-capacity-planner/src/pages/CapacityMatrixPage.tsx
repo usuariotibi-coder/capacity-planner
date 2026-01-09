@@ -1700,7 +1700,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       </div>
 
                       {/* Metrics - Department view only */}
-                      <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-stretch gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         {(() => {
                           const dept = departmentFilter as Department;
                           const quotedHoursValue = getQuotedHours(dept, proj.id);
@@ -1712,45 +1712,41 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           return (
                             <>
                               {/* Quoted Hours */}
-                              <div className="bg-blue-100 rounded px-1 py-0.5 border border-blue-300 text-center min-w-fit">
-                                <div className="text-[9px] text-blue-700 font-bold">{t.quotedLabel}</div>
-                                <div className="text-[9px] font-black text-blue-700">{quotedHoursValue}h</div>
+                              <div className="bg-blue-100 rounded px-2 py-1 border border-blue-300 text-center min-w-fit flex flex-col justify-center">
+                                <div className="text-[10px] text-blue-700 font-bold">{t.quotedLabel}</div>
+                                <div className="text-[11px] font-black text-blue-700">{quotedHoursValue}h</div>
                               </div>
 
                               {/* Used Hours */}
-                              <div className="bg-purple-100 rounded px-1 py-0.5 border border-purple-300 text-center min-w-fit relative">
+                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative group">
+                                <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
+                                <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
                                 <button
                                   onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                                  className="absolute top-0.5 left-0.5 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded transition"
+                                  className="absolute -top-2 -right-2 p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg opacity-0 group-hover:opacity-100"
                                   title={t.editUsedHours}
                                 >
-                                  <Pencil size={8} />
+                                  <Pencil size={12} />
                                 </button>
-                                <div className="text-center pl-2">
-                                  <div className="text-[9px] text-purple-700 font-bold">{t.usedLabel}</div>
-                                  <div className="text-[9px] font-black text-purple-700">{utilizedHoursValue}h</div>
-                                </div>
                               </div>
 
                               {/* Forecasted Hours */}
-                              <div className="bg-orange-100 rounded px-1 py-0.5 border border-orange-300 text-center min-w-fit relative">
+                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative group">
+                                <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
+                                <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
                                 <button
                                   onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                                  className="absolute top-0.5 left-0.5 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded transition"
+                                  className="absolute -top-2 -right-2 p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg opacity-0 group-hover:opacity-100"
                                   title={t.editForecastedHours}
                                 >
-                                  <Pencil size={8} />
+                                  <Pencil size={12} />
                                 </button>
-                                <div className="text-center pl-2">
-                                  <div className="text-[9px] text-orange-700 font-bold">{t.pronosticado}</div>
-                                  <div className="text-[9px] font-black text-orange-700">{forecastedHoursValue}h</div>
-                                </div>
                               </div>
 
                               {/* Utilization % */}
-                              <div className={`rounded px-1 py-0.5 border text-center min-w-fit ${utilizationColorInfo.bg}`}>
-                                <div className={`text-[9px] font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
-                                <div className={`text-[9px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
+                              <div className={`rounded px-2 py-1 border text-center min-w-fit flex flex-col justify-center ${utilizationColorInfo.bg}`}>
+                                <div className={`text-[10px] font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
+                                <div className={`text-[11px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
                               </div>
                             </>
                           );
