@@ -707,6 +707,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def update_budget_hours(self, request, pk=None):
         """
         Update budget hours (utilized or forecast) for a specific project and department.
+        Creates ProjectBudget entry if it doesn't exist.
 
         Request body:
         {
@@ -729,24 +730,33 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            budget = ProjectBudget.objects.get(project=project, department=department)
+            budget, created = ProjectBudget.objects.get_or_create(
+                project=project,
+                department=department,
+                defaults={
+                    'hours_allocated': 0,
+                    'hours_utilized': hours_utilized or 0,
+                    'hours_forecast': hours_forecast or 0,
+                }
+            )
 
-            # Update the fields if provided
-            if hours_utilized is not None:
-                budget.hours_utilized = hours_utilized
-            if hours_forecast is not None:
-                budget.hours_forecast = hours_forecast
+            # Update the fields if provided (only if not newly created)
+            if not created:
+                if hours_utilized is not None:
+                    budget.hours_utilized = hours_utilized
+                if hours_forecast is not None:
+                    budget.hours_forecast = hours_forecast
 
-            budget.save()
+                budget.save()
 
             from capacity.serializers import ProjectBudgetSerializer
             serializer = ProjectBudgetSerializer(budget)
             return Response(serializer.data)
 
-        except ProjectBudget.DoesNotExist:
+        except Exception as e:
             return Response(
-                {'detail': f'ProjectBudget not found for department {department}'},
-                status=404
+                {'detail': f'Error updating budget: {str(e)}'},
+                status=400
             )
 
 

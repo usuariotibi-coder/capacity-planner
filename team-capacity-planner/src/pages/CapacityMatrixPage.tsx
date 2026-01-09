@@ -2027,6 +2027,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       setUtilizedHours(val);
                                     }
                                   }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveUtilized();
+                                    }
+                                  }}
                                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                   autoFocus
                                   placeholder="0"
@@ -2103,6 +2109,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                     const val = e.target.value;
                                     if (val === '' || /^\d+$/.test(val)) {
                                       setForecastHours(val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveForecast();
                                     }
                                   }}
                                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
