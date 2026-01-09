@@ -1665,148 +1665,69 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
               return (
                 <div key={proj.id} className="mb-2 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
-                  {/* Project Header - Single Row */}
-                  <div className="bg-gradient-to-r from-slate-100 to-slate-50 border-b border-gray-300 px-3 py-1.5 flex items-center gap-3 overflow-x-auto">
-                    {/* Project Name and Client */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="min-w-0">
-                        <h3 className="text-xs font-bold text-gray-900 truncate">{proj.name}</h3>
-                        <p className="text-[11px] text-gray-600 truncate">{proj.client}</p>
-                      </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="w-px h-8 bg-gray-300 flex-shrink-0"></div>
-
-                    {/* Date Range */}
-                    <div className="bg-slate-200 rounded px-2 py-0.5 text-[11px] font-semibold text-gray-700 flex-shrink-0">
-                      {proj.startDate} → {proj.endDate}
-                    </div>
-
-                    {/* Project Manager */}
-                    {proj.projectManagerId && (() => {
-                      const manager = employees.find(e => e.id === proj.projectManagerId);
-                      return manager ? (
-                        <div className="bg-blue-100 rounded px-2 py-0.5 text-[11px] font-semibold text-blue-700 flex-shrink-0">
-                          👤 {manager.name}
+                  {/* Project header - Match General View design */}
+                  <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                    <div className="flex items-center justify-between gap-1">
+                      {expandedProjects[proj.id] ? (
+                        <ChevronUp size={14} className="text-gray-600" />
+                      ) : (
+                        <ChevronDown size={14} className="text-gray-600" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
+                          <span className="font-bold">{proj.name}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-600">{proj.client}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
+                            {(() => {
+                              const start = new Date(proj.startDate);
+                              const end = new Date(proj.endDate);
+                              const diffTime = Math.abs(end.getTime() - start.getTime());
+                              const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+                              return `${diffWeeks} weeks`;
+                            })()}
+                          </span>
+                          {proj.projectManagerId && (
+                            <>
+                              <span className="text-gray-400">•</span>
+                              <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                👨‍💼 {employees.find((e) => e.id === proj.projectManagerId)?.name || 'PM'}
+                              </span>
+                            </>
+                          )}
                         </div>
-                      ) : null;
-                    })()}
+                      </div>
 
-                    {/* Spacer */}
-                    <div className="flex-1"></div>
-
-                    {/* Quoted Hours (budget) */}
-                    <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center min-w-fit flex-shrink-0">
-                      <div className="text-[10px] text-blue-700 font-bold">{t.quotedLabel}</div>
-                      <div className="text-[10px] font-black text-blue-700">{(() => {
-                        const dept = departmentFilter as Department;
-                        return getQuotedHours(dept, proj.id);
-                      })()}h</div>
-                    </div>
-
-                    {/* Used Hours */}
-                    <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center min-w-fit flex-shrink-0 relative">
-                      <button
-                        onClick={() => (() => {
-                          const dept = departmentFilter as Department;
-                          const utilizedHoursValue = getUtilizedHours(dept, proj.id);
-                          handleEditUtilized(proj.id, dept, utilizedHoursValue);
-                        })()}
-                        className="absolute top-0.5 left-0.5 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded transition"
-                        title={t.editUsedHours}
-                      >
-                        <Pencil size={8} />
-                      </button>
-                      <div className="text-center pl-3">
-                        <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
-                        <div className="text-[10px] font-black text-purple-700">{(() => {
-                          const dept = departmentFilter as Department;
-                          return getUtilizedHours(dept, proj.id);
-                        })()}h</div>
+                      {/* Zoom controls */}
+                      <div className="flex items-center gap-0.5 ml-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs font-semibold text-indigo-900">Z:</span>
+                        <button
+                          onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut size={12} />
+                        </button>
+                        <input
+                          type="range"
+                          min="50"
+                          max="200"
+                          step="10"
+                          value={getProjectZoom(proj.id)}
+                          onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                          className="w-12 cursor-pointer h-1.5"
+                        />
+                        <button
+                          onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                          title="Zoom In"
+                        >
+                          <ZoomIn size={12} />
+                        </button>
+                        <span className="text-xs font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
                       </div>
                     </div>
-
-                    {/* Forecasted Hours */}
-                    <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center min-w-fit flex-shrink-0 relative">
-                      <button
-                        onClick={() => (() => {
-                          const dept = departmentFilter as Department;
-                          const forecastedHoursValue = getForecastedHours(dept, proj.id);
-                          handleEditForecast(proj.id, dept, forecastedHoursValue);
-                        })()}
-                        className="absolute top-0.5 left-0.5 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded transition"
-                        title={t.editForecastedHours}
-                      >
-                        <Pencil size={8} />
-                      </button>
-                      <div className="text-center pl-3">
-                        <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
-                        <div className="text-[10px] font-black text-orange-700">{(() => {
-                          const dept = departmentFilter as Department;
-                          return getForecastedHours(dept, proj.id);
-                        })()}h</div>
-                      </div>
-                    </div>
-
-                    {/* Utilization % */}
-                    <div className={`rounded px-1.5 py-0.5 border text-center min-w-fit flex-shrink-0 ${(() => {
-                      const dept = departmentFilter as Department;
-                      const utilizationPercent = getUtilizationPercent(dept, proj.id);
-                      return getUtilizationColor(utilizationPercent).bg;
-                    })()}`}>
-                      <div className={`text-[10px] font-bold ${(() => {
-                        const dept = departmentFilter as Department;
-                        const utilizationPercent = getUtilizationPercent(dept, proj.id);
-                        return getUtilizationColor(utilizationPercent).text;
-                      })()}`}>{t.utilizationLabel}</div>
-                      <div className={`text-[10px] font-black ${(() => {
-                        const dept = departmentFilter as Department;
-                        const utilizationPercent = getUtilizationPercent(dept, proj.id);
-                        return getUtilizationColor(utilizationPercent).text;
-                      })()}`}>{(() => {
-                        const dept = departmentFilter as Department;
-                        return getUtilizationPercent(dept, proj.id);
-                      })()}%</div>
-                    </div>
-
-                    {/* Zoom controls */}
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <span className="text-[10px] font-semibold text-indigo-900">Z:</span>
-                      <button
-                        onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
-                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                        title="Zoom Out"
-                      >
-                        <ZoomOut size={12} />
-                      </button>
-                      <input
-                        type="range"
-                        min="50"
-                        max="200"
-                        step="10"
-                        value={getProjectZoom(proj.id)}
-                        onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
-                        className="w-10 cursor-pointer h-1"
-                      />
-                      <button
-                        onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
-                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                        title="Zoom In"
-                      >
-                        <ZoomIn size={12} />
-                      </button>
-                      <span className="text-[10px] font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
-                    </div>
-
-                    {/* Collapse/Expand toggle */}
-                    <button
-                      onClick={() => toggleProjectExpanded(proj.id)}
-                      className="p-1 text-indigo-600 hover:text-indigo-800 font-bold text-base cursor-pointer transition flex-shrink-0"
-                      title={expandedProjects[proj.id] ? 'Hide project' : 'Show project'}
-                    >
-                      {expandedProjects[proj.id] ? '▼' : '▶'}
-                    </button>
                   </div>
 
                   {/* Per-project zoom controls and summary */}
