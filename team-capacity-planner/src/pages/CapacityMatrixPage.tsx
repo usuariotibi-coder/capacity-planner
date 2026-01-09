@@ -565,7 +565,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setUtilizedHours(currentHours.toString());
   };
 
-  const handleSaveUtilized = () => {
+  const handleSaveUtilized = async () => {
     if (!editingUtilized) return;
 
     const project = projects.find(p => p.id === editingUtilized.projectId);
@@ -581,13 +581,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
     updatedHoursUtilized[editingUtilized.department] = parseInt(utilizedHours) || 0;
 
-    updateProject(editingUtilized.projectId, {
-      ...project,
-      departmentHoursUtilized: updatedHoursUtilized,
-    });
-
-    setEditingUtilized(null);
-    setUtilizedHours('');
+    try {
+      await updateProject(editingUtilized.projectId, {
+        ...project,
+        departmentHoursUtilized: updatedHoursUtilized,
+      });
+      setEditingUtilized(null);
+      setUtilizedHours('');
+    } catch (error) {
+      console.error('Error saving utilized hours:', error);
+    }
   };
 
   const handleCancelUtilized = () => {
@@ -601,7 +604,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setForecastHours(currentHours.toString());
   };
 
-  const handleSaveForecast = () => {
+  const handleSaveForecast = async () => {
     if (!editingForecast) return;
 
     const project = projects.find(p => p.id === editingForecast.projectId);
@@ -617,13 +620,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
     updatedHoursForecast[editingForecast.department] = parseInt(forecastHours) || 0;
 
-    updateProject(editingForecast.projectId, {
-      ...project,
-      departmentHoursForecast: updatedHoursForecast,
-    });
-
-    setEditingForecast(null);
-    setForecastHours('');
+    try {
+      await updateProject(editingForecast.projectId, {
+        ...project,
+        departmentHoursForecast: updatedHoursForecast,
+      });
+      setEditingForecast(null);
+      setForecastHours('');
+    } catch (error) {
+      console.error('Error saving forecasted hours:', error);
+    }
   };
 
   const handleCancelForecast = () => {
