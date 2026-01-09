@@ -213,6 +213,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     localStorage.setItem('prgExternalPersonnel', JSON.stringify(prgExternalPersonnel));
   }, [prgExternalPersonnel]);
 
+  // Normalize scioTeamMembers to ensure all departments exist in the structure
+  // This prevents "Cannot read properties of undefined" errors when accessing dept[date]
+  useEffect(() => {
+    const departments: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+    const hasAllDepts = departments.every(dept => scioTeamMembers[dept] !== undefined);
+
+    if (!hasAllDepts) {
+      const normalized: Record<Department, Record<string, number>> = {
+        'PM': scioTeamMembers['PM'] || {},
+        'MED': scioTeamMembers['MED'] || {},
+        'HD': scioTeamMembers['HD'] || {},
+        'MFG': scioTeamMembers['MFG'] || {},
+        'BUILD': scioTeamMembers['BUILD'] || {},
+        'PRG': scioTeamMembers['PRG'] || {},
+      };
+      setScioTeamMembers(normalized);
+    }
+  }, []);
+
   // Refs for table containers
   const departmentsTableRef = useRef<HTMLDivElement>(null);
   const projectsTableRef = useRef<HTMLDivElement>(null);
@@ -1274,13 +1293,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 key={`scio-${dept}-${weekData.date}`}
                                 type="number"
                                 step="0.1"
-                                value={scioTeamMembers[dept][weekData.date] || ''}
+                                value={scioTeamMembers[dept]?.[weekData.date] || ''}
                                 onChange={(e) => {
                                   const newCapacity = parseFloat(e.target.value) || 0;
                                   setScioTeamMembers({
                                     ...scioTeamMembers,
                                     [dept]: {
-                                      ...scioTeamMembers[dept],
+                                      ...(scioTeamMembers[dept] || {}),
                                       [weekData.date]: newCapacity,
                                     },
                                   });
@@ -1500,7 +1519,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const isCurrentWeek = idx === currentDateWeekIndex;
 
                           // Get SCIO Team Members / Hours per Week capacity for this week
-                          const weekCapacity = scioTeamMembers[dept][weekData.date] || 0;
+                          const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
 
                           // Calculate total hours occupied for this department this week
                           const deptAssignments = assignments.filter(a => {
@@ -1988,7 +2007,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const isCurrentWeek = idx === currentDateWeekIndex;
 
                           // Get SCIO Team Members / Hours per Week capacity for this week
-                          const weekCapacity = scioTeamMembers[dept][weekData.date] || 0;
+                          const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
 
                           // Calculate total hours occupied for this department this week
                           const deptAssignments = assignments.filter(a => {
