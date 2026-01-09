@@ -1718,29 +1718,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               </div>
 
                               {/* Used Hours */}
-                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative group">
-                                <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
-                                <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
+                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative">
                                 <button
                                   onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                                  className="absolute -top-2 -right-2 p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg opacity-0 group-hover:opacity-100"
+                                  className="absolute -top-2 -right-2 p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg"
                                   title={t.editUsedHours}
                                 >
                                   <Pencil size={12} />
                                 </button>
+                                <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
+                                <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
                               </div>
 
                               {/* Forecasted Hours */}
-                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative group">
-                                <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
-                                <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
+                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative">
                                 <button
                                   onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                                  className="absolute -top-2 -right-2 p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg opacity-0 group-hover:opacity-100"
+                                  className="absolute -top-2 -right-2 p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg"
                                   title={t.editForecastedHours}
                                 >
                                   <Pencil size={12} />
                                 </button>
+                                <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
+                                <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
                               </div>
 
                               {/* Utilization % */}
