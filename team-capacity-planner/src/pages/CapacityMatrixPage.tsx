@@ -2404,7 +2404,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                             </button>
                                           )}
                                           {!isDeptWeekInRange && (
-                                            <div className="absolute -top-1 -right-1 text-red-600 font-bold text-[10px]">⚠</div>
+                                            <div className="absolute top-0.5 -right-0.5 text-red-600 font-bold text-[10px]">⚠</div>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
