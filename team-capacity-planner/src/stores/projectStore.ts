@@ -46,8 +46,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         firstProjectHasQuoted: data?.[0]?.departmentHoursAllocated ? 'YES' : 'NO',
         firstProjectQuoted: data?.[0]?.departmentHoursAllocated
       });
-      set({ projects: data, isLoading: false, hasFetched: true });
-      console.log('[ProjectStore] Projects state updated successfully');
+
+      // Create a new array reference to ensure React detects the change
+      const newProjects = Array.isArray(data) ? [...data] : data;
+      set({ projects: newProjects, isLoading: false, hasFetched: true });
+      console.log('[ProjectStore] Projects state updated successfully with new reference');
     } catch (error) {
       console.error('[ProjectStore] Error fetching projects:', error);
       set({

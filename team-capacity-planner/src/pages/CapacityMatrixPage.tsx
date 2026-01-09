@@ -46,6 +46,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
   const deleteAssignment = useAssignmentStore((state) => state.deleteAssignment);
   const addProject = useProjectStore((state) => state.addProject);
+
+  // Debug: Log when projects change
+  useEffect(() => {
+    console.log('[CapacityMatrixPage] Projects updated:', {
+      count: projects?.length,
+      firstProjectName: projects?.[0]?.name,
+      firstProjectHasQuoted: projects?.[0]?.departmentHoursAllocated ? 'YES' : 'NO'
+    });
+  }, [projects]);
   const { language } = useLanguage();
   const t = useTranslation(language);
 
