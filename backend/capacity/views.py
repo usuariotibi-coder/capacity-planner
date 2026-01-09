@@ -766,7 +766,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if response.status_code == 201:
             # Create ProjectBudget entries for each department with allocated hours
             project_id = response.data['id']
-            department_hours_allocated = request.data.get('departmentHoursAllocated', {})
+            department_hours_allocated = request.data.get('department_hours_allocated', {})
 
             # Process all departments, even if they have 0 hours
             if department_hours_allocated is not None and isinstance(department_hours_allocated, dict):
@@ -796,7 +796,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if response.status_code in [200, 202]:
             # Update ProjectBudget entries for each department
             project_id = kwargs.get('pk')
-            department_hours_allocated = request.data.get('departmentHoursAllocated', {})
+            department_hours_allocated = request.data.get('department_hours_allocated', {})
 
             # Process all departments, even if they have 0 hours
             if department_hours_allocated is not None and isinstance(department_hours_allocated, dict):
