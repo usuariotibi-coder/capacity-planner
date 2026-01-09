@@ -569,31 +569,36 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!editingUtilized) return;
 
     const newValue = parseInt(utilizedHours) || 0;
+    const projectId = editingUtilized.projectId;
+    const department = editingUtilized.department;
 
     try {
       console.log('[CapacityMatrix] Saving utilized hours:', {
-        projectId: editingUtilized.projectId,
-        department: editingUtilized.department,
+        projectId: projectId,
+        department: department,
         newValue: newValue,
       });
 
       // Call the new endpoint that directly updates ProjectBudget hours_utilized
-      await projectsApi.updateBudgetHours(editingUtilized.projectId, {
-        department: editingUtilized.department,
+      await projectsApi.updateBudgetHours(projectId, {
+        department: department,
         hoursUtilized: newValue,
       });
 
       console.log('[CapacityMatrix] ✓ Utilized hours saved successfully to backend');
 
-      // Refetch projects to get the updated data
-      const fetchProjects = useProjectStore.getState().fetchProjects;
-      await fetchProjects();
-
+      // Close modal immediately
       setEditingUtilized(null);
       setUtilizedHours('');
 
+      // Refetch projects in the background to sync UI
+      console.log('[CapacityMatrix] Refetching projects from backend...');
+      const store = useProjectStore.getState();
+      await store.fetchProjects();
+      console.log('[CapacityMatrix] ✓ Projects refetched successfully');
+
       // Show brief success message
-      const successMsg = `Horas utilizadas guardadas (${editingUtilized.department}: ${newValue}h)`;
+      const successMsg = `Horas utilizadas guardadas (${department}: ${newValue}h)`;
       console.log('[CapacityMatrix] Success:', successMsg);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
@@ -619,31 +624,36 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!editingForecast) return;
 
     const newValue = parseInt(forecastHours) || 0;
+    const projectId = editingForecast.projectId;
+    const department = editingForecast.department;
 
     try {
       console.log('[CapacityMatrix] Saving forecasted hours:', {
-        projectId: editingForecast.projectId,
-        department: editingForecast.department,
+        projectId: projectId,
+        department: department,
         newValue: newValue,
       });
 
       // Call the new endpoint that directly updates ProjectBudget hours_forecast
-      await projectsApi.updateBudgetHours(editingForecast.projectId, {
-        department: editingForecast.department,
+      await projectsApi.updateBudgetHours(projectId, {
+        department: department,
         hoursForecast: newValue,
       });
 
       console.log('[CapacityMatrix] ✓ Forecasted hours saved successfully to backend');
 
-      // Refetch projects to get the updated data
-      const fetchProjects = useProjectStore.getState().fetchProjects;
-      await fetchProjects();
-
+      // Close modal immediately
       setEditingForecast(null);
       setForecastHours('');
 
+      // Refetch projects in the background to sync UI
+      console.log('[CapacityMatrix] Refetching projects from backend...');
+      const store = useProjectStore.getState();
+      await store.fetchProjects();
+      console.log('[CapacityMatrix] ✓ Projects refetched successfully');
+
       // Show brief success message
-      const successMsg = `Horas pronosticadas guardadas (${editingForecast.department}: ${newValue}h)`;
+      const successMsg = `Horas pronosticadas guardadas (${department}: ${newValue}h)`;
       console.log('[CapacityMatrix] Success:', successMsg);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
@@ -875,6 +885,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     // Update total hours for backward compatibility
                     setEditingHours((val === '' ? 0 : Math.max(0, parseInt(val) || 0)) + editingExternalHours);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveCell();
+                    }
+                  }}
                   disabled={selectedEmployees.size > 0 && Array.from(selectedEmployees).some(empId => {
                     const emp = employees.find(e => e.id === empId);
                     return emp?.isSubcontractedMaterial;
@@ -902,6 +918,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       // Update total hours for backward compatibility
                       setEditingHours(editingScioHours + (val === '' ? 0 : Math.max(0, parseInt(val) || 0)));
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveCell();
+                      }
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="0"
                   />
@@ -919,6 +941,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 onChange={(e) => {
                   const val = e.target.value;
                   setEditingHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveCell();
+                  }
                 }}
                 autoFocus
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
