@@ -4,7 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { projectsApi, scioTeamCapacityApi } from '../services/api';
+import { projectsApi, scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
@@ -243,15 +243,70 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     loadScioTeamCapacity();
   }, []);
 
-  // Save subcontractedPersonnel to localStorage whenever it changes
+  // Load BUILD and PRG teams from API, and load subcontracted/external personnel capacity data
   useEffect(() => {
-    localStorage.setItem('subcontractedPersonnel', JSON.stringify(subcontractedPersonnel));
-  }, [subcontractedPersonnel]);
+    const loadTeamsData = async () => {
+      try {
+        // Load active BUILD teams
+        const buildStore = useBuildTeamsStore.getState();
+        await buildStore.loadActiveTeams();
 
-  // Save prgExternalPersonnel to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('prgExternalPersonnel', JSON.stringify(prgExternalPersonnel));
-  }, [prgExternalPersonnel]);
+        // Load active PRG teams
+        const prgStore = usePRGTeamsStore.getState();
+        await prgStore.loadActiveTeams();
+
+        // Load subcontracted team capacity data
+        console.log('[CapacityMatrix] Loading Subcontracted Team Capacity from API...');
+        const subcontractedData = await subcontractedTeamCapacityApi.getAll();
+        const newSubcontractedPersonnel: Record<string, Record<string, number | undefined>> = {
+          'AMI': {},
+          'VICER': {},
+          'ITAX': {},
+          'MCI': {},
+          'MG Electrical': {},
+        };
+
+        for (const record of subcontractedData) {
+          const company = record.company;
+          const weekDate = record.weekStartDate;
+          const capacity = record.capacity;
+
+          if (company && weekDate) {
+            if (!newSubcontractedPersonnel[company]) {
+              newSubcontractedPersonnel[company] = {};
+            }
+            newSubcontractedPersonnel[company][weekDate] = capacity;
+          }
+        }
+        setSubcontractedPersonnel(newSubcontractedPersonnel);
+        console.log('[CapacityMatrix] Subcontracted Team Capacity loaded');
+
+        // Load PRG external team capacity data
+        console.log('[CapacityMatrix] Loading PRG External Team Capacity from API...');
+        const prgExternalData = await prgExternalTeamCapacityApi.getAll();
+        const newPrgExternalPersonnel: Record<string, Record<string, number | undefined>> = {};
+
+        for (const record of prgExternalData) {
+          const teamName = record.teamName;
+          const weekDate = record.weekStartDate;
+          const capacity = record.capacity;
+
+          if (teamName && weekDate) {
+            if (!newPrgExternalPersonnel[teamName]) {
+              newPrgExternalPersonnel[teamName] = {};
+            }
+            newPrgExternalPersonnel[teamName][weekDate] = capacity;
+          }
+        }
+        setPRGExternalPersonnel(newPrgExternalPersonnel);
+        console.log('[CapacityMatrix] PRG External Team Capacity loaded');
+      } catch (error) {
+        console.error('[CapacityMatrix] Error loading teams data:', error);
+      }
+    };
+
+    loadTeamsData();
+  }, []);
 
   // Normalize scioTeamMembers to ensure all departments exist in the structure
   // This prevents "Cannot read properties of undefined" errors when accessing dept[date]
@@ -329,6 +384,92 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
     scioSaveTimeouts.current[timeoutKey] = setTimeout(() => {
       saveScioTeamCapacity(dept, weekDate, newCapacity);
+    }, 500);
+  };
+
+  // Save Subcontracted Team Capacity to API
+  const saveSubcontractedCapacity = async (company: string, weekDate: string, capacity: number | undefined) => {
+    try {
+      if (capacity === undefined || capacity === 0) {
+        // Don't save undefined or 0 values
+        return;
+      }
+
+      console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, weekDate, capacity);
+      await subcontractedTeamCapacityApi.create({
+        company,
+        weekStartDate: weekDate,
+        capacity,
+      });
+    } catch (error) {
+      console.error('[CapacityMatrix] Error saving Subcontracted capacity:', error);
+    }
+  };
+
+  // Debounced saves for subcontracted and PRG external personnel
+  const subcontractedSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const prgExternalSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const handleSubcontractedChange = (company: string, weekDate: string, newCount: number | undefined) => {
+    // Update local state immediately
+    setSubcontractedPersonnel(prev => ({
+      ...prev,
+      [company]: {
+        ...(prev[company] || {}),
+        [weekDate]: newCount,
+      },
+    }));
+
+    // Debounce the API call
+    const timeoutKey = `${company}-${weekDate}`;
+    if (subcontractedSaveTimeouts.current[timeoutKey]) {
+      clearTimeout(subcontractedSaveTimeouts.current[timeoutKey]);
+    }
+    subcontractedSaveTimeouts.current[timeoutKey] = setTimeout(() => {
+      if (newCount !== undefined && newCount > 0) {
+        saveSubcontractedCapacity(company, weekDate, newCount);
+      }
+    }, 500);
+  };
+
+  // Save PRG External Team Capacity to API
+  const savePrgExternalCapacity = async (teamName: string, weekDate: string, capacity: number | undefined) => {
+    try {
+      if (capacity === undefined || capacity === 0) {
+        // Don't save undefined or 0 values
+        return;
+      }
+
+      console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, weekDate, capacity);
+      await prgExternalTeamCapacityApi.create({
+        teamName,
+        weekStartDate: weekDate,
+        capacity,
+      });
+    } catch (error) {
+      console.error('[CapacityMatrix] Error saving PRG External capacity:', error);
+    }
+  };
+
+  const handlePrgExternalChange = (teamName: string, weekDate: string, newCount: number | undefined) => {
+    // Update local state immediately
+    setPRGExternalPersonnel(prev => ({
+      ...prev,
+      [teamName]: {
+        ...(prev[teamName] || {}),
+        [weekDate]: newCount,
+      },
+    }));
+
+    // Debounce the API call
+    const timeoutKey = `${teamName}-${weekDate}`;
+    if (prgExternalSaveTimeouts.current[timeoutKey]) {
+      clearTimeout(prgExternalSaveTimeouts.current[timeoutKey]);
+    }
+    prgExternalSaveTimeouts.current[timeoutKey] = setTimeout(() => {
+      if (newCount !== undefined && newCount > 0) {
+        savePrgExternalCapacity(teamName, weekDate, newCount);
+      }
     }, 500);
   };
 
@@ -1525,13 +1666,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         value={subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : ''}
                                         onChange={(e) => {
                                           const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                          setSubcontractedPersonnel({
-                                            ...subcontractedPersonnel,
-                                            [company]: {
-                                              ...subcontractedPersonnel[company],
-                                              [weekData.date]: newCount,
-                                            },
-                                          });
+                                          handleSubcontractedChange(company, weekData.date, newCount);
                                         }}
                                         className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-violet-900"
                                         style={{textAlign: 'center'}}
@@ -1601,13 +1736,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         value={prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : ''}
                                         onChange={(e) => {
                                           const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                          setPRGExternalPersonnel({
-                                            ...prgExternalPersonnel,
-                                            [team]: {
-                                              ...prgExternalPersonnel[team],
-                                              [weekData.date]: newCount,
-                                            },
-                                          });
+                                          handlePrgExternalChange(team, weekData.date, newCount);
                                         }}
                                         className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900"
                                         style={{textAlign: 'center'}}
