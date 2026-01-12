@@ -110,10 +110,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
   });
 
-  // Active subcontracted teams for BUILD department - Use global store
+  // Active subcontracted teams for BUILD department - Use global store and subscribe to changes
   const { activeTeams, setActiveTeams } = useBuildTeamsStore();
 
-  // Active external teams for PRG department - Use global store
+  // Active external teams for PRG department - Use global store and subscribe to changes
   const { activeTeams: prgActiveTeams, setActiveTeams: setPRGActiveTeams } = usePRGTeamsStore();
 
   // External Personnel state for PRG department
@@ -171,36 +171,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // No need to handle resize - always showing desktop view with scrollable containers
 
-  // Load BUILD and PRG teams from employees list
-  useEffect(() => {
-    if (employees.length > 0) {
-      // Load BUILD subcontracted teams
-      const buildTeams = new Set<string>();
-      employees
-        .filter(emp => emp.department === 'BUILD' && emp.isSubcontractedMaterial)
-        .forEach(emp => {
-          if (emp.subcontractCompany) {
-            buildTeams.add(emp.subcontractCompany);
-          }
-        });
-      if (buildTeams.size > 0) {
-        setActiveTeams(buildTeams);
-      }
-
-      // Load PRG external teams
-      const prgTeams = new Set<string>();
-      employees
-        .filter(emp => emp.department === 'PRG' && emp.isSubcontractedMaterial)
-        .forEach(emp => {
-          if (emp.subcontractCompany) {
-            prgTeams.add(emp.subcontractCompany);
-          }
-        });
-      if (prgTeams.size > 0) {
-        setPRGActiveTeams(prgTeams);
-      }
-    }
-  }, [employees, setActiveTeams, setPRGActiveTeams]);
+  // NOTE: Teams are now loaded from API in the loadTeamsData useEffect below
+  // The old method of loading from employees list has been replaced with API loading
+  // This ensures teams persist across page refreshes
 
   // Load SCIO Team Capacity from API on mount
   useEffect(() => {
