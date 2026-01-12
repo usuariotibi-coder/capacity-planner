@@ -1,4 +1,10 @@
 /**
+ * LANGUAGE TYPES
+ * Supported languages in the application
+ */
+export type Language = 'es' | 'en';
+
+/**
  * DEPARTMENT TYPES
  * Represents the 6 departments in the organization
  */
