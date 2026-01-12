@@ -286,3 +286,29 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action} ({self.created_at})"
+
+
+class EmailVerification(models.Model):
+    """Email verification tokens for user registration"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='email_verification')
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"EmailVerification for {self.user.email}"
+
+    def is_expired(self):
+        """Check if token is expired (48 hours)"""
+        from django.conf import settings
+        from django.utils import timezone
+        expiry_time = self.created_at + settings.EMAIL_VERIFICATION_TOKEN_LIFETIME
+        return timezone.now() > expiry_time
+
+    def is_verified(self):
+        """Check if email is already verified"""
+        return self.verified_at is not None

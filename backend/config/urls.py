@@ -18,6 +18,8 @@ from capacity.views import (
     SubcontractedTeamCapacityViewSet,
     PrgExternalTeamCapacityViewSet,
     DepartmentWeeklyTotalViewSet,
+    UserRegistrationView,
+    EmailVerificationView,
 )
 
 # Create a router and register viewsets
@@ -64,6 +66,10 @@ urlpatterns = [
     # Authentication endpoints
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # Registration endpoints
+    path('api/register/', UserRegistrationView.as_view(), name='user_register'),
+    path('api/verify-email/<str:token>/', EmailVerificationView.as_view(), name='email_verify'),
 
     # API endpoints
     path('api/', include(router.urls)),

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import EmailVerificationPage from './pages/EmailVerificationPage';
 import { Users, Briefcase, Grid3x3, Menu, X, LogOut } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
@@ -15,7 +18,7 @@ type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
-function App() {
+function MainApp() {
   const [currentPage, setCurrentPage] = useState<Page>(() => {
     // Load current page from localStorage if available
     if (typeof window !== 'undefined') {
@@ -48,22 +51,18 @@ function App() {
   // Load data from API when authenticated
   useDataLoader();
 
-  // Save current page to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('currentPage', currentPage);
-    }
+    // Save current page to localStorage
+    localStorage.setItem('currentPage', currentPage);
   }, [currentPage]);
 
-  // Save department filter to localStorage whenever it changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('departmentFilter', departmentFilter);
-    }
+    // Save department filter to localStorage
+    localStorage.setItem('departmentFilter', departmentFilter);
   }, [departmentFilter]);
 
-  // Handle window resize to auto-close sidebar on mobile
   useEffect(() => {
+    // Handle resize event
     const handleResize = () => {
       const isMobile = window.innerWidth < 768;
       if (isMobile && sidebarOpen) {
@@ -75,7 +74,6 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, [sidebarOpen]);
 
-  // Show loading spinner while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -84,9 +82,9 @@ function App() {
     );
   }
 
-  // Show login page if not authenticated
+  // Redirect to login if not authenticated
   if (!isLoggedIn) {
-    return <LoginPage />;
+    return <Navigate to="/login" replace />;
   }
 
   const navItems: Array<{ id: Page; label: string; icon: React.ReactNode }> = [
@@ -135,7 +133,6 @@ function App() {
               key={item.id}
               onClick={() => {
                 setCurrentPage(item.id);
-                // Auto-close sidebar on mobile after selection
                 if (window.innerWidth < 768) {
                   setSidebarOpen(false);
                 }
@@ -152,13 +149,11 @@ function App() {
           ))}
         </nav>
 
-        {/* General View Button (only visible in Capacity) */}
         {currentPage === 'capacity' && (
           <div className="p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
-                // Auto-close sidebar on mobile after selection
                 if (window.innerWidth < 768) {
                   setSidebarOpen(false);
                 }
@@ -172,13 +167,11 @@ function App() {
               📊 {t.general}
             </button>
 
-            {/* Department Filter Dropdown */}
             <label className="block text-xs font-semibold text-slate-400 mb-2">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
-                setDepartmentFilter(e.target.value as DepartmentFilter);
-                // Auto-close sidebar on mobile after selection
+                setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
                 if (window.innerWidth < 768) {
                   setSidebarOpen(false);
                 }
@@ -209,7 +202,6 @@ function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header - Ultra Compact */}
         <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
@@ -225,7 +217,6 @@ function App() {
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Language Selector - Ultra Compact */}
             <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md">
               <button
                 onClick={() => setLanguage('es')}
@@ -259,12 +250,24 @@ function App() {
           </div>
         </div>
 
-        {/* Page Content */}
         <div className="flex-1 overflow-auto">
           {renderPage()}
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email/:token" element={<EmailVerificationPage />} />
+        <Route path="/*" element={<MainApp />} />
+      </Routes>
+    </Router>
   );
 }
 

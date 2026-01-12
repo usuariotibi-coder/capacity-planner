@@ -1421,3 +1421,156 @@ class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
     filterset_fields = ['department', 'week_start_date']
     ordering_fields = ['department', 'week_start_date', 'total_hours']
     ordering = ['department', 'week_start_date']
+
+
+# ==================== USER REGISTRATION VIEWS ====================
+
+from rest_framework import generics
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+
+
+class UserRegistrationView(generics.CreateAPIView):
+    """
+    User registration endpoint.
+
+    POST /api/register/
+
+    Accepts email, password, first_name, last_name, and department.
+    Creates inactive user and sends verification email.
+
+    Permissions:
+        - AllowAny: Registration is open to anyone with valid email domain
+
+    Request Body:
+        {
+            "email": "user@na.scio-automation.com",
+            "password": "SecurePassword123!",
+            "confirm_password": "SecurePassword123!",
+            "first_name": "John",
+            "last_name": "Doe",
+            "department": "PM"
+        }
+
+    Response (201 Created):
+        {
+            "message": "Registration successful. Please check your email to verify your account.",
+            "email": "user@na.scio-automation.com"
+        }
+
+    Rate Limiting:
+        - Applied via DRF throttle (5/hour for anonymous users)
+    """
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
+    throttle_scope = 'registration'
+
+    def create(self, request, *args, **kwargs):
+        """Override create to customize response."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response(
+            {
+                "message": "Registration successful. Please check your email to verify your account.",
+                "email": user.email
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+
+class EmailVerificationView(APIView):
+    """
+    Email verification endpoint.
+
+    GET /api/verify-email/<token>/
+
+    Verifies user email and activates account.
+
+    Permissions:
+        - AllowAny: Anyone with valid token can verify
+
+    Response (200 OK):
+        {
+            "message": "Email verified successfully. You can now log in.",
+            "email": "user@na.scio-automation.com"
+        }
+
+    Error Responses:
+        - 400: Token expired or invalid
+        - 404: Token not found
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        """
+        Verify email token and activate user account.
+
+        Args:
+            request: HTTP request
+            token: Verification token from URL
+
+        Returns:
+            Response with success or error message
+        """
+        from .models import EmailVerification
+
+        try:
+            verification = EmailVerification.objects.select_related('user').get(token=token)
+        except EmailVerification.DoesNotExist:
+            return Response(
+                {"error": "Invalid verification token."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if already verified
+        if verification.is_verified():
+            return Response(
+                {
+                    "message": "Email already verified. You can log in.",
+                    "email": verification.user.email
+                },
+                status=status.HTTP_200_OK
+            )
+
+        # Check if token expired
+        if verification.is_expired():
+            return Response(
+                {"error": "Verification token has expired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verify email and activate user
+        user = verification.user
+        user.is_active = True
+        user.save()
+
+        # Activate employee profile
+        try:
+            employee = user.employee
+            employee.is_active = True
+            employee.save()
+        except:
+            pass  # Employee might not exist
+
+        # Mark verification as complete
+        verification.verified_at = timezone.now()
+        verification.save()
+
+        # Log activity
+        ActivityLog.objects.create(
+            user=user,
+            action='email_verified',
+            model_name='User',
+            object_id=str(user.id),
+            changes={'email_verified': True}
+        )
+
+        return Response(
+            {
+                "message": "Email verified successfully. You can now log in.",
+                "email": user.email
+            },
+            status=status.HTTP_200_OK
+        )

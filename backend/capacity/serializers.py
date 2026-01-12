@@ -39,6 +39,170 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
+class UserRegistrationSerializer(serializers.Serializer):
+    """
+    Serializer for user registration.
+
+    Validates email domain, password strength, and creates user account
+    with email verification requirement.
+    """
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'},
+        min_length=8,
+        help_text="Password must be at least 8 characters"
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'},
+        help_text="Must match password"
+    )
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
+    department = serializers.ChoiceField(
+        choices=Department.choices,
+        required=True,
+        help_text="Employee department"
+    )
+
+    def validate_email(self, value):
+        """
+        Validate email domain and uniqueness.
+        """
+        from django.conf import settings
+
+        # Check domain
+        if not value.lower().endswith(settings.REGISTRATION_EMAIL_DOMAIN):
+            raise serializers.ValidationError(
+                f"Email must be from domain {settings.REGISTRATION_EMAIL_DOMAIN}"
+            )
+
+        # Check if email already exists
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                "A user with this email already exists."
+            )
+
+        return value.lower()
+
+    def validate_password(self, value):
+        """
+        Validate password using Django's password validators.
+        """
+        from django.contrib.auth.password_validation import validate_password
+
+        # Use Django's built-in validators (configured in settings.py)
+        try:
+            validate_password(value)
+        except serializers.ValidationError as e:
+            raise serializers.ValidationError(str(e))
+        return value
+
+    def validate(self, data):
+        """
+        Validate password confirmation match.
+        """
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match."
+            })
+
+        return data
+
+    def create(self, validated_data):
+        """
+        Create inactive user and send verification email.
+        """
+        # Remove confirm_password from data
+        validated_data.pop('confirm_password')
+
+        # Extract department for later
+        department = validated_data.pop('department')
+
+        # Create inactive user
+        user = User.objects.create_user(
+            username=validated_data['email'].split('@')[0],  # Use email prefix as username
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=validated_data['password'],
+            is_active=False  # User must verify email first
+        )
+
+        # Create email verification token
+        import secrets
+        from .models import EmailVerification
+
+        token = secrets.token_urlsafe(32)
+        EmailVerification.objects.create(user=user, token=token)
+
+        # Send verification email
+        self._send_verification_email(user, token)
+
+        # Create Employee profile (inactive until email verified)
+        Employee.objects.create(
+            user=user,
+            name=f"{user.first_name} {user.last_name}",
+            role="Team Member",  # Default role
+            department=department,
+            capacity=40.0,  # Default 40 hours/week
+            is_active=False  # Will be activated on email verification
+        )
+
+        return user
+
+    def _send_verification_email(self, user, token):
+        """
+        Send email verification link to user.
+        """
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from django.template.loader import render_to_string
+
+        verification_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+
+        subject = "Verify your Team Capacity Planner account"
+
+        # Plain text email
+        text_message = f"""
+Hello {user.first_name},
+
+Welcome to Team Capacity Planner!
+
+Please verify your email address by clicking the link below:
+
+{verification_url}
+
+This link will expire in 48 hours.
+
+If you didn't create this account, please ignore this email.
+
+Best regards,
+Team Capacity Planner Team
+        """.strip()
+
+        # HTML email (if templates exist)
+        try:
+            html_message = render_to_string('emails/confirmation_email.html', {
+                'user': user,
+                'verification_url': verification_url,
+            })
+        except:
+            html_message = None
+
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+
+
 class EmployeeSerializer(serializers.ModelSerializer):
     """
     Serializer for Employee model.

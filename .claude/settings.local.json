@@ -74,7 +74,9 @@
       "Bash(git checkout:*)",
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" -m py_compile capacity/views.py)",
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" manage.py makemigrations:*)",
-      "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\":*)"
+      "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\":*)",
+      "Bash(find:*)",
+      "Bash(.venvScriptsactivate)"
     ]
   }
 }

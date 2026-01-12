@@ -71,7 +71,6 @@ export const translations = {
     customer: 'Cliente / Descripción',
     facility: 'Instalación',
     numberOfWeeks: 'Número de Semanas',
-    completeAllFields: 'Por favor completa todos los campos requeridos',
 
     // Resources Page
     teamResources: 'Recursos del Equipo',
@@ -209,6 +208,57 @@ export const translations = {
     login: 'Iniciar Sesión',
     contactAdmin: 'Contacta al administrador para obtener credenciales',
     loginError: 'Error al iniciar sesión',
+    or: 'o',
+    noAccountRegister: '¿No tienes cuenta? Regístrate',
+
+    // Registration Page
+    registerTitle: 'Crear Cuenta',
+    registerSubtitle: 'Completa los datos para registrarte',
+    firstName: 'Nombre',
+    lastName: 'Apellido',
+    email: 'Correo Electrónico',
+    confirmPassword: 'Confirmar Contraseña',
+    register: 'Registrarse',
+    registering: 'Registrándose...',
+    alreadyHaveAccount: '¿Ya tienes cuenta?',
+    backToLogin: 'Volver a Iniciar Sesión',
+
+    // Registration Validation
+    completeAllFields: 'Por favor completa todos los campos',
+    invalidEmailDomain: 'El email debe ser del dominio @na.scio-automation.com',
+    emailDomainRequired: 'Solo se permiten direcciones de correo @na.scio-automation.com',
+    passwordsDoNotMatch: 'Las contraseñas no coinciden',
+    passwordTooShort: 'La contraseña debe tener al menos 8 caracteres',
+    passwordRequirements: 'La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales',
+    passwordStrength: 'Fortaleza de contraseña:',
+    weak: 'Débil',
+    medium: 'Media',
+    strong: 'Fuerte',
+    registrationSuccess: 'Registración Exitosa',
+    registrationSuccessMessage: 'Tu cuenta ha sido creada. Revisa tu correo electrónico para confirmar tu dirección.',
+    registrationError: 'Error en el registro',
+    emailAlreadyExists: 'Este correo electrónico ya está registrado',
+    commonPassword: 'Esta contraseña es muy común. Por favor elige una más segura',
+    passwordSimilarToUsername: 'La contraseña es demasiado similar al usuario',
+
+    // Email Verification
+    verifyingEmail: 'Verificando Correo',
+    pleaseWait: 'Por favor espera mientras verificamos tu correo electrónico...',
+    emailVerified: 'Correo Verificado',
+    emailVerifiedSuccess: 'Tu correo electrónico ha sido verificado exitosamente',
+    redirectingIn: 'Redirigiendo en',
+    seconds: 'segundos...',
+    loginNow: 'Iniciar Sesión Ahora',
+    verificationFailed: 'Verificación Fallida',
+    emailVerificationError: 'El token de verificación es inválido o ha expirado',
+    registerAgain: 'Registrarse de Nuevo',
+
+    // Placeholders
+    egJohn: 'Ej: Juan',
+    egDoe: 'Ej: Pérez',
+    egEmail: 'ej: juan@na.scio-automation.com',
+    enterPasswordPlaceholder: 'Ingresa una contraseña fuerte',
+    confirmPasswordPlaceholder: 'Confirma tu contraseña',
 
     // Navigation extras
     selectDepartment: '-- Selecciona Departamento --',
@@ -336,7 +386,6 @@ export const translations = {
     customer: 'Client / Description',
     facility: 'Facility',
     numberOfWeeks: 'Number of Weeks',
-    completeAllFields: 'Please complete all required fields',
 
     // Resources Page
     teamResources: 'Team Resources',
@@ -474,6 +523,57 @@ export const translations = {
     login: 'Sign In',
     contactAdmin: 'Contact administrator for credentials',
     loginError: 'Login error',
+    or: 'or',
+    noAccountRegister: 'No account? Register here',
+
+    // Registration Page
+    registerTitle: 'Create Account',
+    registerSubtitle: 'Fill in the details to register',
+    firstName: 'First Name',
+    lastName: 'Last Name',
+    email: 'Email Address',
+    confirmPassword: 'Confirm Password',
+    register: 'Register',
+    registering: 'Registering...',
+    alreadyHaveAccount: 'Already have an account?',
+    backToLogin: 'Back to Sign In',
+
+    // Registration Validation
+    completeAllFields: 'Please complete all required fields',
+    invalidEmailDomain: 'Email must be from the @na.scio-automation.com domain',
+    emailDomainRequired: 'Only @na.scio-automation.com email addresses are allowed',
+    passwordsDoNotMatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 8 characters long',
+    passwordRequirements: 'Password must include uppercase, lowercase, numbers and special characters',
+    passwordStrength: 'Password strength:',
+    weak: 'Weak',
+    medium: 'Medium',
+    strong: 'Strong',
+    registrationSuccess: 'Registration Successful',
+    registrationSuccessMessage: 'Your account has been created. Please check your email to confirm your address.',
+    registrationError: 'Registration error',
+    emailAlreadyExists: 'This email address is already registered',
+    commonPassword: 'This password is too common. Please choose a stronger one',
+    passwordSimilarToUsername: 'Password is too similar to username',
+
+    // Email Verification
+    verifyingEmail: 'Verifying Email',
+    pleaseWait: 'Please wait while we verify your email address...',
+    emailVerified: 'Email Verified',
+    emailVerifiedSuccess: 'Your email address has been successfully verified',
+    redirectingIn: 'Redirecting in',
+    seconds: 'seconds...',
+    loginNow: 'Sign In Now',
+    verificationFailed: 'Verification Failed',
+    emailVerificationError: 'The verification token is invalid or has expired',
+    registerAgain: 'Register Again',
+
+    // Placeholders
+    egJohn: 'E.g.: John',
+    egDoe: 'E.g.: Doe',
+    egEmail: 'e.g.: john@na.scio-automation.com',
+    enterPasswordPlaceholder: 'Enter a strong password',
+    confirmPasswordPlaceholder: 'Confirm your password',
 
     // Navigation extras
     selectDepartment: '-- Select Department --',

@@ -184,6 +184,45 @@ export const authApi = {
   logout: () => {
     clearTokens();
   },
+
+  register: async (data: {
+    email: string;
+    password: string;
+    confirm_password: string;
+    first_name: string;
+    last_name: string;
+    department: string;
+  }) => {
+    const response = await fetch(`${API_URL}/api/register/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = Object.entries(errorData)
+        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+        .join('; ');
+      throw new Error(errorMessage || 'Registration failed');
+    }
+
+    return response.json();
+  },
+
+  verifyEmail: async (token: string) => {
+    const response = await fetch(`${API_URL}/api/verify-email/${token}/`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Email verification failed');
+    }
+
+    return response.json();
+  },
 };
 
 // Employees API

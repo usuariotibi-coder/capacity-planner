@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -91,6 +92,24 @@ const LoginPage: React.FC = () => {
             )}
           </button>
         </form>
+
+        <div className="mt-6 space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-800 text-gray-500">{t.or}</span>
+            </div>
+          </div>
+
+          <Link
+            to="/register"
+            className="block w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors text-center"
+          >
+            {t.noAccountRegister}
+          </Link>
+        </div>
 
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>{t.contactAdmin}</p>
