@@ -36,7 +36,7 @@ export const useBuildTeamsStore = create<BuildTeamsStore>((set) => ({
       const data = await subcontractedTeamCapacityApi.getAll();
 
       // Extract unique company names
-      const uniqueCompanies = Array.from(new Set(data.map((r: any) => r.company).filter(Boolean)));
+      const uniqueCompanies = Array.from(new Set(data.map((r: any) => r.company).filter(Boolean))) as string[];
 
       set({ activeTeams: uniqueCompanies });
       console.log('[BuildTeamsStore] Active teams loaded:', uniqueCompanies);
