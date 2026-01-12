@@ -52,15 +52,25 @@ const transformKeysToCamel = (obj: any): any => {
   return obj;
 };
 
+// Keys that should NOT have their nested keys transformed (they contain department codes like PM, MED, etc.)
+const PRESERVE_NESTED_KEYS = ['departmentHoursAllocated', 'department_hours_allocated'];
+
 // Transform object keys from camelCase to snake_case
-const transformKeysToSnake = (obj: any): any => {
+const transformKeysToSnake = (obj: any, preserveNestedKeys = false): any => {
   if (Array.isArray(obj)) {
-    return obj.map(transformKeysToSnake);
+    return obj.map(item => transformKeysToSnake(item, preserveNestedKeys));
   }
   if (obj !== null && typeof obj === 'object') {
     return Object.keys(obj).reduce((acc, key) => {
       const snakeKey = toSnakeCase(key);
-      acc[snakeKey] = transformKeysToSnake(obj[key]);
+      // Check if this key's nested values should be preserved (not transformed)
+      const shouldPreserveNested = PRESERVE_NESTED_KEYS.includes(key) || PRESERVE_NESTED_KEYS.includes(snakeKey);
+      if (shouldPreserveNested) {
+        // Keep nested object as-is (don't transform department codes like PM, MED, etc.)
+        acc[snakeKey] = obj[key];
+      } else {
+        acc[snakeKey] = transformKeysToSnake(obj[key], preserveNestedKeys);
+      }
       return acc;
     }, {} as any);
   }
