@@ -36,7 +36,7 @@ export const usePRGTeamsStore = create<PRGTeamsStore>((set) => ({
       const data = await prgExternalTeamCapacityApi.getAll();
 
       // Extract unique team names
-      const uniqueTeams = Array.from(new Set(data.map(r => r.teamName).filter(Boolean)));
+      const uniqueTeams = Array.from(new Set(data.map((r: any) => r.teamName).filter(Boolean)));
 
       set({ activeTeams: uniqueTeams });
       console.log('[PRGTeamsStore] Active teams loaded:', uniqueTeams);

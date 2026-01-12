@@ -62,13 +62,13 @@ export const useDeleteAllData = () => {
         error: null,
       });
 
-      // Clear team stores
+      // Clear team stores (use arrays, not Sets)
       useBuildTeamsStore.setState({
-        activeTeams: new Set([]),
+        activeTeams: [],
       });
 
       usePRGTeamsStore.setState({
-        activeTeams: new Set([]),
+        activeTeams: [],
       });
 
       // Clear localStorage

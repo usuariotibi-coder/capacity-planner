@@ -1672,7 +1672,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       {dept === 'PRG' && (
                         <>
                           {/* Team rows - Only show active teams */}
-                          {Array.from(prgActiveTeams).map((team) => (
+                          {prgActiveTeams.map((team) => (
                             <div key={`prg-external-${team}`} className="flex gap-0.5 mb-0.5 group">
                               {/* Team Label with delete button */}
                               <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all">
@@ -1817,7 +1817,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
                             const predefinedSum = predefinedTeams.reduce((sum, company) => {
                               // Only count if not already in activeTeams (to avoid double counting)
-                              if (!activeTeams.has(company)) {
+                              if (!activeTeams.includes(company)) {
                                 return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
                               }
                               return sum;
@@ -1825,7 +1825,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                             totalCapacity = weekCapacity + subcontractSum + predefinedSum;
                           } else if (dept === 'PRG') {
-                            const externalSum = Array.from(prgActiveTeams).reduce((sum, team) => {
+                            const externalSum = prgActiveTeams.reduce((sum, team) => {
                               return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
                             }, 0);
                             totalCapacity = weekCapacity + externalSum;
@@ -2468,7 +2468,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
                             const predefinedSum = predefinedTeams.reduce((sum, company) => {
                               // Only count if not already in activeTeams (to avoid double counting)
-                              if (!activeTeams.has(company)) {
+                              if (!activeTeams.includes(company)) {
                                 return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
                               }
                               return sum;
@@ -2476,7 +2476,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                             totalCapacity = weekCapacity + subcontractSum + predefinedSum;
                           } else if (dept === 'PRG') {
-                            const externalSum = Array.from(prgActiveTeams).reduce((sum, team) => {
+                            const externalSum = prgActiveTeams.reduce((sum, team) => {
                               return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
                             }, 0);
                             totalCapacity = weekCapacity + externalSum;

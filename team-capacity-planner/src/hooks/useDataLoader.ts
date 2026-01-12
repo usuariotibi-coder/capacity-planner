@@ -63,8 +63,8 @@ export const useDataLoader = () => {
               }, {});
               localStorage.setItem('subcontractedPersonnel', JSON.stringify(subcontracted));
 
-              // Extract active teams
-              const activeTeams = new Set<string>(results.map((item: CapacityItem) => item.company));
+              // Extract active teams (as array, not Set)
+              const activeTeams = Array.from(new Set(results.map((item: CapacityItem) => item.company)));
               setActiveTeams(activeTeams);
             }
           }),
@@ -81,8 +81,8 @@ export const useDataLoader = () => {
               }, {});
               localStorage.setItem('prgExternalPersonnel', JSON.stringify(prgExternal));
 
-              // Extract active teams
-              const activeTeams = new Set<string>(results.map((item: CapacityItem) => item.teamName));
+              // Extract active teams (as array, not Set)
+              const activeTeams = Array.from(new Set(results.map((item: CapacityItem) => item.teamName)));
               setPRGActiveTeams(activeTeams);
             }
           }),
