@@ -12,22 +12,23 @@ import { subcontractedTeamCapacityApi } from '../services/api';
 
 /**
  * BuildTeamsStore Interface
- * @property activeTeams - Set of active team names
- * @property setActiveTeams - Update the set of active teams
+ * @property activeTeams - Array of active team names
+ * @property setActiveTeams - Update the array of active teams
  * @property loadActiveTeams - Load active teams from API
  */
 interface BuildTeamsStore {
-  activeTeams: Set<string>;
-  setActiveTeams: (teams: Set<string>) => void;
+  activeTeams: string[];
+  setActiveTeams: (teams: string[]) => void;
   loadActiveTeams: () => Promise<void>;
 }
 
 /**
  * Global store for BUILD department teams
  * Initial state: empty, loads from API on demand
+ * Using arrays instead of Sets for better Zustand reactivity
  */
 export const useBuildTeamsStore = create<BuildTeamsStore>((set) => ({
-  activeTeams: new Set([]),
+  activeTeams: [],
   setActiveTeams: (teams) => set({ activeTeams: teams }),
   loadActiveTeams: async () => {
     try {
@@ -35,15 +36,10 @@ export const useBuildTeamsStore = create<BuildTeamsStore>((set) => ({
       const data = await subcontractedTeamCapacityApi.getAll();
 
       // Extract unique company names
-      const uniqueCompanies = new Set<string>();
-      for (const record of data) {
-        if (record.company) {
-          uniqueCompanies.add(record.company);
-        }
-      }
+      const uniqueCompanies = Array.from(new Set(data.map(r => r.company).filter(Boolean)));
 
       set({ activeTeams: uniqueCompanies });
-      console.log('[BuildTeamsStore] Active teams loaded:', Array.from(uniqueCompanies));
+      console.log('[BuildTeamsStore] Active teams loaded:', uniqueCompanies);
     } catch (error) {
       console.error('[BuildTeamsStore] Error loading active teams:', error);
     }

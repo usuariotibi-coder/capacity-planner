@@ -223,10 +223,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Load active BUILD teams
         const buildStore = useBuildTeamsStore.getState();
         await buildStore.loadActiveTeams();
+        console.log('[CapacityMatrix] BUILD teams loaded, activeTeams =', buildStore.activeTeams);
 
         // Load active PRG teams
         const prgStore = usePRGTeamsStore.getState();
         await prgStore.loadActiveTeams();
+        console.log('[CapacityMatrix] PRG teams loaded, activeTeams =', prgStore.activeTeams);
 
         // Load subcontracted team capacity data
         console.log('[CapacityMatrix] Loading Subcontracted Team Capacity from API...');
@@ -1608,8 +1610,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
                                 <button
                                   onClick={() => {
-                                    const newTeams = new Set(activeTeams);
-                                    newTeams.delete(company);
+                                    const newTeams = activeTeams.filter(team => team !== company);
                                     setActiveTeams(newTeams);
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1678,8 +1679,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
                                 <button
                                   onClick={() => {
-                                    const newTeams = new Set(prgActiveTeams);
-                                    newTeams.delete(team);
+                                    const newTeams = prgActiveTeams.filter(t => t !== team);
                                     setPRGActiveTeams(newTeams);
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
@@ -3099,10 +3099,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           subcontractCompany: prgTeamName.trim(),
                         });
 
-                        // Add to active teams set
-                        const newTeams = new Set(prgActiveTeams);
-                        newTeams.add(prgTeamName.trim());
-                        setPRGActiveTeams(newTeams);
+                        // Add to active teams array
+                        const newTeams = [...prgActiveTeams, prgTeamName.trim()];
+                        setPRGActiveTeams([...new Set(newTeams)]);
                         setPRGTeamName('');
                         setIsPRGModalOpen(false);
                       } catch (error) {
@@ -3198,10 +3197,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           subcontractCompany: buildTeamName.trim(),
                         });
 
-                        // Add to active teams set
-                        const newTeams = new Set(activeTeams);
-                        newTeams.add(buildTeamName.trim());
-                        setActiveTeams(newTeams);
+                        // Add to active teams array
+                        const newTeams = [...activeTeams, buildTeamName.trim()];
+                        setActiveTeams([...new Set(newTeams)]);
                         setBuildTeamName('');
                         setIsBuildModalOpen(false);
                       } catch (error) {
