@@ -200,9 +200,8 @@ export const translations = {
     // Login Page
     loginTitle: 'Planificador de Capacidad',
     loginSubtitle: 'Inicia sesión para continuar',
-    username: 'Usuario',
+    enterEmail: 'Ingresa tu correo electrónico',
     password: 'Contraseña',
-    enterUsername: 'Ingresa tu usuario',
     enterPassword: 'Ingresa tu contraseña',
     loggingIn: 'Iniciando sesión...',
     login: 'Iniciar Sesión',
@@ -515,9 +514,8 @@ export const translations = {
     // Login Page
     loginTitle: 'Capacity Planner',
     loginSubtitle: 'Sign in to continue',
-    username: 'Username',
+    enterEmail: 'Enter your email address',
     password: 'Password',
-    enterUsername: 'Enter your username',
     enterPassword: 'Enter your password',
     loggingIn: 'Signing in...',
     login: 'Sign In',

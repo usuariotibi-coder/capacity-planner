@@ -6,7 +6,7 @@ import { useTranslation } from '../utils/translations';
 import type { Language } from '../types';
 
 const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      await login(username, password);
+      await login(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loginError);
     } finally {
@@ -68,16 +68,16 @@ const LoginPage: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
-              {t.username}
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              {t.email}
             </label>
             <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={t.enterUsername}
+              placeholder={t.enterEmail}
               required
               disabled={isSubmitting}
             />
