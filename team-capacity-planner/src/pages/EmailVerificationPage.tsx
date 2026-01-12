@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
+import type { Language } from '../types';
 
 const EmailVerificationPage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
 
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
@@ -45,6 +46,32 @@ const EmailVerificationPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+        <div className="flex justify-end mb-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLanguage('es' as Language)}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                language === 'es'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="Español"
+            >
+              🌮
+            </button>
+            <button
+              onClick={() => setLanguage('en' as Language)}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                language === 'en'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="English"
+            >
+              🍔
+            </button>
+          </div>
+        </div>
         {status === 'verifying' && (
           <div className="text-center">
             <div className="mb-6">

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
-import type { Department } from '../types';
+import type { Department, Language } from '../types';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
@@ -21,7 +21,7 @@ const RegisterPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null);
 
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const navigate = useNavigate();
 
@@ -127,9 +127,35 @@ const RegisterPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4">
       <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">{t.registerTitle}</h1>
-          <p className="text-gray-400">{t.registerSubtitle}</p>
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold text-white mb-2">{t.registerTitle}</h1>
+            <p className="text-gray-400">{t.registerSubtitle}</p>
+          </div>
+          <div className="flex gap-2 ml-4">
+            <button
+              onClick={() => setLanguage('es' as Language)}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                language === 'es'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="Español"
+            >
+              🌮
+            </button>
+            <button
+              onClick={() => setLanguage('en' as Language)}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                language === 'en'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title="English"
+            >
+              🍔
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
