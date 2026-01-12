@@ -107,7 +107,7 @@ export function ProjectsPage() {
     return deptWeekIndex - projectWeekIndex + 1;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.client || !formData.startDate || !formData.facility) {
@@ -143,20 +143,21 @@ export function ProjectsPage() {
       }
     });
 
-    if (editingId) {
-      updateProject(editingId, {
-        ...formData,
-        endDate,
-        numberOfWeeks,
-        projectManagerId: selectedProjectManagerId || undefined,
-        departmentStages: calculatedDepartmentStages,
-        departmentHoursAllocated: deptHoursAllocated,
-      });
-      setEditingId(null);
-    } else {
-      const newProject: Project = {
-        id: generateId(),
-        name: formData.name,
+    try {
+      if (editingId) {
+        await updateProject(editingId, {
+          ...formData,
+          endDate,
+          numberOfWeeks,
+          projectManagerId: selectedProjectManagerId || undefined,
+          departmentStages: calculatedDepartmentStages,
+          departmentHoursAllocated: deptHoursAllocated,
+        });
+        setEditingId(null);
+      } else {
+        const newProject: Project = {
+          id: generateId(),
+          name: formData.name,
         client: formData.client,
         startDate: formData.startDate,
         endDate,
@@ -167,7 +168,8 @@ export function ProjectsPage() {
         departmentHoursAllocated: deptHoursAllocated,
       };
 
-      addProject(newProject);
+      // Wait for project to be created in backend
+      const createdProject = await addProject(newProject);
 
       // Crear asignaciones automáticas para cada departamento
       const weekStarts = getWeekStartsForProject(formData.startDate, numberOfWeeks);
@@ -187,7 +189,7 @@ export function ProjectsPage() {
                 if (hoursThisWeek > 0) {
                   addAssignment({
                     employeeId: emp.id,
-                    projectId: newProject.id,
+                    projectId: createdProject.id, // Use the ID from backend
                     weekStartDate: week,
                     hours: hoursThisWeek,
                     stage: null,
@@ -198,15 +200,19 @@ export function ProjectsPage() {
           }
         }
       });
-    }
+      }
 
-    // Reset form
-    setFormData({ name: '', client: '', startDate: '', facility: 'AL' });
-    setNumberOfWeeks(4);
-    setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
-    setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '' });
-    setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
-    setIsFormOpen(false);
+      // Reset form
+      setFormData({ name: '', client: '', startDate: '', facility: 'AL' });
+      setNumberOfWeeks(4);
+      setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
+      setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '' });
+      setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('[ProjectsPage] Error saving project:', error);
+      // Error is already shown by the store's alert
+    }
   };
 
   const handleEditProject = (proj: Project) => {
