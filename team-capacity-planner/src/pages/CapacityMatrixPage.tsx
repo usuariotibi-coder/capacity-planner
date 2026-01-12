@@ -88,7 +88,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Track API record IDs for SCIO Team Capacity (for updates)
   // Structure: { `${dept}-${weekDate}`: recordId }
   const [scioTeamRecordIds, setScioTeamRecordIds] = useState<Record<string, string>>({});
-  const [scioTeamLoaded, setScioTeamLoaded] = useState(false);
 
   // Subcontracted Personnel state - store subcontracted company members per week (BUILD dept only)
   // Structure: { company: { weekDate: count } } where company is 'AMI' | 'VICER' | 'ITAX' | 'MCI' | 'MG Electrical'
@@ -235,11 +234,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         setScioTeamMembers(newScioTeamMembers);
         setScioTeamRecordIds(newRecordIds);
-        setScioTeamLoaded(true);
         console.log('[CapacityMatrix] SCIO Team Capacity state updated');
       } catch (error) {
         console.error('[CapacityMatrix] Error loading SCIO Team Capacity:', error);
-        setScioTeamLoaded(true); // Still mark as loaded to avoid infinite retries
       }
     };
 
@@ -313,7 +310,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   // Debounced save to avoid too many API calls while typing
-  const scioSaveTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+  const scioSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleScioTeamChange = (dept: Department, weekDate: string, newCapacity: number) => {
     // Update local state immediately
