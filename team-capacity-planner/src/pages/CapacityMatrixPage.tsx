@@ -3099,6 +3099,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           subcontractCompany: prgTeamName.trim(),
                         });
 
+                        // Create initial PrgExternalTeamCapacity record to persist the team
+                        // This ensures the team appears after page refresh
+                        const currentWeekStart = formatToISO(new Date());
+                        await prgExternalTeamCapacityApi.create({
+                          teamName: prgTeamName.trim(),
+                          weekStartDate: currentWeekStart,
+                          capacity: 0,
+                        });
+                        console.log('[CapacityMatrix] Created initial PrgExternalTeamCapacity for:', prgTeamName.trim());
+
                         // Add to active teams array
                         const newTeams = [...prgActiveTeams, prgTeamName.trim()];
                         setPRGActiveTeams([...new Set(newTeams)]);
@@ -3196,6 +3206,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           isSubcontractedMaterial: true,
                           subcontractCompany: buildTeamName.trim(),
                         });
+
+                        // Create initial SubcontractedTeamCapacity record to persist the team
+                        // This ensures the team appears after page refresh
+                        const currentWeekStart = formatToISO(new Date());
+                        await subcontractedTeamCapacityApi.create({
+                          company: buildTeamName.trim(),
+                          weekStartDate: currentWeekStart,
+                          capacity: 0,
+                        });
+                        console.log('[CapacityMatrix] Created initial SubcontractedTeamCapacity for:', buildTeamName.trim());
 
                         // Add to active teams array
                         const newTeams = [...activeTeams, buildTeamName.trim()];
