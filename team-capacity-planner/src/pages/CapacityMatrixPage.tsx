@@ -4,7 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { projectsApi } from '../services/api';
+import { projectsApi, scioTeamCapacityApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
@@ -75,25 +75,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
-  // Use lazy initialization to load from localStorage on first render
-  const [scioTeamMembers, setScioTeamMembers] = useState<Record<Department, Record<string, number>>>(() => {
-    const saved = localStorage.getItem('scioTeamMembers');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading scioTeamMembers from localStorage', e);
-      }
-    }
-    return {
-      'PM': {},
-      'MED': {},
-      'HD': {},
-      'MFG': {},
-      'BUILD': {},
-      'PRG': {},
-    };
+  // Now loads from API instead of localStorage
+  const [scioTeamMembers, setScioTeamMembers] = useState<Record<Department, Record<string, number>>>({
+    'PM': {},
+    'MED': {},
+    'HD': {},
+    'MFG': {},
+    'BUILD': {},
+    'PRG': {},
   });
+
+  // Track API record IDs for SCIO Team Capacity (for updates)
+  // Structure: { `${dept}-${weekDate}`: recordId }
+  const [scioTeamRecordIds, setScioTeamRecordIds] = useState<Record<string, string>>({});
+  const [scioTeamLoaded, setScioTeamLoaded] = useState(false);
 
   // Subcontracted Personnel state - store subcontracted company members per week (BUILD dept only)
   // Structure: { company: { weekDate: count } } where company is 'AMI' | 'VICER' | 'ITAX' | 'MCI' | 'MG Electrical'
@@ -208,10 +203,48 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
   }, [employees, setActiveTeams, setPRGActiveTeams]);
 
-  // Save scioTeamMembers to localStorage whenever it changes
+  // Load SCIO Team Capacity from API on mount
   useEffect(() => {
-    localStorage.setItem('scioTeamMembers', JSON.stringify(scioTeamMembers));
-  }, [scioTeamMembers]);
+    const loadScioTeamCapacity = async () => {
+      try {
+        console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
+        const data = await scioTeamCapacityApi.getAll();
+        console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
+
+        // Transform API data to our state structure
+        const newScioTeamMembers: Record<Department, Record<string, number>> = {
+          'PM': {},
+          'MED': {},
+          'HD': {},
+          'MFG': {},
+          'BUILD': {},
+          'PRG': {},
+        };
+        const newRecordIds: Record<string, string> = {};
+
+        for (const record of data) {
+          const dept = record.department as Department;
+          const weekDate = record.weekStartDate;
+          const capacity = record.capacity;
+
+          if (dept && weekDate && newScioTeamMembers[dept]) {
+            newScioTeamMembers[dept][weekDate] = capacity;
+            newRecordIds[`${dept}-${weekDate}`] = record.id;
+          }
+        }
+
+        setScioTeamMembers(newScioTeamMembers);
+        setScioTeamRecordIds(newRecordIds);
+        setScioTeamLoaded(true);
+        console.log('[CapacityMatrix] SCIO Team Capacity state updated');
+      } catch (error) {
+        console.error('[CapacityMatrix] Error loading SCIO Team Capacity:', error);
+        setScioTeamLoaded(true); // Still mark as loaded to avoid infinite retries
+      }
+    };
+
+    loadScioTeamCapacity();
+  }, []);
 
   // Save subcontractedPersonnel to localStorage whenever it changes
   useEffect(() => {
@@ -241,6 +274,66 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setScioTeamMembers(normalized);
     }
   }, []);
+
+  // Function to save SCIO Team Capacity to API
+  const saveScioTeamCapacity = async (dept: Department, weekDate: string, capacity: number) => {
+    const recordKey = `${dept}-${weekDate}`;
+    const existingId = scioTeamRecordIds[recordKey];
+
+    try {
+      if (capacity === 0 && existingId) {
+        // Delete the record if capacity is 0
+        console.log('[CapacityMatrix] Deleting SCIO capacity:', recordKey);
+        await scioTeamCapacityApi.delete(existingId);
+        setScioTeamRecordIds(prev => {
+          const newIds = { ...prev };
+          delete newIds[recordKey];
+          return newIds;
+        });
+      } else if (existingId) {
+        // Update existing record
+        console.log('[CapacityMatrix] Updating SCIO capacity:', recordKey, capacity);
+        await scioTeamCapacityApi.update(existingId, { capacity });
+      } else if (capacity > 0) {
+        // Create new record
+        console.log('[CapacityMatrix] Creating SCIO capacity:', recordKey, capacity);
+        const result = await scioTeamCapacityApi.create({
+          department: dept,
+          weekStartDate: weekDate,
+          capacity: capacity,
+        });
+        setScioTeamRecordIds(prev => ({
+          ...prev,
+          [recordKey]: result.id,
+        }));
+      }
+    } catch (error) {
+      console.error('[CapacityMatrix] Error saving SCIO capacity:', error);
+    }
+  };
+
+  // Debounced save to avoid too many API calls while typing
+  const scioSaveTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
+  const handleScioTeamChange = (dept: Department, weekDate: string, newCapacity: number) => {
+    // Update local state immediately
+    setScioTeamMembers(prev => ({
+      ...prev,
+      [dept]: {
+        ...(prev[dept] || {}),
+        [weekDate]: newCapacity,
+      },
+    }));
+
+    // Debounce the API call (wait 500ms after last keystroke)
+    const timeoutKey = `${dept}-${weekDate}`;
+    if (scioSaveTimeouts.current[timeoutKey]) {
+      clearTimeout(scioSaveTimeouts.current[timeoutKey]);
+    }
+    scioSaveTimeouts.current[timeoutKey] = setTimeout(() => {
+      saveScioTeamCapacity(dept, weekDate, newCapacity);
+    }, 500);
+  };
 
   // Refs for table containers
   const departmentsTableRef = useRef<HTMLDivElement>(null);
@@ -1379,13 +1472,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 value={scioTeamMembers[dept]?.[weekData.date] || ''}
                                 onChange={(e) => {
                                   const newCapacity = parseFloat(e.target.value) || 0;
-                                  setScioTeamMembers({
-                                    ...scioTeamMembers,
-                                    [dept]: {
-                                      ...(scioTeamMembers[dept] || {}),
-                                      [weekData.date]: newCapacity,
-                                    },
-                                  });
+                                  handleScioTeamChange(dept, weekData.date, newCapacity);
                                 }}
                                 className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 ${
                                   isCurrentWeek ? 'ring-2 ring-red-600 shadow-md border-red-500 bg-gradient-to-b from-red-50 to-orange-50' : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
