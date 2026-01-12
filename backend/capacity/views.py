@@ -43,7 +43,7 @@ from .models import (
     Employee, Project, Assignment, DepartmentStageConfig,
     ProjectBudget, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
-    DepartmentWeeklyTotal
+    DepartmentWeeklyTotal, EmailVerification
 )
 from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
@@ -51,7 +51,8 @@ from .serializers import (
     AssignmentSerializer, DepartmentStageConfigSerializer,
     ProjectBudgetSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
-    PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer
+    PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
+    UserRegistrationSerializer
 )
 
 
