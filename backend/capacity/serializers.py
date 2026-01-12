@@ -123,8 +123,9 @@ class UserRegistrationSerializer(serializers.Serializer):
         department = validated_data.pop('department')
 
         # Create inactive user
+        # Use email as username (Django User username field supports 150 chars, emails are max 254)
         user = User.objects.create_user(
-            username=validated_data['email'].split('@')[0],  # Use email prefix as username
+            username=validated_data['email'],
             email=validated_data['email'],
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
@@ -193,14 +194,22 @@ Team Capacity Planner Team
         except:
             html_message = None
 
-        send_mail(
-            subject=subject,
-            message=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                subject=subject,
+                message=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+        except Exception as e:
+            # Log the error but don't fail the registration
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+            # Email will fail silently - user can still use the app but email verification won't work
+            # In production, you should configure proper email credentials
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
