@@ -177,34 +177,51 @@ class UserRegistrationSerializer(serializers.Serializer):
 
     def _send_verification_code_email(self, user, code):
         """
-        Send 6-digit verification code to user via email.
-        Simple text email that should work with any SMTP provider.
+        Send 6-digit verification code to user via SendGrid API.
         """
-        from django.core.mail import send_mail
         from django.conf import settings
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
         import logging
 
         logger = logging.getLogger(__name__)
 
-        # Log email configuration for debugging
-        logger.info(f"=== EMAIL DEBUG ===")
-        logger.info(f"EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'NOT SET')}")
-        logger.info(f"EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'NOT SET')}")
-        logger.info(f"EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'NOT SET')}")
-        logger.info(f"EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'NOT SET')}")
-        logger.info(f"EMAIL_HOST_PASSWORD: {'SET' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'NOT SET'}")
-        logger.info(f"DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'NOT SET')}")
-        logger.info(f"Recipient: {user.email}")
-        logger.info(f"===================")
+        sendgrid_api_key = getattr(settings, 'SENDGRID_API_KEY', None)
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
 
-        # Skip email if credentials are not properly configured
-        if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
-            logger.warning(f"Email credentials not configured. Skipping verification email for {user.email}")
+        logger.info(f"=== SENDGRID EMAIL DEBUG ===")
+        logger.info(f"SENDGRID_API_KEY: {'SET' if sendgrid_api_key else 'NOT SET'}")
+        logger.info(f"DEFAULT_FROM_EMAIL: {from_email}")
+        logger.info(f"Recipient: {user.email}")
+        logger.info(f"============================")
+
+        if not sendgrid_api_key:
+            logger.warning(f"SendGrid API key not configured. Skipping verification email for {user.email}")
+            return
+
+        if not from_email:
+            logger.warning(f"FROM email not configured. Skipping verification email for {user.email}")
             return
 
         subject = "Your verification code - Team Capacity Planner"
 
-        text_message = f"""Hello {user.first_name},
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Team Capacity Planner</h2>
+            <p>Hello {user.first_name},</p>
+            <p>Your verification code is:</p>
+            <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">{code}</span>
+            </div>
+            <p>Enter this code in the registration page to verify your email address.</p>
+            <p style="color: #6b7280; font-size: 14px;">This code expires in 15 minutes.</p>
+            <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+            <p style="color: #9ca3af; font-size: 12px;">Team Capacity Planner</p>
+        </div>
+        """
+
+        text_content = f"""Hello {user.first_name},
 
 Your verification code is: {code}
 
@@ -216,18 +233,21 @@ If you didn't request this code, please ignore this email.
 
 - Team Capacity Planner"""
 
+        message = Mail(
+            from_email=from_email,
+            to_emails=user.email,
+            subject=subject,
+            plain_text_content=text_content,
+            html_content=html_content
+        )
+
         try:
-            result = send_mail(
-                subject=subject,
-                message=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-            logger.info(f"send_mail returned: {result}")
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
+            logger.info(f"SendGrid response status: {response.status_code}")
             logger.info(f"Verification code email sent successfully to {user.email}")
         except Exception as e:
-            logger.error(f"SMTP ERROR: {type(e).__name__}: {str(e)}")
+            logger.error(f"SENDGRID ERROR: {type(e).__name__}: {str(e)}")
             raise
 
 
