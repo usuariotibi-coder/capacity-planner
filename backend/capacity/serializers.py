@@ -115,7 +115,12 @@ class UserRegistrationSerializer(serializers.Serializer):
     def create(self, validated_data):
         """
         Create inactive user and send verification email.
+        Assign basic permissions for viewing and modifying employees, projects, and assignments.
         """
+        from django.contrib.auth.models import Permission
+        import secrets
+        from .models import EmailVerification
+
         # Remove confirm_password from data
         validated_data.pop('confirm_password')
 
@@ -133,10 +138,18 @@ class UserRegistrationSerializer(serializers.Serializer):
             is_active=False  # User must verify email first
         )
 
-        # Create email verification token
-        import secrets
-        from .models import EmailVerification
+        # Assign basic permissions: view and change for employees, projects, and assignments
+        permissions = Permission.objects.filter(
+            codename__in=[
+                'view_employee', 'change_employee', 'add_employee',
+                'view_project', 'change_project', 'add_project',
+                'view_assignment', 'change_assignment', 'add_assignment',
+                'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
+            ]
+        )
+        user.user_permissions.set(permissions)
 
+        # Create email verification token
         token = secrets.token_urlsafe(32)
         EmailVerification.objects.create(user=user, token=token)
 

@@ -76,7 +76,8 @@
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\" manage.py makemigrations:*)",
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\":*)",
       "Bash(find:*)",
-      "Bash(.venvScriptsactivate)"
+      "Bash(.venvScriptsactivate)",
+      "Bash(\"venv\\\\Scripts\\\\activate.bat\")"
     ]
   }
 }
