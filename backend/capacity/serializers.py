@@ -161,16 +161,17 @@ class UserRegistrationSerializer(serializers.Serializer):
         # The 'department' from registration is just metadata for reference
         # (could be used later when admin creates the employee profile)
 
-        # Try to send verification email
-        # If it fails, user can retry using the resend endpoint
-        # This ensures user account is created even if email service is down
-        try:
-            self._send_verification_email(user, token)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send initial verification email to {user.email}: {str(e)}")
-            # Continue anyway - user can retry with resend endpoint
+        # TEMPORARILY DISABLED: Email sending during registration
+        # Email will be sent manually when user clicks "Resend Verification Email"
+        # This prevents registration failures due to email service issues
+        # TODO: Re-enable once email service is properly configured
+        #
+        # try:
+        #     self._send_verification_email(user, token)
+        # except Exception as e:
+        #     import logging
+        #     logger = logging.getLogger(__name__)
+        #     logger.error(f"Failed to send initial verification email to {user.email}: {str(e)}")
 
         return user
 
