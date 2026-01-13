@@ -161,20 +161,17 @@ class UserRegistrationSerializer(serializers.Serializer):
         # Employee profile is only created when admin designates user as employee
         # The 'department' from registration is just metadata for reference
 
-        # Send verification code email in background thread
-        import threading
+        # Send verification code email (synchronous for now to see logs)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"About to send verification email to {user.email}")
 
-        def send_email_background():
-            try:
-                self._send_verification_code_email(user, code)
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-
-        email_thread = threading.Thread(target=send_email_background)
-        email_thread.daemon = True
-        email_thread.start()
+        try:
+            self._send_verification_code_email(user, code)
+            logger.info(f"Email sent successfully to {user.email}")
+        except Exception as e:
+            logger.error(f"EMAIL SEND FAILED: {type(e).__name__}: {str(e)}")
+            # Don't fail registration if email fails - user can resend later
 
         return user
 
