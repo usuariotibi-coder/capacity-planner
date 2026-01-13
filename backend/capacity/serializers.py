@@ -116,10 +116,11 @@ class UserRegistrationSerializer(serializers.Serializer):
         """
         Create inactive user and send verification email.
         Assign basic permissions for viewing and modifying employees, projects, and assignments.
-        Uses database transactions to ensure data consistency - all or nothing.
+
+        Email sending is decoupled from user creation - if email fails, user is still created
+        but can retry sending via the resend endpoint.
         """
         from django.contrib.auth.models import Permission
-        from django.db import transaction
         import secrets
         from .models import EmailVerification
 
@@ -129,56 +130,54 @@ class UserRegistrationSerializer(serializers.Serializer):
         # Extract department for later
         department = validated_data.pop('department')
 
-        # Use transaction to ensure atomic operation - all or nothing
+        # Create inactive user
+        # Use email as username (Django User username field supports 150 chars, emails are max 254)
+        user = User.objects.create_user(
+            username=validated_data['email'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=validated_data['password'],
+            is_active=False  # User must verify email first
+        )
+
+        # Assign basic permissions: view and change for employees, projects, and assignments
+        permissions = Permission.objects.filter(
+            codename__in=[
+                'view_employee', 'change_employee', 'add_employee',
+                'view_project', 'change_project', 'add_project',
+                'view_assignment', 'change_assignment', 'add_assignment',
+                'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
+            ]
+        )
+        user.user_permissions.set(permissions)
+
+        # Create email verification token
+        token = secrets.token_urlsafe(32)
+        EmailVerification.objects.create(user=user, token=token)
+
+        # Create Employee profile (inactive until email verified)
+        Employee.objects.create(
+            user=user,
+            name=f"{user.first_name} {user.last_name}",
+            role="Team Member",  # Default role
+            department=department,
+            capacity=40.0,  # Default 40 hours/week
+            is_active=False  # Will be activated on email verification
+        )
+
+        # Try to send verification email
+        # If it fails, user can retry using the resend endpoint
+        # This ensures user account is created even if email service is down
         try:
-            with transaction.atomic():
-                # Create inactive user
-                # Use email as username (Django User username field supports 150 chars, emails are max 254)
-                user = User.objects.create_user(
-                    username=validated_data['email'],
-                    email=validated_data['email'],
-                    first_name=validated_data['first_name'],
-                    last_name=validated_data['last_name'],
-                    password=validated_data['password'],
-                    is_active=False  # User must verify email first
-                )
-
-                # Assign basic permissions: view and change for employees, projects, and assignments
-                permissions = Permission.objects.filter(
-                    codename__in=[
-                        'view_employee', 'change_employee', 'add_employee',
-                        'view_project', 'change_project', 'add_project',
-                        'view_assignment', 'change_assignment', 'add_assignment',
-                        'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
-                    ]
-                )
-                user.user_permissions.set(permissions)
-
-                # Create email verification token
-                token = secrets.token_urlsafe(32)
-                EmailVerification.objects.create(user=user, token=token)
-
-                # Create Employee profile (inactive until email verified)
-                Employee.objects.create(
-                    user=user,
-                    name=f"{user.first_name} {user.last_name}",
-                    role="Team Member",  # Default role
-                    department=department,
-                    capacity=40.0,  # Default 40 hours/week
-                    is_active=False  # Will be activated on email verification
-                )
-
-                # Send verification email (LAST - after all data is created)
-                # If this fails, the transaction will rollback everything
-                self._send_verification_email(user, token)
-
-                return user
+            self._send_verification_email(user, token)
         except Exception as e:
-            # If anything fails, transaction.atomic() automatically rolls back all changes
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Error during user registration for {validated_data.get('email')}: {str(e)}")
-            raise
+            logger.error(f"Failed to send initial verification email to {user.email}: {str(e)}")
+            # Continue anyway - user can retry with resend endpoint
+
+        return user
 
     def _send_verification_email(self, user, token):
         """
@@ -229,15 +228,11 @@ Team Capacity Planner Team
                 fail_silently=False,
             )
         except Exception as e:
-            # Log the error and re-raise to trigger transaction rollback
+            # Log the error but don't fail - email can be retried later
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-            # Re-raise the exception so the transaction.atomic() block can rollback
-            # This prevents orphaned user records in the database
-            raise serializers.ValidationError(
-                f"Unable to send verification email. Please try again later. Error: {str(e)}"
-            )
+            # Email is optional - if it fails, user can retry with resend endpoint
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
