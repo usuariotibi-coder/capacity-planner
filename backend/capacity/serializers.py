@@ -161,17 +161,14 @@ class UserRegistrationSerializer(serializers.Serializer):
         # Employee profile is only created when admin designates user as employee
         # The 'department' from registration is just metadata for reference
 
-        # Send verification code email (synchronous for now to see logs)
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"About to send verification email to {user.email}")
+        # Send verification code email
+        print(f"[EMAIL] About to send verification email to {user.email}")
 
         try:
             self._send_verification_code_email(user, code)
-            logger.info(f"Email sent successfully to {user.email}")
+            print(f"[EMAIL] Email sent successfully to {user.email}")
         except Exception as e:
-            logger.error(f"EMAIL SEND FAILED: {type(e).__name__}: {str(e)}")
-            # Don't fail registration if email fails - user can resend later
+            print(f"[EMAIL] SEND FAILED: {type(e).__name__}: {str(e)}")
 
         return user
 
@@ -182,25 +179,20 @@ class UserRegistrationSerializer(serializers.Serializer):
         from django.conf import settings
         from sendgrid import SendGridAPIClient
         from sendgrid.helpers.mail import Mail
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         sendgrid_api_key = getattr(settings, 'SENDGRID_API_KEY', None)
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
 
-        logger.info(f"=== SENDGRID EMAIL DEBUG ===")
-        logger.info(f"SENDGRID_API_KEY: {'SET' if sendgrid_api_key else 'NOT SET'}")
-        logger.info(f"DEFAULT_FROM_EMAIL: {from_email}")
-        logger.info(f"Recipient: {user.email}")
-        logger.info(f"============================")
+        print(f"[SENDGRID] API Key: {'SET (' + sendgrid_api_key[:10] + '...)' if sendgrid_api_key else 'NOT SET'}")
+        print(f"[SENDGRID] From Email: {from_email}")
+        print(f"[SENDGRID] To Email: {user.email}")
 
         if not sendgrid_api_key:
-            logger.warning(f"SendGrid API key not configured. Skipping verification email for {user.email}")
+            print(f"[SENDGRID] ERROR: API key not configured!")
             return
 
         if not from_email:
-            logger.warning(f"FROM email not configured. Skipping verification email for {user.email}")
+            print(f"[SENDGRID] ERROR: FROM email not configured!")
             return
 
         subject = "Your verification code - Team Capacity Planner"
@@ -241,14 +233,10 @@ If you didn't request this code, please ignore this email.
             html_content=html_content
         )
 
-        try:
-            sg = SendGridAPIClient(sendgrid_api_key)
-            response = sg.send(message)
-            logger.info(f"SendGrid response status: {response.status_code}")
-            logger.info(f"Verification code email sent successfully to {user.email}")
-        except Exception as e:
-            logger.error(f"SENDGRID ERROR: {type(e).__name__}: {str(e)}")
-            raise
+        print(f"[SENDGRID] Sending email...")
+        sg = SendGridAPIClient(sendgrid_api_key)
+        response = sg.send(message)
+        print(f"[SENDGRID] Response status: {response.status_code}")
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
