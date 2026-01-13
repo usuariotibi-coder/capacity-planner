@@ -156,15 +156,10 @@ class UserRegistrationSerializer(serializers.Serializer):
         token = secrets.token_urlsafe(32)
         EmailVerification.objects.create(user=user, token=token)
 
-        # Create Employee profile (inactive until email verified)
-        Employee.objects.create(
-            user=user,
-            name=f"{user.first_name} {user.last_name}",
-            role="Team Member",  # Default role
-            department=department,
-            capacity=40.0,  # Default 40 hours/week
-            is_active=False  # Will be activated on email verification
-        )
+        # NOTE: Do NOT create Employee profile here
+        # Employee profile is only created when admin designates user as employee
+        # The 'department' from registration is just metadata for reference
+        # (could be used later when admin creates the employee profile)
 
         # Try to send verification email
         # If it fails, user can retry using the resend endpoint
