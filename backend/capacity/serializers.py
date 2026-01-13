@@ -189,6 +189,17 @@ class UserRegistrationSerializer(serializers.Serializer):
 
         logger = logging.getLogger(__name__)
 
+        # Log email configuration for debugging
+        logger.info(f"=== EMAIL DEBUG ===")
+        logger.info(f"EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'NOT SET')}")
+        logger.info(f"EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'NOT SET')}")
+        logger.info(f"EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'NOT SET')}")
+        logger.info(f"EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'NOT SET')}")
+        logger.info(f"EMAIL_HOST_PASSWORD: {'SET' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'NOT SET'}")
+        logger.info(f"DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'NOT SET')}")
+        logger.info(f"Recipient: {user.email}")
+        logger.info(f"===================")
+
         # Skip email if credentials are not properly configured
         if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
             logger.warning(f"Email credentials not configured. Skipping verification email for {user.email}")
@@ -208,15 +219,19 @@ If you didn't request this code, please ignore this email.
 
 - Team Capacity Planner"""
 
-        send_mail(
-            subject=subject,
-            message=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-
-        logger.info(f"Verification code email sent to {user.email}")
+        try:
+            result = send_mail(
+                subject=subject,
+                message=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            logger.info(f"send_mail returned: {result}")
+            logger.info(f"Verification code email sent successfully to {user.email}")
+        except Exception as e:
+            logger.error(f"SMTP ERROR: {type(e).__name__}: {str(e)}")
+            raise
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
