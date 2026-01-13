@@ -161,14 +161,20 @@ class UserRegistrationSerializer(serializers.Serializer):
         # The 'department' from registration is just metadata for reference
         # (could be used later when admin creates the employee profile)
 
-        # Send verification email (non-blocking - if fails, user can retry later)
-        try:
-            self._send_verification_email(user, token)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-            # Continue - user can retry with "Resend Verification Email" button
+        # Send verification email in background thread (truly non-blocking)
+        import threading
+
+        def send_email_background():
+            try:
+                self._send_verification_email(user, token)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+
+        email_thread = threading.Thread(target=send_email_background)
+        email_thread.daemon = True
+        email_thread.start()
 
         return user
 
