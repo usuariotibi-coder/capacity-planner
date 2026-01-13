@@ -223,6 +223,22 @@ export const authApi = {
 
     return response.json();
   },
+
+  resendVerificationEmail: async (email: string) => {
+    const response = await fetch(`${API_URL}/api/resend-verification-email/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData.error || 'Failed to resend verification email';
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  },
 };
 
 // Employees API

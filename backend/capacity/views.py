@@ -1575,3 +1575,116 @@ class EmailVerificationView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class ResendVerificationEmailView(APIView):
+    """
+    Resend verification email endpoint.
+
+    POST /api/resend-verification-email/
+
+    Resends verification email if the first attempt failed.
+    Useful if the user didn't receive the original email or it expired.
+
+    Permissions:
+        - AllowAny: Anyone can request to resend (rate limited)
+
+    Request Body:
+        {
+            "email": "user@na.scio-automation.com"
+        }
+
+    Response (200 OK):
+        {
+            "message": "Verification email sent. Please check your email.",
+            "email": "user@na.scio-automation.com"
+        }
+
+    Error Responses:
+        - 400: User not found, already verified, or email sending failed
+        - 404: User not found
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'registration'  # Same rate limiting as registration
+
+    def post(self, request):
+        """
+        Resend verification email to user.
+
+        Args:
+            request: HTTP request with email in body
+
+        Returns:
+            Response with success or error message
+        """
+        from django.contrib.auth.models import User
+
+        email = request.data.get('email', '').lower()
+
+        if not email:
+            return Response(
+                {"error": "Email address is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User with this email not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if user is already verified
+        try:
+            verification = EmailVerification.objects.get(user=user)
+            if verification.is_verified():
+                return Response(
+                    {"error": "This email is already verified. You can log in."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except EmailVerification.DoesNotExist:
+            return Response(
+                {"error": "No verification record found for this user."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Regenerate verification token and resend email
+        import secrets
+        from .serializers import UserRegistrationSerializer
+
+        try:
+            # Generate new token
+            verification.token = secrets.token_urlsafe(32)
+            verification.save()
+
+            # Create a temporary serializer instance to access email sending method
+            serializer = UserRegistrationSerializer()
+            serializer._send_verification_email(user, verification.token)
+
+            # Log activity
+            ActivityLog.objects.create(
+                user=user,
+                action='verification_email_resent',
+                model_name='EmailVerification',
+                object_id=str(verification.id),
+                changes={'resent_at': timezone.now().isoformat()}
+            )
+
+            return Response(
+                {
+                    "message": "Verification email sent. Please check your email.",
+                    "email": user.email
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
+
+            return Response(
+                {"error": f"Failed to send verification email. Please try again later."},
+                status=status.HTTP_400_BAD_REQUEST
+            )

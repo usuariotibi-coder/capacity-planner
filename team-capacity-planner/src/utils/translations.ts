@@ -238,6 +238,9 @@ export const translations = {
     registrationSuccessMessage: 'Tu cuenta ha sido creada. Revisa tu correo electrónico para confirmar tu dirección.',
     registrationError: 'Error en el registro',
     emailAlreadyExists: 'Este correo electrónico ya está registrado',
+    resendVerificationEmail: 'Reintentar Envío de Email',
+    resendingEmail: 'Reenviando...',
+    verificationEmailResent: 'Email de verificación reenviado. Revisa tu bandeja de entrada.',
     commonPassword: 'Esta contraseña es muy común. Por favor elige una más segura',
     passwordSimilarToUsername: 'La contraseña es demasiado similar al usuario',
 
@@ -553,6 +556,9 @@ export const translations = {
     registrationSuccessMessage: 'Your account has been created. Please check your email to confirm your address.',
     registrationError: 'Registration error',
     emailAlreadyExists: 'This email address is already registered',
+    resendVerificationEmail: 'Resend Verification Email',
+    resendingEmail: 'Resending...',
+    verificationEmailResent: 'Verification email resent. Check your inbox.',
     commonPassword: 'This password is too common. Please choose a stronger one',
     passwordSimilarToUsername: 'Password is too similar to username',
 
