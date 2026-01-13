@@ -289,12 +289,14 @@ class ActivityLog(models.Model):
 
 
 class EmailVerification(models.Model):
-    """Email verification tokens for user registration"""
+    """Email verification codes for user registration"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='email_verification')
-    token = models.CharField(max_length=64, unique=True)
+    token = models.CharField(max_length=64, unique=True)  # Keep for backwards compatibility
+    code = models.CharField(max_length=6, null=True, blank=True)  # 6-digit verification code
     created_at = models.DateTimeField(auto_now_add=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.IntegerField(default=0)  # Track failed attempts
 
     class Meta:
         ordering = ['-created_at']
@@ -303,12 +305,23 @@ class EmailVerification(models.Model):
         return f"EmailVerification for {self.user.email}"
 
     def is_expired(self):
-        """Check if token is expired (48 hours)"""
+        """Check if code is expired (15 minutes for code, 48 hours for token)"""
         from django.conf import settings
         from django.utils import timezone
-        expiry_time = self.created_at + settings.EMAIL_VERIFICATION_TOKEN_LIFETIME
-        return timezone.now() > expiry_time
+        # Code expires in 15 minutes
+        code_expiry = self.created_at + timedelta(minutes=15)
+        return timezone.now() > code_expiry
 
     def is_verified(self):
         """Check if email is already verified"""
         return self.verified_at is not None
+
+    def max_attempts_reached(self):
+        """Check if max verification attempts reached (5 attempts)"""
+        return self.attempts >= 5
+
+    @staticmethod
+    def generate_code():
+        """Generate a random 6-digit verification code"""
+        import random
+        return str(random.randint(100000, 999999))

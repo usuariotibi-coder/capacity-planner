@@ -152,21 +152,21 @@ class UserRegistrationSerializer(serializers.Serializer):
         )
         user.user_permissions.set(permissions)
 
-        # Create email verification token
-        token = secrets.token_urlsafe(32)
-        EmailVerification.objects.create(user=user, token=token)
+        # Create email verification with 6-digit code
+        token = secrets.token_urlsafe(32)  # Keep token for backwards compatibility
+        code = EmailVerification.generate_code()
+        verification = EmailVerification.objects.create(user=user, token=token, code=code)
 
         # NOTE: Do NOT create Employee profile here
         # Employee profile is only created when admin designates user as employee
         # The 'department' from registration is just metadata for reference
-        # (could be used later when admin creates the employee profile)
 
-        # Send verification email in background thread (truly non-blocking)
+        # Send verification code email in background thread
         import threading
 
         def send_email_background():
             try:
-                self._send_verification_email(user, token)
+                self._send_verification_code_email(user, code)
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
@@ -178,14 +178,13 @@ class UserRegistrationSerializer(serializers.Serializer):
 
         return user
 
-    def _send_verification_email(self, user, token):
+    def _send_verification_code_email(self, user, code):
         """
-        Send email verification link to user.
-        Email sending is optional - if it fails, it's logged but doesn't block registration.
+        Send 6-digit verification code to user via email.
+        Simple text email that should work with any SMTP provider.
         """
         from django.core.mail import send_mail
         from django.conf import settings
-        from django.template.loader import render_to_string
         import logging
 
         logger = logging.getLogger(__name__)
@@ -195,51 +194,29 @@ class UserRegistrationSerializer(serializers.Serializer):
             logger.warning(f"Email credentials not configured. Skipping verification email for {user.email}")
             return
 
-        try:
-            verification_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+        subject = "Your verification code - Team Capacity Planner"
 
-            subject = "Verify your Team Capacity Planner account"
+        text_message = f"""Hello {user.first_name},
 
-            # Plain text email
-            text_message = f"""
-Hello {user.first_name},
+Your verification code is: {code}
 
-Welcome to Team Capacity Planner!
+Enter this code in the registration page to verify your email address.
 
-Please verify your email address by clicking the link below:
+This code expires in 15 minutes.
 
-{verification_url}
+If you didn't request this code, please ignore this email.
 
-This link will expire in 48 hours.
+- Team Capacity Planner"""
 
-If you didn't create this account, please ignore this email.
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
 
-Best regards,
-Team Capacity Planner Team
-            """.strip()
-
-            # HTML email (if templates exist)
-            try:
-                html_message = render_to_string('emails/confirmation_email.html', {
-                    'user': user,
-                    'verification_url': verification_url,
-                })
-            except:
-                html_message = None
-
-            send_mail(
-                subject=subject,
-                message=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
-
-        except Exception as e:
-            # Log the error but don't fail - email can be retried later
-            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-            # Email is optional - if it fails, user can retry with resend endpoint
+        logger.info(f"Verification code email sent to {user.email}")
 
 
 class EmployeeSerializer(serializers.ModelSerializer):

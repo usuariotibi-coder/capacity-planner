@@ -1649,23 +1649,37 @@ class ResendVerificationEmailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Regenerate verification token and resend email
+        # Regenerate verification code and resend email
         import secrets
+        import threading
         from .serializers import UserRegistrationSerializer
 
         try:
-            # Generate new token
+            # Generate new code and reset attempts
             verification.token = secrets.token_urlsafe(32)
+            verification.code = EmailVerification.generate_code()
+            verification.attempts = 0
+            verification.created_at = timezone.now()  # Reset expiry
             verification.save()
 
-            # Create a temporary serializer instance to access email sending method
-            serializer = UserRegistrationSerializer()
-            serializer._send_verification_email(user, verification.token)
+            # Send email in background thread
+            def send_email_background():
+                try:
+                    serializer = UserRegistrationSerializer()
+                    serializer._send_verification_code_email(user, verification.code)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+
+            email_thread = threading.Thread(target=send_email_background)
+            email_thread.daemon = True
+            email_thread.start()
 
             # Log activity
             ActivityLog.objects.create(
                 user=user,
-                action='verification_email_resent',
+                action='verification_code_resent',
                 model_name='EmailVerification',
                 object_id=str(verification.id),
                 changes={'resent_at': timezone.now().isoformat()}
@@ -1673,7 +1687,7 @@ class ResendVerificationEmailView(APIView):
 
             return Response(
                 {
-                    "message": "Verification email sent. Please check your email.",
+                    "message": "Verification code sent. Please check your email.",
                     "email": user.email
                 },
                 status=status.HTTP_200_OK
@@ -1682,9 +1696,115 @@ class ResendVerificationEmailView(APIView):
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
+            logger.error(f"Failed to resend verification code to {user.email}: {str(e)}")
 
             return Response(
-                {"error": f"Failed to send verification email. Please try again later."},
+                {"error": f"Failed to send verification code. Please try again later."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class VerifyCodeView(APIView):
+    """
+    Verify email using 6-digit code.
+
+    POST /api/verify-code/
+
+    Request Body:
+        {
+            "email": "user@na.scio-automation.com",
+            "code": "123456"
+        }
+
+    Response (200 OK):
+        {
+            "message": "Email verified successfully. You can now log in.",
+            "email": "user@na.scio-automation.com"
+        }
+
+    Error Responses:
+        - 400: Invalid code, expired, or max attempts reached
+        - 404: User not found
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'registration'
+
+    def post(self, request):
+        from django.contrib.auth.models import User
+
+        email = request.data.get('email', '').lower()
+        code = request.data.get('code', '').strip()
+
+        if not email or not code:
+            return Response(
+                {"error": "Email and code are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            verification = EmailVerification.objects.get(user=user)
+        except EmailVerification.DoesNotExist:
+            return Response(
+                {"error": "No verification record found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if already verified
+        if verification.is_verified():
+            return Response(
+                {"message": "Email already verified. You can log in.", "email": email},
+                status=status.HTTP_200_OK
+            )
+
+        # Check max attempts
+        if verification.max_attempts_reached():
+            return Response(
+                {"error": "Too many failed attempts. Please request a new code."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if code expired
+        if verification.is_expired():
+            return Response(
+                {"error": "Code expired. Please request a new code."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verify code
+        if verification.code != code:
+            verification.attempts += 1
+            verification.save()
+            remaining = 5 - verification.attempts
+            return Response(
+                {"error": f"Invalid code. {remaining} attempts remaining."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Success! Activate user
+        user.is_active = True
+        user.save()
+
+        verification.verified_at = timezone.now()
+        verification.save()
+
+        # Log activity
+        ActivityLog.objects.create(
+            user=user,
+            action='email_verified',
+            model_name='User',
+            object_id=str(user.id),
+            changes={'email_verified': True, 'method': 'code'}
+        )
+
+        return Response(
+            {"message": "Email verified successfully. You can now log in.", "email": email},
+            status=status.HTTP_200_OK
+        )

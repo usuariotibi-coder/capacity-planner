@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -7,7 +7,10 @@ import type { Department, Language } from '../types';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
+type Step = 'register' | 'verify' | 'success';
+
 const RegisterPage: React.FC = () => {
+  const [step, setStep] = useState<Step>('register');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -16,18 +19,28 @@ const RegisterPage: React.FC = () => {
     lastName: '',
     department: '' as Department | '',
   });
+  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [isResendingCode, setIsResendingCode] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
+  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const navigate = useNavigate();
+
+  // Cooldown timer for resend
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   const calculatePasswordStrength = (password: string): 'weak' | 'medium' | 'strong' => {
     if (password.length < 8) return 'weak';
@@ -47,7 +60,6 @@ const RegisterPage: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // Update password strength
     if (name === 'password') {
       setPasswordStrength(value ? calculatePasswordStrength(value) : null);
     }
@@ -57,17 +69,55 @@ const RegisterPage: React.FC = () => {
     return email.toLowerCase().endsWith('@na.scio-automation.com');
   };
 
-  const handleResendEmail = async () => {
-    setIsResendingEmail(true);
+  // Handle verification code input
+  const handleCodeChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return; // Only allow digits
+
+    const newCode = [...verificationCode];
+    newCode[index] = value.slice(-1); // Only keep last digit
+    setVerificationCode(newCode);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      codeInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleCodePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const newCode = [...verificationCode];
+    for (let i = 0; i < pastedData.length; i++) {
+      newCode[i] = pastedData[i];
+    }
+    setVerificationCode(newCode);
+    // Focus last filled input or the next empty one
+    const nextIndex = Math.min(pastedData.length, 5);
+    codeInputRefs.current[nextIndex]?.focus();
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+
+    setIsResendingCode(true);
     setResendMessage(null);
+    setError(null);
 
     try {
       await authApi.resendVerificationEmail(formData.email);
-      setResendMessage(t.verificationEmailResent || 'Verification email sent. Check your inbox.');
+      setResendMessage(t.codeSent || 'New code sent to your email');
+      setResendCooldown(60); // 60 second cooldown
+      setVerificationCode(['', '', '', '', '', '']);
     } catch (err) {
-      setResendMessage(err instanceof Error ? err.message : t.registrationError);
+      setError(err instanceof Error ? err.message : 'Failed to resend code');
     } finally {
-      setIsResendingEmail(false);
+      setIsResendingCode(false);
     }
   };
 
@@ -97,10 +147,9 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    // Password strength validation - must be strong or medium
     const strength = calculatePasswordStrength(formData.password);
     if (strength === 'weak') {
-      setError(t.passwordMustBeStrong || 'Password must be strong (uppercase, lowercase, numbers, and special characters)');
+      setError(t.passwordMustBeStrong || 'Password must be strong');
       return;
     }
 
@@ -116,7 +165,9 @@ const RegisterPage: React.FC = () => {
         department: formData.department as string,
       });
 
-      setSuccess(true);
+      setStep('verify');
+      // Focus first code input
+      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.registrationError);
     } finally {
@@ -124,7 +175,61 @@ const RegisterPage: React.FC = () => {
     }
   };
 
-  if (success) {
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const code = verificationCode.join('');
+    if (code.length !== 6) {
+      setError(t.enterCompleteCode || 'Please enter the complete 6-digit code');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await authApi.verifyCode(formData.email, code);
+      setStep('success');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+      // Clear code on error
+      setVerificationCode(['', '', '', '', '', '']);
+      codeInputRefs.current[0]?.focus();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Language toggle component
+  const LanguageToggle = () => (
+    <div className="absolute top-4 right-4 flex gap-2">
+      <button
+        onClick={() => setLanguage('es' as Language)}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
+          language === 'es'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+        title="Español"
+      >
+        🌮
+      </button>
+      <button
+        onClick={() => setLanguage('en' as Language)}
+        className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
+          language === 'en'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+        title="English"
+      >
+        🍔
+      </button>
+    </div>
+  );
+
+  // SUCCESS STEP
+  if (step === 'success') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
@@ -134,77 +239,136 @@ const RegisterPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-4">{t.registrationSuccess}</h2>
-            <p className="text-gray-300 mb-6">{t.registrationSuccessMessage}</p>
-            <p className="text-sm text-gray-400 mb-6">{formData.email}</p>
+            <h2 className="text-2xl font-bold text-white mb-4">{t.accountVerified || 'Account Verified!'}</h2>
+            <p className="text-gray-300 mb-6">{t.accountVerifiedMessage || 'Your account has been verified. You can now log in.'}</p>
 
-            {resendMessage && (
-              <div className={`mb-4 p-3 rounded-lg text-sm ${
-                resendMessage.includes('sent')
-                  ? 'bg-green-500/10 border border-green-500 text-green-300'
-                  : 'bg-red-500/10 border border-red-500 text-red-300'
-              }`}>
-                {resendMessage}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate('/login')}
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-              >
-                {t.backToLogin}
-              </button>
-              <button
-                onClick={handleResendEmail}
-                disabled={isResendingEmail}
-                className="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-gray-300 font-medium rounded-lg transition-colors"
-              >
-                {isResendingEmail ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {t.resendingEmail || 'Resending...'}
-                  </>
-                ) : (
-                  t.resendVerificationEmail || 'Resend Verification Email'
-                )}
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              {t.backToLogin}
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // VERIFICATION STEP
+  if (step === 'verify') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 relative">
+        <LanguageToggle />
+        <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="mb-4">
+              <svg className="mx-auto h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">{t.verifyYourEmail || 'Verify Your Email'}</h1>
+            <p className="text-gray-400 text-sm">
+              {t.codeSentTo || 'We sent a 6-digit code to'}
+            </p>
+            <p className="text-blue-400 font-medium">{formData.email}</p>
+          </div>
+
+          <form onSubmit={handleVerifyCode} className="space-y-6">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            {resendMessage && (
+              <div className="bg-green-500/10 border border-green-500 text-green-400 px-4 py-3 rounded-lg text-sm">
+                {resendMessage}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
+                {t.enterVerificationCode || 'Enter verification code'}
+              </label>
+              <div className="flex justify-center gap-2" onPaste={handleCodePaste}>
+                {verificationCode.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => { codeInputRefs.current[index] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodeChange(index, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                    className="w-12 h-14 text-center text-2xl font-bold bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {t.codeExpiresIn || 'Code expires in 15 minutes'}
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || verificationCode.join('').length !== 6}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {t.verifying || 'Verifying...'}
+                </>
+              ) : (
+                t.verifyCode || 'Verify Code'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-400 text-sm mb-2">{t.didntReceiveCode || "Didn't receive the code?"}</p>
+            <button
+              onClick={handleResendCode}
+              disabled={isResendingCode || resendCooldown > 0}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors disabled:text-gray-500 disabled:cursor-not-allowed"
+            >
+              {isResendingCode ? (
+                t.resendingCode || 'Sending...'
+              ) : resendCooldown > 0 ? (
+                `${t.resendCodeIn || 'Resend code in'} ${resendCooldown}s`
+              ) : (
+                t.resendCode || 'Resend Code'
+              )}
+            </button>
+          </div>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => {
+                setStep('register');
+                setError(null);
+                setResendMessage(null);
+                setVerificationCode(['', '', '', '', '', '']);
+              }}
+              className="text-gray-400 hover:text-gray-300 text-sm transition-colors"
+            >
+              {t.changeEmail || '← Change email address'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // REGISTER STEP
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 relative">
-      <div className="absolute top-4 right-4 flex gap-2">
-        <button
-          onClick={() => setLanguage('es' as Language)}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
-            language === 'es'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
-          title="Español"
-        >
-          🌮
-        </button>
-        <button
-          onClick={() => setLanguage('en' as Language)}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
-            language === 'en'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
-          title="English"
-        >
-          🍔
-        </button>
-      </div>
+      <LanguageToggle />
       <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">{t.registerTitle}</h1>

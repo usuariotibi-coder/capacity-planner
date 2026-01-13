@@ -244,7 +244,24 @@ export const translations = {
     commonPassword: 'Esta contraseña es muy común. Por favor elige una más segura',
     passwordSimilarToUsername: 'La contraseña es demasiado similar al usuario',
 
-    // Email Verification
+    // Email Verification (Code-based)
+    verifyYourEmail: 'Verifica tu Correo',
+    codeSentTo: 'Enviamos un código de 6 dígitos a',
+    enterVerificationCode: 'Ingresa el código de verificación',
+    codeExpiresIn: 'El código expira en 15 minutos',
+    verifyCode: 'Verificar Código',
+    verifying: 'Verificando...',
+    enterCompleteCode: 'Por favor ingresa el código completo de 6 dígitos',
+    didntReceiveCode: '¿No recibiste el código?',
+    resendCode: 'Reenviar Código',
+    resendingCode: 'Enviando...',
+    resendCodeIn: 'Reenviar código en',
+    codeSent: 'Nuevo código enviado a tu correo',
+    changeEmail: '← Cambiar correo electrónico',
+    accountVerified: '¡Cuenta Verificada!',
+    accountVerifiedMessage: 'Tu cuenta ha sido verificada. Ya puedes iniciar sesión.',
+
+    // Legacy Email Verification
     verifyingEmail: 'Verificando Correo',
     pleaseWait: 'Por favor espera mientras verificamos tu correo electrónico...',
     emailVerified: 'Correo Verificado',
@@ -562,7 +579,24 @@ export const translations = {
     commonPassword: 'This password is too common. Please choose a stronger one',
     passwordSimilarToUsername: 'Password is too similar to username',
 
-    // Email Verification
+    // Email Verification (Code-based)
+    verifyYourEmail: 'Verify Your Email',
+    codeSentTo: 'We sent a 6-digit code to',
+    enterVerificationCode: 'Enter verification code',
+    codeExpiresIn: 'Code expires in 15 minutes',
+    verifyCode: 'Verify Code',
+    verifying: 'Verifying...',
+    enterCompleteCode: 'Please enter the complete 6-digit code',
+    didntReceiveCode: "Didn't receive the code?",
+    resendCode: 'Resend Code',
+    resendingCode: 'Sending...',
+    resendCodeIn: 'Resend code in',
+    codeSent: 'New code sent to your email',
+    changeEmail: '← Change email address',
+    accountVerified: 'Account Verified!',
+    accountVerifiedMessage: 'Your account has been verified. You can now log in.',
+
+    // Legacy Email Verification
     verifyingEmail: 'Verifying Email',
     pleaseWait: 'Please wait while we verify your email address...',
     emailVerified: 'Email Verified',

@@ -239,6 +239,21 @@ export const authApi = {
 
     return response.json();
   },
+
+  verifyCode: async (email: string, code: string) => {
+    const response = await fetch(`${API_URL}/api/verify-code/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Verification failed');
+    }
+
+    return response.json();
+  },
 };
 
 // Employees API

@@ -21,6 +21,7 @@ from capacity.views import (
     UserRegistrationView,
     EmailVerificationView,
     ResendVerificationEmailView,
+    VerifyCodeView,
 )
 
 # Create a router and register viewsets
@@ -71,6 +72,7 @@ urlpatterns = [
     # Registration endpoints
     path('api/register/', UserRegistrationView.as_view(), name='user_register'),
     path('api/verify-email/<str:token>/', EmailVerificationView.as_view(), name='email_verify'),
+    path('api/verify-code/', VerifyCodeView.as_view(), name='verify_code'),
     path('api/resend-verification-email/', ResendVerificationEmailView.as_view(), name='resend_verification_email'),
 
     # API endpoints
