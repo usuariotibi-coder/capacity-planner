@@ -182,17 +182,27 @@ class UserRegistrationSerializer(serializers.Serializer):
     def _send_verification_email(self, user, token):
         """
         Send email verification link to user.
+        Email sending is optional - if it fails, it's logged but doesn't block registration.
         """
         from django.core.mail import send_mail
         from django.conf import settings
         from django.template.loader import render_to_string
+        import logging
 
-        verification_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+        logger = logging.getLogger(__name__)
 
-        subject = "Verify your Team Capacity Planner account"
+        # Skip email if credentials are not properly configured
+        if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            logger.warning(f"Email credentials not configured. Skipping verification email for {user.email}")
+            return
 
-        # Plain text email
-        text_message = f"""
+        try:
+            verification_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+
+            subject = "Verify your Team Capacity Planner account"
+
+            # Plain text email
+            text_message = f"""
 Hello {user.first_name},
 
 Welcome to Team Capacity Planner!
@@ -207,18 +217,17 @@ If you didn't create this account, please ignore this email.
 
 Best regards,
 Team Capacity Planner Team
-        """.strip()
+            """.strip()
 
-        # HTML email (if templates exist)
-        try:
-            html_message = render_to_string('emails/confirmation_email.html', {
-                'user': user,
-                'verification_url': verification_url,
-            })
-        except:
-            html_message = None
+            # HTML email (if templates exist)
+            try:
+                html_message = render_to_string('emails/confirmation_email.html', {
+                    'user': user,
+                    'verification_url': verification_url,
+                })
+            except:
+                html_message = None
 
-        try:
             send_mail(
                 subject=subject,
                 message=text_message,
@@ -227,10 +236,9 @@ Team Capacity Planner Team
                 html_message=html_message,
                 fail_silently=False,
             )
+
         except Exception as e:
             # Log the error but don't fail - email can be retried later
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
             # Email is optional - if it fails, user can retry with resend endpoint
 
