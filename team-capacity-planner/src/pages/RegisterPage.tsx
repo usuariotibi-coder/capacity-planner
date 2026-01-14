@@ -476,7 +476,7 @@ const RegisterPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-300 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors disabled:text-gray-600"
                 disabled={isSubmitting}
               >
                 {showPassword ? (
@@ -499,7 +499,7 @@ const RegisterPage: React.FC = () => {
                   <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-600'}`} />
                 </div>
                 <p className={`text-xs mt-1 ${passwordStrength === 'weak' ? 'text-red-400' : passwordStrength === 'medium' ? 'text-yellow-400' : 'text-green-400'}`}>
-                  {t.passwordStrength}: {passwordStrength === 'weak' ? t.weak : passwordStrength === 'medium' ? t.medium : t.strong}
+                  {t.passwordStrength} {passwordStrength === 'weak' ? t.weak : passwordStrength === 'medium' ? t.medium : t.strong}
                 </p>
               </div>
             )}
@@ -525,7 +525,7 @@ const RegisterPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-300 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors disabled:text-gray-600"
                 disabled={isSubmitting}
               >
                 {showConfirmPassword ? (
