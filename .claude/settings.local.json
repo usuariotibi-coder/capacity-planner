@@ -77,7 +77,10 @@
       "Bash(\"c:\\\\Users\\\\usuar\\\\OneDrive - CEC Controls\\\\Escritorio\\\\Capacity\\\\backend\\\\venv\\\\Scripts\\\\python.exe\":*)",
       "Bash(find:*)",
       "Bash(.venvScriptsactivate)",
-      "Bash(\"venv\\\\Scripts\\\\activate.bat\")"
+      "Bash(\"venv\\\\Scripts\\\\activate.bat\")",
+      "Bash(ls:*)",
+      "Bash(cd:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }
