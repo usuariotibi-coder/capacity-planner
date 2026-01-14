@@ -3,17 +3,6 @@
 from django.db import migrations
 
 
-class Migration(migrations.Migration):
-
-    dependencies = [
-        ('capacity', '0009_add_verification_code'),
-    ]
-
-    operations = [
-        migrations.RunPython(add_initial_employees, remove_initial_employees),
-    ]
-
-
 def add_initial_employees(apps, schema_editor):
     """Add initial BUILD department employees"""
     Employee = apps.get_model('capacity', 'Employee')
@@ -64,3 +53,14 @@ def remove_initial_employees(apps, schema_editor):
     Employee.objects.filter(
         name__in=['Bryan Hernández', 'Daniel Gámez', 'Guadalupe Rivera', 'Victor Catalan']
     ).delete()
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('capacity', '0009_add_verification_code'),
+    ]
+
+    operations = [
+        migrations.RunPython(add_initial_employees, remove_initial_employees),
+    ]
