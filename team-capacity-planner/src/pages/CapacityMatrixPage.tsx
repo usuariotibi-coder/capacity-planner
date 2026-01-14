@@ -1224,22 +1224,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         className="w-4 h-4 text-blue-500 rounded cursor-pointer"
                       />
                       <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
-                      {/* Show badge for BUILD and PRG departments */}
-                      {isBuildOrPRG && (
-                        isExternal ? (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                            editingCell.department === 'BUILD'
-                              ? 'bg-violet-200 text-violet-800'
-                              : 'bg-cyan-200 text-cyan-800'
-                          }`}>
-                            🏢 {emp.subcontractCompany}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-green-200 text-green-800">
-                            🏠 {t.internal}
-                          </span>
-                        )
-                      )}
                       <span className="text-xs text-gray-500 ml-auto">{emp.capacity}{t.hoursPerSemWeek}</span>
                     </label>
                   );
