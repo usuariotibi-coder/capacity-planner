@@ -1052,7 +1052,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!editingCell) return null;
 
     const stageOptions = STAGE_OPTIONS[editingCell.department] || [];
-    const deptEmployees = employees.filter(emp => emp.department === editingCell.department && emp.isActive);
+    // Filter employees: exclude company entries (where name === subcontractCompany and capacity === 0)
+    // These are company placeholders used in "Ocupación semanal total", not actual resources
+    const deptEmployees = employees.filter(emp =>
+      emp.department === editingCell.department &&
+      emp.isActive &&
+      !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0)
+    );
     const weekData = allWeeksData.find(w => w.date === editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
@@ -1224,6 +1230,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         className="w-4 h-4 text-blue-500 rounded cursor-pointer"
                       />
                       <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
+                      {/* Badge showing Internal or Company name */}
+                      {isBuildOrPRG && (
+                        isExternal ? (
+                          <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
+                            🏢 {emp.subcontractCompany}
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            🏠 Interno
+                          </span>
+                        )
+                      )}
                       <span className="text-xs text-gray-500 ml-auto">{emp.capacity}{t.hoursPerSemWeek}</span>
                     </label>
                   );
