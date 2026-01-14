@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -13,6 +13,7 @@ const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +26,8 @@ const LoginPage: React.FC = () => {
       console.log('[LoginPage] Calling login...');
       await login(email, password);
       console.log('[LoginPage] Login successful!');
+      console.log('[LoginPage] Navigating to home...');
+      navigate('/');
     } catch (err) {
       console.error('[LoginPage] Login error:', err);
       setError(err instanceof Error ? err.message : t.loginError);
