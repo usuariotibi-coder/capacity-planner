@@ -16,14 +16,20 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LoginPage] handleSubmit called');
+    console.log('[LoginPage] Email:', email);
     setIsSubmitting(true);
     setError(null);
 
     try {
+      console.log('[LoginPage] Calling login...');
       await login(email, password);
+      console.log('[LoginPage] Login successful!');
     } catch (err) {
+      console.error('[LoginPage] Login error:', err);
       setError(err instanceof Error ? err.message : t.loginError);
     } finally {
+      console.log('[LoginPage] Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

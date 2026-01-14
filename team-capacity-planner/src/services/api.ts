@@ -166,19 +166,34 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
 // Auth API
 export const authApi = {
   login: async (username: string, password: string) => {
-    const response = await fetch(`${API_URL}/api/token/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
+    console.log('[LOGIN] Starting login request...');
+    console.log('[LOGIN] API URL:', `${API_URL}/api/token/`);
+    console.log('[LOGIN] Username:', username);
 
-    if (!response.ok) {
-      throw new Error('Credenciales inválidas');
+    try {
+      const response = await fetch(`${API_URL}/api/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      console.log('[LOGIN] Response status:', response.status);
+      console.log('[LOGIN] Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.log('[LOGIN] Error response:', errorData);
+        throw new Error('Credenciales inválidas');
+      }
+
+      const data = await response.json();
+      console.log('[LOGIN] Success! Token received');
+      setTokens(data.access, data.refresh);
+      return data;
+    } catch (error) {
+      console.error('[LOGIN] Error:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    setTokens(data.access, data.refresh);
-    return data;
   },
 
   logout: () => {
