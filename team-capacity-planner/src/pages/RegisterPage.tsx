@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, User, Building2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
@@ -70,13 +71,12 @@ const RegisterPage: React.FC = () => {
 
   // Handle verification code input
   const handleCodeChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // Only allow digits
+    if (!/^\d*$/.test(value)) return;
 
     const newCode = [...verificationCode];
-    newCode[index] = value.slice(-1); // Only keep last digit
+    newCode[index] = value.slice(-1);
     setVerificationCode(newCode);
 
-    // Auto-focus next input
     if (value && index < 5) {
       codeInputRefs.current[index + 1]?.focus();
     }
@@ -96,7 +96,6 @@ const RegisterPage: React.FC = () => {
       newCode[i] = pastedData[i];
     }
     setVerificationCode(newCode);
-    // Focus last filled input or the next empty one
     const nextIndex = Math.min(pastedData.length, 5);
     codeInputRefs.current[nextIndex]?.focus();
   };
@@ -111,7 +110,7 @@ const RegisterPage: React.FC = () => {
     try {
       await authApi.resendVerificationEmail(formData.email);
       setResendMessage(t.codeSent || 'New code sent to your email');
-      setResendCooldown(60); // 60 second cooldown
+      setResendCooldown(60);
       setVerificationCode(['', '', '', '', '', '']);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resend code');
@@ -124,7 +123,6 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!formData.email || !formData.password || !formData.confirmPassword ||
         !formData.firstName || !formData.lastName || !formData.department) {
       setError(t.completeAllFields);
@@ -164,7 +162,6 @@ const RegisterPage: React.FC = () => {
         department: formData.department as string,
       });
 
-      // No email verification required - go directly to success
       setStep('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : t.registrationError);
@@ -190,7 +187,6 @@ const RegisterPage: React.FC = () => {
       setStep('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
-      // Clear code on error
       setVerificationCode(['', '', '', '', '', '']);
       codeInputRefs.current[0]?.focus();
     } finally {
@@ -200,28 +196,28 @@ const RegisterPage: React.FC = () => {
 
   // Language toggle component
   const LanguageToggle = () => (
-    <div className="absolute top-4 right-4 flex gap-2">
+    <div className="absolute top-4 right-4 md:top-6 md:right-6 flex gap-2 z-20">
       <button
         onClick={() => setLanguage('es' as Language)}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
+        className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 text-xl ${
           language === 'es'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/50 scale-105'
+            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white hover:scale-105'
         }`}
         title="Español"
       >
-        🌮
+        🇲🇽
       </button>
       <button
         onClick={() => setLanguage('en' as Language)}
-        className={`px-3 py-2 rounded-lg font-medium transition-colors text-lg ${
+        className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 text-xl ${
           language === 'en'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/50 scale-105'
+            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white hover:scale-105'
         }`}
         title="English"
       >
-        🍔
+        🇺🇸
       </button>
     </div>
   );
@@ -229,93 +225,500 @@ const RegisterPage: React.FC = () => {
   // SUCCESS STEP
   if (step === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-          <div className="text-center">
-            <div className="mb-6">
-              <svg className="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-4">{t.registrationSuccess || 'Registration Successful!'}</h2>
-            <p className="text-gray-300 mb-6">{t.registrationSuccessNoVerification || 'Your account has been created. You can now log in.'}</p>
+      <>
+        <style>{`
+          @keyframes scale-in {
+            from {
+              transform: scale(0);
+              opacity: 0;
+            }
+            to {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+          @keyframes draw-check {
+            from {
+              stroke-dasharray: 1000;
+              stroke-dashoffset: 1000;
+            }
+            to {
+              stroke-dasharray: 1000;
+              stroke-dashoffset: 0;
+            }
+          }
+          .animate-scale-in {
+            animation: scale-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          }
+          .animate-draw-check {
+            animation: draw-check 0.5s ease-in-out 0.3s forwards;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+          }
+        `}</style>
 
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = '/login';
-              }}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-            >
-              {t.backToLogin}
-            </button>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 relative overflow-hidden px-4 py-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.1),rgba(0,0,0,0))]" />
+          <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 bg-green-500/5 rounded-full blur-3xl" />
+
+          <div className="relative z-10 bg-zinc-800/90 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md border border-zinc-700/50">
+            <div className="text-center">
+              <div className="relative mb-6">
+                <div className="w-24 h-24 mx-auto rounded-full bg-green-500/20 animate-ping absolute inset-0 m-auto" />
+                <div className="relative w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-green-500 to-green-600
+                            flex items-center justify-center shadow-2xl shadow-green-500/50
+                            animate-scale-in">
+                  <svg
+                    className="w-12 h-12 text-white animate-draw-check"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold text-white mb-2">{t.registrationSuccessTitle || 'Registration Successful!'}</h2>
+              <p className="text-zinc-400 mb-8">{t.registrationSuccessMessage || 'Your account has been created. You can now log in.'}</p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = '/login';
+                }}
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-amber-500
+                           text-white font-semibold rounded-lg
+                           transition-all duration-300
+                           transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg hover:shadow-blue-500/50"
+              >
+                {t.backToLogin}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // VERIFICATION STEP
   if (step === 'verify') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 relative">
-        <LanguageToggle />
-        <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="mb-4">
-              <svg className="mx-auto h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+      <>
+        <style>{`
+          @keyframes fade-in {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+          }
+          .animate-fade-in {
+            animation: fade-in 0.6s ease-out;
+          }
+          .animate-shake {
+            animation: shake 0.3s ease-in-out;
+          }
+        `}</style>
+
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-12 px-4 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.1),rgba(0,0,0,0))]" />
+          <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 bg-blue-500/5 rounded-full blur-3xl" />
+
+          <LanguageToggle />
+
+          <div className="relative z-10 bg-zinc-800/90 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md border border-zinc-700/50 animate-fade-in">
+            <div className="text-center mb-8">
+              <div className="mb-4 flex justify-center">
+                <Mail size={48} className="text-blue-400" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">{t.verifyYourEmail || 'Verify Your Email'}</h1>
+              <p className="text-zinc-400 text-sm">
+                {t.codeSentTo || 'We sent a 6-digit code to'}
+              </p>
+              <p className="text-blue-400 font-medium">{formData.email}</p>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">{t.verifyYourEmail || 'Verify Your Email'}</h1>
-            <p className="text-gray-400 text-sm">
-              {t.codeSentTo || 'We sent a 6-digit code to'}
-            </p>
-            <p className="text-blue-400 font-medium">{formData.email}</p>
+
+            <form onSubmit={handleVerifyCode} className="space-y-6">
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg animate-shake text-sm">
+                  {error}
+                </div>
+              )}
+
+              {resendMessage && (
+                <div className="bg-green-500/10 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg text-sm text-center">
+                  {resendMessage}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-3 text-center">
+                  {t.enterVerificationCode || 'Enter verification code'}
+                </label>
+                <div className="flex justify-center gap-2" onPaste={handleCodePaste}>
+                  {verificationCode.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => { codeInputRefs.current[index] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleCodeChange(index, e.target.value)}
+                      onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-2xl font-bold bg-zinc-900/50 border border-zinc-700 rounded-lg text-white
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                                 transition-all duration-300 hover:border-zinc-600"
+                      disabled={isSubmitting}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 text-center">
+                  {t.codeExpiresIn || 'Code expires in 15 minutes'}
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || verificationCode.join('').length !== 6}
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-amber-500
+                           disabled:from-zinc-700 disabled:to-zinc-600 disabled:cursor-not-allowed
+                           text-white font-semibold rounded-lg
+                           transition-all duration-300
+                           transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg hover:shadow-blue-500/50
+                           flex items-center justify-center"
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {t.verifying || 'Verifying...'}
+                  </>
+                ) : (
+                  t.verifyCode || 'Verify Code'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center space-y-3">
+              <p className="text-zinc-400 text-sm">{t.didntReceiveCode || "Didn't receive the code?"}</p>
+              <button
+                onClick={handleResendCode}
+                disabled={isResendingCode || resendCooldown > 0}
+                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors disabled:text-zinc-500 disabled:cursor-not-allowed"
+              >
+                {isResendingCode ? (
+                  t.resendingCode || 'Sending...'
+                ) : resendCooldown > 0 ? (
+                  `${t.resendCodeIn || 'Resend code in'} ${resendCooldown}s`
+                ) : (
+                  t.resendCode || 'Resend Code'
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setStep('register');
+                  setError(null);
+                  setResendMessage(null);
+                  setVerificationCode(['', '', '', '', '', '']);
+                }}
+                className="block w-full text-zinc-400 hover:text-zinc-300 text-sm transition-colors"
+              >
+                {t.changeEmail || '← Change email address'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // REGISTER STEP
+  return (
+    <>
+      <style>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+        .animate-shake {
+          animation: shake 0.3s ease-in-out;
+        }
+      `}</style>
+
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 py-12 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.1),rgba(0,0,0,0))]" />
+        <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 bg-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-amber-500/5 rounded-full blur-3xl" />
+
+        <LanguageToggle />
+
+        <div className="relative z-10 bg-zinc-800/90 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md border border-zinc-700/50 animate-fade-in">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-amber-400 bg-clip-text text-transparent mb-2">
+              {t.registerTitle}
+            </h1>
+            <p className="text-zinc-400 text-sm">{t.registerSubtitle}</p>
           </div>
 
-          <form onSubmit={handleVerifyCode} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg animate-shake text-sm">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span>{error}</span>
+                </div>
               </div>
             )}
 
-            {resendMessage && (
-              <div className="bg-green-500/10 border border-green-500 text-green-400 px-4 py-3 rounded-lg text-sm text-center">
-                {resendMessage}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3 text-center">
-                {t.enterVerificationCode || 'Enter verification code'}
-              </label>
-              <div className="flex justify-center gap-2" onPaste={handleCodePaste}>
-                {verificationCode.map((digit, index) => (
+            {/* Name fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-zinc-300 mb-2">
+                  {t.firstName}
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                    <User size={20} />
+                  </div>
                   <input
-                    key={index}
-                    ref={(el) => { codeInputRefs.current[index] = el; }}
+                    id="firstName"
+                    name="firstName"
                     type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleCodeChange(index, e.target.value)}
-                    onKeyDown={(e) => handleCodeKeyDown(index, e)}
-                    className="w-12 h-14 text-center text-2xl font-bold bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
+                               focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                               transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                    placeholder={t.egJohn}
+                    required
                     disabled={isSubmitting}
                   />
-                ))}
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                {t.codeExpiresIn || 'Code expires in 15 minutes'}
-              </p>
+
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-medium text-zinc-300 mb-2">
+                  {t.lastName}
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                    <User size={20} />
+                  </div>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    type="text"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
+                               focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                               transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                    placeholder={t.egDoe}
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
             </div>
 
+            {/* Email field */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2">
+                {t.email}
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                  <Mail size={20} />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                  placeholder="user@na.scio-automation.com"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">{t.emailDomainRequired}</p>
+            </div>
+
+            {/* Department field */}
+            <div>
+              <label htmlFor="department" className="block text-sm font-medium text-zinc-300 mb-2">
+                {t.department}
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                  <Building2 size={20} />
+                </div>
+                <select
+                  id="department"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                  required
+                  disabled={isSubmitting}
+                >
+                  <option value="">{t.selectDepartment}</option>
+                  {DEPARTMENTS.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Password field */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-2">
+                {t.password}
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                  <Lock size={20} />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                  placeholder={t.enterPassword}
+                  required
+                  disabled={isSubmitting}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-white transition-colors duration-300"
+                  disabled={isSubmitting}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
+              {/* Password strength indicator */}
+              {passwordStrength && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-zinc-400">{t.passwordStrength}</span>
+                    <span className={`text-xs font-semibold ${
+                      passwordStrength === 'weak' ? 'text-red-400' :
+                      passwordStrength === 'medium' ? 'text-yellow-400' :
+                      'text-green-400'
+                    }`}>
+                      {passwordStrength === 'weak' && t.weak}
+                      {passwordStrength === 'medium' && t.medium}
+                      {passwordStrength === 'strong' && t.strong}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                      passwordStrength === 'weak' ? 'bg-red-500 shadow-lg shadow-red-500/50' :
+                      'bg-zinc-700'
+                    }`} />
+                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                      passwordStrength === 'medium' || passwordStrength === 'strong'
+                        ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
+                        : 'bg-zinc-700'
+                    }`} />
+                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                      passwordStrength === 'strong'
+                        ? 'bg-green-500 shadow-lg shadow-green-500/50'
+                        : 'bg-zinc-700'
+                    }`} />
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-zinc-400 mt-2">{t.passwordRequirements}</p>
+            </div>
+
+            {/* Confirm password field */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-300 mb-2">
+                {t.confirmPassword}
+              </label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                  <Lock size={20} />
+                </div>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                  placeholder={t.confirmPasswordPlaceholder}
+                  required
+                  disabled={isSubmitting}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-white transition-colors duration-300"
+                  disabled={isSubmitting}
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit button */}
             <button
               type="submit"
-              disabled={isSubmitting || verificationCode.join('').length !== 6}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center"
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-amber-500
+                         disabled:from-zinc-700 disabled:to-zinc-600 disabled:cursor-not-allowed
+                         text-white font-semibold rounded-lg
+                         transition-all duration-300
+                         transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg hover:shadow-blue-500/50
+                         flex items-center justify-center mt-2"
             >
               {isSubmitting ? (
                 <>
@@ -323,254 +726,26 @@ const RegisterPage: React.FC = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {t.verifying || 'Verifying...'}
+                  {t.registering}
                 </>
               ) : (
-                t.verifyCode || 'Verify Code'
+                t.register
               )}
             </button>
           </form>
 
+          {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm mb-2">{t.didntReceiveCode || "Didn't receive the code?"}</p>
-            <button
-              onClick={handleResendCode}
-              disabled={isResendingCode || resendCooldown > 0}
-              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors disabled:text-gray-500 disabled:cursor-not-allowed"
+            <Link
+              to="/login"
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
             >
-              {isResendingCode ? (
-                t.resendingCode || 'Sending...'
-              ) : resendCooldown > 0 ? (
-                `${t.resendCodeIn || 'Resend code in'} ${resendCooldown}s`
-              ) : (
-                t.resendCode || 'Resend Code'
-              )}
-            </button>
-          </div>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => {
-                setStep('register');
-                setError(null);
-                setResendMessage(null);
-                setVerificationCode(['', '', '', '', '', '']);
-              }}
-              className="text-gray-400 hover:text-gray-300 text-sm transition-colors"
-            >
-              {t.changeEmail || '← Change email address'}
-            </button>
+              {t.alreadyHaveAccount}
+            </Link>
           </div>
         </div>
       </div>
-    );
-  }
-
-  // REGISTER STEP
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 relative">
-      <LanguageToggle />
-      <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">{t.registerTitle}</h1>
-          <p className="text-gray-400">{t.registerSubtitle}</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">
-                {t.firstName}
-              </label>
-              <input
-                id="firstName"
-                name="firstName"
-                type="text"
-                value={formData.firstName}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t.egJohn}
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">
-                {t.lastName}
-              </label>
-              <input
-                id="lastName"
-                name="lastName"
-                type="text"
-                value={formData.lastName}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t.egDoe}
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-              {t.email}
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="user@na.scio-automation.com"
-              required
-              disabled={isSubmitting}
-            />
-            <p className="text-xs text-gray-400 mt-1">{t.emailDomainRequired}</p>
-          </div>
-
-          <div>
-            <label htmlFor="department" className="block text-sm font-medium text-gray-300 mb-2">
-              {t.department}
-            </label>
-            <select
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-              disabled={isSubmitting}
-            >
-              <option value="">{t.selectDepartment}</option>
-              {DEPARTMENTS.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-              {t.password}
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t.enterPassword}
-                required
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors disabled:text-gray-600"
-                disabled={isSubmitting}
-              >
-                {showPassword ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {passwordStrength && (
-              <div className="mt-2">
-                <div className="flex gap-1">
-                  <div className={`h-1 flex-1 rounded ${passwordStrength === 'weak' ? 'bg-red-500' : passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}`} />
-                  <div className={`h-1 flex-1 rounded ${passwordStrength === 'medium' || passwordStrength === 'strong' ? passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-green-500' : 'bg-gray-600'}`} />
-                  <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-600'}`} />
-                </div>
-                <p className={`text-xs mt-1 ${passwordStrength === 'weak' ? 'text-red-400' : passwordStrength === 'medium' ? 'text-yellow-400' : 'text-green-400'}`}>
-                  {t.passwordStrength} {passwordStrength === 'weak' ? t.weak : passwordStrength === 'medium' ? t.medium : t.strong}
-                </p>
-              </div>
-            )}
-            <p className="text-xs text-gray-400 mt-1">{t.passwordRequirements}</p>
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-              {t.confirmPassword}
-            </label>
-            <div className="relative">
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={t.confirmPasswordPlaceholder}
-                required
-                disabled={isSubmitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors disabled:text-gray-600"
-                disabled={isSubmitting}
-              >
-                {showConfirmPassword ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {t.registering}
-              </>
-            ) : (
-              t.register
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <Link
-            to="/login"
-            className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
-          >
-            {t.alreadyHaveAccount}
-          </Link>
-        </div>
-      </div>
-    </div>
+    </>
   );
 };
 
