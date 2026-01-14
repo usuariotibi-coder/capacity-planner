@@ -48,6 +48,8 @@ function MainApp() {
   const t = useTranslation(language);
   const { isLoggedIn, isLoading, logout } = useAuth();
 
+  console.log('[MainApp] Render: isLoggedIn=', isLoggedIn, 'isLoading=', isLoading);
+
   // Load data from API when authenticated
   useDataLoader();
 
@@ -75,6 +77,7 @@ function MainApp() {
   }, [sidebarOpen]);
 
   if (isLoading) {
+    console.log('[MainApp] Still loading...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -84,8 +87,11 @@ function MainApp() {
 
   // Redirect to login if not authenticated
   if (!isLoggedIn) {
+    console.log('[MainApp] Not logged in, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
+
+  console.log('[MainApp] Authenticated! Rendering main content');
 
   const navItems: Array<{ id: Page; label: string; icon: React.ReactNode }> = [
     { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={20} /> },
