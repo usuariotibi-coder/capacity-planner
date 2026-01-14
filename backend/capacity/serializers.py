@@ -122,23 +122,21 @@ class UserRegistrationSerializer(serializers.Serializer):
         """
         from django.contrib.auth.models import Permission
         import secrets
-        from .models import EmailVerification
-
         # Remove confirm_password from data
         validated_data.pop('confirm_password')
 
-        # Extract department for later
+        # Extract department (stored as metadata, not used for Employee creation)
         department = validated_data.pop('department')
 
-        # Create inactive user
-        # Use email as username (Django User username field supports 150 chars, emails are max 254)
+        # Create ACTIVE user (no email verification required)
+        # Domain validation (@na.scio-automation.com) ensures only company employees can register
         user = User.objects.create_user(
             username=validated_data['email'],
             email=validated_data['email'],
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
             password=validated_data['password'],
-            is_active=False  # User must verify email first
+            is_active=True  # User is active immediately
         )
 
         # Assign basic permissions: view and change for employees, projects, and assignments
@@ -152,23 +150,7 @@ class UserRegistrationSerializer(serializers.Serializer):
         )
         user.user_permissions.set(permissions)
 
-        # Create email verification with 6-digit code
-        token = secrets.token_urlsafe(32)  # Keep token for backwards compatibility
-        code = EmailVerification.generate_code()
-        verification = EmailVerification.objects.create(user=user, token=token, code=code)
-
-        # NOTE: Do NOT create Employee profile here
-        # Employee profile is only created when admin designates user as employee
-        # The 'department' from registration is just metadata for reference
-
-        # Send verification code email
-        print(f"[EMAIL] About to send verification email to {user.email}")
-
-        try:
-            self._send_verification_code_email(user, code)
-            print(f"[EMAIL] Email sent successfully to {user.email}")
-        except Exception as e:
-            print(f"[EMAIL] SEND FAILED: {type(e).__name__}: {str(e)}")
+        print(f"[REGISTER] User {user.email} created and activated successfully")
 
         return user
 

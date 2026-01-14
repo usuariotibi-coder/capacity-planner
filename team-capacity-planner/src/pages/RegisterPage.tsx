@@ -165,9 +165,8 @@ const RegisterPage: React.FC = () => {
         department: formData.department as string,
       });
 
-      setStep('verify');
-      // Focus first code input
-      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
+      // No email verification required - go directly to success
+      setStep('success');
     } catch (err) {
       setError(err instanceof Error ? err.message : t.registrationError);
     } finally {
@@ -239,8 +238,8 @@ const RegisterPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-4">{t.accountVerified || 'Account Verified!'}</h2>
-            <p className="text-gray-300 mb-6">{t.accountVerifiedMessage || 'Your account has been verified. You can now log in.'}</p>
+            <h2 className="text-2xl font-bold text-white mb-4">{t.registrationSuccess || 'Registration Successful!'}</h2>
+            <p className="text-gray-300 mb-6">{t.registrationSuccessNoVerification || 'Your account has been created. You can now log in.'}</p>
 
             <button
               onClick={() => navigate('/login')}
