@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
@@ -32,7 +32,6 @@ const RegisterPage: React.FC = () => {
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
-  const navigate = useNavigate();
 
   // Cooldown timer for resend
   useEffect(() => {
