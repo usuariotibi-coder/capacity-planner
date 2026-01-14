@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
@@ -32,6 +32,7 @@ const RegisterPage: React.FC = () => {
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
+  const navigate = useNavigate();
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -240,12 +241,15 @@ const RegisterPage: React.FC = () => {
             <h2 className="text-2xl font-bold text-white mb-4">{t.registrationSuccess || 'Registration Successful!'}</h2>
             <p className="text-gray-300 mb-6">{t.registrationSuccessNoVerification || 'Your account has been created. You can now log in.'}</p>
 
-            <Link
-              to="/login"
-              className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-center"
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = '/login';
+              }}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               {t.backToLogin}
-            </Link>
+            </button>
           </div>
         </div>
       </div>
