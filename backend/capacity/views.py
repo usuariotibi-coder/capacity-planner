@@ -1808,3 +1808,29 @@ class VerifyCodeView(APIView):
             {"message": "Email verified successfully. You can now log in.", "email": email},
             status=status.HTTP_200_OK
         )
+
+
+# ==================== AUTHENTICATION VIEWS ====================
+
+class CaseInsensitiveTokenObtainPairView(APIView):
+    """
+    Custom token view that accepts case-insensitive username.
+
+    Allows users to login with username in any case (e.g., MARCO.SOTO or marco.soto).
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        from capacity.serializers import CaseInsensitiveTokenObtainPairSerializer
+
+        serializer = CaseInsensitiveTokenObtainPairSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({
+                'access': serializer.validated_data['access'],
+                'refresh': serializer.validated_data['refresh'],
+                'user_id': serializer.validated_data['user_id'],
+                'username': serializer.validated_data['username'],
+                'email': serializer.validated_data['email'],
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)

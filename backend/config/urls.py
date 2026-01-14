@@ -22,6 +22,7 @@ from capacity.views import (
     EmailVerificationView,
     ResendVerificationEmailView,
     VerifyCodeView,
+    CaseInsensitiveTokenObtainPairView,
 )
 
 # Create a router and register viewsets
@@ -66,7 +67,7 @@ urlpatterns = [
     path('', RootView.as_view(), name='root'),
 
     # Authentication endpoints
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', CaseInsensitiveTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Registration endpoints

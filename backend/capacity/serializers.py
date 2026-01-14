@@ -1661,3 +1661,34 @@ class DepartmentWeeklyTotalSerializer(serializers.ModelSerializer):
         model = DepartmentWeeklyTotal
         fields = ('id', 'department', 'week_start_date', 'total_hours', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
+    """
+    Custom serializer for token obtain that accepts case-insensitive username.
+
+    This allows users to login with username in any case (e.g., MARCO.SOTO or marco.soto).
+    """
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from django.contrib.auth import authenticate
+
+        username = attrs.get('username')
+        password = attrs.get('password')
+
+        # Try case-insensitive username lookup
+        user = User.objects.filter(username__iexact=username).first()
+
+        if user and user.check_password(password):
+            refresh = RefreshToken.for_user(user)
+            attrs['refresh'] = str(refresh)
+            attrs['access'] = str(refresh.access_token)
+            attrs['user_id'] = user.id
+            attrs['username'] = user.username
+            attrs['email'] = user.email
+            return attrs
+        else:
+            raise serializers.ValidationError('Invalid credentials')
