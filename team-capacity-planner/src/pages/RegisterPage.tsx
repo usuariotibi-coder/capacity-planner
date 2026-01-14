@@ -241,12 +241,12 @@ const RegisterPage: React.FC = () => {
             <h2 className="text-2xl font-bold text-white mb-4">{t.registrationSuccess || 'Registration Successful!'}</h2>
             <p className="text-gray-300 mb-6">{t.registrationSuccessNoVerification || 'Your account has been created. You can now log in.'}</p>
 
-            <button
-              onClick={() => navigate('/login')}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            <Link
+              to="/login"
+              className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-center"
             >
               {t.backToLogin}
-            </button>
+            </Link>
           </div>
         </div>
       </div>
