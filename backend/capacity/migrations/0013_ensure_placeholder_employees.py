@@ -3,41 +3,36 @@
 from django.db import migrations
 
 
-def add_department_employees(apps, schema_editor):
-    """Add initial employees for all departments"""
+def ensure_placeholder_employees(apps, schema_editor):
+    """Ensure placeholder employees exist for all departments"""
     Employee = apps.get_model('capacity', 'Employee')
 
-    # Default employees for each department (if they don't exist)
+    # Placeholder employees for each department
     employees_data = [
-        # PM Department
         {
             'name': 'PM Employee 1',
             'role': 'Project Manager',
             'department': 'PM',
             'capacity': 40,
         },
-        # MED Department
         {
             'name': 'MED Employee 1',
             'role': 'Mechanical Engineer',
             'department': 'MED',
             'capacity': 40,
         },
-        # HD Department
         {
             'name': 'HD Employee 1',
             'role': 'Hardware Designer',
             'department': 'HD',
             'capacity': 40,
         },
-        # MFG Department
         {
             'name': 'MFG Employee 1',
             'role': 'Manufacturing Engineer',
             'department': 'MFG',
             'capacity': 40,
         },
-        # PRG Department
         {
             'name': 'PRG Employee 1',
             'role': 'Programmer',
@@ -47,7 +42,6 @@ def add_department_employees(apps, schema_editor):
     ]
 
     for emp_data in employees_data:
-        # Always create placeholder employee if it doesn't exist (by name)
         obj, created = Employee.objects.get_or_create(
             name=emp_data['name'],
             defaults={
@@ -61,29 +55,26 @@ def add_department_employees(apps, schema_editor):
         if created:
             print(f"Created placeholder employee: {emp_data['name']}")
         else:
-            print(f"Placeholder employee already exists: {emp_data['name']}")
+            # Ensure the employee is active
+            if not obj.is_active:
+                obj.is_active = True
+                obj.save()
+                print(f"Activated placeholder employee: {emp_data['name']}")
+            else:
+                print(f"Placeholder employee already exists: {emp_data['name']}")
 
 
-def remove_department_employees(apps, schema_editor):
-    """Remove initial employees (reverse migration)"""
-    Employee = apps.get_model('capacity', 'Employee')
-    Employee.objects.filter(
-        name__in=[
-            'PM Employee 1',
-            'MED Employee 1',
-            'HD Employee 1',
-            'MFG Employee 1',
-            'PRG Employee 1',
-        ]
-    ).delete()
+def noop(apps, schema_editor):
+    """No-op reverse migration"""
+    pass
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('capacity', '0011_add_initial_user'),
+        ('capacity', '0012_add_all_department_employees'),
     ]
 
     operations = [
-        migrations.RunPython(add_department_employees, remove_department_employees),
+        migrations.RunPython(ensure_placeholder_employees, noop),
     ]
