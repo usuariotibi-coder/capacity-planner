@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import type { Project } from '../types';
-import { projectsApi, isAuthenticated } from '../services/api';
+import { projectsApi, isAuthenticated, activityLogApi } from '../services/api';
 
 interface ProjectStore {
   projects: Project[];
@@ -68,6 +68,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const newProject = await projectsApi.create(projectData);
       console.log('[Store] Project created:', newProject);
       set((state) => ({ projects: [...state.projects, newProject] }));
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'CREATE',
+        'Project',
+        newProject.id,
+        { project: newProject }
+      );
+
       return newProject;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al crear proyecto';
@@ -92,6 +101,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       console.log('[Store] Updating project:', id, updates);
       await projectsApi.update(id, updates);
       console.log('[Store] Project updated successfully');
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'UPDATE',
+        'Project',
+        id,
+        { updates }
+      );
 
       // Refetch projects to ensure UI is in sync with backend
       console.log('[Store] Refetching projects after update...');
@@ -122,6 +139,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       console.log('[Store] Sending DELETE request to API for project:', id);
       await projectsApi.delete(id);
       console.log('[Store] ✅ Project deleted successfully from server:', id);
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'DELETE',
+        'Project',
+        id,
+        { project: projectToDelete }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar proyecto';
       console.error('[Store] ❌ Error deleting project:', errorMsg);

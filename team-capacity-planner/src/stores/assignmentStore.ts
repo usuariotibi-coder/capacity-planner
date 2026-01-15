@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Assignment } from '../types';
-import { assignmentsApi, isAuthenticated } from '../services/api';
+import { assignmentsApi, isAuthenticated, activityLogApi } from '../services/api';
 
 interface AssignmentStore {
   assignments: Assignment[];
@@ -43,6 +43,14 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       const newAssignment = await assignmentsApi.create(assignment);
       console.log('[Store] Assignment created:', newAssignment);
       set((state) => ({ assignments: [...state.assignments, newAssignment] }));
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'CREATE',
+        'Assignment',
+        newAssignment.id,
+        { assignment: newAssignment }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al crear asignación';
       console.error('[Store] Error creating assignment:', errorMsg);
@@ -67,6 +75,14 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       await assignmentsApi.update(id, updates);
       console.log('[Store] Assignment updated successfully');
 
+      // Log activity
+      await activityLogApi.logActivity(
+        'UPDATE',
+        'Assignment',
+        id,
+        { updates }
+      );
+
       // Refetch assignments to ensure UI is in sync with backend
       console.log('[Store] Refetching assignments after update...');
       await get().fetchAssignments();
@@ -83,6 +99,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   deleteAssignment: async (id) => {
     const originalAssignments = get().assignments;
+    const deletedAssignment = originalAssignments.find((a) => a.id === id);
 
     set((state) => ({
       assignments: state.assignments.filter((assign) => assign.id !== id),
@@ -92,6 +109,14 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       console.log('[Store] Deleting assignment:', id);
       await assignmentsApi.delete(id);
       console.log('[Store] Assignment deleted successfully');
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'DELETE',
+        'Assignment',
+        id,
+        { assignment: deletedAssignment }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar asignación';
       console.error('[Store] Error deleting assignment:', errorMsg);

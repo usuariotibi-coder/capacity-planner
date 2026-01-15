@@ -338,6 +338,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Deleting SCIO capacity:', recordKey);
         await scioTeamCapacityApi.delete(existingId);
         console.log('[CapacityMatrix] ✅ SCIO capacity deleted successfully');
+
+        // Log activity
+        await activityLogApi.logActivity(
+          'DELETE',
+          'ScioTeamCapacity',
+          existingId,
+          { department: dept, weekStartDate: weekDate }
+        );
+
         setScioTeamRecordIds(prev => {
           const newIds = { ...prev };
           delete newIds[recordKey];
@@ -348,10 +357,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Updating SCIO capacity:', recordKey, capacity);
         const updateResult = await scioTeamCapacityApi.update(existingId, { capacity });
         console.log('[CapacityMatrix] ✅ SCIO capacity updated successfully:', updateResult);
+
+        // Log activity
+        await activityLogApi.logActivity(
+          'UPDATE',
+          'ScioTeamCapacity',
+          existingId,
+          { department: dept, weekStartDate: weekDate, capacity }
+        );
       } else if (capacity > 0) {
         // Create new record
         console.log('[CapacityMatrix] Creating SCIO capacity:', recordKey, capacity);
         let createdSuccessfully = false;
+        let createdRecordId: string | null = null;
 
         try {
           console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -363,6 +381,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           console.log('[CapacityMatrix] ✅ CREATE succeeded, result:', result);
           console.log('[CapacityMatrix] 🎯 Record ID assigned:', result.id);
           createdSuccessfully = true;
+          createdRecordId = result.id;
 
           setScioTeamRecordIds(prev => ({
             ...prev,
@@ -390,6 +409,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 const updateResult = await scioTeamCapacityApi.update(existingRecord.id, { capacity });
                 console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
                 createdSuccessfully = true;
+                createdRecordId = existingRecord.id;
 
                 setScioTeamRecordIds(prev => ({
                   ...prev,
@@ -411,6 +431,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         if (!createdSuccessfully) {
           throw new Error('Failed to create or update SCIO capacity record');
+        }
+
+        // Log activity if successfully created
+        if (createdRecordId) {
+          await activityLogApi.logActivity(
+            'CREATE',
+            'ScioTeamCapacity',
+            createdRecordId,
+            { department: dept, weekStartDate: weekDate, capacity }
+          );
         }
       }
     } catch (error) {
@@ -461,6 +491,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, weekDate, capacity);
       let savedSuccessfully = false;
+      let savedRecordId: string | null = null;
 
       try {
         console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -471,6 +502,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         });
         console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
         savedSuccessfully = true;
+        savedRecordId = result.id;
+
+        // Log activity
+        await activityLogApi.logActivity(
+          'CREATE',
+          'SubcontractedTeamCapacity',
+          result.id,
+          { company, weekStartDate: weekDate, capacity }
+        );
       } catch (createError) {
         const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
         console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
@@ -491,6 +531,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               const updateResult = await subcontractedTeamCapacityApi.update(existingRecord.id, { capacity });
               console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
+              savedRecordId = existingRecord.id;
+
+              // Log activity
+              await activityLogApi.logActivity(
+                'UPDATE',
+                'SubcontractedTeamCapacity',
+                existingRecord.id,
+                { company, weekStartDate: weekDate, capacity }
+              );
             } else {
               console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
               throw createError;
@@ -558,6 +607,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, weekDate, capacity);
       let savedSuccessfully = false;
+      let savedRecordId: string | null = null;
 
       try {
         console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -568,6 +618,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         });
         console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
         savedSuccessfully = true;
+        savedRecordId = result.id;
+
+        // Log activity
+        await activityLogApi.logActivity(
+          'CREATE',
+          'PrgExternalTeamCapacity',
+          result.id,
+          { teamName, weekStartDate: weekDate, capacity }
+        );
       } catch (createError) {
         const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
         console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
@@ -588,6 +647,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               const updateResult = await prgExternalTeamCapacityApi.update(existingRecord.id, { capacity });
               console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
+              savedRecordId = existingRecord.id;
+
+              // Log activity
+              await activityLogApi.logActivity(
+                'UPDATE',
+                'PrgExternalTeamCapacity',
+                existingRecord.id,
+                { teamName, weekStartDate: weekDate, capacity }
+              );
             } else {
               console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
               throw createError;
