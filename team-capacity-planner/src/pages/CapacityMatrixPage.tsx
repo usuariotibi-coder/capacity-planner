@@ -999,7 +999,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           // Create new assignment
           if (editingCell.projectId) {
             const newAssignment: any = {
-              id: generateId(),
               employeeId,
               projectId: editingCell.projectId,
               weekStartDate: editingCell.weekStart,
@@ -1014,6 +1013,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               newAssignment.externalHours = externalHours;
             }
 
+            console.log('[CapacityMatrix] Creating new assignment for employee:', employeeId, newAssignment);
             addAssignment(newAssignment);
           }
         }
@@ -1032,13 +1032,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       });
     } else {
       // Create new assignment for first available employee in department
+      console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
+      console.log('[CapacityMatrix] All employees:', employees.map(e => ({ name: e.name, dept: e.department, active: e.isActive })));
+
       const availableEmployee = employees.find(
         (emp) => emp.department === editingCell.department && emp.isActive
       );
 
+      console.log('[CapacityMatrix] Found available employee:', availableEmployee);
+      console.log('[CapacityMatrix] Project ID:', editingCell.projectId);
+
       if (availableEmployee && editingCell.projectId) {
         const newAssignment: any = {
-          id: generateId(),
           employeeId: availableEmployee.id,
           projectId: editingCell.projectId,
           weekStartDate: editingCell.weekStart,
@@ -1053,7 +1058,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           newAssignment.externalHours = editingExternalHours;
         }
 
+        console.log('[CapacityMatrix] Creating new assignment:', newAssignment);
         addAssignment(newAssignment);
+      } else {
+        // Show error if no employee found
+        if (!availableEmployee) {
+          console.error('[CapacityMatrix] ❌ No active employee found for department:', editingCell.department);
+          alert(`No hay empleados activos en el departamento ${editingCell.department}. Por favor agregue un empleado primero.`);
+        }
+        if (!editingCell.projectId) {
+          console.error('[CapacityMatrix] ❌ No project ID available');
+          alert('Error: No se encontró el ID del proyecto.');
+        }
       }
     }
 
