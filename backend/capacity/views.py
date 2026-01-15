@@ -1360,6 +1360,7 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     API ViewSet for SCIO Team Capacity.
 
     Provides CRUD operations for managing SCIO team capacity per department and week.
+    Supports upsert behavior: if a record with the same department+week exists, it will be updated.
     """
     queryset = ScioTeamCapacity.objects.all()
     serializer_class = ScioTeamCapacitySerializer
@@ -1370,6 +1371,30 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['department', 'week_start_date', 'capacity']
     ordering = ['department', 'week_start_date']
 
+    def perform_create(self, serializer):
+        """
+        Override create to support upsert behavior.
+        If a record with the same department+week_start_date exists, update it.
+        Otherwise create a new one.
+        """
+        department = serializer.validated_data.get('department')
+        week_start_date = serializer.validated_data.get('week_start_date')
+        capacity = serializer.validated_data.get('capacity')
+
+        obj, created = ScioTeamCapacity.objects.update_or_create(
+            department=department,
+            week_start_date=week_start_date,
+            defaults={'capacity': capacity}
+        )
+
+        if created:
+            print(f"[ScioTeamCapacity] Created new record: {obj.id}")
+        else:
+            print(f"[ScioTeamCapacity] Updated existing record: {obj.id}")
+
+        # Update the serializer's instance so it returns the saved object
+        self.instance = obj
+
 
 # ==================== SUBCONTRACTED TEAM CAPACITY VIEWSET ====================
 
@@ -1378,6 +1403,7 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
     API ViewSet for Subcontracted Team Capacity.
 
     Provides CRUD operations for managing subcontracted team capacity per company and week.
+    Supports upsert behavior: if a record with the same company+week exists, it will be updated.
     """
     queryset = SubcontractedTeamCapacity.objects.all()
     serializer_class = SubcontractedTeamCapacitySerializer
@@ -1388,6 +1414,30 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['company', 'week_start_date', 'capacity']
     ordering = ['company', 'week_start_date']
 
+    def perform_create(self, serializer):
+        """
+        Override create to support upsert behavior.
+        If a record with the same company+week_start_date exists, update it.
+        Otherwise create a new one.
+        """
+        company = serializer.validated_data.get('company')
+        week_start_date = serializer.validated_data.get('week_start_date')
+        capacity = serializer.validated_data.get('capacity')
+
+        obj, created = SubcontractedTeamCapacity.objects.update_or_create(
+            company=company,
+            week_start_date=week_start_date,
+            defaults={'capacity': capacity}
+        )
+
+        if created:
+            print(f"[SubcontractedTeamCapacity] Created new record: {obj.id}")
+        else:
+            print(f"[SubcontractedTeamCapacity] Updated existing record: {obj.id}")
+
+        # Update the serializer's instance so it returns the saved object
+        self.instance = obj
+
 
 # ==================== PRG EXTERNAL TEAM CAPACITY VIEWSET ====================
 
@@ -1396,6 +1446,7 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     API ViewSet for PRG External Team Capacity.
 
     Provides CRUD operations for managing external team capacity for PRG department per week.
+    Supports upsert behavior: if a record with the same team+week exists, it will be updated.
     """
     queryset = PrgExternalTeamCapacity.objects.all()
     serializer_class = PrgExternalTeamCapacitySerializer
@@ -1405,6 +1456,30 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     filterset_fields = ['team_name', 'week_start_date']
     ordering_fields = ['team_name', 'week_start_date', 'capacity']
     ordering = ['team_name', 'week_start_date']
+
+    def perform_create(self, serializer):
+        """
+        Override create to support upsert behavior.
+        If a record with the same team_name+week_start_date exists, update it.
+        Otherwise create a new one.
+        """
+        team_name = serializer.validated_data.get('team_name')
+        week_start_date = serializer.validated_data.get('week_start_date')
+        capacity = serializer.validated_data.get('capacity')
+
+        obj, created = PrgExternalTeamCapacity.objects.update_or_create(
+            team_name=team_name,
+            week_start_date=week_start_date,
+            defaults={'capacity': capacity}
+        )
+
+        if created:
+            print(f"[PrgExternalTeamCapacity] Created new record: {obj.id}")
+        else:
+            print(f"[PrgExternalTeamCapacity] Updated existing record: {obj.id}")
+
+        # Update the serializer's instance so it returns the saved object
+        self.instance = obj
 
 
 class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):

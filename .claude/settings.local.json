@@ -80,7 +80,8 @@
       "Bash(\"venv\\\\Scripts\\\\activate.bat\")",
       "Bash(ls:*)",
       "Bash(cd:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(git revert:*)"
     ]
   }
 }
