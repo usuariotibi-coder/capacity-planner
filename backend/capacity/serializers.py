@@ -1699,14 +1699,20 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
             # Add custom claims to the access token
             refresh['username'] = user.username
             refresh['email'] = user.email
+            refresh['first_name'] = user.first_name
+            refresh['last_name'] = user.last_name
             refresh.access_token['username'] = user.username
             refresh.access_token['email'] = user.email
+            refresh.access_token['first_name'] = user.first_name
+            refresh.access_token['last_name'] = user.last_name
 
             attrs['refresh'] = str(refresh)
             attrs['access'] = str(refresh.access_token)
             attrs['user_id'] = user.id
             attrs['username'] = user.username
             attrs['email'] = user.email
+            attrs['first_name'] = user.first_name
+            attrs['last_name'] = user.last_name
             return attrs
         else:
             raise serializers.ValidationError('Invalid credentials')

@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
-  // Extract username from token
+  // Extract user name from token
   const extractUsername = () => {
     const token = getAccessToken();
     if (!token) {
@@ -41,13 +41,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const decoded = decodeToken(token);
-    if (decoded && decoded.username) {
-      // Format username: MARCO.SOTO -> Marco Soto
-      const formatted = decoded.username
-        .split('.')
-        .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-        .join(' ');
-      setCurrentUser(formatted);
+    if (decoded) {
+      // Use first_name and last_name from token if available
+      if (decoded.first_name || decoded.last_name) {
+        const firstName = decoded.first_name || '';
+        const lastName = decoded.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        if (fullName) {
+          setCurrentUser(fullName);
+          return;
+        }
+      }
+      // Fallback to username if name fields are empty
+      if (decoded.username) {
+        const formatted = decoded.username
+          .split('.')
+          .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+          .join(' ');
+        setCurrentUser(formatted);
+      }
     }
   };
 
