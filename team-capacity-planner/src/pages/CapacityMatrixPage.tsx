@@ -380,9 +380,38 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] Error saving SCIO capacity:', errorMsg);
-      alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
-      // Revert local state on error by refetching
-      window.location.reload();
+
+      // Only show alert if it's not a unique constraint violation (which we handle by updating)
+      if (!errorMsg.includes('conjunto único')) {
+        alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
+      }
+
+      // Revert local state to what backend has
+      const allScioRecords = await scioTeamCapacityApi.getAll();
+      const newScioTeamMembers: Record<Department, Record<string, number>> = {
+        'PM': {},
+        'MED': {},
+        'HD': {},
+        'MFG': {},
+        'BUILD': {},
+        'PRG': {},
+      };
+      const newRecordIds: Record<string, string> = {};
+
+      for (const record of allScioRecords) {
+        const recordDept = record.department as Department;
+        const recordWeekDate = record.weekStartDate;
+        const recordCapacity = record.capacity;
+
+        if (recordDept && recordWeekDate && newScioTeamMembers[recordDept]) {
+          newScioTeamMembers[recordDept][recordWeekDate] = recordCapacity;
+          newRecordIds[`${recordDept}-${recordWeekDate}`] = record.id;
+        }
+      }
+
+      setScioTeamMembers(newScioTeamMembers);
+      setScioTeamRecordIds(newRecordIds);
+      console.log('[CapacityMatrix] State reverted to backend values');
     }
   };
 
@@ -442,9 +471,40 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] Error saving Subcontracted capacity:', errorMsg);
-      alert(`Error al guardar capacidad de ${company} (${weekDate}): ${errorMsg}`);
-      // Revert local state on error by refetching
-      window.location.reload();
+
+      // Only show alert if it's not a unique constraint violation (which we handle by updating)
+      if (!errorMsg.includes('conjunto único')) {
+        alert(`Error al guardar capacidad de ${company} (${weekDate}): ${errorMsg}`);
+      }
+
+      // Revert local state to what backend has
+      const allRecords = await subcontractedTeamCapacityApi.getAll();
+      const newSubcontractedPersonnel: Record<string, Record<string, number | undefined>> = {
+        'AMI': {},
+        'VICER': {},
+        'ITAX': {},
+        'MCI': {},
+        'MG Electrical': {},
+      };
+      const newRecordIds: Record<string, string> = {};
+
+      for (const record of allRecords) {
+        const recordCompany = record.company;
+        const recordWeekDate = record.weekStartDate;
+        const recordCapacity = record.capacity;
+
+        if (recordCompany && recordWeekDate) {
+          if (!newSubcontractedPersonnel[recordCompany]) {
+            newSubcontractedPersonnel[recordCompany] = {};
+          }
+          newSubcontractedPersonnel[recordCompany][recordWeekDate] = recordCapacity;
+          newRecordIds[`${recordCompany}-${recordWeekDate}`] = record.id;
+        }
+      }
+
+      setSubcontractedPersonnel(newSubcontractedPersonnel);
+      setSubcontractedRecordIds(newRecordIds);
+      console.log('[CapacityMatrix] Subcontracted state reverted to backend values');
     }
   };
 
@@ -507,9 +567,34 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] Error saving PRG External capacity:', errorMsg);
-      alert(`Error al guardar capacidad PRG (${teamName} - ${weekDate}): ${errorMsg}`);
-      // Revert local state on error by refetching
-      window.location.reload();
+
+      // Only show alert if it's not a unique constraint violation (which we handle by updating)
+      if (!errorMsg.includes('conjunto único')) {
+        alert(`Error al guardar capacidad PRG (${teamName} - ${weekDate}): ${errorMsg}`);
+      }
+
+      // Revert local state to what backend has
+      const allRecords = await prgExternalTeamCapacityApi.getAll();
+      const newPRGExternalPersonnel: Record<string, Record<string, number | undefined>> = {};
+      const newRecordIds: Record<string, string> = {};
+
+      for (const record of allRecords) {
+        const recordTeamName = record.teamName;
+        const recordWeekDate = record.weekStartDate;
+        const recordCapacity = record.capacity;
+
+        if (recordTeamName && recordWeekDate) {
+          if (!newPRGExternalPersonnel[recordTeamName]) {
+            newPRGExternalPersonnel[recordTeamName] = {};
+          }
+          newPRGExternalPersonnel[recordTeamName][recordWeekDate] = recordCapacity;
+          newRecordIds[`${recordTeamName}-${recordWeekDate}`] = record.id;
+        }
+      }
+
+      setPRGExternalPersonnel(newPRGExternalPersonnel);
+      setPrgExternalRecordIds(newRecordIds);
+      console.log('[CapacityMatrix] PRG External state reverted to backend values');
     }
   };
 
