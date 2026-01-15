@@ -198,6 +198,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
         const data = await scioTeamCapacityApi.getAll();
         console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
+        console.log('[CapacityMatrix] 📊 Total SCIO records loaded:', data?.length || 0);
 
         // Transform API data to our state structure
         const newScioTeamMembers: Record<Department, Record<string, number>> = {
@@ -360,6 +361,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             capacity: capacity,
           });
           console.log('[CapacityMatrix] ✅ CREATE succeeded, result:', result);
+          console.log('[CapacityMatrix] 🎯 Record ID assigned:', result.id);
           createdSuccessfully = true;
 
           setScioTeamRecordIds(prev => ({
