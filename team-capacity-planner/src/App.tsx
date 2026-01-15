@@ -226,20 +226,20 @@ function MainApp() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* User Info Widget */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* User Info Widget - More Prominent */}
             {currentUser && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-white">
+              <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl border border-blue-400 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
+                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-gray-800 truncate">
+                  <span className="text-sm font-bold text-white truncate">
                     {currentUser}
                   </span>
-                  <span className="text-xs text-gray-600">
+                  <span className="text-xs text-blue-100 font-medium">
                     {t.loggedIn || 'Logged in'}
                   </span>
                 </div>
