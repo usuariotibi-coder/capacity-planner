@@ -897,10 +897,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Hours cannot be negative."
             )
-        if value > 168:  # Maximum hours in a week
-            raise serializers.ValidationError(
-                "Hours cannot exceed 168 hours in a week."
-            )
+        # No maximum hours limit - allow any positive value for flexibility
         return value
 
     def validate_scio_hours(self, value):
