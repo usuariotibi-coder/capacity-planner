@@ -1363,11 +1363,12 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
 
     Provides CRUD operations for managing SCIO team capacity per department and week.
     Supports upsert behavior: if a record with the same department+week exists, it will be updated.
+    Pagination disabled to return all records at once (small dataset).
     """
     queryset = ScioTeamCapacity.objects.all()
     serializer_class = ScioTeamCapacitySerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+    pagination_class = None  # Disabled - return all records at once
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['department', 'week_start_date']
     ordering_fields = ['department', 'week_start_date', 'capacity']
@@ -1407,11 +1408,12 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
 
     Provides CRUD operations for managing subcontracted team capacity per company and week.
     Supports upsert behavior: if a record with the same company+week exists, it will be updated.
+    Pagination disabled to return all records at once (small dataset).
     """
     queryset = SubcontractedTeamCapacity.objects.all()
     serializer_class = SubcontractedTeamCapacitySerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+    pagination_class = None  # Disabled - return all records at once
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['company', 'week_start_date']
     ordering_fields = ['company', 'week_start_date', 'capacity']
@@ -1451,11 +1453,12 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
 
     Provides CRUD operations for managing external team capacity for PRG department per week.
     Supports upsert behavior: if a record with the same team+week exists, it will be updated.
+    Pagination disabled to return all records at once (small dataset).
     """
     queryset = PrgExternalTeamCapacity.objects.all()
     serializer_class = PrgExternalTeamCapacitySerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+    pagination_class = None  # Disabled - return all records at once
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['team_name', 'week_start_date']
     ordering_fields = ['team_name', 'week_start_date', 'capacity']
