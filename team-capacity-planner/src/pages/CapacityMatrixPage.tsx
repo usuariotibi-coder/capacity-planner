@@ -491,7 +491,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, weekDate, capacity);
       let savedSuccessfully = false;
-      let savedRecordId: string | null = null;
 
       try {
         console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -502,7 +501,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         });
         console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
         savedSuccessfully = true;
-        savedRecordId = result.id;
 
         // Log activity
         await activityLogApi.logActivity(
@@ -531,7 +529,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               const updateResult = await subcontractedTeamCapacityApi.update(existingRecord.id, { capacity });
               console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
-              savedRecordId = existingRecord.id;
 
               // Log activity
               await activityLogApi.logActivity(
@@ -607,7 +604,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, weekDate, capacity);
       let savedSuccessfully = false;
-      let savedRecordId: string | null = null;
 
       try {
         console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -618,7 +614,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         });
         console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
         savedSuccessfully = true;
-        savedRecordId = result.id;
 
         // Log activity
         await activityLogApi.logActivity(
@@ -647,7 +642,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               const updateResult = await prgExternalTeamCapacityApi.update(existingRecord.id, { capacity });
               console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
-              savedRecordId = existingRecord.id;
 
               // Log activity
               await activityLogApi.logActivity(
