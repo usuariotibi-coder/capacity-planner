@@ -1696,6 +1696,12 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
 
         if user and user.check_password(password):
             refresh = RefreshToken.for_user(user)
+            # Add custom claims to the access token
+            refresh['username'] = user.username
+            refresh['email'] = user.email
+            refresh.access_token['username'] = user.username
+            refresh.access_token['email'] = user.email
+
             attrs['refresh'] = str(refresh)
             attrs['access'] = str(refresh.access_token)
             attrs['user_id'] = user.id

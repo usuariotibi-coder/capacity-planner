@@ -1288,11 +1288,11 @@ class ProjectBudgetViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+class ActivityLogViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for ActivityLog model (Read-Only).
+    ViewSet for ActivityLog model.
 
-    Provides read-only access to activity logs for audit trail:
+    Provides full CRUD access to activity logs for audit trail:
     - Filtering by user and model
     - Ordering by timestamp
     - Pagination with large result set
@@ -1300,10 +1300,10 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     Endpoints:
         GET /api/activity-logs/ - List all activity logs
         GET /api/activity-logs/{id}/ - Get log entry details
+        POST /api/activity-logs/ - Create a new activity log
 
     Permissions:
         - IsAuthenticated: User must be logged in
-        - CanViewActivityLog: Users can view their own logs, staff can view all
 
     Query Parameters:
         - user: Filter by user ID
@@ -1320,20 +1320,20 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
         .select_related('user')
     )
     serializer_class = ActivityLogSerializer
-    permission_classes = [IsAuthenticated, CanViewActivityLog]
+    permission_classes = [IsAuthenticated]
     pagination_class = LargeResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['user', 'model_name', 'action']
     ordering_fields = ['created_at', 'user', 'action']
     ordering = ['-created_at']
 
-    def get_queryset(self):
-        """Filter activity logs based on user permissions."""
-        queryset = super().get_queryset()
+    def perform_create(self, serializer):
+        """Set the user when creating an activity log."""
+        serializer.save(user=self.request.user)
 
-        # If user is not staff, only show their own activity
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(user=self.request.user)
+    def get_queryset(self):
+        """Return all activity logs for authenticated users."""
+        queryset = super().get_queryset()
 
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')
