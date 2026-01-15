@@ -15,6 +15,8 @@ Production-ready implementation with:
 - Performance optimization with select_related and prefetch_related
 
 Designed to handle 50+ concurrent users efficiently.
+
+Version: 1.1.0 - Added upsert support for team capacity endpoints
 """
 
 from datetime import datetime, timedelta
