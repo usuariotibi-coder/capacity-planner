@@ -357,7 +357,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         }));
       }
     } catch (error) {
-      console.error('[CapacityMatrix] Error saving SCIO capacity:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving SCIO capacity:', errorMsg);
+      alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
+      // Revert local state on error by refetching
+      window.location.reload();
     }
   };
 
@@ -399,7 +403,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         capacity,
       });
     } catch (error) {
-      console.error('[CapacityMatrix] Error saving Subcontracted capacity:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving Subcontracted capacity:', errorMsg);
+      alert(`Error al guardar capacidad de ${company} (${weekDate}): ${errorMsg}`);
+      // Revert local state on error by refetching
+      window.location.reload();
     }
   };
 
@@ -444,7 +452,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         capacity,
       });
     } catch (error) {
-      console.error('[CapacityMatrix] Error saving PRG External capacity:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving PRG External capacity:', errorMsg);
+      alert(`Error al guardar capacidad PRG (${teamName} - ${weekDate}): ${errorMsg}`);
+      // Revert local state on error by refetching
+      window.location.reload();
     }
   };
 

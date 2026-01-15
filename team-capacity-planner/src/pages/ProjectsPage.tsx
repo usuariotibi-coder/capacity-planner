@@ -145,6 +145,7 @@ export function ProjectsPage() {
 
     try {
       if (editingId) {
+        console.log('[ProjectsPage] Updating project with budget hours:', deptHoursAllocated);
         await updateProject(editingId, {
           ...formData,
           endDate,
@@ -153,7 +154,10 @@ export function ProjectsPage() {
           departmentStages: calculatedDepartmentStages,
           departmentHoursAllocated: deptHoursAllocated,
         });
+        console.log('[ProjectsPage] ✓ Project updated successfully');
         setEditingId(null);
+        setIsFormOpen(false);
+        alert('✓ Proyecto actualizado exitosamente');
       } else {
         const newProject: Project = {
           id: generateId(),
@@ -170,6 +174,7 @@ export function ProjectsPage() {
 
       // Wait for project to be created in backend
       const createdProject = await addProject(newProject);
+      console.log('[ProjectsPage] ✓ Project created successfully');
 
       // Crear asignaciones automáticas para cada departamento
       const weekStarts = getWeekStartsForProject(formData.startDate, numberOfWeeks);
@@ -200,6 +205,7 @@ export function ProjectsPage() {
           }
         }
       });
+      alert('✓ Proyecto creado exitosamente');
       }
 
       // Reset form
@@ -210,8 +216,9 @@ export function ProjectsPage() {
       setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
       setIsFormOpen(false);
     } catch (error) {
-      console.error('[ProjectsPage] Error saving project:', error);
-      // Error is already shown by the store's alert
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[ProjectsPage] Error saving project:', errorMsg);
+      alert(`❌ Error al guardar proyecto: ${errorMsg}`);
     }
   };
 
