@@ -6,6 +6,7 @@ export const translations = {
     capacityMatrix: 'Matriz de Capacidad',
     resources: 'Recursos',
     projects: 'Proyectos',
+    activityLog: 'Registro de Actividad',
 
     // Department Filter
     viewDepartment: 'VER DEPARTAMENTO',
@@ -310,6 +311,14 @@ export const translations = {
     deleting: 'Eliminando...',
     errorDeletingTeam: 'Error al eliminar equipo',
     notConfigured: 'No configurado',
+
+    // Activity Log
+    search: 'Buscar...',
+    allActions: 'Todas las Acciones',
+    allModels: 'Todos los Modelos',
+    results: 'resultados',
+    noResultsFound: 'No se encontraron resultados',
+    noActivityYet: 'Sin actividad aún',
     projectTooltip: 'Proyecto',
     departmentTooltip: 'Departamento',
 
@@ -350,6 +359,7 @@ export const translations = {
     capacityMatrix: 'Capacity Matrix',
     resources: 'Resources',
     projects: 'Projects',
+    activityLog: 'Activity Log',
 
     // Department Filter
     viewDepartment: 'VIEW DEPARTMENT',
@@ -654,6 +664,14 @@ export const translations = {
     deleting: 'Deleting...',
     errorDeletingTeam: 'Error deleting team',
     notConfigured: 'Not configured',
+
+    // Activity Log
+    search: 'Search...',
+    allActions: 'All Actions',
+    allModels: 'All Models',
+    results: 'results',
+    noResultsFound: 'No results found',
+    noActivityYet: 'No activity yet',
     projectTooltip: 'Project',
     departmentTooltip: 'Department',
 

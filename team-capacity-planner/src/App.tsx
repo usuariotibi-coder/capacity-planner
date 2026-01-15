@@ -3,17 +3,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
+import { ActivityLogPage } from './pages/ActivityLogPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
 import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
 
-type Page = 'resources' | 'projects' | 'capacity';
+type Page = 'resources' | 'projects' | 'capacity' | 'activity-log';
 type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
@@ -97,6 +98,7 @@ function MainApp() {
     { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={20} /> },
     { id: 'resources', label: t.resources, icon: <Users size={20} /> },
     { id: 'projects', label: t.projects, icon: <Briefcase size={20} /> },
+    { id: 'activity-log', label: t.activityLog || 'Activity Log', icon: <FileText size={20} /> },
   ];
 
   const renderPage = () => {
@@ -105,6 +107,8 @@ function MainApp() {
         return <ResourcesPage />;
       case 'projects':
         return <ProjectsPage />;
+      case 'activity-log':
+        return <ActivityLogPage />;
       case 'capacity':
         return <CapacityMatrixPage departmentFilter={departmentFilter} />;
       default:
