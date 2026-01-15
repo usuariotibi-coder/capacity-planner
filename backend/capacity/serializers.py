@@ -1616,6 +1616,7 @@ class ScioTeamCapacitySerializer(serializers.ModelSerializer):
     Serializer for SCIO Team Capacity model.
 
     Represents team capacity per department and week.
+    Unique validation is disabled here because the ViewSet handles upsert logic.
     """
 
     class Meta:
@@ -1623,12 +1624,17 @@ class ScioTeamCapacitySerializer(serializers.ModelSerializer):
         fields = ('id', 'department', 'week_start_date', 'capacity', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
+    def get_validators(self):
+        """Remove unique_together validators to allow upsert behavior in ViewSet"""
+        return []
+
 
 class SubcontractedTeamCapacitySerializer(serializers.ModelSerializer):
     """
     Serializer for Subcontracted Team Capacity model.
 
     Represents subcontracted team capacity per company and week (BUILD department).
+    Unique validation is disabled here because the ViewSet handles upsert logic.
     """
 
     class Meta:
@@ -1636,18 +1642,27 @@ class SubcontractedTeamCapacitySerializer(serializers.ModelSerializer):
         fields = ('id', 'company', 'week_start_date', 'capacity', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
+    def get_validators(self):
+        """Remove unique_together validators to allow upsert behavior in ViewSet"""
+        return []
+
 
 class PrgExternalTeamCapacitySerializer(serializers.ModelSerializer):
     """
     Serializer for PRG External Team Capacity model.
 
     Represents external team capacity for PRG department per week.
+    Unique validation is disabled here because the ViewSet handles upsert logic.
     """
 
     class Meta:
         model = PrgExternalTeamCapacity
         fields = ('id', 'team_name', 'week_start_date', 'capacity', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_validators(self):
+        """Remove unique_together validators to allow upsert behavior in ViewSet"""
+        return []
 
 
 class DepartmentWeeklyTotalSerializer(serializers.ModelSerializer):
