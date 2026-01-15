@@ -348,9 +348,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         const updateResult = await scioTeamCapacityApi.update(existingId, { capacity });
         console.log('[CapacityMatrix] ✅ SCIO capacity updated successfully:', updateResult);
       } else if (capacity > 0) {
-        // Create or update record
+        // Create new record
         console.log('[CapacityMatrix] Creating SCIO capacity:', recordKey, capacity);
-        let savedSuccessfully = false;
+        let createdSuccessfully = false;
 
         try {
           console.log('[CapacityMatrix] Sending CREATE request to API...');
@@ -360,7 +360,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             capacity: capacity,
           });
           console.log('[CapacityMatrix] ✅ CREATE succeeded, result:', result);
-          savedSuccessfully = true;
+          createdSuccessfully = true;
 
           setScioTeamRecordIds(prev => ({
             ...prev,
@@ -369,39 +369,37 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         } catch (createError) {
           const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
           console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
+          console.log('[CapacityMatrix] Checking if this is a unique constraint violation...');
 
-          // If create fails due to unique constraint, it means record already exists
-          // Reload all records and find the existing one to update it
+          // If create fails due to unique constraint, try to update instead
+          // This happens when the record already exists but we don't have the ID
           if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-            console.log('[CapacityMatrix] Detected unique constraint violation, reloading all records...');
+            console.log('[CapacityMatrix] Detected unique constraint violation, fetching all records to find existing one...');
             try {
               const allScioRecords = await scioTeamCapacityApi.getAll();
-              console.log('[CapacityMatrix] Reloaded all SCIO records, total count:', allScioRecords.length);
+              console.log('[CapacityMatrix] Fetched all SCIO records, total count:', allScioRecords.length);
 
               const existingRecord = allScioRecords.find(
                 (r: any) => r.department === dept && r.weekStartDate === weekDate
               );
 
               if (existingRecord) {
-                console.log('[CapacityMatrix] ✅ Found existing record with ID:', existingRecord.id);
-                console.log('[CapacityMatrix] Updating record from capacity', existingRecord.capacity, 'to', capacity);
-                await scioTeamCapacityApi.update(existingRecord.id, { capacity });
-                console.log('[CapacityMatrix] ✅ UPDATE succeeded');
-                savedSuccessfully = true;
+                console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
+                const updateResult = await scioTeamCapacityApi.update(existingRecord.id, { capacity });
+                console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
+                createdSuccessfully = true;
 
-                // Store the ID for future updates
                 setScioTeamRecordIds(prev => ({
                   ...prev,
                   [recordKey]: existingRecord.id,
                 }));
               } else {
-                console.log('[CapacityMatrix] ⚠️ Unique constraint error but no existing record found');
-                console.log('[CapacityMatrix] Available records:', allScioRecords.map((r: any) => ({ dept: r.department, date: r.weekStartDate, capacity: r.capacity })));
+                console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
                 throw createError;
               }
-            } catch (reloadError) {
-              console.error('[CapacityMatrix] ❌ Failed to reload and update:', reloadError);
-              throw reloadError;
+            } catch (getError) {
+              console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
+              throw getError;
             }
           } else {
             // Not a unique constraint error, throw it
@@ -409,7 +407,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           }
         }
 
-        if (!savedSuccessfully) {
+        if (!createdSuccessfully) {
           throw new Error('Failed to create or update SCIO capacity record');
         }
       }
@@ -475,31 +473,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
         console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
 
-        // If create fails due to unique constraint, reload and update
+        // If create fails due to unique constraint, try to update instead
         if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-          console.log('[CapacityMatrix] Detected unique constraint violation, reloading records...');
+          console.log('[CapacityMatrix] Detected unique constraint violation, trying to find and update existing record...');
           try {
             const allRecords = await subcontractedTeamCapacityApi.getAll();
-            console.log('[CapacityMatrix] Reloaded all Subcontracted records, total count:', allRecords.length);
+            console.log('[CapacityMatrix] Fetched all Subcontracted records, total count:', allRecords.length);
 
             const existingRecord = allRecords.find(
               (r: any) => r.company === company && r.weekStartDate === weekDate
             );
 
             if (existingRecord) {
-              console.log('[CapacityMatrix] ✅ Found existing record with ID:', existingRecord.id);
-              console.log('[CapacityMatrix] Updating record from capacity', existingRecord.capacity, 'to', capacity);
-              await subcontractedTeamCapacityApi.update(existingRecord.id, { capacity });
-              console.log('[CapacityMatrix] ✅ UPDATE succeeded');
+              console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
+              const updateResult = await subcontractedTeamCapacityApi.update(existingRecord.id, { capacity });
+              console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
             } else {
-              console.log('[CapacityMatrix] ⚠️ Unique constraint error but no existing record found');
-              console.log('[CapacityMatrix] Available records:', allRecords.map((r: any) => ({ company: r.company, date: r.weekStartDate, capacity: r.capacity })));
+              console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
               throw createError;
             }
-          } catch (reloadError) {
-            console.error('[CapacityMatrix] ❌ Failed to reload and update:', reloadError);
-            throw reloadError;
+          } catch (getError) {
+            console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
+            throw getError;
           }
         } else {
           throw createError;
@@ -574,31 +570,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
         console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
 
-        // If create fails due to unique constraint, reload and update
+        // If create fails due to unique constraint, try to update instead
         if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-          console.log('[CapacityMatrix] Detected unique constraint violation, reloading records...');
+          console.log('[CapacityMatrix] Detected unique constraint violation, trying to find and update existing record...');
           try {
             const allRecords = await prgExternalTeamCapacityApi.getAll();
-            console.log('[CapacityMatrix] Reloaded all PRG External records, total count:', allRecords.length);
+            console.log('[CapacityMatrix] Fetched all PRG External records, total count:', allRecords.length);
 
             const existingRecord = allRecords.find(
               (r: any) => r.teamName === teamName && r.weekStartDate === weekDate
             );
 
             if (existingRecord) {
-              console.log('[CapacityMatrix] ✅ Found existing record with ID:', existingRecord.id);
-              console.log('[CapacityMatrix] Updating record from capacity', existingRecord.capacity, 'to', capacity);
-              await prgExternalTeamCapacityApi.update(existingRecord.id, { capacity });
-              console.log('[CapacityMatrix] ✅ UPDATE succeeded');
+              console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
+              const updateResult = await prgExternalTeamCapacityApi.update(existingRecord.id, { capacity });
+              console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
               savedSuccessfully = true;
             } else {
-              console.log('[CapacityMatrix] ⚠️ Unique constraint error but no existing record found');
-              console.log('[CapacityMatrix] Available records:', allRecords.map((r: any) => ({ teamName: r.teamName, date: r.weekStartDate, capacity: r.capacity })));
+              console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
               throw createError;
             }
-          } catch (reloadError) {
-            console.error('[CapacityMatrix] ❌ Failed to reload and update:', reloadError);
-            throw reloadError;
+          } catch (getError) {
+            console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
+            throw getError;
           }
         } else {
           throw createError;
