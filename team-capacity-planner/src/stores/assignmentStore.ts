@@ -66,6 +66,11 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       console.log('[Store] Updating assignment:', id, updates);
       await assignmentsApi.update(id, updates);
       console.log('[Store] Assignment updated successfully');
+
+      // Refetch assignments to ensure UI is in sync with backend
+      console.log('[Store] Refetching assignments after update...');
+      await get().fetchAssignments();
+      console.log('[Store] Assignments refetched successfully');
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al actualizar asignación';

@@ -92,6 +92,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       console.log('[Store] Updating project:', id, updates);
       await projectsApi.update(id, updates);
       console.log('[Store] Project updated successfully');
+
+      // Refetch projects to ensure UI is in sync with backend
+      console.log('[Store] Refetching projects after update...');
+      await get().fetchProjects(true);
+      console.log('[Store] Projects refetched successfully');
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al actualizar proyecto';
