@@ -346,7 +346,9 @@ export function ResourcesPage() {
       <div className="overflow-y-auto flex-1 p-8">
         {/* Employees grouped by department */}
         {DEPARTMENTS.map((dept) => {
-          const deptEmployees = employees.filter((e) => e.department === dept && !e.isSubcontractedMaterial);
+          // Filter out system placeholder employees (names like "MFG Employee 1", "PM Employee 1", etc.)
+          const isPlaceholderEmployee = (name: string) => /^(PM|MED|HD|MFG|PRG|BUILD) Employee \d+$/.test(name);
+          const deptEmployees = employees.filter((e) => e.department === dept && !e.isSubcontractedMaterial && !isPlaceholderEmployee(e.name));
           if (deptEmployees.length === 0) return null;
 
           return (
