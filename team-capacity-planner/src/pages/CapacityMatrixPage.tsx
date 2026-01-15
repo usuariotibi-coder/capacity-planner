@@ -89,6 +89,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Structure: { `${dept}-${weekDate}`: recordId }
   const [scioTeamRecordIds, setScioTeamRecordIds] = useState<Record<string, string>>({});
 
+  // Track API record IDs for Subcontracted Team Capacity (for deletion)
+  // Structure: { `${company}-${weekDate}`: recordId }
+  const [subcontractedRecordIds, setSubcontractedRecordIds] = useState<Record<string, string>>({});
+
+  // Track API record IDs for PRG External Team Capacity (for deletion)
+  // Structure: { `${teamName}-${weekDate}`: recordId }
+  const [prgExternalRecordIds, setPrgExternalRecordIds] = useState<Record<string, string>>({});
+
+  // Delete confirmation state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    type: 'subcontracted' | 'prg' | null;
+    teamName: string;
+    teamData?: any;
+  }>({ isOpen: false, type: null, teamName: '' });
+
   // Subcontracted Personnel state - store subcontracted company members per week (BUILD dept only)
   // Structure: { company: { weekDate: count } } where company is 'AMI' | 'VICER' | 'ITAX' | 'MCI' | 'MG Electrical'
   // Use lazy initialization to load from localStorage on first render
@@ -240,6 +256,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           'MCI': {},
           'MG Electrical': {},
         };
+        const newSubcontractedRecordIds: Record<string, string> = {};
 
         for (const record of subcontractedData) {
           const company = record.company;
@@ -251,15 +268,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               newSubcontractedPersonnel[company] = {};
             }
             newSubcontractedPersonnel[company][weekDate] = capacity;
+            newSubcontractedRecordIds[`${company}-${weekDate}`] = record.id;
           }
         }
         setSubcontractedPersonnel(newSubcontractedPersonnel);
+        setSubcontractedRecordIds(newSubcontractedRecordIds);
         console.log('[CapacityMatrix] Subcontracted Team Capacity loaded');
 
         // Load PRG external team capacity data
         console.log('[CapacityMatrix] Loading PRG External Team Capacity from API...');
         const prgExternalData = await prgExternalTeamCapacityApi.getAll();
         const newPrgExternalPersonnel: Record<string, Record<string, number | undefined>> = {};
+        const newPrgExternalRecordIds: Record<string, string> = {};
 
         for (const record of prgExternalData) {
           const teamName = record.teamName;
@@ -271,9 +291,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               newPrgExternalPersonnel[teamName] = {};
             }
             newPrgExternalPersonnel[teamName][weekDate] = capacity;
+            newPrgExternalRecordIds[`${teamName}-${weekDate}`] = record.id;
           }
         }
         setPRGExternalPersonnel(newPrgExternalPersonnel);
+        setPrgExternalRecordIds(newPrgExternalRecordIds);
         console.log('[CapacityMatrix] PRG External Team Capacity loaded');
       } catch (error) {
         console.error('[CapacityMatrix] Error loading teams data:', error);
@@ -446,6 +468,91 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         savePrgExternalCapacity(teamName, weekDate, newCount);
       }
     }, 500);
+  };
+
+  // Delete team handler
+  const handleDeleteTeam = async () => {
+    if (!deleteConfirmation.isOpen || !deleteConfirmation.teamName || !deleteConfirmation.type) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const teamName = deleteConfirmation.teamName;
+      const type = deleteConfirmation.type;
+
+      if (type === 'subcontracted') {
+        // Delete all records for this company from database
+        const recordsToDelete = Object.keys(subcontractedRecordIds).filter(
+          key => key.startsWith(`${teamName}-`)
+        );
+
+        for (const recordKey of recordsToDelete) {
+          const recordId = subcontractedRecordIds[recordKey];
+          await subcontractedTeamCapacityApi.delete(recordId);
+        }
+
+        // Update local state
+        setSubcontractedPersonnel(prev => {
+          const newState = { ...prev };
+          delete newState[teamName];
+          return newState;
+        });
+
+        // Update record IDs
+        setSubcontractedRecordIds(prev => {
+          const newIds = { ...prev };
+          Object.keys(newIds).forEach(key => {
+            if (key.startsWith(`${teamName}-`)) {
+              delete newIds[key];
+            }
+          });
+          return newIds;
+        });
+
+        // Remove from active teams
+        setActiveTeams(activeTeams.filter(team => team !== teamName));
+      } else if (type === 'prg') {
+        // Delete all records for this team from database
+        const recordsToDelete = Object.keys(prgExternalRecordIds).filter(
+          key => key.startsWith(`${teamName}-`)
+        );
+
+        for (const recordKey of recordsToDelete) {
+          const recordId = prgExternalRecordIds[recordKey];
+          await prgExternalTeamCapacityApi.delete(recordId);
+        }
+
+        // Update local state
+        setPRGExternalPersonnel(prev => {
+          const newState = { ...prev };
+          delete newState[teamName];
+          return newState;
+        });
+
+        // Update record IDs
+        setPrgExternalRecordIds(prev => {
+          const newIds = { ...prev };
+          Object.keys(newIds).forEach(key => {
+            if (key.startsWith(`${teamName}-`)) {
+              delete newIds[key];
+            }
+          });
+          return newIds;
+        });
+
+        // Remove from active teams
+        setPRGActiveTeams(prgActiveTeams.filter(team => team !== teamName));
+      }
+
+      console.log(`[CapacityMatrix] Deleted ${type} team: ${teamName}`);
+      setDeleteConfirmation({ isOpen: false, type: null, teamName: '' });
+    } catch (error) {
+      console.error('[CapacityMatrix] Error deleting team:', error);
+      alert(`${t.errorDeletingTeam || 'Error deleting team'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Refs for table containers
@@ -1612,8 +1719,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
                                 <button
                                   onClick={() => {
-                                    const newTeams = activeTeams.filter(team => team !== company);
-                                    setActiveTeams(newTeams);
+                                    setDeleteConfirmation({
+                                      isOpen: true,
+                                      type: 'subcontracted',
+                                      teamName: company,
+                                    });
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
                                   title={`${t.removeTeamTitle} ${company}`}
@@ -1681,8 +1791,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
                                 <button
                                   onClick={() => {
-                                    const newTeams = prgActiveTeams.filter(t => t !== team);
-                                    setPRGActiveTeams(newTeams);
+                                    setDeleteConfirmation({
+                                      isOpen: true,
+                                      type: 'prg',
+                                      teamName: team,
+                                    });
                                   }}
                                   className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
                                   title={`${t.removeTeamTitle} ${team}`}
@@ -3315,6 +3428,74 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        {deleteConfirmation.isOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 animate-fade-in">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 0a9 9 0 11-18 0 9 9 0 0118 0" />
+                </svg>
+              </div>
+
+              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                {deleteConfirmation.type === 'subcontracted'
+                  ? `${t.deleteTeam || 'Delete Team'}: ${deleteConfirmation.teamName}`
+                  : `${t.deleteExternalTeam || 'Delete External Team'}: ${deleteConfirmation.teamName}`}
+              </h3>
+
+              <p className="text-gray-600 text-center text-sm mb-6">
+                {deleteConfirmation.type === 'subcontracted'
+                  ? t.deleteSubcontractedConfirm || `Are you sure you want to delete the subcontracted team "${deleteConfirmation.teamName}" and all its capacity data? This action cannot be undone.`
+                  : t.deleteExternalConfirm || `Are you sure you want to delete the external team "${deleteConfirmation.teamName}" and all its capacity data? This action cannot be undone.`}
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmation({ isOpen: false, type: null, teamName: '' })}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-300 disabled:cursor-not-allowed text-gray-800 font-semibold rounded-lg transition-colors"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={handleDeleteTeam}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {t.deleting || 'Deleting...'}
+                    </>
+                  ) : (
+                    t.delete || 'Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <style>{`
+          @keyframes fade-in {
+            from {
+              opacity: 0;
+              transform: scale(0.95);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          .animate-fade-in {
+            animation: fade-in 0.2s ease-out;
+          }
+        `}</style>
     </div>
   );
 }
