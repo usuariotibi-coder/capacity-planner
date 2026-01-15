@@ -533,3 +533,28 @@ export const projectBudgetsApi = {
     });
   },
 };
+
+// Activity Log API
+export const activityLogApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/activity-logs/');
+    return data.results || data;
+  },
+
+  logActivity: async (action: string, modelName: string, objectId: string, changes?: any) => {
+    try {
+      await apiFetch('/api/activity-logs/', {
+        method: 'POST',
+        body: JSON.stringify({
+          action,
+          model_name: modelName,
+          object_id: objectId,
+          changes: changes || null,
+        }),
+      });
+    } catch (error) {
+      // Log errors silently to avoid disrupting user actions
+      console.warn('[ActivityLog] Failed to log activity:', error);
+    }
+  },
+};

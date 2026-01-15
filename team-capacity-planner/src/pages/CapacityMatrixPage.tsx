@@ -4,7 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { projectsApi, scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi } from '../services/api';
+import { projectsApi, scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
@@ -546,6 +546,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
 
       console.log(`[CapacityMatrix] Deleted ${type} team: ${teamName}`);
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'DELETE',
+        type === 'subcontracted' ? 'SubcontractedTeamCapacity' : 'PrgExternalTeamCapacity',
+        teamName,
+        { type, teamName }
+      );
+
       setDeleteConfirmation({ isOpen: false, type: null, teamName: '' });
     } catch (error) {
       console.error('[CapacityMatrix] Error deleting team:', error);

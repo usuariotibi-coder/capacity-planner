@@ -1,5 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { authApi, isAuthenticated } from '../services/api';
+import { authApi, isAuthenticated, getAccessToken } from '../services/api';
+
+// Decode JWT without verification (safe for client-side)
+const decodeToken = (token: string): any => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const decoded = JSON.parse(atob(parts[1]));
+    return decoded;
+  } catch (error) {
+    console.error('[AuthContext] Error decoding token:', error);
+    return null;
+  }
+};
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -7,6 +21,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   error: string | null;
+  currentUser: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +30,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+
+  // Extract username from token
+  const extractUsername = () => {
+    const token = getAccessToken();
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    const decoded = decodeToken(token);
+    if (decoded && decoded.username) {
+      // Format username: MARCO.SOTO -> Marco Soto
+      const formatted = decoded.username
+        .split('.')
+        .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+      setCurrentUser(formatted);
+    }
+  };
 
   // Check authentication on mount and when storage changes
   useEffect(() => {
@@ -22,6 +57,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const authenticated = isAuthenticated();
     console.log('[AuthContext] isAuthenticated:', authenticated);
     setIsLoggedIn(authenticated);
+    if (authenticated) {
+      extractUsername();
+    } else {
+      setCurrentUser(null);
+    }
     setIsLoading(false);
   }, []);
 
@@ -32,6 +72,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const authenticated = isAuthenticated();
       console.log('[AuthContext] Updated isAuthenticated:', authenticated);
       setIsLoggedIn(authenticated);
+      if (authenticated) {
+        extractUsername();
+      } else {
+        setCurrentUser(null);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -50,6 +95,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const authenticated = isAuthenticated();
       console.log('[AuthContext] isAuthenticated after login:', authenticated);
       setIsLoggedIn(authenticated);
+      if (authenticated) {
+        extractUsername();
+      }
       console.log('[AuthContext] isLoggedIn state updated to:', authenticated);
     } catch (err) {
       console.error('[AuthContext] Login failed:', err);
@@ -63,6 +111,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     authApi.logout();
     setIsLoggedIn(false);
+    setCurrentUser(null);
     // Clear any cached data
     localStorage.removeItem('employees');
     localStorage.removeItem('projects');
@@ -70,7 +119,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isLoading, login, logout, error }}>
+    <AuthContext.Provider value={{ isLoggedIn, isLoading, login, logout, error, currentUser }}>
       {children}
     </AuthContext.Provider>
   );

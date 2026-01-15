@@ -46,7 +46,7 @@ function MainApp() {
   });
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
-  const { isLoggedIn, isLoading, logout } = useAuth();
+  const { isLoggedIn, isLoading, logout, currentUser } = useAuth();
 
   console.log('[MainApp] Render: isLoggedIn=', isLoggedIn, 'isLoading=', isLoading);
 
@@ -222,7 +222,26 @@ function MainApp() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* User Info Widget */}
+            {currentUser && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-white">
+                    {currentUser.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-gray-800 truncate">
+                    {currentUser}
+                  </span>
+                  <span className="text-xs text-gray-600">
+                    {t.loggedIn || 'Logged in'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md">
               <button
                 onClick={() => setLanguage('es')}
@@ -233,7 +252,7 @@ function MainApp() {
                 }`}
                 title="Español"
               >
-                🌮
+                🇲🇽
               </button>
               <button
                 onClick={() => setLanguage('en')}
@@ -244,7 +263,7 @@ function MainApp() {
                 }`}
                 title="English"
               >
-                🍔
+                🇺🇸
               </button>
             </div>
 

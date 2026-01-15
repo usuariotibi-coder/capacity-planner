@@ -209,6 +209,7 @@ export const translations = {
     loginError: 'Error al iniciar sesión',
     or: 'o',
     noAccountRegister: '¿No tienes cuenta? Regístrate',
+    loggedIn: 'Iniciado',
 
     // Registration Page
     registerTitle: 'Crear Cuenta',
@@ -552,6 +553,7 @@ export const translations = {
     loginError: 'Login error',
     or: 'or',
     noAccountRegister: 'No account? Register here',
+    loggedIn: 'Logged in',
 
     // Registration Page
     registerTitle: 'Create Account',

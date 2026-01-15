@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Employee } from '../types';
-import { employeesApi, isAuthenticated } from '../services/api';
+import { employeesApi, isAuthenticated, activityLogApi } from '../services/api';
 
 interface EmployeeStore {
   employees: Employee[];
@@ -41,6 +41,14 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
       const newEmployee = await employeesApi.create(employee);
       console.log('[Store] Employee created:', newEmployee);
       set((state) => ({ employees: [...state.employees, newEmployee] }));
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'CREATE',
+        'Employee',
+        newEmployee.id,
+        employee
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al crear empleado';
       console.error('[Store] Error creating employee:', errorMsg);
@@ -64,6 +72,14 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
       console.log('[Store] Updating employee:', id, updates);
       await employeesApi.update(id, updates);
       console.log('[Store] Employee updated successfully');
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'UPDATE',
+        'Employee',
+        id,
+        updates
+      );
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al actualizar empleado';
@@ -86,6 +102,13 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
       console.log('[Store] Deleting employee:', id);
       await employeesApi.delete(id);
       console.log('[Store] Employee deleted successfully');
+
+      // Log activity
+      await activityLogApi.logActivity(
+        'DELETE',
+        'Employee',
+        id
+      );
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar empleado';
