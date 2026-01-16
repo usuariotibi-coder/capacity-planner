@@ -109,6 +109,14 @@ export function ActivityLogPage() {
     }
   };
 
+  // List of internal fields to hide from users
+  const internalFields = ['id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'createdAt', 'updatedAt', 'userId', 'user_id'];
+
+  // Check if a field should be hidden (internal/technical)
+  const isInternalField = (key: string): boolean => {
+    return internalFields.includes(key.toLowerCase());
+  };
+
   // Format key names for display (convert snake_case to Title Case)
   const formatKeyName = (key: string): string => {
     return key
@@ -118,20 +126,22 @@ export function ActivityLogPage() {
       .join(' ');
   };
 
-  // Format value for display (handle nested objects)
+  // Format value for display - simple and clear
   const formatValue = (value: any): string => {
-    if (value === null || value === undefined) return '—';
+    if (value === null || value === undefined) return '(empty)';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'string') {
+      if (value.length > 80) {
+        return value.substring(0, 77) + '...';
+      }
+      return value;
+    }
     if (typeof value === 'object') {
       if (Array.isArray(value)) {
-        return value.length === 0 ? 'Empty array' : `${value.length} items`;
+        return `[${value.length} items]`;
       }
-      // For nested objects, show a simplified version
-      const keys = Object.keys(value);
-      return keys.length === 0 ? '{}' : `Object with ${keys.length} properties`;
-    }
-    if (typeof value === 'string' && value.length > 100) {
-      return value.substring(0, 97) + '...';
+      return '(complex data)';
     }
     return String(value);
   };
@@ -396,17 +406,26 @@ export function ActivityLogPage() {
                         if (mainObj) {
                           // Show main object type and key fields
                           const { objectType, data } = mainObj;
-                          const entries = Object.entries(data);
+                          // Filter out internal fields
+                          const entries = Object.entries(data).filter(([key]) => !isInternalField(key));
 
                           // Prioritize important fields
-                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity'];
+                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
                           const prioritized = entries.sort((a, b) => {
                             const aImportant = importantFields.includes(a[0]) ? 0 : 1;
                             const bImportant = importantFields.includes(b[0]) ? 0 : 1;
                             return aImportant - bImportant;
                           });
 
-                          const displayedEntries = prioritized.slice(0, 7);
+                          const displayedEntries = prioritized.slice(0, 10);
+
+                          if (displayedEntries.length === 0) {
+                            return (
+                              <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
+                                No user-visible changes
+                              </div>
+                            );
+                          }
 
                           return (
                             <div className="space-y-2">
@@ -419,17 +438,17 @@ export function ActivityLogPage() {
                                   return (
                                     <div
                                       key={key}
-                                      className={`p-2.5 rounded border ${
+                                      className={`p-3 rounded border ${
                                         isImportant
                                           ? 'bg-blue-50 border-blue-200'
                                           : 'bg-white/80 border-amber-100'
                                       }`}
                                     >
-                                      <div className="flex justify-between items-start gap-2">
-                                        <span className={`text-xs font-semibold whitespace-nowrap ${
-                                          isImportant ? 'text-blue-700' : 'text-gray-600'
+                                      <div className="flex justify-between items-start gap-3">
+                                        <span className={`text-sm font-semibold whitespace-nowrap ${
+                                          isImportant ? 'text-blue-700' : 'text-gray-700'
                                         }`}>
-                                          {isImportant && '⭐ '}{formatKeyName(key)}:
+                                          {isImportant && '⭐ '}{formatKeyName(key)}
                                         </span>
                                         <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
                                           {formatValue(value)}
@@ -438,9 +457,9 @@ export function ActivityLogPage() {
                                     </div>
                                   );
                                 })}
-                                {entries.length > 7 && (
+                                {entries.length > 10 && (
                                   <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{entries.length - 7} more fields
+                                    +{entries.length - 10} more fields
                                   </div>
                                 )}
                               </div>
@@ -450,15 +469,25 @@ export function ActivityLogPage() {
 
                         // Fallback for other formats
                         if (typeof log.changes === 'object') {
-                          const entries = Object.entries(log.changes);
-                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status'];
+                          // Filter out internal fields
+                          const entries = Object.entries(log.changes).filter(([key]) => !isInternalField(key));
+
+                          if (entries.length === 0) {
+                            return (
+                              <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
+                                No user-visible changes
+                              </div>
+                            );
+                          }
+
+                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
                           const prioritized = entries.sort((a, b) => {
                             const aImportant = importantFields.includes(a[0]) ? 0 : 1;
                             const bImportant = importantFields.includes(b[0]) ? 0 : 1;
                             return aImportant - bImportant;
                           });
 
-                          const displayedEntries = prioritized.slice(0, 7);
+                          const displayedEntries = prioritized.slice(0, 10);
 
                           return (
                             <div className="space-y-2">
@@ -468,17 +497,17 @@ export function ActivityLogPage() {
                                   return (
                                     <div
                                       key={key}
-                                      className={`p-2.5 rounded border ${
+                                      className={`p-3 rounded border ${
                                         isImportant
                                           ? 'bg-blue-50 border-blue-200'
                                           : 'bg-white/80 border-amber-100'
                                       }`}
                                     >
-                                      <div className="flex justify-between items-start gap-2">
-                                        <span className={`text-xs font-semibold whitespace-nowrap ${
-                                          isImportant ? 'text-blue-700' : 'text-gray-600'
+                                      <div className="flex justify-between items-start gap-3">
+                                        <span className={`text-sm font-semibold whitespace-nowrap ${
+                                          isImportant ? 'text-blue-700' : 'text-gray-700'
                                         }`}>
-                                          {isImportant && '⭐ '}{formatKeyName(key)}:
+                                          {isImportant && '⭐ '}{formatKeyName(key)}
                                         </span>
                                         <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
                                           {formatValue(value)}
@@ -487,9 +516,9 @@ export function ActivityLogPage() {
                                     </div>
                                   );
                                 })}
-                                {entries.length > 7 && (
+                                {entries.length > 10 && (
                                   <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{entries.length - 7} more fields
+                                    +{entries.length - 10} more fields
                                   </div>
                                 )}
                               </div>
