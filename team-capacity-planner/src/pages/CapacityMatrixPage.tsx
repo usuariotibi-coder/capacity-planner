@@ -833,6 +833,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     endDate.setDate(endDate.getDate() + (numberOfWeeks * 7) - 1);
     const endDateISO = formatToISO(endDate);
 
+    // Build departmentStages with the selected department having a configured start date and duration
+    const calculatedDepartmentStages: Record<string, any> = {
+      PM: [],
+      MED: [],
+      HD: [],
+      MFG: [],
+      BUILD: [],
+      PRG: [],
+    };
+
+    // Add the department that was selected in the quick project form
+    calculatedDepartmentStages[dept] = [{
+      stage: null,
+      weekStart: 1, // Always start at week 1 of the project
+      weekEnd: numberOfWeeks,
+      departmentStartDate: startDateISO,
+      durationWeeks: numberOfWeeks,
+    }];
+
     const newProject = {
       id: generateId(),
       name: quickProjectForm.name,
@@ -841,15 +860,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       endDate: endDateISO,
       numberOfWeeks: numberOfWeeks,
       facility: quickProjectForm.facility,
-      departmentConfigs: {
-        PM: { startDate: null, duration: 0 },
-        MED: { startDate: null, duration: 0 },
-        HD: { startDate: null, duration: 0 },
-        MFG: { startDate: null, duration: 0 },
-        BUILD: { startDate: null, duration: 0 },
-        PRG: { startDate: null, duration: 0 },
-        [dept]: { startDate: startDateISO, duration: numberOfWeeks },
-      },
+      departmentStages: calculatedDepartmentStages,
       departmentHoursAllocated: {
         PM: 0,
         MED: 0,
