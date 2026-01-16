@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import type { Department, Stage } from '../types';
@@ -177,6 +177,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     startDate: '',
     numberOfWeeks: '' as any,
     facility: 'AL' as 'AL' | 'MI',
+    budgetHours: 0,
+  });
+
+  // Import existing project modal state
+  const [showImportProjectModal, setShowImportProjectModal] = useState(false);
+  const [importProjectForm, setImportProjectForm] = useState({
+    projectId: '',
+    startDate: '',
+    numberOfWeeks: '' as any,
     budgetHours: 0,
   });
 
@@ -890,6 +899,75 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       numberOfWeeks: '',
       facility: 'AL',
       budgetHours: 0,
+    });
+  };
+
+  // Handle importing an existing project to the current department
+  const handleImportProject = async () => {
+    if (!importProjectForm.projectId || !importProjectForm.startDate || !importProjectForm.numberOfWeeks) {
+      alert(t.completeAllFields);
+      return;
+    }
+
+    const dept = departmentFilter as Department;
+    const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
+    if (!selectedProject) {
+      alert('Project not found');
+      return;
+    }
+
+    const startDateISO = importProjectForm.startDate;
+    const numberOfWeeks = importProjectForm.numberOfWeeks as number;
+
+    // Build new departmentStages - add this department's configuration
+    const newDepartmentStages = { ...(selectedProject.departmentStages || {}) };
+    newDepartmentStages[dept] = [{
+      stage: null,
+      weekStart: 1,
+      weekEnd: numberOfWeeks,
+      departmentStartDate: startDateISO,
+      durationWeeks: numberOfWeeks,
+    }];
+
+    // Build new departmentHoursAllocated - add this department's budget
+    const newDepartmentHoursAllocated = { ...(selectedProject.departmentHoursAllocated || {}) };
+    newDepartmentHoursAllocated[dept] = importProjectForm.budgetHours;
+
+    // Build new visibleInDepartments - add this department
+    const currentVisible = selectedProject.visibleInDepartments || [];
+    const newVisibleInDepartments = currentVisible.includes(dept)
+      ? currentVisible
+      : [...currentVisible, dept];
+
+    // Update the project
+    await updateProject(selectedProject.id, {
+      departmentStages: newDepartmentStages,
+      departmentHoursAllocated: newDepartmentHoursAllocated,
+      visibleInDepartments: newVisibleInDepartments,
+    });
+
+    setShowImportProjectModal(false);
+    setImportProjectForm({
+      projectId: '',
+      startDate: '',
+      numberOfWeeks: '',
+      budgetHours: 0,
+    });
+  };
+
+  // Get projects that are not visible in the current department (available for import)
+  const getAvailableProjectsForImport = (): Project[] => {
+    const dept = departmentFilter as Department;
+    return projects.filter(proj => {
+      // Exclude projects that already have this department in visibleInDepartments
+      if (proj.visibleInDepartments && proj.visibleInDepartments.includes(dept)) {
+        return false;
+      }
+      // Exclude projects that already have departmentStages configured for this department
+      if (proj.departmentStages && proj.departmentStages[dept] && proj.departmentStages[dept].length > 0) {
+        return false;
+      }
+      return true;
     });
   };
 
@@ -1812,6 +1890,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <span>{t.create}</span>
             </button>
           )}
+
+          {/* Import Existing Project Button - Only in department view (except PM) */}
+          {departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
+            <button
+              onClick={() => setShowImportProjectModal(true)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+              title={t.importProject || 'Import Existing Project'}
+            >
+              <FolderPlus size={12} />
+              <span>{t.import || 'Import'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -2299,7 +2389,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             </div>
 
             {/* Projects in department view - each with individual zoom controls */}
-            {projects.map((proj) => {
+            {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
+            {projects.filter((proj) => {
+              const dept = departmentFilter as Department;
+
+              // If project was created from a specific department (has visibleInDepartments),
+              // only show it in those departments
+              if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
+                return proj.visibleInDepartments.includes(dept);
+              }
+
+              // Projects created from Projects page (no visibleInDepartments) appear in all departments
+              return true;
+            }).map((proj) => {
               const dept = departmentFilter as Department;
 
               return (
@@ -3427,6 +3529,121 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition"
                   >
                     {t.create}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Import Existing Project Modal */}
+        {showImportProjectModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h2 className="text-lg font-bold">📂 {t.importProject || 'Import Existing Project'}</h2>
+                <button
+                  onClick={() => setShowImportProjectModal(false)}
+                  className="hover:bg-amber-700 p-1 rounded transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); handleImportProject(); }} className="p-6 space-y-4">
+                {/* Select Project */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.selectProject || 'Select Project'}</label>
+                  <select
+                    value={importProjectForm.projectId}
+                    onChange={(e) => setImportProjectForm({ ...importProjectForm, projectId: e.target.value })}
+                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                  >
+                    <option value="">{t.selectAProject || '-- Select a project --'}</option>
+                    {getAvailableProjectsForImport().map((proj) => (
+                      <option key={proj.id} value={proj.id}>
+                        {proj.name} - {proj.client}
+                      </option>
+                    ))}
+                  </select>
+                  {importProjectForm.projectId && (() => {
+                    const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
+                    return selectedProject && (
+                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
+                        <div><strong>{t.facility || 'Facility'}:</strong> {selectedProject.facility}</div>
+                        <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate} → {selectedProject.endDate}</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Start Date for this department */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDateDept || 'Start Date for'} {departmentFilter}</label>
+                  <input
+                    type="date"
+                    value={importProjectForm.startDate}
+                    onChange={(e) => setImportProjectForm({ ...importProjectForm, startDate: e.target.value })}
+                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                  />
+                </div>
+
+                {/* Number of Weeks for this department */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">⏱️ {t.numberOfWeeks}</label>
+                  <input
+                    type="text"
+                    value={importProjectForm.numberOfWeeks}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        const num = value === '' ? '' : parseInt(value);
+                        if (num === '' || (num >= 1 && num <= 52)) {
+                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: num });
+                        } else if (num < 1) {
+                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: 1 });
+                        } else if (num > 52) {
+                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: 52 });
+                        }
+                      }
+                    }}
+                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                    placeholder="4"
+                  />
+                </div>
+
+                {/* Budget Hours for this department */}
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">💚 {t.budgetHours || 'Budget Hours'}</label>
+                  <input
+                    type="text"
+                    value={importProjectForm.budgetHours}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d+$/.test(value)) {
+                        const num = value === '' ? 0 : parseInt(value);
+                        setImportProjectForm({ ...importProjectForm, budgetHours: num });
+                      }
+                    }}
+                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                    placeholder="0"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportProjectModal(false)}
+                    className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition"
+                  >
+                    {t.import || 'Import'}
                   </button>
                 </div>
               </form>

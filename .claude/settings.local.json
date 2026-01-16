@@ -81,7 +81,8 @@
       "Bash(ls:*)",
       "Bash(cd:*)",
       "Bash(sqlite3:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
