@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#ffffff" rx="8"/>
+
+  <!-- SCIO Text - Red color matching the logo -->
+  <text x="32" y="38"
+        font-family="Arial, sans-serif"
+        font-size="20"
+        font-weight="bold"
+        fill="#E31937"
+        text-anchor="middle">
+    SCIO
+  </text>
+
+  <!-- Small accent line -->
+  <rect x="12" y="46" width="40" height="2" fill="#E31937" rx="1"/>
+</svg>
