@@ -2,16 +2,16 @@
   <!-- Background -->
   <rect width="64" height="64" fill="#ffffff" rx="8"/>
 
-  <!-- SCIO Text - Red color matching the logo -->
-  <text x="32" y="38"
+  <!-- SCIO Text - Blue color matching the logo -->
+  <text x="32" y="36"
         font-family="Arial, sans-serif"
-        font-size="20"
+        font-size="18"
         font-weight="bold"
-        fill="#E31937"
+        fill="#1E3A8A"
         text-anchor="middle">
     SCIO
   </text>
 
-  <!-- Small accent line -->
-  <rect x="12" y="46" width="40" height="2" fill="#E31937" rx="1"/>
+  <!-- AUTOMATION accent line - Red -->
+  <rect x="10" y="44" width="44" height="3" fill="#DC2626" rx="1"/>
 </svg>
