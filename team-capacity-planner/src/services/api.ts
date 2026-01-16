@@ -543,7 +543,8 @@ export const activityLogApi = {
 
   logActivity: async (action: string, modelName: string, objectId: string, changes?: any) => {
     try {
-      await apiFetch('/api/activity-logs/', {
+      console.log('[ActivityLog] Logging activity:', { action, modelName, objectId, changes });
+      const response = await apiFetch('/api/activity-logs/', {
         method: 'POST',
         body: JSON.stringify({
           action,
@@ -552,9 +553,10 @@ export const activityLogApi = {
           changes: changes || null,
         }),
       });
+      console.log('[ActivityLog] Activity logged successfully:', response);
     } catch (error) {
-      // Log errors silently to avoid disrupting user actions
-      console.warn('[ActivityLog] Failed to log activity:', error);
+      // Log errors to console for debugging
+      console.error('[ActivityLog] Failed to log activity:', error);
     }
   },
 };
