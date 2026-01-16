@@ -214,7 +214,7 @@ export function ActivityLogPage() {
                         {log.user?.username || 'Unknown User'}
                       </span>
                       <span className="text-xs text-gray-600">
-                        {log.model_name} • {log.object_id.substring(0, 8)}...
+                        {log.model_name} • {log.object_id?.substring(0, 8) || 'N/A'}...
                       </span>
                     </div>
 
