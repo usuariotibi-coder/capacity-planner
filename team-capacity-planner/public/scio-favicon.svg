@@ -1,17 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Background -->
-  <rect width="64" height="64" fill="#ffffff" rx="8"/>
+  <!-- Background - Navy/Dark blue matching SCIO logo -->
+  <rect width="64" height="64" fill="#1a1f3a" rx="8"/>
 
-  <!-- SCIO Text - Blue color matching the logo -->
-  <text x="32" y="36"
+  <!-- SCIO Text - Light/White with navy background -->
+  <text x="32" y="32"
         font-family="Arial, sans-serif"
-        font-size="18"
+        font-size="16"
         font-weight="bold"
-        fill="#1E3A8A"
-        text-anchor="middle">
+        fill="#ffffff"
+        text-anchor="middle"
+        dominant-baseline="middle">
     SCIO
   </text>
 
-  <!-- AUTOMATION accent line - Red -->
-  <rect x="10" y="44" width="44" height="3" fill="#DC2626" rx="1"/>
+  <!-- Red accent bar at bottom - AUTOMATION color -->
+  <rect x="8" y="46" width="48" height="4" fill="#E63946" rx="2"/>
 </svg>
