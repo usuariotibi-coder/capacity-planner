@@ -117,11 +117,11 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 flex-col md:flex-row">
       {/* Overlay for mobile when sidebar is open */}
       {sidebarOpen && window.innerWidth < 768 && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -129,8 +129,10 @@ function MainApp() {
       {/* Sidebar */}
       <div
         className={`${
-          sidebarOpen ? 'w-64' : 'w-0'
-        } fixed md:relative z-50 md:z-auto h-full bg-slate-800 text-white transition-all duration-300 overflow-y-auto flex flex-col shadow-lg`}
+          sidebarOpen ? 'h-auto md:h-full w-full md:w-64' : 'h-0 md:h-full w-0'
+        } md:relative md:z-auto z-40 bg-slate-800 text-white transition-all duration-300 overflow-y-auto flex flex-col shadow-lg md:overflow-y-auto ${
+          sidebarOpen ? 'order-3 md:order-1' : 'order-3 md:order-1 hidden md:flex'
+        }`}
       >
         <div className="p-6 border-b border-slate-700 flex-shrink-0">
           <h1 className="text-2xl font-bold">{t.teamCapacity}</h1>
@@ -211,7 +213,7 @@ function MainApp() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden order-1 md:order-2 min-h-0">
         <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
