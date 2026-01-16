@@ -921,14 +921,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const numberOfWeeks = importProjectForm.numberOfWeeks as number;
 
     // Build new departmentStages - add this department's configuration
-    const existingStages = selectedProject.departmentStages || {};
+    const existingStages = selectedProject.departmentStages;
     const newDepartmentStages: Record<string, any> = {
-      PM: existingStages.PM || [],
-      MED: existingStages.MED || [],
-      HD: existingStages.HD || [],
-      MFG: existingStages.MFG || [],
-      BUILD: existingStages.BUILD || [],
-      PRG: existingStages.PRG || [],
+      PM: existingStages?.PM || [],
+      MED: existingStages?.MED || [],
+      HD: existingStages?.HD || [],
+      MFG: existingStages?.MFG || [],
+      BUILD: existingStages?.BUILD || [],
+      PRG: existingStages?.PRG || [],
     };
     newDepartmentStages[dept] = [{
       stage: null,
@@ -939,14 +939,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }];
 
     // Build new departmentHoursAllocated - add this department's budget
-    const existingHours = selectedProject.departmentHoursAllocated || {};
+    const existingHours = selectedProject.departmentHoursAllocated;
     const newDepartmentHoursAllocated: Record<string, number> = {
-      PM: existingHours.PM || 0,
-      MED: existingHours.MED || 0,
-      HD: existingHours.HD || 0,
-      MFG: existingHours.MFG || 0,
-      BUILD: existingHours.BUILD || 0,
-      PRG: existingHours.PRG || 0,
+      PM: existingHours?.PM || 0,
+      MED: existingHours?.MED || 0,
+      HD: existingHours?.HD || 0,
+      MFG: existingHours?.MFG || 0,
+      BUILD: existingHours?.BUILD || 0,
+      PRG: existingHours?.PRG || 0,
     };
     newDepartmentHoursAllocated[dept] = importProjectForm.budgetHours;
 
