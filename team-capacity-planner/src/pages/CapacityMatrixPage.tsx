@@ -1900,11 +1900,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {departmentFilter !== 'General' && departmentFilter !== 'PM' && (
             <button
               onClick={() => setShowQuickProjectModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-1 px-3 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0 whitespace-nowrap"
               title={t.createProject}
             >
               <Plus size={12} />
-              <span>{t.create}</span>
+              <span>{t.createProject || 'Create Project'}</span>
             </button>
           )}
 
@@ -1912,11 +1912,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-1 px-3 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0 whitespace-nowrap"
               title={t.importProject || 'Import Existing Project'}
             >
               <FolderPlus size={12} />
-              <span>{t.import || 'Import'}</span>
+              <span>{t.importProject || 'Import Project'}</span>
             </button>
           )}
         </div>
