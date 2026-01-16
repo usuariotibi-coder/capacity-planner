@@ -1333,8 +1333,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           cellTextClass = 'text-orange-600';
           indicatorContent = (
             <div className="flex flex-col items-center gap-0.5">
-              <span className="font-bold">{t.starts}</span>
+              <span className="font-bold text-xs">{t.starts}</span>
               <span className="text-xs opacity-75">{deptStartDate}</span>
+              {deptDuration > 0 && (
+                <span className="text-xs font-semibold opacity-85">
+                  {deptDuration} {deptDuration === 1 ? 'week' : 'weeks'}
+                </span>
+              )}
             </div>
           );
         } else {
