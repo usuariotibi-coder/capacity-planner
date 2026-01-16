@@ -2457,8 +2457,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         </div>
                       </div>
 
-                      {/* Metrics - Department view only */}
-                      <div className="flex items-stretch gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* Metrics - Department view only - Responsive for mobile */}
+                      <div className="flex items-stretch gap-0.5 flex-shrink-0 flex-wrap md:flex-nowrap" onClick={(e) => e.stopPropagation()}>
                         {(() => {
                           const dept = departmentFilter as Department;
                           const quotedHoursValue = getQuotedHours(dept, proj.id);
@@ -2469,57 +2469,57 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                           return (
                             <>
-                              {/* Quoted Hours */}
-                              <div className="bg-blue-100 rounded px-2 py-1 border border-blue-300 text-center min-w-fit flex flex-col justify-center">
-                                <div className="text-[10px] text-blue-700 font-bold">{t.quotedLabel}</div>
-                                <div className="text-[11px] font-black text-blue-700">{quotedHoursValue}h</div>
+                              {/* Quoted Hours - More compact on mobile */}
+                              <div className="bg-blue-100 rounded px-1 md:px-2 py-0.5 md:py-1 border border-blue-300 text-center min-w-fit flex flex-col justify-center">
+                                <div className="text-[8px] md:text-[10px] text-blue-700 font-bold">Quoted</div>
+                                <div className="text-[9px] md:text-[11px] font-black text-blue-700">{quotedHoursValue}h</div>
                               </div>
 
-                              {/* Used Hours */}
-                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative">
+                              {/* Used Hours - More compact on mobile */}
+                              <div className="bg-purple-100 rounded px-1 md:px-2 py-0.5 md:py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative">
                                 <button
                                   onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                                  className="absolute -top-2 -right-2 p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg"
+                                  className="absolute -top-1.5 -right-1.5 p-0.5 md:p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg"
                                   title={t.editUsedHours}
                                 >
-                                  <Pencil size={12} />
+                                  <Pencil size={10} />
                                 </button>
-                                <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
-                                <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
+                                <div className="text-[8px] md:text-[10px] text-purple-700 font-bold">Used</div>
+                                <div className="text-[9px] md:text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
                               </div>
 
-                              {/* Forecasted Hours */}
-                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative">
+                              {/* Forecasted Hours - More compact on mobile */}
+                              <div className="bg-orange-100 rounded px-1 md:px-2 py-0.5 md:py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative">
                                 <button
                                   onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                                  className="absolute -top-2 -right-2 p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg"
+                                  className="absolute -top-1.5 -right-1.5 p-0.5 md:p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg"
                                   title={t.editForecastedHours}
                                 >
-                                  <Pencil size={12} />
+                                  <Pencil size={10} />
                                 </button>
-                                <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
-                                <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
+                                <div className="text-[8px] md:text-[10px] text-orange-700 font-bold">Forecast</div>
+                                <div className="text-[9px] md:text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
                               </div>
 
-                              {/* Utilization % */}
-                              <div className={`rounded px-2 py-1 border text-center min-w-fit flex flex-col justify-center ${utilizationColorInfo.bg}`}>
-                                <div className={`text-[10px] font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
-                                <div className={`text-[11px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
+                              {/* Utilization % - More compact on mobile */}
+                              <div className={`rounded px-1 md:px-2 py-0.5 md:py-1 border text-center min-w-fit flex flex-col justify-center ${utilizationColorInfo.bg}`}>
+                                <div className={`text-[8px] md:text-[10px] font-bold ${utilizationColorInfo.text}`}>Util</div>
+                                <div className={`text-[9px] md:text-[11px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
                               </div>
                             </>
                           );
                         })()}
                       </div>
 
-                      {/* Zoom controls */}
+                      {/* Zoom controls - More compact on mobile */}
                       <div className="flex items-center gap-0.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-[9px] font-semibold text-indigo-900">Z:</span>
+                        <span className="text-[8px] md:text-[9px] font-semibold text-indigo-900">Z:</span>
                         <button
                           onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom Out"
                         >
-                          <ZoomOut size={12} />
+                          <ZoomOut size={10} />
                         </button>
                         <input
                           type="range"
@@ -2528,16 +2528,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           step="10"
                           value={getProjectZoom(proj.id)}
                           onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
-                          className="w-10 cursor-pointer h-1"
+                          className="w-8 md:w-10 cursor-pointer h-1"
                         />
                         <button
                           onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom In"
                         >
-                          <ZoomIn size={12} />
+                          <ZoomIn size={10} />
                         </button>
-                        <span className="text-[9px] font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
+                        <span className="text-[8px] md:text-[9px] font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
                       </div>
                     </div>
                   </div>
