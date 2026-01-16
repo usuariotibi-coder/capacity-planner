@@ -109,35 +109,45 @@ export function ActivityLogPage() {
     }
   };
 
-  // Format changes for display
-  const formatChanges = (changes: any): string => {
-    if (!changes) return 'No changes';
+  // Format key names for display (convert snake_case to Title Case)
+  const formatKeyName = (key: string): string => {
+    return key
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
-    if (typeof changes === 'string') {
-      return changes;
+  // Format value for display (handle nested objects)
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'object') {
+      if (Array.isArray(value)) {
+        return value.length === 0 ? 'Empty array' : `${value.length} items`;
+      }
+      // For nested objects, show a simplified version
+      const keys = Object.keys(value);
+      return keys.length === 0 ? '{}' : `Object with ${keys.length} properties`;
     }
-
-    if (typeof changes === 'object') {
-      const entries = Object.entries(changes);
-      if (entries.length === 0) return 'No changes';
-
-      return entries
-        .map(([key, value]) => {
-          const formattedKey = key
-            .replace(/_/g, ' ')
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-
-          if (typeof value === 'object') {
-            return `${formattedKey}: ${JSON.stringify(value).substring(0, 50)}...`;
-          }
-          return `${formattedKey}: ${value}`;
-        })
-        .join('\n');
+    if (typeof value === 'string' && value.length > 100) {
+      return value.substring(0, 97) + '...';
     }
+    return String(value);
+  };
 
-    return String(changes);
+  // Check if there's a nested object (like Assignment, Project, etc.)
+  const extractMainObject = (changes: any): { objectType: string; data: any } | null => {
+    if (!changes || typeof changes !== 'object') return null;
+
+    const entries = Object.entries(changes);
+    if (entries.length === 1) {
+      const [key, value] = entries[0];
+      if (typeof value === 'object' && value !== null) {
+        return { objectType: key, data: value };
+      }
+    }
+    return null;
   };
 
   return (
@@ -302,11 +312,90 @@ export function ActivityLogPage() {
                     </div>
 
                     {/* Changes */}
-                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                      <p className="text-xs font-semibold text-yellow-900 mb-2">📝 Changes</p>
-                      <p className="text-sm text-yellow-900 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-yellow-100">
-                        {formatChanges(log.changes)}
+                    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-lg border border-amber-200">
+                      <p className="text-xs font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                        <span>📝</span>
+                        <span>{log.action === 'created' ? 'Created with' : log.action === 'updated' ? 'Updated fields' : 'Deleted'}</span>
                       </p>
+
+                      {(() => {
+                        const mainObj = extractMainObject(log.changes);
+
+                        if (!log.changes) {
+                          return (
+                            <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
+                              No changes recorded
+                            </div>
+                          );
+                        }
+
+                        if (mainObj) {
+                          // Show main object type and key fields
+                          const { objectType, data } = mainObj;
+                          const entries = Object.entries(data).slice(0, 5); // Show first 5 fields
+
+                          return (
+                            <div className="space-y-2">
+                              <div className="inline-block bg-amber-100 text-amber-900 text-xs font-semibold px-3 py-1 rounded-full mb-2">
+                                {objectType}
+                              </div>
+                              <div className="grid grid-cols-1 gap-2">
+                                {entries.map(([key, value]) => (
+                                  <div key={key} className="bg-white/80 p-2.5 rounded border border-amber-100">
+                                    <div className="flex justify-between items-start gap-2">
+                                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
+                                        {formatKeyName(key)}:
+                                      </span>
+                                      <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                        {formatValue(value)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {Object.entries(data).length > 5 && (
+                                  <div className="text-xs text-amber-700 italic px-2 py-1">
+                                    +{Object.entries(data).length - 5} more fields
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Fallback for other formats
+                        if (typeof log.changes === 'object') {
+                          const entries = Object.entries(log.changes);
+                          return (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 gap-2">
+                                {entries.slice(0, 5).map(([key, value]) => (
+                                  <div key={key} className="bg-white/80 p-2.5 rounded border border-amber-100">
+                                    <div className="flex justify-between items-start gap-2">
+                                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
+                                        {formatKeyName(key)}:
+                                      </span>
+                                      <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                        {formatValue(value)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {entries.length > 5 && (
+                                  <div className="text-xs text-amber-700 italic px-2 py-1">
+                                    +{entries.length - 5} more fields
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
+                            {String(log.changes)}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
