@@ -1,18 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Background - Navy/Dark blue matching SCIO logo -->
-  <rect width="64" height="64" fill="#1a1f3a" rx="8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Background - Dark color matching SCIO logo -->
+  <rect width="100" height="100" fill="#1a1a2e" rx="8"/>
 
-  <!-- SCIO Text - Light/White with navy background -->
-  <text x="32" y="32"
-        font-family="Arial, sans-serif"
-        font-size="16"
-        font-weight="bold"
-        fill="#ffffff"
+  <!-- SCIO Text - Large, bold, light gray/white -->
+  <text x="50" y="35"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="28"
+        font-weight="900"
+        fill="#e8e8e8"
         text-anchor="middle"
-        dominant-baseline="middle">
+        letter-spacing="2">
     SCIO
   </text>
 
-  <!-- Red accent bar at bottom - AUTOMATION color -->
-  <rect x="8" y="46" width="48" height="4" fill="#E63946" rx="2"/>
+  <!-- Small red square accent (top right of SCIO) -->
+  <rect x="62" y="18" width="8" height="8" fill="#d32f2f" rx="1"/>
+
+  <!-- AUTOMATION Text - Small, red, italic -->
+  <text x="50" y="65"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="10"
+        font-weight="bold"
+        fill="#d32f2f"
+        text-anchor="middle"
+        font-style="italic"
+        letter-spacing="1">
+    AUTOMATION
+  </text>
 </svg>
