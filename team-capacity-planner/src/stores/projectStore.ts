@@ -71,7 +71,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'CREATE',
+        'created',
         'Project',
         newProject.id,
         { project: newProject }
@@ -104,7 +104,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'UPDATE',
+        'updated',
         'Project',
         id,
         { updates }
@@ -142,7 +142,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'DELETE',
+        'deleted',
         'Project',
         id,
         { project: projectToDelete }

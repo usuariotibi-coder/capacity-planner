@@ -46,7 +46,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'CREATE',
+        'created',
         'Assignment',
         newAssignment.id,
         { assignment: newAssignment }
@@ -77,7 +77,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'UPDATE',
+        'updated',
         'Assignment',
         id,
         { updates }
@@ -112,7 +112,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
       // Log activity
       await activityLogApi.logActivity(
-        'DELETE',
+        'deleted',
         'Assignment',
         id,
         { assignment: deletedAssignment }

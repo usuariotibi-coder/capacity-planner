@@ -341,7 +341,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Log activity
         await activityLogApi.logActivity(
-          'DELETE',
+          'deleted',
           'ScioTeamCapacity',
           existingId,
           { department: dept, weekStartDate: weekDate }
@@ -360,7 +360,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Log activity
         await activityLogApi.logActivity(
-          'UPDATE',
+          'updated',
           'ScioTeamCapacity',
           existingId,
           { department: dept, weekStartDate: weekDate, capacity }
@@ -436,7 +436,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Log activity if successfully created
         if (createdRecordId) {
           await activityLogApi.logActivity(
-            'CREATE',
+            'created',
             'ScioTeamCapacity',
             createdRecordId,
             { department: dept, weekStartDate: weekDate, capacity }
@@ -504,7 +504,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Log activity
         await activityLogApi.logActivity(
-          'CREATE',
+          'created',
           'SubcontractedTeamCapacity',
           result.id,
           { company, weekStartDate: weekDate, capacity }
@@ -532,7 +532,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
               // Log activity
               await activityLogApi.logActivity(
-                'UPDATE',
+                'updated',
                 'SubcontractedTeamCapacity',
                 existingRecord.id,
                 { company, weekStartDate: weekDate, capacity }
@@ -617,7 +617,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Log activity
         await activityLogApi.logActivity(
-          'CREATE',
+          'created',
           'PrgExternalTeamCapacity',
           result.id,
           { teamName, weekStartDate: weekDate, capacity }
@@ -645,7 +645,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
               // Log activity
               await activityLogApi.logActivity(
-                'UPDATE',
+                'updated',
                 'PrgExternalTeamCapacity',
                 existingRecord.id,
                 { teamName, weekStartDate: weekDate, capacity }
