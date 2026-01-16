@@ -98,15 +98,46 @@ export function ActivityLogPage() {
   // Get action icon
   const getActionIcon = (action: string) => {
     switch (action) {
-      case 'CREATE':
+      case 'created':
         return '➕';
-      case 'UPDATE':
+      case 'updated':
         return '✏️';
-      case 'DELETE':
+      case 'deleted':
         return '🗑️';
       default:
         return '📋';
     }
+  };
+
+  // Format changes for display
+  const formatChanges = (changes: any): string => {
+    if (!changes) return 'No changes';
+
+    if (typeof changes === 'string') {
+      return changes;
+    }
+
+    if (typeof changes === 'object') {
+      const entries = Object.entries(changes);
+      if (entries.length === 0) return 'No changes';
+
+      return entries
+        .map(([key, value]) => {
+          const formattedKey = key
+            .replace(/_/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+
+          if (typeof value === 'object') {
+            return `${formattedKey}: ${JSON.stringify(value).substring(0, 50)}...`;
+          }
+          return `${formattedKey}: ${value}`;
+        })
+        .join('\n');
+    }
+
+    return String(changes);
   };
 
   return (
@@ -271,14 +302,12 @@ export function ActivityLogPage() {
                     </div>
 
                     {/* Changes */}
-                    {log.changes && (
-                      <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <p className="text-xs font-semibold text-yellow-900 mb-2">📝 Changes</p>
-                        <pre className="text-xs text-yellow-900 bg-white p-2 rounded border border-yellow-100 overflow-auto max-h-48">
-                          {JSON.stringify(log.changes, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                      <p className="text-xs font-semibold text-yellow-900 mb-2">📝 Changes</p>
+                      <p className="text-sm text-yellow-900 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-yellow-100">
+                        {formatChanges(log.changes)}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
