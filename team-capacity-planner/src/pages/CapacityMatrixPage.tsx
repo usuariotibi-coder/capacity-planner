@@ -1832,21 +1832,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
       {/* Edit Cell Modal */}
       {renderEditModal()}
-      {/* Sticky Header - Minimal */}
+      {/* Sticky Header - Responsive */}
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
-        <div className="px-2 py-1 flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            {departmentFilter === 'General' ? (
-              <h1 className="text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent truncate">
-                {t.generalView}
-              </h1>
-            ) : (
-              <h1 className="text-xs font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent truncate">
-                {departmentFilter}
-              </h1>
-            )}
-          </div>
-
+        <div className="px-1 py-1 flex flex-wrap items-center gap-1">
           {/* Zoom controls - ultra compact */}
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5 flex-shrink-0">
             <button
@@ -1854,15 +1842,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
               title={t.zoomOut}
             >
-              <ZoomOut size={14} />
+              <ZoomOut size={12} />
             </button>
-            <span className="text-[10px] font-semibold text-gray-700 w-8 text-center">{zoom}%</span>
+            <span className="text-[9px] font-semibold text-gray-700 w-6 text-center">{zoom}%</span>
             <button
               onClick={() => setZoom(Math.min(200, zoom + 10))}
               className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
               title={t.zoomIn}
             >
-              <ZoomIn size={14} />
+              <ZoomIn size={12} />
             </button>
           </div>
 
@@ -1870,7 +1858,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="border border-blue-300 rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex-shrink-0"
+            className="border border-blue-300 rounded px-1 py-0.5 text-[9px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex-shrink-0"
           >
             <option value={2024}>2024</option>
             <option value={2025}>2025</option>
@@ -1880,7 +1868,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
           {/* Current Week Info - ultra compact */}
           {currentDateWeekIndex >= 0 && (
-            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-1.5 py-0.5 rounded-md shadow-sm flex items-center gap-1 text-[10px] flex-shrink-0">
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-1 py-0.5 rounded-md shadow-sm flex items-center gap-0.5 text-[9px] flex-shrink-0">
               <span className="font-bold">🎯</span>
               <span className="font-bold">W{currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.weekNum : '-'}</span>
             </div>
@@ -1889,22 +1877,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {/* Legend Toggle Button - ultra compact */}
           <button
             onClick={() => setShowLegend(!showLegend)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0"
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-500 hover:bg-blue-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
             title={t.toggleLegend}
           >
             <span>{showLegend ? '▼' : '▶'}</span>
-            <span>{t.legend}</span>
+            <span className="hidden sm:inline">{t.legend}</span>
           </button>
 
           {/* Create Project Button - Only in department view (except PM) */}
           {departmentFilter !== 'General' && departmentFilter !== 'PM' && (
             <button
               onClick={() => setShowQuickProjectModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0 whitespace-nowrap"
-              title={t.createProject}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              title={t.createProject || 'Create Project'}
             >
-              <Plus size={12} />
-              <span>{t.createProject || 'Create Project'}</span>
+              <Plus size={10} />
+              <span className="hidden sm:inline">{t.createProject || 'Create'}</span>
             </button>
           )}
 
@@ -1912,11 +1900,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-semibold rounded transition flex-shrink-0 whitespace-nowrap"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
               title={t.importProject || 'Import Existing Project'}
             >
-              <FolderPlus size={12} />
-              <span>{t.importProject || 'Import Project'}</span>
+              <FolderPlus size={10} />
+              <span className="hidden sm:inline">{t.importProject || 'Import'}</span>
             </button>
           )}
         </div>
