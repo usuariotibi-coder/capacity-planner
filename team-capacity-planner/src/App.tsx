@@ -214,30 +214,40 @@ function MainApp() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* User Info Widget - More Prominent */}
+          <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
+            {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl border border-blue-400 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-white">
+              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg md:rounded-xl border border-blue-400 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
+                <div className="w-8 md:w-10 h-8 md:h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs md:text-sm font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-bold text-white truncate">
+                  <span className="text-xs md:text-sm font-bold text-white truncate">
                     {currentUser}
                   </span>
-                  <span className="text-xs text-blue-100 font-medium">
+                  <span className="text-[10px] md:text-xs text-blue-100 font-medium">
                     {t.loggedIn || 'Logged in'}
                   </span>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md">
+            {/* Mobile User Icon Only */}
+            {currentUser && (
+              <div className="sm:hidden w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center border border-blue-400 shadow-lg shadow-blue-500/30 flex-shrink-0" title={currentUser}>
+                <span className="text-xs font-bold text-white">
+                  {currentUser.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+
+            {/* Language Selector - Responsive */}
+            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md flex-shrink-0">
               <button
                 onClick={() => setLanguage('es')}
-                className={`px-2 py-0.5 rounded text-base transition ${
+                className={`px-1.5 md:px-2 py-0.5 rounded text-sm md:text-base transition ${
                   language === 'es'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-800'
@@ -248,7 +258,7 @@ function MainApp() {
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-2 py-0.5 rounded text-base transition ${
+                className={`px-1.5 md:px-2 py-0.5 rounded text-sm md:text-base transition ${
                   language === 'en'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-800'
