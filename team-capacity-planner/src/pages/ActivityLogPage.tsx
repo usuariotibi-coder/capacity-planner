@@ -109,16 +109,63 @@ export function ActivityLogPage() {
     }
   };
 
-  // List of internal fields to hide from users
-  const internalFields = ['id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'createdAt', 'updatedAt', 'userId', 'user_id'];
+  // List of internal/technical fields to hide from users
+  const internalFields = [
+    'id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by',
+    'createdAt', 'updatedAt', 'userId', 'user_id', 'projectId', 'project_id',
+    'employeeId', 'employee_id', 'assignmentId', 'assignment_id', 'scioHours',
+    'sciohoursallocated', 'sciohours', 'sciohours_allocated', 'scio_hours',
+    'scio_hours_allocated', 'department_hours_allocated', 'departmenthours',
+    'departmenthoursallocated', 'allocationId', 'allocation_id', 'teamId', 'team_id',
+    'capacityId', 'capacity_id', 'companyId', 'company_id', 'externalTeamId',
+    'external_team_id', 'modified_by', 'modifiedBy', 'modified_at', 'modifiedAt',
+    'is_active', 'isActive', 'is_deleted', 'isDeleted', 'deleted_at', 'deletedAt'
+  ];
 
   // Check if a field should be hidden (internal/technical)
   const isInternalField = (key: string): boolean => {
-    return internalFields.includes(key.toLowerCase());
+    const lowerKey = key.toLowerCase();
+    return internalFields.some(field => lowerKey === field);
   };
 
-  // Format key names for display (convert snake_case to Title Case)
+  // Map of field names to human-readable labels
+  const fieldLabels: Record<string, string> = {
+    'hours': 'Hours',
+    'hoursAssigned': 'Hours Assigned',
+    'hours_assigned': 'Hours Assigned',
+    'projectName': 'Project',
+    'project_name': 'Project',
+    'employeeName': 'Employee',
+    'employee_name': 'Employee',
+    'name': 'Name',
+    'title': 'Title',
+    'description': 'Description',
+    'status': 'Status',
+    'weekStartDate': 'Week Starting',
+    'week_start_date': 'Week Starting',
+    'startDate': 'Start Date',
+    'start_date': 'Start Date',
+    'endDate': 'End Date',
+    'end_date': 'End Date',
+    'client': 'Client',
+    'facility': 'Facility/Location',
+    'capacity': 'Capacity',
+    'teamName': 'Team',
+    'team_name': 'Team',
+    'company': 'Company',
+    'role': 'Role',
+    'department': 'Department',
+    'stage': 'Stage',
+    'comment': 'Notes/Comment'
+  };
+
+  // Format key names for display
   const formatKeyName = (key: string): string => {
+    // Check if we have a custom label for this field
+    if (fieldLabels[key]) {
+      return fieldLabels[key];
+    }
+    // Otherwise, convert snake_case to Title Case
     return key
       .replace(/_/g, ' ')
       .split(' ')
