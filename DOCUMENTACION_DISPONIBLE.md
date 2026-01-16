@@ -4,6 +4,13 @@
 
 ### Guías Principales en Español
 
+0. **[ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md)** 📊 🆕 NUEVO (16 Enero 2026)
+   - Estado completo del proyecto
+   - Cambios recientes (rediseño UI, importación de proyectos, etc.)
+   - Características implementadas
+   - Próximos pasos
+   - Checklist de deployment
+
 1. **[GUIA_RAPIDA.md](./GUIA_RAPIDA.md)** 🌟
    - Referencia rápida de 2 minutos
    - Comandos rápidos
@@ -79,10 +86,11 @@
 ## 🎯 Por Dónde Empezar (Recomendado)
 
 ### Si hablas español:
-1. Lee [GUIA_RAPIDA.md](./GUIA_RAPIDA.md) (2 minutos)
-2. Lee [RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md) (10 minutos)
-3. Ejecuta `cd backend && run_local.bat`
-4. Lee [backend/README.md](./backend/README.md) para más detalles
+1. Lee [ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md) (15 minutos) - 📊 NUEVO
+2. Lee [GUIA_RAPIDA.md](./GUIA_RAPIDA.md) (2 minutos)
+3. Lee [RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md) (10 minutos)
+4. Ejecuta `cd backend && run_local.bat`
+5. Lee [backend/README.md](./backend/README.md) para más detalles
 
 ### Si hablas inglés:
 1. Lee [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) (2 minutos)

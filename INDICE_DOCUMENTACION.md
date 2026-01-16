@@ -19,6 +19,7 @@
 
 | Archivo | Descripción | Tiempo |
 |---------|-------------|--------|
+| [ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md) | 📊 Estado completo con cambios recientes (NUEVO) | 15 min |
 | [GUIA_RAPIDA.md](./GUIA_RAPIDA.md) | Referencia rápida con comandos esenciales | 2 min |
 | [RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md) | Resumen completo de lo que se ha construido | 10 min |
 | [backend/README.md](./backend/README.md) | Configuración y estructura del proyecto | 20 min |
@@ -44,15 +45,21 @@
 
 ## 🗺️ Mapa de Documentación por Tarea
 
+### "Quiero ver qué ha cambiado recientemente" ✨ NUEVO
+1. Lee: [ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md) - Rediseño UI, nuevas features, etc.
+2. Git log: Ver últimos 10 commits
+3. Prueba en local: `cd backend && run_local.bat`
+
 ### "Quiero comenzar ahora mismo"
 1. Ejecuta: `cd backend && run_local.bat`
 2. Lee: [GUIA_RAPIDA.md](./GUIA_RAPIDA.md)
 3. Prueba: Los comandos cURL en la guía rápida
 
 ### "Quiero entender qué se ha construido"
-1. Lee: [RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)
-2. Lee: [backend/README.md](./backend/README.md)
-3. Referencia: [backend/BACKEND_SUMMARY.md](./backend/BACKEND_SUMMARY.md)
+1. Lee: [ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md)
+2. Lee: [RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)
+3. Lee: [backend/README.md](./backend/README.md)
+4. Referencia: [backend/BACKEND_SUMMARY.md](./backend/BACKEND_SUMMARY.md)
 
 ### "Quiero probar todos los endpoints"
 1. Configura: [backend/LOCAL_TESTING.md](./backend/LOCAL_TESTING.md)

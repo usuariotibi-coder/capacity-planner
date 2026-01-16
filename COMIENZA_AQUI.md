@@ -28,6 +28,9 @@ run_local.bat
 
 ### 🇪🇸 EN ESPAÑOL (Nuevos Documentos)
 
+#### 📊 Estado Actual del Proyecto (NUEVO - 16 Enero 2026)
+→ [ESTADO_ACTUAL_PROYECTO.md](./ESTADO_ACTUAL_PROYECTO.md) - Todo lo reciente incluyendo rediseño UI
+
 #### Para Empezar (2 minutos)
 → [GUIA_RAPIDA.md](./GUIA_RAPIDA.md) - Referencia rápida con comandos
 
