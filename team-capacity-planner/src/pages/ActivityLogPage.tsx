@@ -150,6 +150,43 @@ export function ActivityLogPage() {
     return null;
   };
 
+  // Extract important summary information from changes
+  const extractSummaryInfo = (changes: any, modelName: string) => {
+    if (!changes || typeof changes !== 'object') return null;
+
+    const mainObj = extractMainObject(changes);
+    const data = mainObj ? mainObj.data : changes;
+
+    const summary: any = {
+      hours: null,
+      project: null,
+      employee: null,
+      week: null,
+      status: null,
+      description: null,
+    };
+
+    // Extract important fields based on model type
+    if (modelName === 'Assignment') {
+      summary.hours = data.hours || data.hoursAssigned;
+      summary.employee = data.employeeName || data.employee_name;
+      summary.project = data.projectName || data.project_name;
+      summary.week = data.weekStartDate || data.week_start_date;
+      summary.status = data.status;
+    } else if (modelName === 'Project') {
+      summary.project = data.name || data.projectName;
+      summary.description = data.description;
+      summary.status = data.status;
+    } else if (modelName === 'TeamCapacity' || modelName === 'SubcontractedTeamCapacity' || modelName === 'PrgExternalTeamCapacity') {
+      summary.hours = data.capacity || data.hours;
+      summary.project = data.projectName || data.project_name || data.project;
+      summary.employee = data.teamName || data.team_name || data.company;
+      summary.week = data.weekStartDate || data.week_start_date;
+    }
+
+    return summary;
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -237,45 +274,72 @@ export function ActivityLogPage() {
                 className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
               >
                 {/* Log Entry Header */}
-                <button
-                  onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                  className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Action Badge */}
-                    <div
-                      className={`px-2 py-1 rounded font-semibold text-xs border flex-shrink-0 ${getActionColor(log.action)}`}
+                {(() => {
+                  const summary = extractSummaryInfo(log.changes, log.model_name);
+                  return (
+                    <button
+                      onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                      className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
                     >
-                      {getActionIcon(log.action)} {log.action}
-                    </div>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Action Badge */}
+                        <div
+                          className={`px-2 py-1 rounded font-semibold text-xs border flex-shrink-0 ${getActionColor(log.action)}`}
+                        >
+                          {getActionIcon(log.action)} {log.action}
+                        </div>
 
-                    {/* User Info */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-semibold text-gray-900 truncate">
-                        {log.user?.username || 'Unknown User'}
-                      </span>
-                      <span className="text-xs text-gray-600">
-                        {log.model_name} • {log.object_id?.substring(0, 8) || 'N/A'}...
-                      </span>
-                    </div>
+                        {/* User & Model Info */}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {log.user?.username || 'Unknown User'}
+                            <span className="text-gray-500 font-normal"> • {log.model_name}</span>
+                          </span>
 
-                    {/* Timestamp */}
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-xs text-gray-600 block">
-                        {formatDate(log.created_at)}
-                      </span>
-                    </div>
-                  </div>
+                          {/* Important Summary Info */}
+                          <div className="flex flex-wrap gap-2 mt-0.5">
+                            {summary?.project && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                📊 {summary.project}
+                              </span>
+                            )}
+                            {summary?.hours && (
+                              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                ⏱️ {summary.hours}h
+                              </span>
+                            )}
+                            {summary?.employee && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                👤 {summary.employee}
+                              </span>
+                            )}
+                            {summary?.week && (
+                              <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                📅 Sem. {summary.week?.substring(5, 7)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                  {/* Expand Icon */}
-                  <div className="ml-2 flex-shrink-0">
-                    {expandedId === log.id ? (
-                      <ChevronUp size={18} className="text-gray-400" />
-                    ) : (
-                      <ChevronDown size={18} className="text-gray-400" />
-                    )}
-                  </div>
-                </button>
+                        {/* Timestamp */}
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-xs text-gray-600 block">
+                            {formatDate(log.created_at)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expand Icon */}
+                      <div className="ml-2 flex-shrink-0">
+                        {expandedId === log.id ? (
+                          <ChevronUp size={18} className="text-gray-400" />
+                        ) : (
+                          <ChevronDown size={18} className="text-gray-400" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })()}
 
                 {/* Expanded Details */}
                 {expandedId === log.id && (
@@ -311,7 +375,7 @@ export function ActivityLogPage() {
                       </p>
                     </div>
 
-                    {/* Changes */}
+                    {/* Changes - Enhanced View */}
                     <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-lg border border-amber-200">
                       <p className="text-xs font-semibold text-amber-900 mb-3 flex items-center gap-2">
                         <span>📝</span>
@@ -332,7 +396,17 @@ export function ActivityLogPage() {
                         if (mainObj) {
                           // Show main object type and key fields
                           const { objectType, data } = mainObj;
-                          const entries = Object.entries(data).slice(0, 5); // Show first 5 fields
+                          const entries = Object.entries(data);
+
+                          // Prioritize important fields
+                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity'];
+                          const prioritized = entries.sort((a, b) => {
+                            const aImportant = importantFields.includes(a[0]) ? 0 : 1;
+                            const bImportant = importantFields.includes(b[0]) ? 0 : 1;
+                            return aImportant - bImportant;
+                          });
+
+                          const displayedEntries = prioritized.slice(0, 7);
 
                           return (
                             <div className="space-y-2">
@@ -340,21 +414,33 @@ export function ActivityLogPage() {
                                 {objectType}
                               </div>
                               <div className="grid grid-cols-1 gap-2">
-                                {entries.map(([key, value]) => (
-                                  <div key={key} className="bg-white/80 p-2.5 rounded border border-amber-100">
-                                    <div className="flex justify-between items-start gap-2">
-                                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
-                                        {formatKeyName(key)}:
-                                      </span>
-                                      <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
-                                        {formatValue(value)}
-                                      </span>
+                                {displayedEntries.map(([key, value]) => {
+                                  const isImportant = importantFields.includes(key);
+                                  return (
+                                    <div
+                                      key={key}
+                                      className={`p-2.5 rounded border ${
+                                        isImportant
+                                          ? 'bg-blue-50 border-blue-200'
+                                          : 'bg-white/80 border-amber-100'
+                                      }`}
+                                    >
+                                      <div className="flex justify-between items-start gap-2">
+                                        <span className={`text-xs font-semibold whitespace-nowrap ${
+                                          isImportant ? 'text-blue-700' : 'text-gray-600'
+                                        }`}>
+                                          {isImportant && '⭐ '}{formatKeyName(key)}:
+                                        </span>
+                                        <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                          {formatValue(value)}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                                {Object.entries(data).length > 5 && (
+                                  );
+                                })}
+                                {entries.length > 7 && (
                                   <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{Object.entries(data).length - 5} more fields
+                                    +{entries.length - 7} more fields
                                   </div>
                                 )}
                               </div>
@@ -365,24 +451,45 @@ export function ActivityLogPage() {
                         // Fallback for other formats
                         if (typeof log.changes === 'object') {
                           const entries = Object.entries(log.changes);
+                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status'];
+                          const prioritized = entries.sort((a, b) => {
+                            const aImportant = importantFields.includes(a[0]) ? 0 : 1;
+                            const bImportant = importantFields.includes(b[0]) ? 0 : 1;
+                            return aImportant - bImportant;
+                          });
+
+                          const displayedEntries = prioritized.slice(0, 7);
+
                           return (
                             <div className="space-y-2">
                               <div className="grid grid-cols-1 gap-2">
-                                {entries.slice(0, 5).map(([key, value]) => (
-                                  <div key={key} className="bg-white/80 p-2.5 rounded border border-amber-100">
-                                    <div className="flex justify-between items-start gap-2">
-                                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
-                                        {formatKeyName(key)}:
-                                      </span>
-                                      <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
-                                        {formatValue(value)}
-                                      </span>
+                                {displayedEntries.map(([key, value]) => {
+                                  const isImportant = importantFields.includes(key);
+                                  return (
+                                    <div
+                                      key={key}
+                                      className={`p-2.5 rounded border ${
+                                        isImportant
+                                          ? 'bg-blue-50 border-blue-200'
+                                          : 'bg-white/80 border-amber-100'
+                                      }`}
+                                    >
+                                      <div className="flex justify-between items-start gap-2">
+                                        <span className={`text-xs font-semibold whitespace-nowrap ${
+                                          isImportant ? 'text-blue-700' : 'text-gray-600'
+                                        }`}>
+                                          {isImportant && '⭐ '}{formatKeyName(key)}:
+                                        </span>
+                                        <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                          {formatValue(value)}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                                {entries.length > 5 && (
+                                  );
+                                })}
+                                {entries.length > 7 && (
                                   <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{entries.length - 5} more fields
+                                    +{entries.length - 7} more fields
                                   </div>
                                 )}
                               </div>
