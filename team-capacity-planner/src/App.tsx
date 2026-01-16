@@ -117,11 +117,11 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 flex-col md:flex-row">
+    <div className="flex h-screen bg-gray-50">
       {/* Overlay for mobile when sidebar is open */}
       {sidebarOpen && window.innerWidth < 768 && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -129,17 +129,15 @@ function MainApp() {
       {/* Sidebar */}
       <div
         className={`${
-          sidebarOpen ? 'h-auto md:h-full w-full md:w-64' : 'h-0 md:h-full w-0'
-        } md:relative md:z-auto z-40 bg-slate-800 text-white transition-all duration-300 overflow-y-auto flex flex-col shadow-lg md:overflow-y-auto ${
-          sidebarOpen ? 'order-3 md:order-1' : 'order-3 md:order-1 hidden md:flex'
-        }`}
+          sidebarOpen ? 'w-56' : 'w-0'
+        } fixed md:relative z-50 md:z-auto h-full bg-slate-800 text-white transition-all duration-300 overflow-y-auto flex flex-col shadow-lg`}
       >
-        <div className="p-6 border-b border-slate-700 flex-shrink-0">
-          <h1 className="text-2xl font-bold">{t.teamCapacity}</h1>
-          <p className="text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
+        <div className="p-3 md:p-6 border-b border-slate-700 flex-shrink-0">
+          <h1 className="text-lg md:text-2xl font-bold">{t.teamCapacity}</h1>
+          <p className="text-xs text-slate-400 mt-0.5 md:mt-1">{t.plannerSubtitle}</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-2 md:p-4 space-y-1 md:space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -149,20 +147,20 @@ function MainApp() {
                   setSidebarOpen(false);
                 }
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              className={`w-full flex items-center gap-2 md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-lg transition text-xs md:text-sm ${
                 currentPage === item.id
                   ? 'bg-blue-500 text-white'
                   : 'text-slate-300 hover:bg-slate-700'
               }`}
             >
-              {item.icon}
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="flex-shrink-0">{item.icon}</span>
+              <span className="font-medium hidden sm:inline">{item.label}</span>
             </button>
           ))}
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto">
+          <div className="p-2 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto max-h-40 md:max-h-none">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
@@ -170,7 +168,7 @@ function MainApp() {
                   setSidebarOpen(false);
                 }
               }}
-              className={`w-full mb-4 px-3 py-2 rounded text-sm font-semibold transition ${
+              className={`w-full mb-2 md:mb-4 px-2 md:px-3 py-1.5 md:py-2 rounded text-xs md:text-sm font-semibold transition ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -179,7 +177,7 @@ function MainApp() {
               📊 {t.general}
             </button>
 
-            <label className="block text-xs font-semibold text-slate-400 mb-2">{t.viewDepartment}</label>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
@@ -188,7 +186,7 @@ function MainApp() {
                   setSidebarOpen(false);
                 }
               }}
-              className="w-full bg-slate-700 text-white text-sm rounded px-2 py-2 border border-slate-600 hover:border-blue-500 transition"
+              className="w-full bg-slate-700 text-white text-xs md:text-sm rounded px-2 py-1.5 md:py-2 border border-slate-600 hover:border-blue-500 transition"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
@@ -200,20 +198,21 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-4 border-t border-slate-700 flex-shrink-0">
+        <div className="p-2 md:p-4 border-t border-slate-700 flex-shrink-0">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-2"
+            className="w-full flex items-center gap-2 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-1 md:mb-2"
           >
-            <LogOut size={16} />
-            {t.logout}
+            <LogOut size={14} className="md:hidden" />
+            <LogOut size={16} className="hidden md:inline" />
+            <span className="hidden sm:inline">{t.logout}</span>
           </button>
-          <p className="text-xs text-slate-400">{t.teamCapacityPlanner} v1.1.0</p>
+          <p className="text-[10px] md:text-xs text-slate-400 text-center">{t.teamCapacityPlanner}</p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden order-1 md:order-2 min-h-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
