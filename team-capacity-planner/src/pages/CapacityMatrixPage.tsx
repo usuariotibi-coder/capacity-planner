@@ -12,7 +12,7 @@ import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
-import type { Department, Stage } from '../types';
+import type { Department, Stage, Project } from '../types';
 
 type DepartmentFilter = 'General' | Department;
 
@@ -46,6 +46,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
   const deleteAssignment = useAssignmentStore((state) => state.deleteAssignment);
   const addProject = useProjectStore((state) => state.addProject);
+  const updateProject = useProjectStore((state) => state.updateProject);
 
   // Debug: Log when projects change
   useEffect(() => {
