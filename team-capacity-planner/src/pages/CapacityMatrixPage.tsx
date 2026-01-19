@@ -2534,10 +2534,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                           return (
                             <>
-                              <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center">
-                                <span className="text-[9px] text-blue-700 font-bold">{quotedHoursValue}h</span>
+                              <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center flex flex-col">
+                                <span className="text-[7px] text-blue-600 font-semibold leading-none">Quoted</span>
+                                <span className="text-[9px] text-blue-700 font-bold leading-none">{quotedHoursValue}h</span>
                               </div>
-                              <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center relative">
+                              <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center relative flex flex-col">
                                 <button
                                   onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
                                   className="absolute -top-1 -right-1 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow"
@@ -2545,9 +2546,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 >
                                   <Pencil size={8} />
                                 </button>
-                                <span className="text-[9px] text-purple-700 font-bold">{utilizedHoursValue}h</span>
+                                <span className="text-[7px] text-purple-600 font-semibold leading-none">Used</span>
+                                <span className="text-[9px] text-purple-700 font-bold leading-none">{utilizedHoursValue}h</span>
                               </div>
-                              <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center relative">
+                              <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center relative flex flex-col">
                                 <button
                                   onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
                                   className="absolute -top-1 -right-1 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow"
@@ -2555,10 +2557,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 >
                                   <Pencil size={8} />
                                 </button>
-                                <span className="text-[9px] text-orange-700 font-bold">{forecastedHoursValue}h</span>
+                                <span className="text-[7px] text-orange-600 font-semibold leading-none">Forecast</span>
+                                <span className="text-[9px] text-orange-700 font-bold leading-none">{forecastedHoursValue}h</span>
                               </div>
-                              <div className={`rounded px-1.5 py-0.5 border text-center ${utilizationColorInfo.bg}`}>
-                                <span className={`text-[9px] font-bold ${utilizationColorInfo.text}`}>{utilizationPercent}%</span>
+                              <div className={`rounded px-1.5 py-0.5 border text-center flex flex-col ${utilizationColorInfo.bg}`}>
+                                <span className={`text-[7px] font-semibold leading-none ${utilizationColorInfo.text}`}>Util</span>
+                                <span className={`text-[9px] font-bold leading-none ${utilizationColorInfo.text}`}>{utilizationPercent}%</span>
                               </div>
                             </>
                           );

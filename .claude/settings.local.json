@@ -82,7 +82,8 @@
       "Bash(cd:*)",
       "Bash(sqlite3:*)",
       "Bash(git revert:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(powershell -Command \"Get-ChildItem -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name=''TotalSize'';Expression={[math]::Round\\($_Sum/1MB,2\\)}}\")"
     ]
   }
 }
