@@ -130,22 +130,22 @@ function MainApp() {
           <p className="hidden md:block text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
         </div>
 
-        <nav className="flex-1 p-0.5 md:p-4 space-y-0.5 md:space-y-2 overflow-y-auto">
+        <nav className="p-0.5 md:p-4 space-y-0 md:space-y-2">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0.5 md:gap-3 px-1 md:px-4 py-1.5 md:py-3 rounded-lg transition text-[10px] md:text-sm ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-3 px-0.5 md:px-4 py-1 md:py-3 rounded-lg transition text-[8px] md:text-sm ${
                 currentPage === item.id
                   ? 'bg-blue-500 text-white'
                   : 'text-slate-300 hover:bg-slate-700'
               }`}
               title={item.label}
             >
-              <span className="flex-shrink-0 text-base md:text-xl">{item.icon}</span>
-              <span className="font-medium text-center md:text-left leading-tight">{item.label}</span>
+              <span className="flex-shrink-0 text-sm md:text-xl">{item.icon}</span>
+              <span className="font-medium text-center md:text-left leading-none">{item.label}</span>
             </button>
           ))}
         </nav>
