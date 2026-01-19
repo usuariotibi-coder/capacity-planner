@@ -124,39 +124,39 @@ function MainApp() {
           sidebarOpen ? 'w-20 md:w-56' : 'w-0'
         } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0`}
       >
-        <div className="p-1 md:p-6 border-b border-slate-700 flex-shrink-0">
+        <div className="p-0.5 md:p-6 border-b border-slate-700 flex-shrink-0">
           <h1 className="text-[8px] md:text-2xl font-bold text-center md:text-left whitespace-nowrap overflow-hidden">📊</h1>
           <h1 className="hidden md:block text-2xl font-bold">{t.teamCapacity}</h1>
           <p className="hidden md:block text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
         </div>
 
-        <nav className="flex-1 p-1 md:p-4 space-y-1 md:space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-0.5 md:p-4 space-y-0.5 md:space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-4 py-2 md:py-3 rounded-lg transition text-xs md:text-sm ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0.5 md:gap-3 px-1 md:px-4 py-1.5 md:py-3 rounded-lg transition text-[10px] md:text-sm ${
                 currentPage === item.id
                   ? 'bg-blue-500 text-white'
                   : 'text-slate-300 hover:bg-slate-700'
               }`}
               title={item.label}
             >
-              <span className="flex-shrink-0">{item.icon}</span>
-              <span className="font-medium text-center md:text-left">{item.label}</span>
+              <span className="flex-shrink-0 text-base md:text-xl">{item.icon}</span>
+              <span className="font-medium text-center md:text-left leading-tight">{item.label}</span>
             </button>
           ))}
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-1 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto">
+          <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto max-h-24 md:max-h-none">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
               }}
-              className={`w-full mb-1 md:mb-4 px-1 md:px-3 py-1.5 md:py-2 rounded text-[10px] md:text-sm font-semibold transition ${
+              className={`w-full mb-0.5 md:mb-4 px-1 md:px-3 py-1 md:py-2 rounded text-[9px] md:text-sm font-semibold transition ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -173,7 +173,7 @@ function MainApp() {
               onChange={(e) => {
                 setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
               }}
-              className="w-full bg-slate-700 text-white text-[10px] md:text-sm rounded px-1 md:px-2 py-1 md:py-2 border border-slate-600 hover:border-blue-500 transition"
+              className="w-full bg-slate-700 text-white text-[9px] md:text-sm rounded px-1 md:px-2 py-0.5 md:py-2 border border-slate-600 hover:border-blue-500 transition"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
@@ -185,13 +185,13 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-1 md:p-4 border-t border-slate-700 flex-shrink-0">
+        <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0">
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-2 px-1 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-1 md:mb-2"
+            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-0.5 md:mb-2"
             title={t.logout}
           >
-            <LogOut size={16} />
+            <LogOut size={14} className="md:w-4 md:h-4" />
             <span className="hidden md:inline">{t.logout}</span>
           </button>
           <p className="hidden md:block text-xs text-slate-400 text-center">{t.teamCapacityPlanner}</p>
