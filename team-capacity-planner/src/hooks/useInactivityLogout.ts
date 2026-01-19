@@ -9,7 +9,7 @@ export const useInactivityLogout = () => {
   useEffect(() => {
     if (!isLoggedIn) return;
 
-    let inactivityTimer: NodeJS.Timeout;
+    let inactivityTimer: ReturnType<typeof setTimeout>;
 
     const resetTimer = () => {
       // Clear existing timer
