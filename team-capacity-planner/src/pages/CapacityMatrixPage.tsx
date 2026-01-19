@@ -2726,15 +2726,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               }
                             });
 
-                            return months.map((monthInfo) => (
-                              <th
-                                key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                className="border border-gray-300 px-2 py-1 text-center font-semibold text-xs bg-gray-200 text-gray-700"
-                              >
-                                {monthInfo.month}
-                              </th>
-                            ));
+                            return months.map((monthInfo, idx) => {
+                              const isEven = idx % 2 === 0;
+                              return (
+                                <th
+                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                  colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                  className={`border-2 px-2 py-1.5 text-center font-bold text-xs transition-all ${
+                                    isEven
+                                      ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
+                                      : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                  }`}
+                                >
+                                  {monthInfo.month}
+                                </th>
+                              );
+                            });
                           })()}
                         </tr>
                         {/* Week row */}
@@ -3296,15 +3303,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 }
                               });
 
-                              return months.map((monthInfo) => (
-                                <th
-                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                  colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                  className="border border-gray-300 px-2 py-1 text-center font-semibold text-xs bg-gray-200 text-gray-700"
-                                >
-                                  {monthInfo.month}
-                                </th>
-                              ));
+                              return months.map((monthInfo, idx) => {
+                                const isEven = idx % 2 === 0;
+                                return (
+                                  <th
+                                    key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                    colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                    className={`border-2 px-2 py-1.5 text-center font-bold text-xs transition-all ${
+                                      isEven
+                                        ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
+                                        : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                    }`}
+                                  >
+                                    {monthInfo.month}
+                                  </th>
+                                );
+                              });
                             })()}
                           </tr>
                           {/* Week row */}
