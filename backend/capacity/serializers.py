@@ -1697,49 +1697,64 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
         user = User.objects.filter(username__iexact=username).first()
 
         if user and user.check_password(password):
-            # Check active sessions for this user (limit to 2)
-            active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+            try:
+                # Check active sessions for this user (limit to 2)
+                active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
 
-            if active_sessions >= 2:
-                # Reject login if user already has 2 active sessions
-                raise serializers.ValidationError(
-                    'Máximo de dispositivos conectados alcanzado. Por favor, cierre sesión en otro dispositivo.'
+                if active_sessions >= 2:
+                    # Reject login if user already has 2 active sessions
+                    raise serializers.ValidationError(
+                        'Máximo de dispositivos conectados alcanzado. Por favor, cierre sesión en otro dispositivo.'
+                    )
+
+                refresh = RefreshToken.for_user(user)
+                # Add custom claims to the access token
+                refresh['username'] = user.username
+                refresh['email'] = user.email
+                refresh['first_name'] = user.first_name
+                refresh['last_name'] = user.last_name
+                refresh.access_token['username'] = user.username
+                refresh.access_token['email'] = user.email
+                refresh.access_token['first_name'] = user.first_name
+                refresh.access_token['last_name'] = user.last_name
+
+                # Create a new session record (safely handle missing request context)
+                try:
+                    request = self.context.get('request')
+                    if request:
+                        device_info = {
+                            'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+                            'ip_address': self.get_client_ip(request),
+                        }
+                    else:
+                        device_info = {}
+                except Exception:
+                    device_info = {}
+
+                UserSession.objects.create(
+                    user=user,
+                    refresh_token=str(refresh),
+                    device_info=device_info,
+                    is_active=True
                 )
 
-            refresh = RefreshToken.for_user(user)
-            # Add custom claims to the access token
-            refresh['username'] = user.username
-            refresh['email'] = user.email
-            refresh['first_name'] = user.first_name
-            refresh['last_name'] = user.last_name
-            refresh.access_token['username'] = user.username
-            refresh.access_token['email'] = user.email
-            refresh.access_token['first_name'] = user.first_name
-            refresh.access_token['last_name'] = user.last_name
-
-            # Create a new session record
-            device_info = {
-                'user_agent': self.context.get('request').META.get('HTTP_USER_AGENT', '') if self.context.get('request') else '',
-                'ip_address': self.get_client_ip(self.context.get('request')) if self.context.get('request') else '',
-            }
-
-            UserSession.objects.create(
-                user=user,
-                refresh_token=str(refresh),
-                device_info=device_info,
-                is_active=True
-            )
-
-            attrs['refresh'] = str(refresh)
-            attrs['access'] = str(refresh.access_token)
-            attrs['user_id'] = user.id
-            attrs['username'] = user.username
-            attrs['email'] = user.email
-            attrs['first_name'] = user.first_name
-            attrs['last_name'] = user.last_name
-            return attrs
+                attrs['refresh'] = str(refresh)
+                attrs['access'] = str(refresh.access_token)
+                attrs['user_id'] = user.id
+                attrs['username'] = user.username
+                attrs['email'] = user.email
+                attrs['first_name'] = user.first_name
+                attrs['last_name'] = user.last_name
+                return attrs
+            except serializers.ValidationError:
+                # Re-raise validation errors (like max sessions reached)
+                raise
+            except Exception as e:
+                # Log the error and return generic message
+                print(f"Error during login: {str(e)}")
+                raise serializers.ValidationError('Error al procesar el login. Por favor, intente nuevamente.')
         else:
-            raise serializers.ValidationError('Invalid credentials')
+            raise serializers.ValidationError('Credenciales inválidas')
 
     def get_client_ip(self, request):
         """Get client IP address from request"""
