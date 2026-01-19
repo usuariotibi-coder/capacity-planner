@@ -2701,6 +2701,43 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
                       <table className="border-collapse text-xs w-full">
                         <thead>
+                        {/* Month row */}
+                        <tr className="bg-gray-200 text-gray-700">
+                          <th className="border border-gray-300 px-1 py-0.5 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs"></th>
+                          {(() => {
+                            const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
+                            let currentMonth = '';
+                            let startIdx = 0;
+
+                            allWeeksData.forEach((weekData, idx) => {
+                              const date = new Date(weekData.date);
+                              const monthName = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+
+                              if (monthName !== currentMonth) {
+                                if (currentMonth) {
+                                  months.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
+                                }
+                                currentMonth = monthName;
+                                startIdx = idx;
+                              }
+
+                              if (idx === allWeeksData.length - 1) {
+                                months.push({ month: currentMonth, startIdx, endIdx: idx });
+                              }
+                            });
+
+                            return months.map((monthInfo) => (
+                              <th
+                                key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                className="border border-gray-300 px-2 py-1 text-center font-semibold text-xs bg-gray-200 text-gray-700"
+                              >
+                                {monthInfo.month}
+                              </th>
+                            ));
+                          })()}
+                        </tr>
+                        {/* Week row */}
                         <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
                           <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs">
                             {proj.name}
@@ -3234,7 +3271,44 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       }}>
                       <table className="border-collapse text-xs w-full">
                         <thead>
-                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-20">
+                          {/* Month row */}
+                          <tr className="bg-gray-200 text-gray-700 sticky top-0 z-20">
+                            <th className="border border-gray-300 px-1 py-0.5 text-left font-bold sticky left-0 bg-gray-200 z-30 text-xs"></th>
+                            {(() => {
+                              const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
+                              let currentMonth = '';
+                              let startIdx = 0;
+
+                              allWeeksData.forEach((weekData, idx) => {
+                                const date = new Date(weekData.date);
+                                const monthName = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+
+                                if (monthName !== currentMonth) {
+                                  if (currentMonth) {
+                                    months.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
+                                  }
+                                  currentMonth = monthName;
+                                  startIdx = idx;
+                                }
+
+                                if (idx === allWeeksData.length - 1) {
+                                  months.push({ month: currentMonth, startIdx, endIdx: idx });
+                                }
+                              });
+
+                              return months.map((monthInfo) => (
+                                <th
+                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                  colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                  className="border border-gray-300 px-2 py-1 text-center font-semibold text-xs bg-gray-200 text-gray-700"
+                                >
+                                  {monthInfo.month}
+                                </th>
+                              ));
+                            })()}
+                          </tr>
+                          {/* Week row */}
+                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-6 z-20">
                             <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-xs">
                               Dpto
                             </th>
