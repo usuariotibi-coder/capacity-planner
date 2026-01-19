@@ -1907,7 +1907,7 @@ class CaseInsensitiveTokenObtainPairView(APIView):
     def post(self, request):
         from capacity.serializers import CaseInsensitiveTokenObtainPairSerializer
 
-        serializer = CaseInsensitiveTokenObtainPairSerializer(data=request.data)
+        serializer = CaseInsensitiveTokenObtainPairSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             return Response({
                 'access': serializer.validated_data['access'],
@@ -1917,3 +1917,37 @@ class CaseInsensitiveTokenObtainPairView(APIView):
                 'email': serializer.validated_data['email'],
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class LogoutView(APIView):
+    """
+    Logout view that deactivates the current user session.
+
+    Marks the session associated with the current refresh token as inactive,
+    allowing another device to login if the user has reached the 2-device limit.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from capacity.models import UserSession
+        from rest_framework_simplejwt.tokens import TokenError
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+
+        try:
+            # Get the refresh token from request
+            refresh_token = request.data.get('refresh')
+
+            if refresh_token:
+                # Mark the session as inactive
+                UserSession.objects.filter(
+                    user=request.user,
+                    refresh_token=refresh_token
+                ).update(is_active=False)
+
+            return Response({
+                'detail': 'Sesión cerrada exitosamente.'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'detail': f'Error al cerrar sesión: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

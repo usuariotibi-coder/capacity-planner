@@ -1701,11 +1701,10 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
             active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
 
             if active_sessions >= 2:
-                # Remove the oldest session to allow the new login
-                oldest_session = UserSession.objects.filter(user=user, is_active=True).order_by('created_at').first()
-                if oldest_session:
-                    oldest_session.is_active = False
-                    oldest_session.save()
+                # Reject login if user already has 2 active sessions
+                raise serializers.ValidationError(
+                    'Máximo de dispositivos conectados alcanzado. Por favor, cierre sesión en otro dispositivo.'
+                )
 
             refresh = RefreshToken.for_user(user)
             # Add custom claims to the access token
