@@ -13,6 +13,7 @@ import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
 import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
+import { useInactivityLogout } from './hooks/useInactivityLogout';
 
 type Page = 'resources' | 'projects' | 'capacity' | 'activity-log';
 type DepartmentFilter = 'General' | Department;
@@ -53,6 +54,9 @@ function MainApp() {
 
   // Load data from API when authenticated
   useDataLoader();
+
+  // Handle inactivity logout (1 hour)
+  useInactivityLogout();
 
   useEffect(() => {
     // Save current page to localStorage
