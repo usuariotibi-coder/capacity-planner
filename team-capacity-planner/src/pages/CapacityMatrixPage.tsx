@@ -2712,7 +2712,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                             allWeeksData.forEach((weekData, idx) => {
                               const date = new Date(weekData.date);
-                              const monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                              let monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                              // Capitalize first letter
+                              monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
                               if (monthName !== currentMonth) {
                                 if (currentMonth) {
@@ -3290,7 +3292,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                               allWeeksData.forEach((weekData, idx) => {
                                 const date = new Date(weekData.date);
-                                const monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                                let monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                                // Capitalize first letter
+                                monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
                                 if (monthName !== currentMonth) {
                                   if (currentMonth) {
