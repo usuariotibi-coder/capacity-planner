@@ -1951,3 +1951,55 @@ class LogoutView(APIView):
             return Response({
                 'detail': f'Error al cerrar sesión: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SessionStatusView(APIView):
+    """
+    View to check if the current session is still active.
+
+    Returns:
+    - 200 OK: Session is active
+    - 401 Unauthorized: Session is inactive or has been logged out
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from capacity.models import UserSession
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+
+        try:
+            # Get the access token from the request
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+
+                # Check if there's an active session for this user with this token info
+                # We'll use a simple check - if user is authenticated and has active sessions
+                active_sessions = UserSession.objects.filter(
+                    user=request.user,
+                    is_active=True
+                ).count()
+
+                if active_sessions > 0:
+                    return Response({
+                        'status': 'active',
+                        'detail': 'Sesión activa',
+                        'user': request.user.username,
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        'status': 'inactive',
+                        'detail': 'Sesión inactiva o ha sido cerrada.',
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+
+            return Response({
+                'status': 'error',
+                'detail': 'Token no proporcionado',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'status': 'error',
+                'detail': f'Error al verificar sesión: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
