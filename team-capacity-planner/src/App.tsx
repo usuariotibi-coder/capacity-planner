@@ -151,12 +151,12 @@ function MainApp() {
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto max-h-24 md:max-h-none">
+          <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto max-h-20 md:max-h-none space-y-0.5 md:space-y-2">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
               }}
-              className={`w-full mb-0.5 md:mb-4 px-1 md:px-3 py-1 md:py-2 rounded text-[9px] md:text-sm font-semibold transition ${
+              className={`w-full px-1 md:px-3 py-0.5 md:py-2 rounded text-[8px] md:text-sm font-semibold transition leading-tight ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -167,13 +167,13 @@ function MainApp() {
               <span className="hidden md:inline">📊 {t.general}</span>
             </button>
 
-            <label className="hidden md:block text-xs font-semibold text-slate-400 mb-1">{t.viewDepartment}</label>
+            <label className="hidden md:block text-xs font-semibold text-slate-400">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
               }}
-              className="w-full bg-slate-700 text-white text-[9px] md:text-sm rounded px-1 md:px-2 py-0.5 md:py-2 border border-slate-600 hover:border-blue-500 transition"
+              className="w-full bg-slate-700 text-white text-[8px] md:text-sm rounded px-1 md:px-2 py-0.5 md:py-2 border border-slate-600 hover:border-blue-500 transition leading-tight"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
