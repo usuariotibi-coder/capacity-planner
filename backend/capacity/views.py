@@ -2003,3 +2003,68 @@ class SessionStatusView(APIView):
                 'status': 'error',
                 'detail': f'Error al verificar sesión: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChangePasswordView(APIView):
+    """
+    View to change user password.
+
+    Requires:
+    - current_password: Current password for verification
+    - new_password: New password to set
+    - confirm_password: Confirmation of new password (must match new_password)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            current_password = request.data.get('current_password')
+            new_password = request.data.get('new_password')
+            confirm_password = request.data.get('confirm_password')
+
+            # Validate inputs
+            if not current_password or not new_password or not confirm_password:
+                return Response({
+                    'detail': 'Por favor, proporciona la contraseña actual, nueva y confirmación.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check if new password and confirm password match
+            if new_password != confirm_password:
+                return Response({
+                    'detail': 'Las contraseñas nuevas no coinciden.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check if new password is different from current
+            if current_password == new_password:
+                return Response({
+                    'detail': 'La nueva contraseña debe ser diferente de la actual.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Verify current password
+            if not request.user.check_password(current_password):
+                return Response({
+                    'detail': 'La contraseña actual es incorrecta.'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+
+            # Validate new password strength (minimum 8 characters)
+            if len(new_password) < 8:
+                return Response({
+                    'detail': 'La nueva contraseña debe tener al menos 8 caracteres.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Change password
+            request.user.set_password(new_password)
+            request.user.save()
+
+            # Invalidate all sessions for this user (they need to login again with new password)
+            from capacity.models import UserSession
+            UserSession.objects.filter(user=request.user).update(is_active=False)
+
+            return Response({
+                'detail': 'Contraseña actualizada correctamente. Por favor, inicia sesión nuevamente.'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'detail': f'Error al cambiar contraseña: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -7,7 +7,8 @@ import { ActivityLogPage } from './pages/ActivityLogPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText } from 'lucide-react';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -189,10 +190,18 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0">
+        <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 space-y-0.5 md:space-y-2">
+          <button
+            onClick={() => window.location.href = '/change-password'}
+            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
+            title="Cambiar contraseña"
+          >
+            <Lock size={14} className="md:w-4 md:h-4" />
+            <span className="hidden md:inline">Cambiar Contraseña</span>
+          </button>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition mb-0.5 md:mb-2"
+            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
             title={t.logout}
           >
             <LogOut size={14} className="md:w-4 md:h-4" />
@@ -296,6 +305,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email/:token" element={<EmailVerificationPage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/*" element={<MainApp />} />
       </Routes>
     </Router>

@@ -25,6 +25,7 @@ from capacity.views import (
     CaseInsensitiveTokenObtainPairView,
     LogoutView,
     SessionStatusView,
+    ChangePasswordView,
 )
 
 # Create a router and register viewsets
@@ -73,6 +74,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/logout/', LogoutView.as_view(), name='logout'),
     path('api/session-status/', SessionStatusView.as_view(), name='session_status'),
+    path('api/change-password/', ChangePasswordView.as_view(), name='change_password'),
 
     # Registration endpoints
     path('api/register/', UserRegistrationView.as_view(), name='user_register'),
