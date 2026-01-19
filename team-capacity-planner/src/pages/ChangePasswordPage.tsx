@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { useTranslation } from '../utils/translations';
 import { Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
@@ -11,8 +9,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 export const ChangePasswordPage = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { language } = useLanguage();
-  const t = useTranslation(language);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -53,7 +49,7 @@ export const ChangePasswordPage = () => {
       // Get the access token from localStorage
       const token = localStorage.getItem('access_token');
 
-      const response = await axios.post(
+      await axios.post(
         `${API_URL}/change-password/`,
         {
           current_password: currentPassword,
