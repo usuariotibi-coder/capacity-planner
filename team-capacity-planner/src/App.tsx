@@ -137,7 +137,7 @@ function MainApp() {
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-1 md:px-4 py-2 md:py-3 rounded-lg transition text-xs md:text-sm ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-1 md:px-4 py-2 md:py-3 rounded-lg transition text-xs md:text-sm ${
                 currentPage === item.id
                   ? 'bg-blue-500 text-white'
                   : 'text-slate-300 hover:bg-slate-700'
@@ -145,7 +145,7 @@ function MainApp() {
               title={item.label}
             >
               <span className="flex-shrink-0">{item.icon}</span>
-              <span className="font-medium hidden md:inline">{item.label}</span>
+              <span className="font-medium text-center md:text-left">{item.label}</span>
             </button>
           ))}
         </nav>
