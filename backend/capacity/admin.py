@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Employee, Project, Assignment, DepartmentStageConfig, ProjectBudget, ActivityLog
+from .models import Employee, Project, Assignment, DepartmentStageConfig, ProjectBudget, ActivityLog, UserSession
 
 
 @admin.register(Employee)
@@ -40,3 +40,11 @@ class ActivityLogAdmin(admin.ModelAdmin):
     list_display = ['user', 'action', 'model_name', 'created_at']
     list_filter = ['model_name', 'created_at']
     readonly_fields = ['user', 'action', 'model_name', 'object_id', 'changes', 'created_at']
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'created_at', 'last_activity', 'is_active']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['user__username', 'device_info']
+    readonly_fields = ['id', 'refresh_token', 'created_at', 'last_activity']

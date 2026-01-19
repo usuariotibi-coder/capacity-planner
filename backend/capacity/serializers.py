@@ -1680,6 +1680,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
     Custom serializer for token obtain that accepts case-insensitive username.
 
     This allows users to login with username in any case (e.g., MARCO.SOTO or marco.soto).
+    Limits users to maximum 2 simultaneous sessions/devices.
     """
     username = serializers.CharField(required=True)
     password = serializers.CharField(required=True, write_only=True)
@@ -1687,6 +1688,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
     def validate(self, attrs):
         from rest_framework_simplejwt.tokens import RefreshToken
         from django.contrib.auth import authenticate
+        from capacity.models import UserSession
 
         username = attrs.get('username')
         password = attrs.get('password')
@@ -1695,6 +1697,16 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
         user = User.objects.filter(username__iexact=username).first()
 
         if user and user.check_password(password):
+            # Check active sessions for this user (limit to 2)
+            active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
+
+            if active_sessions >= 2:
+                # Remove the oldest session to allow the new login
+                oldest_session = UserSession.objects.filter(user=user, is_active=True).order_by('created_at').first()
+                if oldest_session:
+                    oldest_session.is_active = False
+                    oldest_session.save()
+
             refresh = RefreshToken.for_user(user)
             # Add custom claims to the access token
             refresh['username'] = user.username
@@ -1706,6 +1718,19 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
             refresh.access_token['first_name'] = user.first_name
             refresh.access_token['last_name'] = user.last_name
 
+            # Create a new session record
+            device_info = {
+                'user_agent': self.context.get('request').META.get('HTTP_USER_AGENT', '') if self.context.get('request') else '',
+                'ip_address': self.get_client_ip(self.context.get('request')) if self.context.get('request') else '',
+            }
+
+            UserSession.objects.create(
+                user=user,
+                refresh_token=str(refresh),
+                device_info=device_info,
+                is_active=True
+            )
+
             attrs['refresh'] = str(refresh)
             attrs['access'] = str(refresh.access_token)
             attrs['user_id'] = user.id
@@ -1716,3 +1741,14 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
             return attrs
         else:
             raise serializers.ValidationError('Invalid credentials')
+
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        if not request:
+            return ''
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip

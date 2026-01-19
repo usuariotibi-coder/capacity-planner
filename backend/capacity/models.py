@@ -325,3 +325,28 @@ class EmailVerification(models.Model):
         """Generate a random 6-digit verification code"""
         import random
         return str(random.randint(100000, 999999))
+
+
+class UserSession(models.Model):
+    """
+    Model to track active user sessions.
+
+    Limits users to a maximum of 2 simultaneous sessions/devices.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
+    refresh_token = models.TextField(unique=True, help_text="JWT refresh token for this session")
+    device_info = models.JSONField(default=dict, blank=True, help_text="Device information (user agent, IP, etc.)")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Session creation timestamp")
+    last_activity = models.DateTimeField(auto_now=True, help_text="Last activity timestamp")
+    is_active = models.BooleanField(default=True, help_text="Whether this session is still active")
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['refresh_token']),
+        ]
+
+    def __str__(self):
+        return f"Session for {self.user.username} - Created: {self.created_at}"
