@@ -2703,15 +2703,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         <thead>
                         {/* Month row */}
                         <tr className="bg-gray-200 text-gray-700">
-                          <th className="border border-gray-300 px-1 py-0.5 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs"></th>
+                          <th className="border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs"></th>
                           {(() => {
                             const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
                             let currentMonth = '';
                             let startIdx = 0;
+                            const locale = language === 'es' ? 'es-ES' : 'en-US';
 
                             allWeeksData.forEach((weekData, idx) => {
                               const date = new Date(weekData.date);
-                              const monthName = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                              const monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
 
                               if (monthName !== currentMonth) {
                                 if (currentMonth) {
@@ -2732,7 +2733,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <th
                                   key={`${monthInfo.month}-${monthInfo.startIdx}`}
                                   colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                  className={`border-2 px-2 py-1.5 text-center font-bold text-xs transition-all ${
+                                  className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
                                     isEven
                                       ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
                                       : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
@@ -3280,15 +3281,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         <thead>
                           {/* Month row */}
                           <tr className="bg-gray-200 text-gray-700 sticky top-0 z-20">
-                            <th className="border border-gray-300 px-1 py-0.5 text-left font-bold sticky left-0 bg-gray-200 z-30 text-xs"></th>
+                            <th className="border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-30 text-xs"></th>
                             {(() => {
                               const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
                               let currentMonth = '';
                               let startIdx = 0;
+                              const locale = language === 'es' ? 'es-ES' : 'en-US';
 
                               allWeeksData.forEach((weekData, idx) => {
                                 const date = new Date(weekData.date);
-                                const monthName = date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                                const monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
 
                                 if (monthName !== currentMonth) {
                                   if (currentMonth) {
@@ -3309,7 +3311,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   <th
                                     key={`${monthInfo.month}-${monthInfo.startIdx}`}
                                     colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                    className={`border-2 px-2 py-1.5 text-center font-bold text-xs transition-all ${
+                                    className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
                                       isEven
                                         ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
                                         : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
@@ -3322,7 +3324,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             })()}
                           </tr>
                           {/* Week row */}
-                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-6 z-20">
+                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-5 z-20">
                             <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-xs">
                               Dpto
                             </th>
