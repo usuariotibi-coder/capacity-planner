@@ -121,7 +121,7 @@ function MainApp() {
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
-          sidebarOpen ? 'w-16 md:w-56' : 'w-0'
+          sidebarOpen ? 'w-14 md:w-56' : 'w-0'
         } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0`}
       >
         <div className="p-0.5 md:p-6 border-b border-slate-700 flex-shrink-0">
