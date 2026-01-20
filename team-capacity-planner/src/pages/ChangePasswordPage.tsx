@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
+const API_URL = `${BASE_URL}/api`;
 
 export const ChangePasswordPage = () => {
   const navigate = useNavigate();

@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 const SESSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check session status every 5 minutes
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
+const API_URL = `${BASE_URL}/api`;
 
 export const useInactivityLogout = () => {
   const { logout, isLoggedIn } = useAuth();
