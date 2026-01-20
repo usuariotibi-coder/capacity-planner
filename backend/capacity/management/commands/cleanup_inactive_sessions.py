@@ -33,6 +33,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'✓ Successfully marked {inactive_sessions} inactive sessions as inactive'
+                f'Successfully marked {inactive_sessions} inactive sessions as inactive'
             )
         )
