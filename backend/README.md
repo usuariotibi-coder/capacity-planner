@@ -49,6 +49,7 @@ python manage.py runserver
 
 - **[LOCAL_TESTING.md](./LOCAL_TESTING.md)** - Guía de pruebas locales con datos de prueba y casos de prueba
 - **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Referencia completa de la API con ejemplos
+- **[SESSION_MANAGEMENT.md](./SESSION_MANAGEMENT.md)** - Sistema de sesiones, limites de dispositivos e inactividad
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Guía de despliegue en Railway
 
 ## 🏗️ Estructura del Proyecto

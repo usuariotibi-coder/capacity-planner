@@ -406,6 +406,99 @@ curl -X POST http://localhost:8000/api/token/refresh/ \
 - **Token Rotation**: Enabled (refresh tokens rotate on use)
 - **Blacklist After Rotation**: Enabled
 
+### Session Management
+
+**Key Features**:
+- **Maximum Sessions**: 2 active sessions per user (limits device connections)
+- **Inactivity Timeout**: 30 minutes (auto-logout both frontend and backend)
+- **Device Tracking**: Stores User-Agent and IP address
+- **Activity Monitoring**: Updates on every API request
+
+**Session Endpoints**:
+
+#### Check Session Status
+**Endpoint**: `GET /api/session-status/`
+
+Verify if the current session is still active.
+
+**Request**:
+```
+GET /api/session-status/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+```
+
+**Response (Active)**:
+```json
+{
+  "status": "active",
+  "user_id": 123,
+  "username": "user@example.com"
+}
+```
+
+**Response (Inactive)**:
+```
+Status: 401 Unauthorized
+{
+  "detail": "Session is inactive"
+}
+```
+
+#### Logout (Deactivate Session)
+**Endpoint**: `POST /api/logout/`
+
+Manually deactivate the current session.
+
+**Request**:
+```
+POST /api/logout/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "refresh": "YOUR_REFRESH_TOKEN"
+}
+```
+
+**Response**:
+```json
+{
+  "detail": "Successfully logged out"
+}
+```
+
+#### Change Password
+**Endpoint**: `POST /api/change-password/`
+
+Change user password and invalidate all active sessions (forces re-login on all devices).
+
+**Request**:
+```
+POST /api/change-password/
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "current_password": "old_password",
+  "new_password": "new_password",
+  "confirm_password": "new_password"
+}
+```
+
+**Response**:
+```json
+{
+  "detail": "Password changed successfully. All sessions have been invalidated."
+}
+```
+
+**Error Response (Wrong Current Password)**:
+```json
+{
+  "current_password": ["Current password is incorrect"]
+}
+```
+
 ---
 
 ## API Endpoints
