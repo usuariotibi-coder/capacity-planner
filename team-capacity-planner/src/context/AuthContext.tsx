@@ -120,10 +120,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = () => {
-    authApi.logout();
+  const logout = async () => {
+    // Call backend to deactivate session (async but don't block UI)
+    authApi.logout().catch((error) => {
+      console.error('[AuthContext] Logout backend call failed:', error);
+    });
+
+    // Immediately update local state
     setIsLoggedIn(false);
     setCurrentUser(null);
+
     // Clear any cached data
     localStorage.removeItem('employees');
     localStorage.removeItem('projects');

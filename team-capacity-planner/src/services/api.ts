@@ -181,9 +181,35 @@ export const authApi = {
       console.log('[LOGIN] Response ok:', response.ok);
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.log('[LOGIN] Error response:', errorData);
-        throw new Error('Credenciales inválidas');
+        const errorText = await response.text();
+        console.log('[LOGIN] Error response:', errorText);
+
+        // Parse backend error and extract meaningful message
+        let errorMessage = 'Credenciales inválidas';
+        try {
+          const errorData = JSON.parse(errorText);
+          // Handle non_field_errors (e.g., "Máximo de dispositivos conectados")
+          if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+            errorMessage = errorData.non_field_errors.join('. ');
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else {
+            // Join all error messages from the response
+            const messages = Object.values(errorData).flat();
+            if (messages.length > 0) {
+              errorMessage = messages.join('. ');
+            }
+          }
+        } catch {
+          // If JSON parsing fails, use the raw text or default message
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -196,7 +222,28 @@ export const authApi = {
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    const refreshToken = getRefreshToken();
+    const accessToken = getAccessToken();
+
+    // Call backend to deactivate the session
+    if (refreshToken && accessToken) {
+      try {
+        await fetch(`${API_URL}/api/logout/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        });
+        console.log('[LOGOUT] Session deactivated on backend');
+      } catch (error) {
+        console.error('[LOGOUT] Failed to deactivate session on backend:', error);
+      }
+    }
+
+    // Clear local tokens
     clearTokens();
   },
 
