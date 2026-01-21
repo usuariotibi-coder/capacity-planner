@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
@@ -305,8 +306,22 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email/:token" element={<EmailVerificationPage />} />
-        <Route path="/change-password" element={<ChangePasswordPage />} />
-        <Route path="/*" element={<MainApp />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   );
