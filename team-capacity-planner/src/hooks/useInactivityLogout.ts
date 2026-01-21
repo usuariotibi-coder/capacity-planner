@@ -72,6 +72,31 @@ export const useInactivityLogout = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Handle tab/window close - logout when user closes the tab/browser
+    const handleBeforeUnload = () => {
+      console.log('[useInactivityLogout] Tab/window closing, logging out...');
+      // Use sendBeacon to ensure logout request completes even if tab is closing
+      const refreshToken = localStorage.getItem('refresh_token');
+      const accessToken = localStorage.getItem('access_token');
+
+      if (refreshToken && accessToken) {
+        try {
+          // Use navigator.sendBeacon for reliable delivery when page unloads
+          navigator.sendBeacon(`${API_URL}/logout/`, JSON.stringify({
+            refresh: refreshToken,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          }));
+        } catch (error) {
+          console.error('[useInactivityLogout] Error sending logout beacon:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Initialize timer on mount
     resetTimer();
 
@@ -83,6 +108,7 @@ export const useInactivityLogout = () => {
         window.removeEventListener(event, resetTimer);
       });
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [isLoggedIn, logout]);
 };
