@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import type { Project } from '../types';
 import { projectsApi, isAuthenticated, activityLogApi } from '../services/api';
+import { getChangedFields } from '../utils/activityLog';
 
 interface ProjectStore {
   projects: Project[];
@@ -89,6 +90,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   updateProject: async (id, updates) => {
     const originalProjects = get().projects;
+    const originalProject = originalProjects.find((proj) => proj.id === id);
+    const changedUpdates = getChangedFields(originalProject, updates);
 
     // Optimistic update
     set((state) => ({
@@ -103,12 +106,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       console.log('[Store] Project updated successfully');
 
       // Log activity
-      await activityLogApi.logActivity(
-        'updated',
-        'Project',
-        id,
-        { updates }
-      );
+      if (Object.keys(changedUpdates).length > 0) {
+        await activityLogApi.logActivity(
+          'updated',
+          'Project',
+          id,
+          { updates: changedUpdates }
+        );
+      }
 
       // Refetch projects to ensure UI is in sync with backend
       console.log('[Store] Refetching projects after update...');

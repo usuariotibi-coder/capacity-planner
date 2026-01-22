@@ -159,20 +159,20 @@ export function ActivityLogPage() {
   // List of internal/technical fields to hide from users
   const internalFields = [
     'id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by',
-    'createdAt', 'updatedAt', 'userId', 'user_id', 'projectId', 'project_id',
-    'employeeId', 'employee_id', 'assignmentId', 'assignment_id', 'scioHours',
-    'sciohoursallocated', 'sciohours', 'sciohours_allocated', 'scio_hours',
-    'scio_hours_allocated', 'department_hours_allocated', 'departmenthours',
-    'departmenthoursallocated', 'allocationId', 'allocation_id', 'teamId', 'team_id',
-    'capacityId', 'capacity_id', 'companyId', 'company_id', 'externalTeamId',
-    'external_team_id', 'modified_by', 'modifiedBy', 'modified_at', 'modifiedAt',
-    'is_active', 'isActive', 'is_deleted', 'isDeleted', 'deleted_at', 'deletedAt'
+    'createdat', 'updatedat', 'userid', 'user_id', 'projectid', 'project_id',
+    'employeeid', 'employee_id', 'assignmentid', 'assignment_id', 'sciohours',
+    'sciohoursallocated', 'sciohours_allocated', 'scio_hours', 'scio_hours_allocated',
+    'department_hours_allocated', 'departmenthours', 'departmenthoursallocated',
+    'allocationid', 'allocation_id', 'teamid', 'team_id', 'capacityid', 'capacity_id',
+    'companyid', 'company_id', 'externalteamid', 'external_team_id', 'modified_by',
+    'modifiedby', 'modified_at', 'modifiedat', 'is_active', 'isactive', 'is_deleted',
+    'isdeleted', 'deleted_at', 'deletedat'
   ];
 
   // Check if a field should be hidden (internal/technical)
   const isInternalField = (key: string): boolean => {
     const lowerKey = key.toLowerCase();
-    return internalFields.some(field => lowerKey === field);
+    return internalFields.includes(lowerKey);
   };
 
   // Map of field names to human-readable labels
@@ -492,7 +492,15 @@ export function ActivityLogPage() {
                           </p>
 
                           {(() => {
-                            const mainObj = extractMainObject(log.changes);
+                            const updatePayload =
+                              isUpdateAction(log.action) &&
+                              log.changes &&
+                              typeof log.changes === 'object' &&
+                              (log.changes as any).updates &&
+                              typeof (log.changes as any).updates === 'object'
+                                ? { objectType: null, data: (log.changes as any).updates }
+                                : null;
+                            const mainObj = updatePayload || extractMainObject(log.changes);
 
                             if (!log.changes) {
                               return (
@@ -525,9 +533,11 @@ export function ActivityLogPage() {
 
                               return (
                                 <div className="space-y-2">
-                                  <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full border border-slate-200 mb-2">
-                                    {objectType}
-                                  </div>
+                                  {objectType && (
+                                    <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full border border-slate-200 mb-2">
+                                      {objectType}
+                                    </div>
+                                  )}
                                   <div className="grid grid-cols-1 gap-2">
                                     {displayedEntries.map(([key, value]) => {
                                       const isImportant = importantFields.includes(key);

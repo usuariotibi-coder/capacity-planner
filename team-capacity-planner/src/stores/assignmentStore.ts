@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Assignment } from '../types';
 import { assignmentsApi, isAuthenticated, activityLogApi } from '../services/api';
+import { getChangedFields } from '../utils/activityLog';
 
 interface AssignmentStore {
   assignments: Assignment[];
@@ -62,6 +63,8 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   updateAssignment: async (id, updates) => {
     const originalAssignments = get().assignments;
+    const originalAssignment = originalAssignments.find((assign) => assign.id === id);
+    const changedUpdates = getChangedFields(originalAssignment, updates);
 
     // Optimistic update
     set((state) => ({
@@ -76,12 +79,14 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       console.log('[Store] Assignment updated successfully');
 
       // Log activity
-      await activityLogApi.logActivity(
-        'updated',
-        'Assignment',
-        id,
-        { updates }
-      );
+      if (Object.keys(changedUpdates).length > 0) {
+        await activityLogApi.logActivity(
+          'updated',
+          'Assignment',
+          id,
+          { updates: changedUpdates }
+        );
+      }
 
       // Refetch assignments to ensure UI is in sync with backend
       console.log('[Store] Refetching assignments after update...');

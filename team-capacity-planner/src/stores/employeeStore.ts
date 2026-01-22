@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Employee } from '../types';
 import { employeesApi, isAuthenticated, activityLogApi } from '../services/api';
+import { getChangedFields } from '../utils/activityLog';
 
 interface EmployeeStore {
   employees: Employee[];
@@ -60,6 +61,8 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
 
   updateEmployee: async (id, updates) => {
     const originalEmployees = get().employees;
+    const originalEmployee = originalEmployees.find((emp) => emp.id === id);
+    const changedUpdates = getChangedFields(originalEmployee, updates);
 
     // Optimistic update
     set((state) => ({
@@ -74,12 +77,14 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
       console.log('[Store] Employee updated successfully');
 
       // Log activity
-      await activityLogApi.logActivity(
-        'UPDATE',
-        'Employee',
-        id,
-        updates
-      );
+      if (Object.keys(changedUpdates).length > 0) {
+        await activityLogApi.logActivity(
+          'UPDATE',
+          'Employee',
+          id,
+          { updates: changedUpdates }
+        );
+      }
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al actualizar empleado';
