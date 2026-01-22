@@ -156,6 +156,27 @@ export function ActivityLogPage() {
     return String(value);
   };
 
+  const noiseFields = [
+    'weeknumber',
+    'stagedisplay',
+    'externalhours',
+    'totalhours',
+    'assignmentcount',
+    'projectmanager',
+  ];
+
+  const isDisplayValue = (value: any) => {
+    if (value === null || value === undefined || value === '') return false;
+    if (Array.isArray(value)) return false;
+    if (typeof value === 'object') return false;
+    return true;
+  };
+
+  const shouldHideField = (key: string, value: any) => {
+    const lowerKey = key.toLowerCase();
+    return isInternalField(key) || noiseFields.includes(lowerKey) || !isDisplayValue(value);
+  };
+
   // List of internal/technical fields to hide from users
   const internalFields = [
     'id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by',
@@ -379,6 +400,7 @@ export function ActivityLogPage() {
                 const tone = getActionTone(log.action);
                 const actionLabel = getActionLabel(log.action);
                 const modelLabel = log.model_name || (language === 'es' ? 'Registro' : 'Record');
+                const isUpdate = isUpdateAction(log.action);
                 const isExpanded = expandedId === log.id;
                 const userLabel =
                   log.user?.first_name && log.user?.last_name
@@ -512,10 +534,13 @@ export function ActivityLogPage() {
 
                             if (mainObj) {
                               const { objectType, data } = mainObj;
-                              const entries = Object.entries(data).filter(([key]) => !isInternalField(key));
+                              const entries = Object.entries(data).filter(([key, value]) => !shouldHideField(key, value));
 
                               const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
-                              const prioritized = entries.sort((a, b) => {
+                              const visibleEntries = isUpdate
+                                ? entries
+                                : entries.filter(([key]) => importantFields.includes(key));
+                              const prioritized = visibleEntries.sort((a, b) => {
                                 const aImportant = importantFields.includes(a[0]) ? 0 : 1;
                                 const bImportant = importantFields.includes(b[0]) ? 0 : 1;
                                 return aImportant - bImportant;
@@ -563,9 +588,9 @@ export function ActivityLogPage() {
                                         </div>
                                       );
                                     })}
-                                    {entries.length > 10 && (
+                                    {visibleEntries.length > 10 && (
                                       <div className="text-xs text-slate-500 italic px-2 py-1">
-                                        +{entries.length - 10} more fields
+                                        +{visibleEntries.length - 10} more fields
                                       </div>
                                     )}
                                   </div>
@@ -574,7 +599,7 @@ export function ActivityLogPage() {
                             }
 
                             if (typeof log.changes === 'object') {
-                              const entries = Object.entries(log.changes).filter(([key]) => !isInternalField(key));
+                              const entries = Object.entries(log.changes).filter(([key, value]) => !shouldHideField(key, value));
 
                               if (entries.length === 0) {
                                 return (
@@ -585,7 +610,10 @@ export function ActivityLogPage() {
                               }
 
                               const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
-                              const prioritized = entries.sort((a, b) => {
+                              const visibleEntries = isUpdate
+                                ? entries
+                                : entries.filter(([key]) => importantFields.includes(key));
+                              const prioritized = visibleEntries.sort((a, b) => {
                                 const aImportant = importantFields.includes(a[0]) ? 0 : 1;
                                 const bImportant = importantFields.includes(b[0]) ? 0 : 1;
                                 return aImportant - bImportant;
@@ -620,9 +648,9 @@ export function ActivityLogPage() {
                                         </div>
                                       );
                                     })}
-                                    {entries.length > 10 && (
+                                    {visibleEntries.length > 10 && (
                                       <div className="text-xs text-slate-500 italic px-2 py-1">
-                                        +{entries.length - 10} more fields
+                                        +{visibleEntries.length - 10} more fields
                                       </div>
                                     )}
                                   </div>
