@@ -11,6 +11,7 @@ interface ActivityLog {
   user: {
     id: number;
     username: string;
+    email: string;
     first_name: string;
     last_name: string;
   } | null;
@@ -40,6 +41,11 @@ export function ActivityLogPage() {
       setError(null);
       try {
         const data = await activityLogApi.getAll();
+        console.log('[ActivityLog] Raw data from API:', data);
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('[ActivityLog] First log entry:', data[0]);
+          console.log('[ActivityLog] User object:', data[0].user);
+        }
         setLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error loading activity logs');
@@ -324,8 +330,9 @@ export function ActivityLogPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-2 p-6">
-            {filteredLogs.map((log) => (
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {filteredLogs.map((log) => (
               <div
                 key={log.id}
                 className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
@@ -348,14 +355,13 @@ export function ActivityLogPage() {
 
                         {/* User & Model Info */}
                         <div className="flex flex-col min-w-0 flex-1 gap-1">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
-                              {log.user && log.user.first_name && log.user.last_name
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-xs font-medium text-white bg-gray-600 px-2.5 py-1 rounded flex-shrink-0">
+                              {log.user?.first_name && log.user?.last_name
                                 ? `${log.user.first_name} ${log.user.last_name}`
-                                : log.user?.username || 'Unknown User'}
+                                : log.user?.username || log.user?.email || 'Unknown'}
                             </span>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-600">{log.model_name}</span>
+                            <span className="text-xs text-gray-500 font-medium">{log.model_name}</span>
                           </div>
 
                           {/* Important Summary Info */}
@@ -570,6 +576,7 @@ export function ActivityLogPage() {
                 )}
               </div>
             ))}
+            </div>
           </div>
         )}
       </div>
