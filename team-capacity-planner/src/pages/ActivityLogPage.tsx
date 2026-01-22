@@ -349,7 +349,9 @@ export function ActivityLogPage() {
                         {/* User & Model Info */}
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-semibold text-gray-900">
-                            {log.user?.username || 'Unknown User'}
+                            {log.user?.first_name && log.user?.last_name
+                              ? `${log.user.first_name} ${log.user.last_name}`
+                              : log.user?.username || 'Unknown User'}
                             <span className="text-gray-500 font-normal"> • {log.model_name}</span>
                           </span>
 
@@ -408,29 +410,8 @@ export function ActivityLogPage() {
                         <p className="text-sm text-blue-800">
                           {log.user.first_name} {log.user.last_name}
                         </p>
-                        <p className="text-xs text-blue-700 font-mono">
-                          {log.user.username}
-                        </p>
                       </div>
                     )}
-
-                    {/* Object ID */}
-                    <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">🔍 Object ID</p>
-                      <p className="text-xs text-gray-600 font-mono break-all">
-                        {log.object_id}
-                      </p>
-                    </div>
-
-                    {/* Timestamp */}
-                    <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">⏰ Timestamp</p>
-                      <p className="text-xs text-gray-600 font-mono">
-                        {new Date(log.created_at).toLocaleString(
-                          language === 'es' ? 'es-ES' : 'en-US'
-                        )}
-                      </p>
-                    </div>
 
                     {/* Changes - Enhanced View */}
                     <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-lg border border-amber-200">
