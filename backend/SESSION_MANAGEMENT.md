@@ -529,6 +529,38 @@ const API_URL = 'http://localhost:8000/api';
 
 ---
 
+## Recent Updates (January 2026)
+
+### ✅ Route Protection
+- Created `ProtectedRoute` component to guard private routes
+- All authenticated pages require valid JWT tokens
+- Automatic redirect to login for unauthorized users
+
+### ✅ Auto-Logout on Tab Close
+- Added `beforeunload` event listener
+- Uses `navigator.sendBeacon()` for reliable logout
+- Session deactivated immediately when user closes tab
+
+### ✅ Real Error Messages
+- Login now displays actual backend errors
+- Shows "Máximo de dispositivos conectados" instead of generic error
+- Improved error parsing in frontend
+
+### ✅ Proper Session Deactivation
+- Logout now calls `/api/logout/` endpoint
+- Session marked as `is_active=False` in database
+- Prevents session accumulation bug
+
+### ✅ Activity Log Improvements
+- Shows user full name instead of email
+- 2-column grid layout for better visibility
+- Removed technical details (Object ID, Timestamp)
+- Debug logging for troubleshooting
+
+**See**: `SECURITY_AND_SESSION_UPDATES.md` for detailed changelog
+
+---
+
 ## Future Enhancements
 
 - [ ] Device fingerprinting (WebGL, screen resolution, etc)
@@ -537,3 +569,4 @@ const API_URL = 'http://localhost:8000/api';
 - [ ] Suspicious activity alerts
 - [ ] Push notifications on new login
 - [ ] Session activity audit log
+- [ ] WebSocket real-time session invalidation
