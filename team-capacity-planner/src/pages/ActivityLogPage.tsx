@@ -338,48 +338,51 @@ export function ActivityLogPage() {
                       onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
                       className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
                         {/* Action Badge */}
                         <div
-                          className={`px-2 py-1 rounded font-semibold text-xs border flex-shrink-0 ${getActionColor(log.action)}`}
+                          className={`px-2.5 py-1.5 rounded font-semibold text-xs border flex-shrink-0 ${getActionColor(log.action)}`}
                         >
                           {getActionIcon(log.action)} {log.action}
                         </div>
 
                         {/* User & Model Info */}
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold text-gray-900">
-                              {log.user?.first_name && log.user?.last_name
+                        <div className="flex flex-col min-w-0 flex-1 gap-1">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
+                              {log.user && log.user.first_name && log.user.last_name
                                 ? `${log.user.first_name} ${log.user.last_name}`
                                 : log.user?.username || 'Unknown User'}
                             </span>
-                            <span className="text-gray-500 font-normal text-sm">• {log.model_name}</span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-600">{log.model_name}</span>
                           </div>
 
                           {/* Important Summary Info */}
-                          <div className="flex flex-wrap gap-2 mt-0.5">
-                            {summary?.project && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                📊 {summary.project}
-                              </span>
-                            )}
-                            {summary?.hours && (
-                              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                ⏱️ {summary.hours}h
-                              </span>
-                            )}
-                            {summary?.employee && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                👤 {summary.employee}
-                              </span>
-                            )}
-                            {summary?.week && (
-                              <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                📅 Sem. {summary.week?.substring(5, 7)}
-                              </span>
-                            )}
-                          </div>
+                          {(summary?.project || summary?.hours || summary?.employee || summary?.week) && (
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {summary?.project && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                  📊 {summary.project}
+                                </span>
+                              )}
+                              {summary?.hours && (
+                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                  ⏱️ {summary.hours}h
+                                </span>
+                              )}
+                              {summary?.employee && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                  👤 {summary.employee}
+                                </span>
+                              )}
+                              {summary?.week && (
+                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                  📅 Sem. {summary.week?.substring(5, 7)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Timestamp */}
