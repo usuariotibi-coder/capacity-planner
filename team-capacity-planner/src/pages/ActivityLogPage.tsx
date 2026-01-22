@@ -59,19 +59,21 @@ export function ActivityLogPage() {
   }, []);
 
   // Get unique actions and models
-  const uniqueActions = Array.from(new Set(logs.map(log => log.action)));
-  const uniqueModels = Array.from(new Set(logs.map(log => log.model_name)));
+  const uniqueActions = Array.from(new Set(logs.map(log => log.action).filter(Boolean)));
+  const uniqueModels = Array.from(new Set(logs.map(log => log.model_name).filter(Boolean)));
 
   // Filter logs
   const filteredLogs = logs.filter(log => {
+    const actionValue = log.action || '';
+    const modelValue = log.model_name || '';
     const matchesSearch =
       searchTerm === '' ||
       (log.user?.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.model_name.toLowerCase().includes(searchTerm.toLowerCase());
+      actionValue.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      modelValue.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesAction = filterAction === 'all' || log.action === filterAction;
-    const matchesModel = filterModel === 'all' || log.model_name === filterModel;
+    const matchesAction = filterAction === 'all' || actionValue === filterAction;
+    const matchesModel = filterModel === 'all' || modelValue === filterModel;
 
     return matchesSearch && matchesAction && matchesModel;
   });
@@ -87,7 +89,7 @@ export function ActivityLogPage() {
     }
   };
 
-  const normalizeAction = (action: string) => action.toLowerCase();
+  const normalizeAction = (action?: string) => (action || '').toLowerCase();
   const isCreateAction = (action: string) => ['create', 'created'].includes(normalizeAction(action));
   const isUpdateAction = (action: string) => ['update', 'updated'].includes(normalizeAction(action));
   const isDeleteAction = (action: string) => ['delete', 'deleted', 'remove', 'removed'].includes(normalizeAction(action));
@@ -376,13 +378,14 @@ export function ActivityLogPage() {
                 const summary = extractSummaryInfo(log.changes, log.model_name);
                 const tone = getActionTone(log.action);
                 const actionLabel = getActionLabel(log.action);
+                const modelLabel = log.model_name || (language === 'es' ? 'Registro' : 'Record');
                 const userLabel =
                   log.user?.first_name && log.user?.last_name
                     ? `${log.user.first_name} ${log.user.last_name}`
                     : log.user?.username ||
                       log.user?.email ||
                       (language === 'es' ? 'Desconocido' : 'Unknown');
-                const resourceLabel = log.model_name.toLowerCase().includes('team')
+                const resourceLabel = (log.model_name || '').toLowerCase().includes('team')
                   ? (language === 'es' ? 'Equipo' : 'Team')
                   : (language === 'es' ? 'Empleado' : 'Employee');
 
@@ -429,7 +432,7 @@ export function ActivityLogPage() {
                             <span className={`text-[11px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border ${tone.badge}`}>
                               {actionLabel}
                             </span>
-                            <span className="text-sm font-semibold text-gray-900 truncate">{log.model_name}</span>
+                            <span className="text-sm font-semibold text-gray-900 truncate">{modelLabel}</span>
                           </div>
 
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
