@@ -156,6 +156,16 @@ export function ActivityLogPage() {
     return String(value);
   };
 
+  const formatTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const locale = language === 'es' ? 'es-MX' : 'en-US';
+      return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
+    } catch {
+      return '';
+    }
+  };
+
   const noiseFields = [
     'weeknumber',
     'stagedisplay',
@@ -402,12 +412,14 @@ export function ActivityLogPage() {
                 const modelLabel = log.model_name || (language === 'es' ? 'Registro' : 'Record');
                 const isUpdate = isUpdateAction(log.action);
                 const isExpanded = expandedId === log.id;
+                const userFullName = [log.user?.first_name, log.user?.last_name].filter(Boolean).join(' ').trim();
+                const usernameFallback = log.user?.username || '';
+                const timeLabel = formatTime(log.created_at);
                 const userLabel =
-                  log.user?.first_name && log.user?.last_name
-                    ? `${log.user.first_name} ${log.user.last_name}`
-                    : log.user?.username ||
-                      log.user?.email ||
-                      (language === 'es' ? 'Desconocido' : 'Unknown');
+                  userFullName ||
+                  (usernameFallback && !usernameFallback.includes('@')
+                    ? usernameFallback
+                    : (language === 'es' ? 'Usuario' : 'User'));
                 const resourceLabel = (log.model_name || '').toLowerCase().includes('team')
                   ? (language === 'es' ? 'Equipo' : 'Team')
                   : (language === 'es' ? 'Empleado' : 'Employee');
@@ -465,7 +477,7 @@ export function ActivityLogPage() {
                             </span>
                             <span className="inline-flex items-center gap-1.5">
                               <Clock size={12} className="text-gray-400" />
-                              {formatDate(log.created_at)}
+                              {formatDate(log.created_at)}{timeLabel ? ` - ${timeLabel}` : ''}
                             </span>
                           </div>
 
