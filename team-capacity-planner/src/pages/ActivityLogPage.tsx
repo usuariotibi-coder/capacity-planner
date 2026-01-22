@@ -12,14 +12,15 @@ interface ActivityLog {
     id: number;
     username: string;
     email: string;
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
   } | null;
   action: string;
-  model_name: string;
-  object_id: string;
+  modelName: string;
+  objectId: string;
   changes: any;
-  created_at: string;
+  createdAt: string;
+  formattedCreatedAt?: string;
 }
 
 export function ActivityLogPage() {
@@ -60,12 +61,12 @@ export function ActivityLogPage() {
 
   // Get unique actions and models
   const uniqueActions = Array.from(new Set(logs.map(log => log.action).filter(Boolean)));
-  const uniqueModels = Array.from(new Set(logs.map(log => log.model_name).filter(Boolean)));
+  const uniqueModels = Array.from(new Set(logs.map(log => log.modelName).filter(Boolean)));
 
   // Filter logs
   const filteredLogs = logs.filter(log => {
     const actionValue = log.action || '';
-    const modelValue = log.model_name || '';
+    const modelValue = log.modelName || '';
     const matchesSearch =
       searchTerm === '' ||
       (log.user?.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,6 +167,24 @@ export function ActivityLogPage() {
     }
   };
 
+  const formatUserName = (user: ActivityLog['user']) => {
+    const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+    if (fullName) return fullName;
+
+    const fallback = user?.username || user?.email || '';
+    if (!fallback) return language === 'es' ? 'Usuario' : 'User';
+
+    const base = fallback.includes('@') ? fallback.split('@')[0] : fallback;
+    const cleaned = base.replace(/[._-]+/g, ' ').trim();
+    if (!cleaned) return language === 'es' ? 'Usuario' : 'User';
+
+    return cleaned
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   const noiseFields = [
     'weeknumber',
     'stagedisplay',
@@ -189,7 +208,7 @@ export function ActivityLogPage() {
 
   // List of internal/technical fields to hide from users
   const internalFields = [
-    'id', 'uuid', 'object_id', 'created_at', 'updated_at', 'created_by', 'updated_by',
+    'id', 'uuid', 'object_id', 'objectid', 'created_at', 'createdat', 'updated_at', 'updatedat', 'created_by', 'updated_by',
     'createdat', 'updatedat', 'userid', 'user_id', 'projectid', 'project_id',
     'employeeid', 'employee_id', 'assignmentid', 'assignment_id', 'sciohours',
     'sciohoursallocated', 'sciohours_allocated', 'scio_hours', 'scio_hours_allocated',
@@ -406,21 +425,16 @@ export function ActivityLogPage() {
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {filteredLogs.map((log) => {
-                const summary = extractSummaryInfo(log.changes, log.model_name);
+                const summary = extractSummaryInfo(log.changes, log.modelName);
                 const tone = getActionTone(log.action);
                 const actionLabel = getActionLabel(log.action);
-                const modelLabel = log.model_name || (language === 'es' ? 'Registro' : 'Record');
+                const modelLabel = log.modelName || (language === 'es' ? 'Registro' : 'Record');
                 const isUpdate = isUpdateAction(log.action);
                 const isExpanded = expandedId === log.id;
-                const userFullName = [log.user?.first_name, log.user?.last_name].filter(Boolean).join(' ').trim();
-                const usernameFallback = log.user?.username || '';
-                const timeLabel = formatTime(log.created_at);
-                const userLabel =
-                  userFullName ||
-                  (usernameFallback && !usernameFallback.includes('@')
-                    ? usernameFallback
-                    : (language === 'es' ? 'Usuario' : 'User'));
-                const resourceLabel = (log.model_name || '').toLowerCase().includes('team')
+                const createdAtValue = log.createdAt || log.formattedCreatedAt || '';
+                const timeLabel = formatTime(createdAtValue);
+                const userLabel = formatUserName(log.user);
+                const resourceLabel = (log.modelName || '').toLowerCase().includes('team')
                   ? (language === 'es' ? 'Equipo' : 'Team')
                   : (language === 'es' ? 'Empleado' : 'Employee');
 
@@ -477,7 +491,7 @@ export function ActivityLogPage() {
                             </span>
                             <span className="inline-flex items-center gap-1.5">
                               <Clock size={12} className="text-gray-400" />
-                              {formatDate(log.created_at)}{timeLabel ? ` - ${timeLabel}` : ''}
+                              {formatDate(createdAtValue)}{timeLabel ? ` - ${timeLabel}` : ''}
                             </span>
                           </div>
 
