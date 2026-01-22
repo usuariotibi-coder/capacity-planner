@@ -379,6 +379,7 @@ export function ActivityLogPage() {
                 const tone = getActionTone(log.action);
                 const actionLabel = getActionLabel(log.action);
                 const modelLabel = log.model_name || (language === 'es' ? 'Registro' : 'Record');
+                const isExpanded = expandedId === log.id;
                 const userLabel =
                   log.user?.first_name && log.user?.last_name
                     ? `${log.user.first_name} ${log.user.last_name}`
@@ -415,12 +416,12 @@ export function ActivityLogPage() {
                 return (
                   <div
                     key={log.id}
-                    className={`border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 ${tone.accent}`}
+                    className={`border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 ${tone.accent} ${isExpanded ? 'lg:col-span-2' : ''}`}
                   >
                     <button
-                      onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                      onClick={() => setExpandedId(isExpanded ? null : log.id)}
                       className="w-full px-4 py-3 bg-white hover:bg-gray-50 flex items-start justify-between gap-3 transition-colors"
-                      aria-expanded={expandedId === log.id}
+                      aria-expanded={isExpanded}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className={`h-9 w-9 rounded-lg border flex items-center justify-center flex-shrink-0 ${tone.iconBg}`}>
@@ -464,7 +465,7 @@ export function ActivityLogPage() {
                       </div>
 
                       <div className="mt-1 flex-shrink-0">
-                        {expandedId === log.id ? (
+                        {isExpanded ? (
                           <ChevronUp size={18} className="text-gray-400" />
                         ) : (
                           <ChevronDown size={18} className="text-gray-400" />
@@ -472,7 +473,7 @@ export function ActivityLogPage() {
                       </div>
                     </button>
 
-                    {expandedId === log.id && (
+                    {isExpanded && (
                       <div className="border-t border-gray-200 bg-white p-4 space-y-3">
                         {log.user && (
                           <div className="bg-blue-50 p-3 rounded border border-blue-200">
