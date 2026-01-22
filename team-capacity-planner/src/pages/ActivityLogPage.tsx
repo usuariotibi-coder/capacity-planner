@@ -348,12 +348,14 @@ export function ActivityLogPage() {
 
                         {/* User & Model Info */}
                         <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {log.user?.first_name && log.user?.last_name
-                              ? `${log.user.first_name} ${log.user.last_name}`
-                              : log.user?.username || 'Unknown User'}
-                            <span className="text-gray-500 font-normal"> • {log.model_name}</span>
-                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {log.user?.first_name && log.user?.last_name
+                                ? `${log.user.first_name} ${log.user.last_name}`
+                                : log.user?.username || 'Unknown User'}
+                            </span>
+                            <span className="text-gray-500 font-normal text-sm">• {log.model_name}</span>
+                          </div>
 
                           {/* Important Summary Info */}
                           <div className="flex flex-wrap gap-2 mt-0.5">
