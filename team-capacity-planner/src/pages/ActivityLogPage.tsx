@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { formatDistanceToNow } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, FileText, Pencil, Plus, Search, Tag, Trash2, User } from 'lucide-react';
 
 interface ActivityLog {
   id: string;
@@ -87,32 +87,71 @@ export function ActivityLogPage() {
     }
   };
 
-  // Get action color
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case 'CREATE':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'UPDATE':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'DELETE':
-        return 'bg-red-100 text-red-800 border-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
+  const normalizeAction = (action: string) => action.toLowerCase();
+  const isCreateAction = (action: string) => ['create', 'created'].includes(normalizeAction(action));
+  const isUpdateAction = (action: string) => ['update', 'updated'].includes(normalizeAction(action));
+  const isDeleteAction = (action: string) => ['delete', 'deleted', 'remove', 'removed'].includes(normalizeAction(action));
+
+  const getActionLabel = (action: string) => {
+    if (isCreateAction(action)) return language === 'es' ? 'Creado' : 'Created';
+    if (isUpdateAction(action)) return language === 'es' ? 'Actualizado' : 'Updated';
+    if (isDeleteAction(action)) return language === 'es' ? 'Eliminado' : 'Deleted';
+    if (!action) return language === 'es' ? 'Accion' : 'Action';
+    return action.charAt(0).toUpperCase() + action.slice(1).toLowerCase();
   };
 
-  // Get action icon
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'created':
-        return '➕';
-      case 'updated':
-        return '✏️';
-      case 'deleted':
-        return '🗑️';
-      default:
-        return '📋';
+  const getActionDetailLabel = (action: string) => {
+    if (isCreateAction(action)) return language === 'es' ? 'Creado con' : 'Created with';
+    if (isUpdateAction(action)) return language === 'es' ? 'Campos actualizados' : 'Updated fields';
+    if (isDeleteAction(action)) return language === 'es' ? 'Eliminado' : 'Deleted';
+    return getActionLabel(action);
+  };
+
+  const getActionTone = (action: string) => {
+    if (isCreateAction(action)) {
+      return {
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        iconBg: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        accent: 'border-l-emerald-400',
+      };
     }
+    if (isUpdateAction(action)) {
+      return {
+        badge: 'bg-blue-50 text-blue-700 border-blue-200',
+        iconBg: 'bg-blue-100 text-blue-700 border-blue-200',
+        accent: 'border-l-blue-400',
+      };
+    }
+    if (isDeleteAction(action)) {
+      return {
+        badge: 'bg-red-50 text-red-700 border-red-200',
+        iconBg: 'bg-red-100 text-red-700 border-red-200',
+        accent: 'border-l-red-400',
+      };
+    }
+    return {
+      badge: 'bg-slate-100 text-slate-700 border-slate-200',
+      iconBg: 'bg-slate-100 text-slate-700 border-slate-200',
+      accent: 'border-l-slate-300',
+    };
+  };
+
+  const getActionIcon = (action: string) => {
+    if (isCreateAction(action)) return <Plus size={16} />;
+    if (isUpdateAction(action)) return <Pencil size={16} />;
+    if (isDeleteAction(action)) return <Trash2 size={16} />;
+    return <FileText size={16} />;
+  };
+
+  const hasValue = (value: any) => value !== null && value !== undefined && value !== '';
+
+  const formatShortDate = (value: any) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') {
+      return value.includes('T') ? value.split('T')[0] : value;
+    }
+    if (value instanceof Date) return value.toISOString().split('T')[0];
+    return String(value);
   };
 
   // List of internal/technical fields to hide from users
@@ -254,8 +293,9 @@ export function ActivityLogPage() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          📊 {t.activityLog || 'Activity Log'}
+        <h1 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <FileText size={22} className="text-blue-600" />
+          {t.activityLog || 'Activity Log'}
         </h1>
 
         {/* Filters */}
@@ -281,7 +321,7 @@ export function ActivityLogPage() {
             <option value="all">{t.allActions || 'All Actions'}</option>
             {uniqueActions.map(action => (
               <option key={action} value={action}>
-                {getActionIcon(action)} {action}
+                {getActionLabel(action)}
               </option>
             ))}
           </select>
@@ -332,75 +372,95 @@ export function ActivityLogPage() {
         ) : (
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {filteredLogs.map((log) => (
-              <div
-                key={log.id}
-                className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-              >
-                {/* Log Entry Header */}
-                {(() => {
-                  const summary = extractSummaryInfo(log.changes, log.model_name);
-                  return (
+              {filteredLogs.map((log) => {
+                const summary = extractSummaryInfo(log.changes, log.model_name);
+                const tone = getActionTone(log.action);
+                const actionLabel = getActionLabel(log.action);
+                const userLabel =
+                  log.user?.first_name && log.user?.last_name
+                    ? `${log.user.first_name} ${log.user.last_name}`
+                    : log.user?.username ||
+                      log.user?.email ||
+                      (language === 'es' ? 'Desconocido' : 'Unknown');
+                const resourceLabel = log.model_name.toLowerCase().includes('team')
+                  ? (language === 'es' ? 'Equipo' : 'Team')
+                  : (language === 'es' ? 'Empleado' : 'Employee');
+
+                const summaryItems = [
+                  hasValue(summary?.project) && {
+                    label: language === 'es' ? 'Proyecto' : 'Project',
+                    value: summary?.project,
+                    className: 'bg-blue-50 text-blue-700 border-blue-200',
+                  },
+                  hasValue(summary?.hours) && {
+                    label: language === 'es' ? 'Horas' : 'Hours',
+                    value: `${summary?.hours}h`,
+                    className: 'bg-slate-50 text-slate-700 border-slate-200',
+                  },
+                  hasValue(summary?.employee) && {
+                    label: resourceLabel,
+                    value: summary?.employee,
+                    className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  },
+                  hasValue(summary?.week) && {
+                    label: language === 'es' ? 'Semana' : 'Week',
+                    value: formatShortDate(summary?.week),
+                    className: 'bg-amber-50 text-amber-700 border-amber-200',
+                  },
+                ].filter(Boolean) as Array<{ label: string; value: string; className: string }>;
+
+                return (
+                  <div
+                    key={log.id}
+                    className={`border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 ${tone.accent}`}
+                  >
                     <button
                       onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                      className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                      className="w-full px-4 py-3 bg-white hover:bg-gray-50 flex items-start justify-between gap-3 transition-colors"
+                      aria-expanded={expandedId === log.id}
                     >
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        {/* Action Badge */}
-                        <div
-                          className={`px-2.5 py-1.5 rounded font-semibold text-xs border flex-shrink-0 ${getActionColor(log.action)}`}
-                        >
-                          {getActionIcon(log.action)} {log.action}
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className={`h-9 w-9 rounded-lg border flex items-center justify-center flex-shrink-0 ${tone.iconBg}`}>
+                          {getActionIcon(log.action)}
                         </div>
 
-                        {/* User & Model Info */}
-                        <div className="flex flex-col min-w-0 flex-1 gap-1">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="text-xs font-medium text-white bg-gray-600 px-2.5 py-1 rounded flex-shrink-0">
-                              {log.user?.first_name && log.user?.last_name
-                                ? `${log.user.first_name} ${log.user.last_name}`
-                                : log.user?.username || log.user?.email || 'Unknown'}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`text-[11px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border ${tone.badge}`}>
+                              {actionLabel}
                             </span>
-                            <span className="text-xs text-gray-500 font-medium">{log.model_name}</span>
+                            <span className="text-sm font-semibold text-gray-900 truncate">{log.model_name}</span>
                           </div>
 
-                          {/* Important Summary Info */}
-                          {(summary?.project || summary?.hours || summary?.employee || summary?.week) && (
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {summary?.project && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                  📊 {summary.project}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                            <span className="inline-flex items-center gap-1.5 min-w-0">
+                              <User size={12} className="text-gray-400" />
+                              <span className="font-medium text-gray-700 truncate">{userLabel}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock size={12} className="text-gray-400" />
+                              {formatDate(log.created_at)}
+                            </span>
+                          </div>
+
+                          {summaryItems.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {summaryItems.map(item => (
+                                <span
+                                  key={`${item.label}-${item.value}`}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${item.className}`}
+                                  title={String(item.value)}
+                                >
+                                  <span className="text-[10px] uppercase tracking-wide opacity-70">{item.label}</span>
+                                  <span className="max-w-[180px] truncate">{item.value}</span>
                                 </span>
-                              )}
-                              {summary?.hours && (
-                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                  ⏱️ {summary.hours}h
-                                </span>
-                              )}
-                              {summary?.employee && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                  👤 {summary.employee}
-                                </span>
-                              )}
-                              {summary?.week && (
-                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                  📅 Sem. {summary.week?.substring(5, 7)}
-                                </span>
-                              )}
+                              ))}
                             </div>
                           )}
                         </div>
-
-                        {/* Timestamp */}
-                        <div className="text-right flex-shrink-0">
-                          <span className="text-xs text-gray-600 block">
-                            {formatDate(log.created_at)}
-                          </span>
-                        </div>
                       </div>
 
-                      {/* Expand Icon */}
-                      <div className="ml-2 flex-shrink-0">
+                      <div className="mt-1 flex-shrink-0">
                         {expandedId === log.id ? (
                           <ChevronUp size={18} className="text-gray-400" />
                         ) : (
@@ -408,174 +468,166 @@ export function ActivityLogPage() {
                         )}
                       </div>
                     </button>
-                  );
-                })()}
 
-                {/* Expanded Details */}
-                {expandedId === log.id && (
-                  <div className="border-t border-gray-200 bg-white p-4 space-y-3">
-                    {/* User Details */}
-                    {log.user && (
-                      <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                        <p className="text-xs font-semibold text-blue-900 mb-1">👤 User</p>
-                        <p className="text-sm text-blue-800">
-                          {log.user.first_name} {log.user.last_name}
-                        </p>
+                    {expandedId === log.id && (
+                      <div className="border-t border-gray-200 bg-white p-4 space-y-3">
+                        {log.user && (
+                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                            <p className="text-xs font-semibold text-blue-900 mb-1 flex items-center gap-2">
+                              <User size={12} className="text-blue-700" />
+                              {language === 'es' ? 'Usuario' : 'User'}
+                            </p>
+                            <p className="text-sm text-blue-800">{userLabel}</p>
+                          </div>
+                        )}
+
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Tag size={12} className="text-slate-400" />
+                            {getActionDetailLabel(log.action)}
+                          </p>
+
+                          {(() => {
+                            const mainObj = extractMainObject(log.changes);
+
+                            if (!log.changes) {
+                              return (
+                                <div className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                  No changes recorded
+                                </div>
+                              );
+                            }
+
+                            if (mainObj) {
+                              const { objectType, data } = mainObj;
+                              const entries = Object.entries(data).filter(([key]) => !isInternalField(key));
+
+                              const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
+                              const prioritized = entries.sort((a, b) => {
+                                const aImportant = importantFields.includes(a[0]) ? 0 : 1;
+                                const bImportant = importantFields.includes(b[0]) ? 0 : 1;
+                                return aImportant - bImportant;
+                              });
+
+                              const displayedEntries = prioritized.slice(0, 10);
+
+                              if (displayedEntries.length === 0) {
+                                return (
+                                  <div className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                    No user-visible changes
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="space-y-2">
+                                  <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full border border-slate-200 mb-2">
+                                    {objectType}
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {displayedEntries.map(([key, value]) => {
+                                      const isImportant = importantFields.includes(key);
+                                      return (
+                                        <div
+                                          key={key}
+                                          className={`p-3 rounded border ${
+                                            isImportant
+                                              ? 'bg-blue-50 border-blue-200'
+                                              : 'bg-white border-slate-200'
+                                          }`}
+                                        >
+                                          <div className="flex justify-between items-start gap-3">
+                                            <span className={`text-sm font-semibold whitespace-nowrap ${
+                                              isImportant ? 'text-blue-700' : 'text-slate-700'
+                                            }`}>
+                                              {formatKeyName(key)}
+                                            </span>
+                                            <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                              {formatValue(value)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {entries.length > 10 && (
+                                      <div className="text-xs text-slate-500 italic px-2 py-1">
+                                        +{entries.length - 10} more fields
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (typeof log.changes === 'object') {
+                              const entries = Object.entries(log.changes).filter(([key]) => !isInternalField(key));
+
+                              if (entries.length === 0) {
+                                return (
+                                  <div className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                    No user-visible changes
+                                  </div>
+                                );
+                              }
+
+                              const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
+                              const prioritized = entries.sort((a, b) => {
+                                const aImportant = importantFields.includes(a[0]) ? 0 : 1;
+                                const bImportant = importantFields.includes(b[0]) ? 0 : 1;
+                                return aImportant - bImportant;
+                              });
+
+                              const displayedEntries = prioritized.slice(0, 10);
+
+                              return (
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {displayedEntries.map(([key, value]) => {
+                                      const isImportant = importantFields.includes(key);
+                                      return (
+                                        <div
+                                          key={key}
+                                          className={`p-3 rounded border ${
+                                            isImportant
+                                              ? 'bg-blue-50 border-blue-200'
+                                              : 'bg-white border-slate-200'
+                                          }`}
+                                        >
+                                          <div className="flex justify-between items-start gap-3">
+                                            <span className={`text-sm font-semibold whitespace-nowrap ${
+                                              isImportant ? 'text-blue-700' : 'text-slate-700'
+                                            }`}>
+                                              {formatKeyName(key)}
+                                            </span>
+                                            <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
+                                              {formatValue(value)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {entries.length > 10 && (
+                                      <div className="text-xs text-slate-500 italic px-2 py-1">
+                                        +{entries.length - 10} more fields
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+                                {String(log.changes)}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     )}
-
-                    {/* Changes - Enhanced View */}
-                    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-lg border border-amber-200">
-                      <p className="text-xs font-semibold text-amber-900 mb-3 flex items-center gap-2">
-                        <span>📝</span>
-                        <span>{log.action === 'created' ? 'Created with' : log.action === 'updated' ? 'Updated fields' : 'Deleted'}</span>
-                      </p>
-
-                      {(() => {
-                        const mainObj = extractMainObject(log.changes);
-
-                        if (!log.changes) {
-                          return (
-                            <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
-                              No changes recorded
-                            </div>
-                          );
-                        }
-
-                        if (mainObj) {
-                          // Show main object type and key fields
-                          const { objectType, data } = mainObj;
-                          // Filter out internal fields
-                          const entries = Object.entries(data).filter(([key]) => !isInternalField(key));
-
-                          // Prioritize important fields
-                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'teamName', 'team_name', 'company', 'capacity', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
-                          const prioritized = entries.sort((a, b) => {
-                            const aImportant = importantFields.includes(a[0]) ? 0 : 1;
-                            const bImportant = importantFields.includes(b[0]) ? 0 : 1;
-                            return aImportant - bImportant;
-                          });
-
-                          const displayedEntries = prioritized.slice(0, 10);
-
-                          if (displayedEntries.length === 0) {
-                            return (
-                              <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
-                                No user-visible changes
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div className="space-y-2">
-                              <div className="inline-block bg-amber-100 text-amber-900 text-xs font-semibold px-3 py-1 rounded-full mb-2">
-                                {objectType}
-                              </div>
-                              <div className="grid grid-cols-1 gap-2">
-                                {displayedEntries.map(([key, value]) => {
-                                  const isImportant = importantFields.includes(key);
-                                  return (
-                                    <div
-                                      key={key}
-                                      className={`p-3 rounded border ${
-                                        isImportant
-                                          ? 'bg-blue-50 border-blue-200'
-                                          : 'bg-white/80 border-amber-100'
-                                      }`}
-                                    >
-                                      <div className="flex justify-between items-start gap-3">
-                                        <span className={`text-sm font-semibold whitespace-nowrap ${
-                                          isImportant ? 'text-blue-700' : 'text-gray-700'
-                                        }`}>
-                                          {isImportant && '⭐ '}{formatKeyName(key)}
-                                        </span>
-                                        <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
-                                          {formatValue(value)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                {entries.length > 10 && (
-                                  <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{entries.length - 10} more fields
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Fallback for other formats
-                        if (typeof log.changes === 'object') {
-                          // Filter out internal fields
-                          const entries = Object.entries(log.changes).filter(([key]) => !isInternalField(key));
-
-                          if (entries.length === 0) {
-                            return (
-                              <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
-                                No user-visible changes
-                              </div>
-                            );
-                          }
-
-                          const importantFields = ['hours', 'hoursAssigned', 'projectName', 'project_name', 'employeeName', 'employee_name', 'weekStartDate', 'week_start_date', 'name', 'status', 'title', 'description', 'client', 'facility', 'endDate', 'end_date', 'startDate', 'start_date'];
-                          const prioritized = entries.sort((a, b) => {
-                            const aImportant = importantFields.includes(a[0]) ? 0 : 1;
-                            const bImportant = importantFields.includes(b[0]) ? 0 : 1;
-                            return aImportant - bImportant;
-                          });
-
-                          const displayedEntries = prioritized.slice(0, 10);
-
-                          return (
-                            <div className="space-y-2">
-                              <div className="grid grid-cols-1 gap-2">
-                                {displayedEntries.map(([key, value]) => {
-                                  const isImportant = importantFields.includes(key);
-                                  return (
-                                    <div
-                                      key={key}
-                                      className={`p-3 rounded border ${
-                                        isImportant
-                                          ? 'bg-blue-50 border-blue-200'
-                                          : 'bg-white/80 border-amber-100'
-                                      }`}
-                                    >
-                                      <div className="flex justify-between items-start gap-3">
-                                        <span className={`text-sm font-semibold whitespace-nowrap ${
-                                          isImportant ? 'text-blue-700' : 'text-gray-700'
-                                        }`}>
-                                          {isImportant && '⭐ '}{formatKeyName(key)}
-                                        </span>
-                                        <span className="text-sm text-gray-900 font-medium text-right break-words flex-1">
-                                          {formatValue(value)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                {entries.length > 10 && (
-                                  <div className="text-xs text-amber-700 italic px-2 py-1">
-                                    +{entries.length - 10} more fields
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="text-sm text-amber-700 bg-white/60 p-2 rounded">
-                            {String(log.changes)}
-                          </div>
-                        );
-                      })()}
-                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
             </div>
           </div>
         )}
