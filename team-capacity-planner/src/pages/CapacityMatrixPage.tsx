@@ -3353,7 +3353,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       </div>
                                     </>
                                   )}
-                                  <div className={`font-bold text-xs leading-none`}>W{weekData.weekNum}</div>
+                                  <div className={`font-bold text-xs leading-none`}>CW{weekData.weekNum}</div>
                                 </th>
                               );
                             })}
