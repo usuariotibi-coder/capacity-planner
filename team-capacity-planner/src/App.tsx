@@ -123,12 +123,12 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen">
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
           sidebarOpen ? 'w-12 md:w-48' : 'w-0'
-        } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0 min-h-0`}
+        } h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-xl shadow-slate-900/30 flex-shrink-0 min-h-0 border-r border-slate-700/60`}
       >
         <div className="p-0.5 md:p-6 border-b border-slate-700 flex-shrink-0">
           <h1 className="text-[8px] md:text-2xl font-bold text-center md:text-left whitespace-nowrap overflow-hidden">📊</h1>
@@ -147,8 +147,8 @@ function MainApp() {
               }}
               className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-3 px-0.5 md:px-4 py-1 md:py-3 rounded-lg transition text-[8px] md:text-sm ${
                 currentPage === item.id
-                  ? 'bg-blue-500 text-white'
-                  : 'text-slate-300 hover:bg-slate-700'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md shadow-blue-500/30'
+                  : 'text-slate-300 hover:bg-slate-700/70'
               }`}
               title={item.label}
             >
@@ -217,7 +217,7 @@ function MainApp() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
+        <div className="bg-white/85 backdrop-blur border-b border-white/60 px-3 py-1.5 flex items-center justify-between shadow-md shadow-slate-900/5">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -261,7 +261,7 @@ function MainApp() {
             )}
 
             {/* Language Selector - Responsive */}
-            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md flex-shrink-0">
+            <div className="flex items-center gap-0.5 bg-white/80 p-0.5 rounded-md flex-shrink-0 border border-slate-200/70 shadow-sm">
               <button
                 onClick={() => setLanguage('es')}
                 className={`px-1.5 md:px-2 py-0.5 rounded text-sm md:text-base transition ${
