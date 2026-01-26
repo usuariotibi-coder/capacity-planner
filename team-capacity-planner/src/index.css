@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Make interactive elements feel clickable, avoid text-caret selection */
+button,
+[role="button"],
+a,
+.cursor-pointer {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Hide number input spinners for centered inputs */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
