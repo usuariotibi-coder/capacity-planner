@@ -197,10 +197,10 @@ function MainApp() {
           <button
             onClick={() => window.location.href = '/change-password'}
             className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
-            title="Cambiar contraseña"
+            title={t.changePassword}
           >
             <Lock size={14} className="md:w-4 md:h-4" />
-            <span className="hidden md:inline">Cambiar Contraseña</span>
+            <span className="hidden md:inline">{t.changePassword}</span>
           </button>
           <button
             onClick={logout}
