@@ -128,13 +128,15 @@ function MainApp() {
       <div
         className={`${
           sidebarOpen ? 'w-14 md:w-56' : 'w-0'
-        } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0`}
+        } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0 min-h-0`}
       >
         <div className="p-0.5 md:p-6 border-b border-slate-700 flex-shrink-0">
           <h1 className="text-[8px] md:text-2xl font-bold text-center md:text-left whitespace-nowrap overflow-hidden">📊</h1>
           <h1 className="hidden md:block text-2xl font-bold">{t.teamCapacity}</h1>
           <p className="hidden md:block text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
         </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 
         <nav className="p-0.5 md:p-4 space-y-0 md:space-y-2">
           {navItems.map((item) => (
@@ -157,7 +159,7 @@ function MainApp() {
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 overflow-y-auto max-h-20 md:max-h-none space-y-0.5 md:space-y-2">
+          <div className="p-0.5 md:p-4 border-t border-slate-700 space-y-0.5 md:space-y-2">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
@@ -191,7 +193,7 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-0.5 md:p-4 border-t border-slate-700 flex-shrink-0 space-y-0.5 md:space-y-2">
+        <div className="p-0.5 md:p-4 border-t border-slate-700 space-y-0.5 md:space-y-2">
           <button
             onClick={() => window.location.href = '/change-password'}
             className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
@@ -209,6 +211,7 @@ function MainApp() {
             <span className="hidden md:inline">{t.logout}</span>
           </button>
           <p className="hidden md:block text-xs text-slate-400 text-center">{t.teamCapacityPlanner}</p>
+        </div>
         </div>
       </div>
 
