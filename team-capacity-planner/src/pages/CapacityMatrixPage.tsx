@@ -1960,7 +1960,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   : 'bg-blue-100 text-blue-900 border-blue-300'
                               }`}
                             >
-                              W{weekData.weekNum}
+                              CW{weekData.weekNum}
                             </div>
                           );
                         })}
@@ -2026,7 +2026,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
                                 isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
                               }`}
-                              title={`${t.totalLabel} - W${weekData.weekNum}: ${displayValue.toFixed(2)} ${unit}`}
+                              title={`${t.totalLabel} - CW${weekData.weekNum}: ${displayValue.toFixed(2)} ${unit}`}
                             >
                               <div className={`${textColor} font-bold text-[9px]`}>
                                 {displayValue.toFixed(2)}
@@ -2354,7 +2354,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
                                 isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
                               }`}
-                              title={`${t.capacityLabel} - W${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
+                              title={`${t.capacityLabel} - CW${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
                               <div className={`${textColor} font-bold text-[9px]`}>
                                 {availableCapacity.toFixed(2)}
@@ -2766,7 +2766,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
                                 }`}
                               >
-                                <div className={`font-bold text-xs leading-none`}>W{weekData.weekNum}</div>
+                                <div className={`font-bold text-xs leading-none`}>CW{weekData.weekNum}</div>
                               </th>
                             );
                           })}
@@ -3024,7 +3024,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               : 'bg-blue-100 text-blue-900 border-blue-300'
                           }`}
                         >
-                          W{weekData.weekNum}
+                          CW{weekData.weekNum}
                         </div>
                       );
                     })}
@@ -3133,7 +3133,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               className={`w-16 flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
                                 isCurrentWeek ? 'ring-1 ring-red-600 shadow-md' : ''
                               }`}
-                              title={`${dept} - W${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
+                              title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
                               {totalCapacity > 0 ? (
                                 <div className={`${textColor} font-bold text-[7px]`}>
