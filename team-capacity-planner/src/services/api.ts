@@ -590,11 +590,21 @@ export const activityLogApi = {
 
   logActivity: async (action: string, modelName: string, objectId: string, changes?: any) => {
     try {
-      console.log('[ActivityLog] Logging activity:', { action, modelName, objectId, changes });
+      const normalizedAction = (() => {
+        const raw = (action || '').toString().trim();
+        const lower = raw.toLowerCase();
+        if (['created', 'updated', 'deleted', 'viewed'].includes(lower)) return lower;
+        if (['create', 'created'].includes(lower)) return 'created';
+        if (['update', 'updated'].includes(lower)) return 'updated';
+        if (['delete', 'deleted', 'remove', 'removed'].includes(lower)) return 'deleted';
+        if (['view', 'viewed', 'read'].includes(lower)) return 'viewed';
+        return lower;
+      })();
+      console.log('[ActivityLog] Logging activity:', { action: normalizedAction, modelName, objectId, changes });
       const response = await apiFetch('/api/activity-logs/', {
         method: 'POST',
         body: JSON.stringify({
-          action,
+          action: normalizedAction,
           model_name: modelName,
           object_id: objectId,
           changes: changes || null,

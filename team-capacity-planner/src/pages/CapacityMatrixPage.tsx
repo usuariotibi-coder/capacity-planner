@@ -721,11 +721,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       const teamName = deleteConfirmation.teamName;
       const type = deleteConfirmation.type;
 
+      let deletedRecordId: string | undefined;
+
       if (type === 'subcontracted') {
         // Delete all records for this company from database
         const recordsToDelete = Object.keys(subcontractedRecordIds).filter(
           key => key.startsWith(`${teamName}-`)
         );
+        deletedRecordId = recordsToDelete.length > 0 ? subcontractedRecordIds[recordsToDelete[0]] : undefined;
 
         for (const recordKey of recordsToDelete) {
           const recordId = subcontractedRecordIds[recordKey];
@@ -757,6 +760,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         const recordsToDelete = Object.keys(prgExternalRecordIds).filter(
           key => key.startsWith(`${teamName}-`)
         );
+        deletedRecordId = recordsToDelete.length > 0 ? prgExternalRecordIds[recordsToDelete[0]] : undefined;
 
         for (const recordKey of recordsToDelete) {
           const recordId = prgExternalRecordIds[recordKey];
@@ -787,13 +791,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       console.log(`[CapacityMatrix] Deleted ${type} team: ${teamName}`);
 
-      // Log activity
-      await activityLogApi.logActivity(
-        'DELETE',
-        type === 'subcontracted' ? 'SubcontractedTeamCapacity' : 'PrgExternalTeamCapacity',
-        teamName,
-        { type, teamName }
-      );
+      // Log activity (use a valid UUID from deleted records if available)
+      if (deletedRecordId) {
+        await activityLogApi.logActivity(
+          'deleted',
+          type === 'subcontracted' ? 'SubcontractedTeamCapacity' : 'PrgExternalTeamCapacity',
+          deletedRecordId,
+          { type, teamName }
+        );
+      }
 
       setDeleteConfirmation({ isOpen: false, type: null, teamName: '' });
     } catch (error) {

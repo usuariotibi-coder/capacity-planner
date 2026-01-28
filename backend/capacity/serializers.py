@@ -1428,6 +1428,10 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'Assignment',
             'DepartmentStageConfig',
             'ProjectBudget',
+            'ScioTeamCapacity',
+            'SubcontractedTeamCapacity',
+            'PrgExternalTeamCapacity',
+            'DepartmentWeeklyTotal',
         ]
         if value not in valid_models:
             raise serializers.ValidationError(
