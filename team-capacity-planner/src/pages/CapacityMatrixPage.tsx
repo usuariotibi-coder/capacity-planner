@@ -1651,7 +1651,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       handleSaveCell();
                     }
                   }}
-                  disabled={selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected}
+                  disabled={selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && editingScioHours === 0 && editingScioHoursInput === ''}
                   autoFocus
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
