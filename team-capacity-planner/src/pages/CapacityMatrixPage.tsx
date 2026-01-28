@@ -1053,9 +1053,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     // Get quoted hours (budget)
     const quotedHours = project.departmentHoursAllocated?.[department] || 0;
-    if (quotedHours === 0) return 0;
+    const totalPlanned = utilizedHoursValue + forecastedHoursValue;
+    if (quotedHours === 0) {
+      return totalPlanned > 0 ? 100 : 0;
+    }
 
-    return Math.round(((utilizedHoursValue + forecastedHoursValue) / quotedHours) * 100);
+    return Math.round((totalPlanned / quotedHours) * 100);
   };
 
   // Get utilized hours (manually entered) for a department in a project
