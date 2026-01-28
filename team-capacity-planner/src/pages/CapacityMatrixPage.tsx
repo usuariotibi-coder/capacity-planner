@@ -1579,13 +1579,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t.scioHours}</label>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={editingScioHours || ''}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setEditingScioHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                    const raw = e.target.value.replace(',', '.');
+                    const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
+                    setEditingScioHours(num);
                     // Update total hours for backward compatibility
-                    setEditingHours((val === '' ? 0 : Math.max(0, parseInt(val) || 0)) + editingExternalHours);
+                    setEditingHours(num + editingExternalHours);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -1612,13 +1613,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.enterExternalHours}</label>
                   <input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="decimal"
                     value={editingExternalHours || ''}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setEditingExternalHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                      const raw = e.target.value.replace(',', '.');
+                      const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
+                      setEditingExternalHours(num);
                       // Update total hours for backward compatibility
-                      setEditingHours(editingScioHours + (val === '' ? 0 : Math.max(0, parseInt(val) || 0)));
+                      setEditingHours(editingScioHours + num);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1638,11 +1640,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 value={editingHours || ''}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setEditingHours(val === '' ? 0 : Math.max(0, parseInt(val) || 0));
+                  const raw = e.target.value.replace(',', '.');
+                  const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
+                  setEditingHours(num);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -2859,12 +2862,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
                                 <input
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode="decimal"
                                   value={utilizedHours}
                                   onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === '' || /^\d+$/.test(val)) {
-                                      setUtilizedHours(val);
+                                    const raw = e.target.value.replace(',', '.');
+                                    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                      setUtilizedHours(raw);
                                     }
                                   }}
                                   onKeyDown={(e) => {
@@ -2943,12 +2946,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
                                 <input
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode="decimal"
                                   value={forecastHours}
                                   onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val === '' || /^\d+$/.test(val)) {
-                                      setForecastHours(val);
+                                    const raw = e.target.value.replace(',', '.');
+                                    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                      setForecastHours(raw);
                                     }
                                   }}
                                   onKeyDown={(e) => {
