@@ -163,6 +163,17 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
   return transformKeysToCamel(data);
 };
 
+const normalizeApiEndpoint = (endpoint: string): string => {
+  if (!endpoint) return endpoint;
+  if (endpoint.startsWith('http')) {
+    const apiBase = API_URL.replace(/\/$/, '');
+    if (endpoint.startsWith(apiBase)) {
+      return endpoint.slice(apiBase.length);
+    }
+  }
+  return endpoint;
+};
+
 // Auth API
 export const authApi = {
   login: async (username: string, password: string) => {
@@ -392,8 +403,21 @@ export const projectsApi = {
 // Assignments API
 export const assignmentsApi = {
   getAll: async () => {
-    const data = await apiFetch('/api/assignments/');
-    return data.results || data;
+    let endpoint = '/api/assignments/?page_size=2000';
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      const results = data.results || [];
+      allResults = allResults.concat(results);
+      endpoint = data.next ? normalizeApiEndpoint(data.next) : '';
+    }
+
+    return allResults;
   },
 
   get: async (id: string) => {
