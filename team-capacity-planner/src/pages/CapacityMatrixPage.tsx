@@ -1123,7 +1123,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setSelectedEmployees(assignedEmployeeIds);
   };
 
-  const handleSaveCell = () => {
+  const handleSaveCell = async () => {
     // For BUILD and PRG, use separate SCIO and external hours
     const isBuildOrPRG = editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG');
     const totalHours = isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours;
@@ -1221,9 +1221,28 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
       console.log('[CapacityMatrix] All employees:', employees.map(e => ({ name: e.name, dept: e.department, active: e.isActive })));
 
-      const availableEmployee = employees.find(
-        (emp) => emp.department === editingCell.department && emp.isActive
-      );
+    let availableEmployee = employees.find(
+      (emp) => emp.department === editingCell.department && emp.isActive
+    );
+
+    // For MFG, allow using any existing employee or auto-create a placeholder
+    if (!availableEmployee && editingCell.department === 'MFG') {
+      availableEmployee = employees.find((emp) => emp.department === 'MFG');
+      if (!availableEmployee) {
+        try {
+          availableEmployee = await addEmployee({
+            name: 'MFG Placeholder',
+            role: 'Manufacturing',
+            department: 'MFG',
+            capacity: 0,
+            isActive: false,
+            isSubcontractedMaterial: false,
+          });
+        } catch (error) {
+          console.error('[CapacityMatrix] ❌ Failed to create MFG placeholder employee:', error);
+        }
+      }
+    }
 
       console.log('[CapacityMatrix] Found available employee:', availableEmployee);
       console.log('[CapacityMatrix] Project ID:', editingCell.projectId);
@@ -1248,9 +1267,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         addAssignment(newAssignment);
       } else {
         // Show error if no employee found
-        if (!availableEmployee) {
+        if (!availableEmployee && editingCell.department !== 'MFG') {
           console.error('[CapacityMatrix] ❌ No active employee found for department:', editingCell.department);
           alert(`No hay empleados activos en el departamento ${editingCell.department}. Por favor agregue un empleado primero.`);
+        }
+        if (!availableEmployee && editingCell.department === 'MFG') {
+          console.error('[CapacityMatrix] ❌ No MFG placeholder employee available');
+          alert('No se pudo crear un recurso automático para MFG. Intenta de nuevo.');
         }
         if (!editingCell.projectId) {
           console.error('[CapacityMatrix] ❌ No project ID available');

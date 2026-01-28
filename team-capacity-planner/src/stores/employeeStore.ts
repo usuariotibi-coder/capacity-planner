@@ -9,7 +9,7 @@ interface EmployeeStore {
   error: string | null;
   hasFetched: boolean;
   fetchEmployees: () => Promise<void>;
-  addEmployee: (employee: Omit<Employee, 'id'>) => Promise<void>;
+  addEmployee: (employee: Omit<Employee, 'id'>) => Promise<Employee>;
   updateEmployee: (id: string, employee: Partial<Employee>) => void;
   deleteEmployee: (id: string) => Promise<void>;
 }
@@ -50,6 +50,8 @@ export const useEmployeeStore = create<EmployeeStore>((set, get) => ({
         newEmployee.id,
         employee
       );
+
+      return newEmployee;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al crear empleado';
       console.error('[Store] Error creating employee:', errorMsg);
