@@ -349,7 +349,14 @@ export function ResourcesPage() {
           // Filter out system placeholder employees (names like "MFG Employee 1", "PM Employee 1", etc.)
           const isPlaceholderEmployee = (name: string) =>
             /^(PM|MED|HD|MFG|PRG|BUILD) Employee \d+$/.test(name) || name === 'MFG Placeholder';
-          const deptEmployees = employees.filter((e) => e.department === dept && !isPlaceholderEmployee(e.name));
+          const isCompanyPlaceholder = (e: any) =>
+            e.isSubcontractedMaterial &&
+            e.subcontractCompany &&
+            e.subcontractCompany === e.name &&
+            (e.capacity === 0 || e.capacity === 0.0);
+          const deptEmployees = employees.filter(
+            (e) => e.department === dept && !isPlaceholderEmployee(e.name) && !isCompanyPlaceholder(e)
+          );
           if (deptEmployees.length === 0) return null;
 
           return (
