@@ -63,6 +63,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingHours, setEditingHours] = useState<number>(0);
   const [editingScioHours, setEditingScioHours] = useState<number>(0);
   const [editingExternalHours, setEditingExternalHours] = useState<number>(0);
+  const [editingHoursInput, setEditingHoursInput] = useState<string>('');
+  const [editingScioHoursInput, setEditingScioHoursInput] = useState<string>('');
+  const [editingExternalHoursInput, setEditingExternalHoursInput] = useState<string>('');
   const [editingStage, setEditingStage] = useState<Stage>(null);
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
@@ -1109,6 +1112,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingHours(totalHours);
     setEditingScioHours(totalScioHours);
     setEditingExternalHours(totalExternalHours);
+    setEditingHoursInput(totalHours ? totalHours.toString() : '');
+    setEditingScioHoursInput(totalScioHours ? totalScioHours.toString() : '');
+    setEditingExternalHoursInput(totalExternalHours ? totalExternalHours.toString() : '');
     setEditingStage(firstAssignmentStage);
     setEditingComment(firstAssignmentComment);
     setSelectedEmployees(assignedEmployeeIds);
@@ -1125,6 +1131,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setEditingComment('');
       setEditingScioHours(0);
       setEditingExternalHours(0);
+      setEditingHoursInput('');
+      setEditingScioHoursInput('');
+      setEditingExternalHoursInput('');
       setSelectedEmployees(new Set());
       return;
     }
@@ -1252,6 +1261,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingComment('');
     setEditingScioHours(0);
     setEditingExternalHours(0);
+    setEditingHoursInput('');
+    setEditingScioHoursInput('');
+    setEditingExternalHoursInput('');
     setSelectedEmployees(new Set());
   };
 
@@ -1264,7 +1276,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const handleSaveUtilized = async () => {
     if (!editingUtilized) return;
 
-    const newValue = parseInt(utilizedHours) || 0;
+    const newValue = parseFloat(utilizedHours.replace(',', '.')) || 0;
     const projectId = editingUtilized.projectId;
     const department = editingUtilized.department;
 
@@ -1319,7 +1331,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const handleSaveForecast = async () => {
     if (!editingForecast) return;
 
-    const newValue = parseInt(forecastHours) || 0;
+    const newValue = parseFloat(forecastHours.replace(',', '.')) || 0;
     const projectId = editingForecast.projectId;
     const department = editingForecast.department;
 
@@ -1547,6 +1559,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             setEditingStage(null);
             setEditingHours(0);
             setEditingComment('');
+            setEditingHoursInput('');
+            setEditingScioHoursInput('');
+            setEditingExternalHoursInput('');
             setSelectedEmployees(new Set());
           }}
         />
@@ -1563,6 +1578,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 setEditingStage(null);
                 setEditingHours(0);
                 setEditingComment('');
+                setEditingHoursInput('');
+                setEditingScioHoursInput('');
+                setEditingExternalHoursInput('');
                 setSelectedEmployees(new Set());
               }}
               className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
@@ -1580,13 +1598,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={editingScioHours || ''}
+                  value={editingScioHoursInput}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(',', '.');
-                    const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
-                    setEditingScioHours(num);
-                    // Update total hours for backward compatibility
-                    setEditingHours(num + editingExternalHours);
+                    const raw = e.target.value;
+                    const normalized = raw.replace(',', '.');
+                    if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                      setEditingScioHoursInput(raw);
+                      const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                      setEditingScioHours(num);
+                      // Update total hours for backward compatibility
+                      setEditingHours(num + editingExternalHours);
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -1614,13 +1636,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={editingExternalHours || ''}
+                    value={editingExternalHoursInput}
                     onChange={(e) => {
-                      const raw = e.target.value.replace(',', '.');
-                      const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
-                      setEditingExternalHours(num);
-                      // Update total hours for backward compatibility
-                      setEditingHours(editingScioHours + num);
+                      const raw = e.target.value;
+                      const normalized = raw.replace(',', '.');
+                      if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                        setEditingExternalHoursInput(raw);
+                        const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                        setEditingExternalHours(num);
+                        // Update total hours for backward compatibility
+                        setEditingHours(editingScioHours + num);
+                      }
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1641,11 +1667,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <input
                 type="text"
                 inputMode="decimal"
-                value={editingHours || ''}
+                value={editingHoursInput}
                 onChange={(e) => {
-                  const raw = e.target.value.replace(',', '.');
-                  const num = raw === '' ? 0 : Math.max(0, parseFloat(raw) || 0);
-                  setEditingHours(num);
+                  const raw = e.target.value;
+                  const normalized = raw.replace(',', '.');
+                  if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                    setEditingHoursInput(raw);
+                    const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                    setEditingHours(num);
+                  }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -1785,6 +1815,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           setEditingStage(null);
                           setEditingHours(0);
                           setEditingComment('');
+                          setEditingHoursInput('');
+                          setEditingScioHoursInput('');
+                          setEditingExternalHoursInput('');
                           setSelectedEmployees(new Set());
                         }
                       } finally {
@@ -1817,6 +1850,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   setEditingStage(null);
                   setEditingHours(0);
                   setEditingComment('');
+                  setEditingHoursInput('');
+                  setEditingScioHoursInput('');
+                  setEditingExternalHoursInput('');
                   setSelectedEmployees(new Set());
                   setShowDeleteConfirm(false);
                 }}
