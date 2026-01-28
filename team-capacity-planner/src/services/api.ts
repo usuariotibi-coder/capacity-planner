@@ -167,9 +167,14 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
 const normalizeApiEndpoint = (endpoint: string): string => {
   if (!endpoint) return endpoint;
   if (endpoint.startsWith('http')) {
-    const apiBase = API_URL.replace(/\/$/, '');
-    if (endpoint.startsWith(apiBase)) {
-      return endpoint.slice(apiBase.length);
+    try {
+      const url = new URL(endpoint);
+      const apiHost = new URL(API_URL).host;
+      if (url.host === apiHost) {
+        return `${url.pathname}${url.search}`;
+      }
+    } catch {
+      return endpoint;
     }
   }
   return endpoint;
