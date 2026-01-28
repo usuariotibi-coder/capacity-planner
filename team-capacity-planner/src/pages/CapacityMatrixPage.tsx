@@ -130,6 +130,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
   });
 
+  const [subcontractedInputs, setSubcontractedInputs] = useState<Record<string, string>>({});
+
   // Active subcontracted teams for BUILD department - Use global store and subscribe to changes
   const { activeTeams, setActiveTeams } = useBuildTeamsStore();
 
@@ -150,6 +152,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
     return {};
   });
+
+  const [prgExternalInputs, setPrgExternalInputs] = useState<Record<string, string>>({});
 
   // Modal state for adding PRG external teams
   const [isPRGModalOpen, setIsPRGModalOpen] = useState(false);
@@ -2178,13 +2182,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       }`}
                                     >
                                       <input
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        value={subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : ''}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={subcontractedInputs[`${company}-${weekData.date}`] ?? (subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : '')}
                                         onChange={(e) => {
-                                          const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                          handleSubcontractedChange(company, weekData.date, newCount);
+                                          const raw = e.target.value;
+                                          const normalized = raw.replace(',', '.');
+                                          if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                            setSubcontractedInputs(prev => ({
+                                              ...prev,
+                                              [`${company}-${weekData.date}`]: raw,
+                                            }));
+                                            let newCount: number | undefined;
+                                            if (normalized === '' || normalized === '.') {
+                                              newCount = undefined;
+                                            } else {
+                                              newCount = parseFloat(normalized);
+                                            }
+                                            handleSubcontractedChange(company, weekData.date, newCount);
+                                          }
                                         }}
                                         className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-violet-900"
                                         style={{textAlign: 'center'}}
@@ -2250,13 +2266,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       }`}
                                     >
                                       <input
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        value={prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : ''}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={prgExternalInputs[`${team}-${weekData.date}`] ?? (prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : '')}
                                         onChange={(e) => {
-                                          const newCount = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                          handlePrgExternalChange(team, weekData.date, newCount);
+                                          const raw = e.target.value;
+                                          const normalized = raw.replace(',', '.');
+                                          if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                            setPrgExternalInputs(prev => ({
+                                              ...prev,
+                                              [`${team}-${weekData.date}`]: raw,
+                                            }));
+                                            let newCount: number | undefined;
+                                            if (normalized === '' || normalized === '.') {
+                                              newCount = undefined;
+                                            } else {
+                                              newCount = parseFloat(normalized);
+                                            }
+                                            handlePrgExternalChange(team, weekData.date, newCount);
+                                          }
                                         }}
                                         className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900"
                                         style={{textAlign: 'center'}}

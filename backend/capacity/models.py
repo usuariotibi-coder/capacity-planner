@@ -213,7 +213,7 @@ class SubcontractedTeamCapacity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.CharField(max_length=100, help_text="Company name (e.g., AMI, VICER, ITAX, etc.)")
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
-    capacity = models.IntegerField(validators=[MinValueValidator(0)], help_text="Number of personnel from this company")
+    capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="Number of personnel from this company")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -233,7 +233,7 @@ class PrgExternalTeamCapacity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     team_name = models.CharField(max_length=100, help_text="External team name")
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
-    capacity = models.IntegerField(validators=[MinValueValidator(0)], help_text="Number of personnel from this team")
+    capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="Number of personnel from this team")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
