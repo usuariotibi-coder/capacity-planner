@@ -385,11 +385,12 @@ export function ProjectsPage() {
                         inputMode="numeric"
                         value={numberOfWeeks === 0 ? '' : numberOfWeeks}
                         onChange={(e) => {
-                          if (e.target.value === '') {
+                          const raw = e.target.value;
+                          if (raw === '' || raw.length > 3) {
                             setNumberOfWeeks(0);
                           } else {
-                            const num = parseInt(e.target.value);
-                            if (!isNaN(num) && num >= 1 && num <= 52) {
+                            const num = parseInt(raw, 10);
+                            if (!isNaN(num) && num >= 1 && num <= 999) {
                               setNumberOfWeeks(num);
                             }
                           }
