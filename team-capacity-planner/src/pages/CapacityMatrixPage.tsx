@@ -1575,6 +1575,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       emp.isActive &&
       !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0)
     );
+    const selectedEmployeeList = Array.from(selectedEmployees)
+      .map((empId) => employees.find((e) => e.id === empId))
+      .filter(Boolean);
+    const hasExternalSelected = selectedEmployeeList.some((emp) => emp?.isSubcontractedMaterial);
+    const hasInternalSelected = selectedEmployeeList.some((emp) => !emp?.isSubcontractedMaterial);
     const weekData = allWeeksData.find(w => w.date === editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
@@ -1646,10 +1651,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       handleSaveCell();
                     }
                   }}
-                  disabled={selectedEmployees.size > 0 && Array.from(selectedEmployees).some(empId => {
-                    const emp = employees.find(e => e.id === empId);
-                    return emp?.isSubcontractedMaterial;
-                  })}
+                  disabled={selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected}
                   autoFocus
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
@@ -1657,10 +1659,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               </div>
 
               {/* External Hours input - conditionally shown based on selected external resource */}
-              {selectedEmployees.size > 0 && Array.from(selectedEmployees).some(empId => {
-                const emp = employees.find(e => e.id === empId);
-                return emp?.isSubcontractedMaterial;
-              }) && (
+              {selectedEmployees.size > 0 && hasExternalSelected && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.enterExternalHours}</label>
                   <input
