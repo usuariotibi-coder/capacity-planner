@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import type { Project } from '../types';
 import { projectsApi, isAuthenticated, activityLogApi } from '../services/api';
+import { useAssignmentStore } from './assignmentStore';
 import { getChangedFields } from '../utils/activityLog';
 
 interface ProjectStore {
@@ -78,6 +79,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         { project: newProject }
       );
 
+
       return newProject;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al crear proyecto';
@@ -140,6 +142,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       projects: state.projects.filter((proj) => proj.id !== id),
     }));
 
+    // Optimistic update - remove assignments tied to this project
+    useAssignmentStore.getState().removeAssignmentsByProject(id);
+
     try {
       console.log('[Store] Sending DELETE request to API for project:', id);
       await projectsApi.delete(id);
@@ -152,11 +157,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         id,
         { project: projectToDelete }
       );
+
+      // Refetch assignments to ensure totals are recalculated from backend
+      await useAssignmentStore.getState().fetchAssignments(true);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar proyecto';
       console.error('[Store] ❌ Error deleting project:', errorMsg);
       console.error('[Store] Reverting optimistic update...');
       set({ projects: originalProjects });
+      // Restore assignments from backend if delete failed
+      await useAssignmentStore.getState().fetchAssignments(true);
       set({ error: errorMsg });
       alert(`Error al eliminar proyecto: ${errorMsg}`);
       throw error;

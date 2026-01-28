@@ -8,10 +8,11 @@ interface AssignmentStore {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
-  fetchAssignments: () => Promise<void>;
+  fetchAssignments: (force?: boolean) => Promise<void>;
   addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
   updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => Promise<void>;
+  removeAssignmentsByProject: (projectId: string) => void;
   getAssignmentsByEmployee: (employeeId: string) => Assignment[];
   getAssignmentsByWeek: (weekStartDate: string) => Assignment[];
 }
@@ -22,9 +23,9 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   error: null,
   hasFetched: false,
 
-  fetchAssignments: async () => {
+  fetchAssignments: async (force = false) => {
     if (!isAuthenticated()) return;
-    if (get().hasFetched) return;
+    if (get().hasFetched && !force) return;
 
     set({ isLoading: true, error: null });
     try {
@@ -131,6 +132,11 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       throw error;
     }
   },
+
+  removeAssignmentsByProject: (projectId) =>
+    set((state) => ({
+      assignments: state.assignments.filter((assign) => assign.projectId !== projectId),
+    })),
 
   getAssignmentsByEmployee: (employeeId) =>
     get().assignments.filter((assign) => assign.employeeId === employeeId),
