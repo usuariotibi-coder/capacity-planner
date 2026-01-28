@@ -3266,9 +3266,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">Projects Matrix</h2>
 
               {projects.filter((proj) => {
-                // Filter projects that have activity in the selected year range
-                const yearStart = `${selectedYear}-01-01`;
-                const yearEnd = `${selectedYear + 1}-12-31`; // Include next year weeks too
+                // Filter projects that have activity in the selected year range (weeks shown)
+                const rangeStart = allWeeksData[0]?.date || `${selectedYear}-01-01`;
+                const rangeEnd = allWeeksData[allWeeksData.length - 1]?.date || `${selectedYear + 1}-12-31`;
 
                 // If in General view, exclude quick-created projects (those with visibleInDepartments)
                 // Check if array has elements, not just that it exists (empty array [] is truthy)
@@ -3276,7 +3276,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   return false;
                 }
 
-                return proj.startDate <= yearEnd && proj.endDate >= yearStart;
+                const projectStart = proj.startDate || '';
+                const projectEnd = proj.endDate || proj.startDate || '';
+                const projectOverlapsRange = projectStart && projectEnd
+                  ? projectStart <= rangeEnd && projectEnd >= rangeStart
+                  : false;
+
+                const hasAssignmentsInRange = assignments.some((assignment) => (
+                  assignment.projectId === proj.id &&
+                  assignment.weekStartDate >= rangeStart &&
+                  assignment.weekStartDate <= rangeEnd
+                ));
+
+                return projectOverlapsRange || hasAssignmentsInRange;
               }).map((proj) => (
                 <div key={proj.id} className="mb-1 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
                   {/* Project header */}
