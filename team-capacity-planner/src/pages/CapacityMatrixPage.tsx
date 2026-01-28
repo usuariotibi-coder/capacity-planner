@@ -62,6 +62,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
   const [editingScioHours, setEditingScioHours] = useState<number>(0);
+  const [initialScioHours, setInitialScioHours] = useState<number>(0);
   const [editingExternalHours, setEditingExternalHours] = useState<number>(0);
   const [editingHoursInput, setEditingHoursInput] = useState<string>('');
   const [editingScioHoursInput, setEditingScioHoursInput] = useState<string>('');
@@ -1118,6 +1119,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingCell({ department, weekStart, projectId });
     setEditingHours(totalHours);
     setEditingScioHours(totalScioHours);
+    setInitialScioHours(totalScioHours);
     setEditingExternalHours(totalExternalHours);
     setEditingHoursInput(totalHours ? totalHours.toString() : '');
     setEditingScioHoursInput(totalScioHours ? totalScioHours.toString() : '');
@@ -1137,6 +1139,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setEditingStage(null);
       setEditingComment('');
       setEditingScioHours(0);
+      setInitialScioHours(0);
       setEditingExternalHours(0);
       setEditingHoursInput('');
       setEditingScioHoursInput('');
@@ -1290,6 +1293,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingStage(null);
     setEditingComment('');
     setEditingScioHours(0);
+    setInitialScioHours(0);
     setEditingExternalHours(0);
     setEditingHoursInput('');
     setEditingScioHoursInput('');
@@ -1580,6 +1584,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       .filter(Boolean);
     const hasExternalSelected = selectedEmployeeList.some((emp) => emp?.isSubcontractedMaterial);
     const hasInternalSelected = selectedEmployeeList.some((emp) => !emp?.isSubcontractedMaterial);
+    const scioInputLocked = selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
     const weekData = allWeeksData.find(w => w.date === editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
@@ -1597,6 +1602,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             setEditingHoursInput('');
             setEditingScioHoursInput('');
             setEditingExternalHoursInput('');
+            setInitialScioHours(0);
             setSelectedEmployees(new Set());
           }}
         />
@@ -1616,6 +1622,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 setEditingHoursInput('');
                 setEditingScioHoursInput('');
                 setEditingExternalHoursInput('');
+                setInitialScioHours(0);
                 setSelectedEmployees(new Set());
               }}
               className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
@@ -1651,7 +1658,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       handleSaveCell();
                     }
                   }}
-                  disabled={selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && editingScioHours === 0 && editingScioHoursInput === ''}
+                  disabled={scioInputLocked}
                   autoFocus
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
