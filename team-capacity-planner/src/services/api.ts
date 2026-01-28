@@ -119,7 +119,8 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
       console.log('[API] Request body:', options.body);
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
+    const response = await fetch(url, {
       ...options,
       headers,
     });
