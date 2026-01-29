@@ -2817,7 +2817,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                             allWeeksData.forEach((weekData, idx) => {
                               const date = new Date(weekData.date);
-                              let monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                              const labelDate = new Date(date);
+                              labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
+                              let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
                               // Capitalize first letter
                               monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
@@ -3409,7 +3411,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                               allWeeksData.forEach((weekData, idx) => {
                                 const date = new Date(weekData.date);
-                                let monthName = date.toLocaleString(locale, { month: 'short', year: 'numeric' });
+                                const labelDate = new Date(date);
+                                labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
+                                let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
                                 // Capitalize first letter
                                 monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 

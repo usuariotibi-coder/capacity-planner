@@ -36,6 +36,10 @@ export function ResourcesPage() {
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   const allWeeksData = getAllWeeksWithNextYear(selectedYear);
+  const lastWeek = Math.max(
+    ...allWeeksData.filter((week) => !week.isNextYear).map((week) => week.weekNum),
+    52
+  );
 
   // Toggle calendar visibility for an employee
   const toggleEmployeeCalendar = (employeeId: string) => {
@@ -522,7 +526,7 @@ export function ResourcesPage() {
                           <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
                             <span>← {t.week} 1</span>
                             <span className="flex-1 text-center">{selectedYear}</span>
-                            <span>{t.week} 52+ →</span>
+                            <span>{t.week} {lastWeek}+ →</span>
                           </div>
                         </div>
                       )}
@@ -544,3 +548,4 @@ export function ResourcesPage() {
     </div>
   );
 }
+

@@ -33,8 +33,29 @@ export const formatToISO = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const getISOWeekInfo = (date: Date): { year: number; week: number } => {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7; // Monday = 0 ... Sunday = 6
+  d.setDate(d.getDate() - day + 3); // Shift to Thursday
+
+  const isoYear = d.getFullYear();
+  const firstThursday = new Date(isoYear, 0, 4);
+  const firstThursdayDay = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - firstThursdayDay + 3);
+
+  const week = 1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * MS_PER_DAY));
+  return { year: isoYear, week };
+};
+
+const getISOWeeksInYear = (year: number): number => {
+  const dec28 = new Date(year, 11, 28);
+  return getISOWeekInfo(dec28).week;
+};
+
 /**
- * Obtiene el lunes de la semana 1 del año especificado (o actual)
+ * Obtiene el lunes de la semana que contiene el 1 de enero del aÃ±o especificado (o actual)
  */
 export const getWeek1Start = (year?: number): Date => {
   const targetYear = year || new Date().getFullYear();
@@ -43,15 +64,20 @@ export const getWeek1Start = (year?: number): Date => {
 };
 
 /**
- * Obtiene todas las 52 semanas del año como array de strings (ISO format)
+ * Obtiene todas las semanas del aÃ±o como array de strings (ISO format)
+ * Incluye la semana de inicio si pertenece al aÃ±o anterior (cuando el 1 de enero cae Vie/Sab/Dom)
  */
 export const getAllWeeksOfYear = (year?: number): string[] => {
   const targetYear = year || new Date().getFullYear();
   const weeks: string[] = [];
   let current = getWeek1Start(targetYear);
 
-  // Generar 52 semanas
-  for (let i = 0; i < 52; i++) {
+  while (true) {
+    const info = getISOWeekInfo(current);
+    if (info.year > targetYear) {
+      break;
+    }
+
     weeks.push(current.toISOString().split('T')[0]);
     current = new Date(current);
     current.setDate(current.getDate() + 7);
@@ -61,58 +87,65 @@ export const getAllWeeksOfYear = (year?: number): string[] => {
 };
 
 /**
- * Obtiene el número de semana (1-52) para una fecha dada
+ * Obtiene el nÃºmero de semana ISO para una fecha dada
  */
 export const getWeekNumber = (dateStr: string, year?: number): number => {
-  const targetYear = year || new Date().getFullYear();
-  const week1Start = getWeek1Start(targetYear);
   const date = new Date(dateStr);
+  const { year: isoYear, week } = getISOWeekInfo(date);
 
-  const diff = date.getTime() - week1Start.getTime();
-  const weekNum = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1;
+  if (year !== undefined && isoYear !== year) {
+    const weeksInTarget = getISOWeeksInYear(year);
+    return isoYear < year ? weeksInTarget : 1;
+  }
 
-  return Math.max(1, Math.min(52, weekNum));
+  return week;
 };
 
 /**
- * Obtiene el número de la semana actual (1-52)
+ * Obtiene el nÃºmero de la semana actual (ISO)
  */
 export const getCurrentWeekNumber = (): number => {
   return getWeekNumber(formatToISO(new Date()));
 };
 
 /**
- * Obtiene las semanas del año actual más las primeras semanas del próximo año
+ * Obtiene las semanas del aÃ±o actual mÃ¡s las primeras semanas del prÃ³ximo aÃ±o
  * Retorna un array de objetos con: { date: string, weekNum: number, isNextYear: boolean }
- * Las semanas del próximo año empiezan en 1
+ * Las semanas del prÃ³ximo aÃ±o empiezan en 1
  */
 export const getAllWeeksWithNextYear = (year?: number): Array<{ date: string; weekNum: number; isNextYear: boolean }> => {
   const targetYear = year || new Date().getFullYear();
   const weeks: Array<{ date: string; weekNum: number; isNextYear: boolean }> = [];
 
-  // Get all 52 weeks of current year
   let current = getWeek1Start(targetYear);
-  for (let i = 0; i < 52; i++) {
+
+  // Current year (calendar view): include leading overlap + all ISO weeks of the year
+  while (true) {
+    const info = getISOWeekInfo(current);
+    if (info.year > targetYear) {
+      break;
+    }
+
     weeks.push({
       date: current.toISOString().split('T')[0],
-      weekNum: i + 1,
+      weekNum: info.week,
       isNextYear: false
     });
+
     current = new Date(current);
     current.setDate(current.getDate() + 7);
   }
 
-  // Add first 10 weeks of next year - numbering starts at 1
-  const nextYear = targetYear + 1;
-  let nextYearCurrent = getWeek1Start(nextYear);
+  // Add first 10 weeks of next year
   for (let i = 0; i < 10; i++) {
+    const info = getISOWeekInfo(current);
     weeks.push({
-      date: nextYearCurrent.toISOString().split('T')[0],
-      weekNum: i + 1,  // Reset to 1 for next year
+      date: current.toISOString().split('T')[0],
+      weekNum: info.week,
       isNextYear: true
     });
-    nextYearCurrent = new Date(nextYearCurrent);
-    nextYearCurrent.setDate(nextYearCurrent.getDate() + 7);
+    current = new Date(current);
+    current.setDate(current.getDate() + 7);
   }
 
   return weeks;
