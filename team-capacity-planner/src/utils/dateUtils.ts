@@ -8,13 +8,18 @@ export const getWeekStart = (date: Date): Date => {
   return new Date(d.setDate(diff));
 };
 
+export const parseISODate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 /**
  * Obtiene un array de strings con las fechas de inicio de semana en un rango
  */
 export const getWeeksInRange = (startDate: string, endDate: string): string[] => {
   const weeks: string[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseISODate(startDate);
+  const end = parseISODate(endDate);
 
   let current = getWeekStart(start);
 
@@ -90,7 +95,7 @@ export const getAllWeeksOfYear = (year?: number): string[] => {
  * Obtiene el nÃºmero de semana ISO para una fecha dada
  */
 export const getWeekNumber = (dateStr: string, year?: number): number => {
-  const date = new Date(dateStr);
+  const date = parseISODate(dateStr);
   const { year: isoYear, week } = getISOWeekInfo(date);
 
   if (year !== undefined && isoYear !== year) {

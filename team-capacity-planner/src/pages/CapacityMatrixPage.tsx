@@ -5,7 +5,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { projectsApi, scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
@@ -77,6 +77,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const minYearOption = 2024;
+  const maxYearOption = new Date().getFullYear() + 10;
+  const yearOptions = Array.from(
+    { length: maxYearOption - minYearOption + 1 },
+    (_, idx) => minYearOption + idx
+  );
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
@@ -1941,10 +1947,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
             className="border border-blue-300 rounded px-1 py-0.5 text-[9px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex-shrink-0"
           >
-            <option value={2024}>2024</option>
-            <option value={2025}>2025</option>
-            <option value={2026}>2026</option>
-            <option value={2027}>2027</option>
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
           </select>
 
           {/* Current Week Info - ultra compact */}
@@ -2816,7 +2821,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             const locale = language === 'es' ? 'es-ES' : 'en-US';
 
                             allWeeksData.forEach((weekData, idx) => {
-                              const date = new Date(weekData.date);
+                              const date = parseISODate(weekData.date);
                               const labelDate = new Date(date);
                               labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
                               let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
@@ -3410,7 +3415,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               const locale = language === 'es' ? 'es-ES' : 'en-US';
 
                               allWeeksData.forEach((weekData, idx) => {
-                                const date = new Date(weekData.date);
+                                const date = parseISODate(weekData.date);
                                 const labelDate = new Date(date);
                                 labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
                                 let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });

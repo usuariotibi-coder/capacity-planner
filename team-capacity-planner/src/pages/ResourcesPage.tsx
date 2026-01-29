@@ -34,6 +34,12 @@ export function ResourcesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const minYearOption = 2024;
+  const maxYearOption = new Date().getFullYear() + 10;
+  const yearOptions = Array.from(
+    { length: maxYearOption - minYearOption + 1 },
+    (_, idx) => minYearOption + idx
+  );
 
   const allWeeksData = getAllWeeksWithNextYear(selectedYear);
   const lastWeek = Math.max(
@@ -146,10 +152,9 @@ export function ResourcesPage() {
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                 className="border-2 border-blue-300 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
               >
-                <option value={2024}>2024</option>
-                <option value={2025}>2025</option>
-                <option value={2026}>2026</option>
-                <option value={2027}>2027</option>
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
               </select>
             </div>
             <button
