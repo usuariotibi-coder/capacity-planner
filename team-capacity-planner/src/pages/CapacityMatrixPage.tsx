@@ -7,7 +7,7 @@ import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
-import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
+import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
