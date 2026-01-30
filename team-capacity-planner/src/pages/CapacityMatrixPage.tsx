@@ -847,13 +847,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     assignments.forEach((assignment) => {
       const dept = employeeDeptMap.get(assignment.employeeId);
       if (!dept) return;
+      const normalizedWeekStart = normalizeWeekStartDate(assignment.weekStartDate);
 
       const key = `${assignment.projectId}-${dept}`;
       if (!map[key]) {
         map[key] = { utilized: 0, forecast: 0 };
       }
 
-      if (assignment.weekStartDate < currentWeekStart) {
+      if (normalizedWeekStart < currentWeekStart) {
         map[key].utilized += assignment.hours;
       } else {
         map[key].forecast += assignment.hours;
@@ -871,8 +872,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     assignments.forEach((assignment) => {
       const dept = employeeDeptMap.get(assignment.employeeId);
       if (!dept) return;
+      const normalizedWeekStart = normalizeWeekStartDate(assignment.weekStartDate);
 
-      const cellKey = `${assignment.projectId}|${dept}|${assignment.weekStartDate}`;
+      const cellKey = `${assignment.projectId}|${dept}|${normalizedWeekStart}`;
       const cellEntry = byCell.get(cellKey) ?? { totalHours: 0, assignments: [], stage: null, comment: undefined };
       cellEntry.totalHours += assignment.hours;
       cellEntry.assignments.push(assignment);
@@ -884,7 +886,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
       byCell.set(cellKey, cellEntry);
 
-      const deptWeekKey = `${dept}|${assignment.weekStartDate}`;
+      const deptWeekKey = `${dept}|${normalizedWeekStart}`;
       deptWeekTotals.set(deptWeekKey, (deptWeekTotals.get(deptWeekKey) || 0) + assignment.hours);
 
       if (assignment.externalHours) {

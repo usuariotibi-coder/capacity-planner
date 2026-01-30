@@ -9,12 +9,26 @@ export const getWeekStart = (date: Date): Date => {
 };
 
 export const parseISODate = (dateStr: string): Date => {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  if (!dateStr) {
+    return new Date(NaN);
+  }
+
+  // Support full ISO datetime strings by trimming to the date portion.
+  const clean = dateStr.split('T')[0].split(' ')[0];
+  const [year, month, day] = clean.split('-').map(Number);
+  if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+    return new Date(year, month - 1, day);
+  }
+
+  const fallback = new Date(dateStr);
+  return Number.isNaN(fallback.getTime()) ? new Date(NaN) : fallback;
 };
 
 export const normalizeWeekStartDate = (dateStr: string): string => {
   const date = parseISODate(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    return dateStr;
+  }
   const day = date.getDay();
   if (day === 0) {
     // If stored as Sunday due to timezone shift, move to Monday
