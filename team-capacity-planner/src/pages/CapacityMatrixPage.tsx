@@ -58,6 +58,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   }, [projects]);
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const locale = language === 'es' ? 'es-ES' : 'en-US';
 
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
@@ -823,12 +824,130 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectsTableRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const allWeeksData = getAllWeeksWithNextYear(selectedYear);
+  const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
   const employeeDeptMap = useMemo(
     () => new Map(employees.map((emp) => [emp.id, emp.department])),
     [employees]
   );
+  const employeeNameById = useMemo(
+    () => new Map(employees.map((emp) => [emp.id, emp.name])),
+    [employees]
+  );
+  const projectById = useMemo(
+    () => new Map(projects.map((proj) => [proj.id, proj])),
+    [projects]
+  );
+  const weekDataByDate = useMemo(
+    () => new Map(allWeeksData.map((week) => [week.date, week])),
+    [allWeeksData]
+  );
+  const projectDurationWeeksById = useMemo(() => {
+    const map = new Map<string, number>();
+    projects.forEach((proj) => {
+      const start = new Date(proj.startDate);
+      const end = new Date(proj.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+      map.set(proj.id, diffWeeks);
+    });
+    return map;
+  }, [projects]);
+  const projectStartDisplayById = useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach((proj) => {
+      const display = proj.startDate
+        ? new Date(proj.startDate).toLocaleDateString(locale)
+        : 'N/A';
+      map.set(proj.id, display);
+    });
+    return map;
+  }, [projects, locale]);
+  const projectManagerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach((proj) => {
+      if (proj.projectManagerId) {
+        map.set(proj.id, employeeNameById.get(proj.projectManagerId) || 'PM');
+      }
+    });
+    return map;
+  }, [projects, employeeNameById]);
+  const projectDeptMetaByKey = useMemo(() => {
+    const map = new Map<string, {
+      deptStartDate?: string;
+      deptEndDate?: string;
+      deptDisplayDate: string;
+      effectiveStartDate: string;
+      effectiveEndDate: string;
+    }>();
+
+    projects.forEach((proj) => {
+      DEPARTMENTS.forEach((dept) => {
+        let deptStartDate: string | undefined;
+        let deptDuration = 0;
+
+        if (dept === 'PM') {
+          deptStartDate = proj.startDate;
+          deptDuration = proj.numberOfWeeks || 0;
+        } else {
+          const deptStages = proj.departmentStages?.[dept];
+          const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
+          deptStartDate = deptFirstStage?.departmentStartDate;
+          deptDuration = deptFirstStage?.durationWeeks || 0;
+        }
+
+        let deptEndDate = '';
+        if (deptStartDate && deptDuration > 0) {
+          const endDate = new Date(deptStartDate);
+          endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
+          deptEndDate = formatToISO(endDate);
+        }
+
+        const effectiveStartDate = deptStartDate || proj.startDate;
+        const effectiveEndDate = deptEndDate || proj.endDate || proj.startDate;
+        const deptDisplayDate = deptStartDate
+          ? new Date(deptStartDate).toLocaleDateString(locale)
+          : t.notConfigured;
+
+        map.set(`${proj.id}|${dept}`, {
+          deptStartDate,
+          deptEndDate,
+          deptDisplayDate,
+          effectiveStartDate,
+          effectiveEndDate,
+        });
+      });
+    });
+
+    return map;
+  }, [projects, locale, t.notConfigured]);
+  const monthSpans = useMemo(() => {
+    const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
+    let currentMonth = '';
+    let startIdx = 0;
+
+    allWeeksData.forEach((weekData, idx) => {
+      const date = parseISODate(weekData.date);
+      const labelDate = new Date(date);
+      labelDate.setDate(labelDate.getDate() + 3);
+      let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
+      monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+      if (monthName !== currentMonth) {
+        if (currentMonth) {
+          months.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
+        }
+        currentMonth = monthName;
+        startIdx = idx;
+      }
+
+      if (idx === allWeeksData.length - 1) {
+        months.push({ month: currentMonth, startIdx, endIdx: idx });
+      }
+    });
+
+    return months;
+  }, [allWeeksData, locale]);
 
   // Find the current week - it's the week that contains today's date
   const currentDateWeekIndex = allWeeksData.findIndex((w) => {
@@ -899,6 +1018,57 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     return { byCell, deptWeekTotals, deptWeekExternalTotals };
   }, [assignments, employeeDeptMap]);
+
+  const weekRange = useMemo(() => {
+    const rangeStart = allWeeksData[0]?.date || `${selectedYear}-01-01`;
+    const rangeEnd = allWeeksData[allWeeksData.length - 1]?.date || `${selectedYear + 1}-12-31`;
+    return { rangeStart, rangeEnd };
+  }, [allWeeksData, selectedYear]);
+
+  const assignmentProjectIdsInRange = useMemo(() => {
+    const ids = new Set<string>();
+    const { rangeStart, rangeEnd } = weekRange;
+    assignments.forEach((assignment) => {
+      const weekStart = normalizeWeekStartDate(assignment.weekStartDate);
+      if (weekStart >= rangeStart && weekStart <= rangeEnd) {
+        ids.add(assignment.projectId);
+      }
+    });
+    return ids;
+  }, [assignments, weekRange]);
+
+  const departmentProjects = useMemo(() => {
+    const dept = departmentFilter as Department;
+    return projects.filter((proj) => {
+      if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
+        return proj.visibleInDepartments.includes(dept);
+      }
+      return true;
+    });
+  }, [projects, departmentFilter]);
+
+  const generalProjects = useMemo(() => {
+    if (departmentFilter !== 'General') {
+      return [];
+    }
+
+    const { rangeStart, rangeEnd } = weekRange;
+    return projects.filter((proj) => {
+      if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
+        return false;
+      }
+
+      const projectStart = proj.startDate || '';
+      const projectEnd = proj.endDate || proj.startDate || '';
+      const projectOverlapsRange = projectStart && projectEnd
+        ? projectStart <= rangeEnd && projectEnd >= rangeStart
+        : false;
+
+      const hasAssignmentsInRange = assignmentProjectIdsInRange.has(proj.id);
+
+      return projectOverlapsRange || hasAssignmentsInRange;
+    });
+  }, [projects, departmentFilter, weekRange, assignmentProjectIdsInRange]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -1113,7 +1283,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Forecasted Hours = sum of assignments from current week onward (includes current week)
   // Quoted Hours = departmentHoursAllocated (budget)
   const getUtilizationPercent = (department: Department, projectId: string): number => {
-    const project = projects.find(p => p.id === projectId);
+    const project = projectById.get(projectId);
     if (!project) return 0;
 
     // Get utilized hours (calculated)
@@ -1144,7 +1314,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Get quoted hours (budget) for a department in a project
   const getQuotedHours = (department: Department, projectId: string): number => {
-    const project = projects.find(p => p.id === projectId);
+    const project = projectById.get(projectId);
     const quotedHours = project?.departmentHoursAllocated?.[department] || 0;
     if (project && quotedHours === 0) {
       console.log(`[getQuotedHours] Project ${project.name}, Dept ${department}: ${quotedHours}`, {
@@ -1365,41 +1535,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setSelectedEmployees(new Set());
   };
 
-  const renderCellContent = (department: Department, weekStart: string, projectId?: string) => {
+  const renderCellContent = (department: Department, weekStart: string, project?: Project) => {
+    const projectId = project?.id;
     const { totalHours, talent, stage, assignments: cellAssignments } = getDepartmentWeekData(department, weekStart, projectId);
-    const weekData = allWeeksData.find((w) => w.date === weekStart);
-    const weekNum = weekData?.weekNum || 1;
+    const weekNum = weekDataByDate.get(weekStart)?.weekNum || 1;
 
     // Get comment from first assignment (comments are shared across assignments in same cell)
     const cellComment = cellAssignments.length > 0 ? cellAssignments[0].comment : undefined;
 
     // Get project and department stage info for visual indicators
-    const project = projects.find(p => p.id === projectId);
+    const projectMetaKey = projectId ? `${projectId}|${department}` : '';
+    const deptMeta = projectId ? projectDeptMetaByKey.get(projectMetaKey) : undefined;
 
     // Special case for PM: use project start date and total duration
     // PM department spans the entire project lifecycle
-    let deptStartDate: string | undefined;
-    let deptDuration: number;
-
-    if (department === 'PM' && project) {
-      // PM uses the project's start date and total number of weeks
-      deptStartDate = project.startDate;
-      deptDuration = project.numberOfWeeks || 0;
-    } else {
-      // Other departments use their specific configuration
-      const deptStages = project?.departmentStages?.[department];
-      const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
-      deptStartDate = deptFirstStage?.departmentStartDate;
-      deptDuration = deptFirstStage?.durationWeeks || 0;
-    }
-
-    // Calculate department end date by adding weeks to start date
-    let deptEndDate = '';
-    if (deptStartDate && deptDuration > 0) {
-      const endDate = new Date(deptStartDate);
-      endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
-      deptEndDate = formatToISO(endDate);
-    }
+    const deptStartDate = deptMeta?.deptStartDate;
+    const deptEndDate = deptMeta?.deptEndDate || '';
 
     // Check if current week is within department range using date comparison
     const isDeptWeekInRange = deptStartDate && deptEndDate && weekStart >= deptStartDate && weekStart <= deptEndDate;
@@ -1410,10 +1561,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const isGeneralView = departmentFilter === 'General';
 
     // Get project info for tooltip
-    const projectStartDate = project?.startDate ? new Date(project.startDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US') : 'N/A';
-    const deptDisplayDate = deptStartDate
-      ? new Date(deptStartDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')
-      : t.notConfigured;
+    const projectStartDate = projectId ? (projectStartDisplayById.get(projectId) || 'N/A') : 'N/A';
+    const deptDisplayDate = deptMeta?.deptDisplayDate || t.notConfigured;
 
     // Build tooltip text, including comment if present
     let tooltipText = `📅 ${t.projectTooltip}: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
@@ -1539,7 +1688,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const hasExternalSelected = selectedEmployeeList.some((emp) => emp?.isSubcontractedMaterial);
     const hasInternalSelected = selectedEmployeeList.some((emp) => !emp?.isSubcontractedMaterial);
     const scioInputLocked = selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
-    const weekData = allWeeksData.find(w => w.date === editingCell.weekStart);
+    const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
 
@@ -2440,18 +2589,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
-            {projects.filter((proj) => {
-              const dept = departmentFilter as Department;
-
-              // If project was created from a specific department (has visibleInDepartments),
-              // only show it in those departments
-              if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
-                return proj.visibleInDepartments.includes(dept);
-              }
-
-              // Projects created from Projects page (no visibleInDepartments) appear in all departments
-              return true;
-            }).map((proj) => {
+            {departmentProjects.map((proj) => {
               const dept = departmentFilter as Department;
 
               return (
@@ -2472,19 +2610,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           <span className="text-gray-600">{proj.client}</span>
                           <span className="text-gray-400">•</span>
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
-                            {(() => {
-                              const start = new Date(proj.startDate);
-                              const end = new Date(proj.endDate);
-                              const diffTime = Math.abs(end.getTime() - start.getTime());
-                              const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-                              return `${diffWeeks} weeks`;
-                            })()}
+                            {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
                           {proj.projectManagerId && (
                             <>
                               <span className="text-gray-400">•</span>
                               <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                👨‍💼 {employees.find((e) => e.id === proj.projectManagerId)?.name || 'PM'}
+                                👨‍💼 {projectManagerNameById.get(proj.id) || 'PM'}
                               </span>
                             </>
                           )}
@@ -2707,50 +2839,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         {/* Month row */}
                         <tr className="bg-gray-200 text-gray-700">
                           <th className="border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs"></th>
-                          {(() => {
-                            const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
-                            let currentMonth = '';
-                            let startIdx = 0;
-                            const locale = language === 'es' ? 'es-ES' : 'en-US';
-
-                            allWeeksData.forEach((weekData, idx) => {
-                              const date = parseISODate(weekData.date);
-                              const labelDate = new Date(date);
-                              labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
-                              let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
-                              // Capitalize first letter
-                              monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-                              if (monthName !== currentMonth) {
-                                if (currentMonth) {
-                                  months.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
-                                }
-                                currentMonth = monthName;
-                                startIdx = idx;
-                              }
-
-                              if (idx === allWeeksData.length - 1) {
-                                months.push({ month: currentMonth, startIdx, endIdx: idx });
-                              }
-                            });
-
-                            return months.map((monthInfo, idx) => {
-                              const isEven = idx % 2 === 0;
-                              return (
-                                <th
-                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                  colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                  className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
-                                    isEven
-                                      ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
-                                      : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
-                                  }`}
-                                >
-                                  {monthInfo.month}
-                                </th>
-                              );
-                            });
-                          })()}
+                          {monthSpans.map((monthInfo, idx) => {
+                            const isEven = idx % 2 === 0;
+                            return (
+                              <th
+                                key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
+                                  isEven
+                                    ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
+                                    : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                }`}
+                              >
+                                {monthInfo.month}
+                              </th>
+                            );
+                          })}
                         </tr>
                         {/* Week row */}
                         <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
@@ -2805,7 +2909,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   : 'border-gray-300'
                               }`}
                             >
-                              {renderCellContent(dept, week, proj.id)}
+                              {renderCellContent(dept, week, proj)}
                             </td>
                           );
                         })}
@@ -3001,31 +3105,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">Projects Matrix</h2>
 
-              {projects.filter((proj) => {
-                // Filter projects that have activity in the selected year range (weeks shown)
-                const rangeStart = allWeeksData[0]?.date || `${selectedYear}-01-01`;
-                const rangeEnd = allWeeksData[allWeeksData.length - 1]?.date || `${selectedYear + 1}-12-31`;
-
-                // If in General view, exclude quick-created projects (those with visibleInDepartments)
-                // Check if array has elements, not just that it exists (empty array [] is truthy)
-                if (departmentFilter === 'General' && proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
-                  return false;
-                }
-
-                const projectStart = proj.startDate || '';
-                const projectEnd = proj.endDate || proj.startDate || '';
-                const projectOverlapsRange = projectStart && projectEnd
-                  ? projectStart <= rangeEnd && projectEnd >= rangeStart
-                  : false;
-
-                const hasAssignmentsInRange = assignments.some((assignment) => (
-                  assignment.projectId === proj.id &&
-                  assignment.weekStartDate >= rangeStart &&
-                  assignment.weekStartDate <= rangeEnd
-                ));
-
-                return projectOverlapsRange || hasAssignmentsInRange;
-              }).map((proj) => (
+              {generalProjects.map((proj) => (
                 <div key={proj.id} className="mb-1 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
                   {/* Project header */}
                   <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
@@ -3042,13 +3122,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           <span className="text-gray-600">{proj.client}</span>
                           <span className="text-gray-400">•</span>
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
-                            {proj.numberOfWeeks} weeks
+                            {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
                           {proj.projectManagerId && (
                             <>
                               <span className="text-gray-400">•</span>
                               <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                👨‍💼 {employees.find((e) => e.id === proj.projectManagerId)?.name || 'PM'}
+                                👨‍💼 {projectManagerNameById.get(proj.id) || 'PM'}
                               </span>
                             </>
                           )}
@@ -3130,50 +3210,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           {/* Month row */}
                           <tr className="bg-gray-200 text-gray-700 sticky top-0 z-20">
                             <th className="border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-30 text-xs"></th>
-                            {(() => {
-                              const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
-                              let currentMonth = '';
-                              let startIdx = 0;
-                              const locale = language === 'es' ? 'es-ES' : 'en-US';
-
-                              allWeeksData.forEach((weekData, idx) => {
-                                const date = parseISODate(weekData.date);
-                                const labelDate = new Date(date);
-                                labelDate.setDate(labelDate.getDate() + 3); // Use mid-week (Thu) to assign month
-                                let monthName = labelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
-                                // Capitalize first letter
-                                monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-                                if (monthName !== currentMonth) {
-                                  if (currentMonth) {
-                                    months.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
-                                  }
-                                  currentMonth = monthName;
-                                  startIdx = idx;
-                                }
-
-                                if (idx === allWeeksData.length - 1) {
-                                  months.push({ month: currentMonth, startIdx, endIdx: idx });
-                                }
-                              });
-
-                              return months.map((monthInfo, idx) => {
-                                const isEven = idx % 2 === 0;
-                                return (
-                                  <th
-                                    key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                    colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                    className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
-                                      isEven
-                                        ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
-                                        : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
-                                    }`}
-                                  >
-                                    {monthInfo.month}
-                                  </th>
-                                );
-                              });
-                            })()}
+                            {monthSpans.map((monthInfo, idx) => {
+                              const isEven = idx % 2 === 0;
+                              return (
+                                <th
+                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
+                                  colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
+                                  className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
+                                    isEven
+                                      ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
+                                      : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                  }`}
+                                >
+                                  {monthInfo.month}
+                                </th>
+                              );
+                            })}
                           </tr>
                           {/* Week row */}
                           <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-5 z-20">
@@ -3238,26 +3290,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   // Get comment from first assignment (comments are shared across assignments in same cell)
                                   const cellComment = cellEntry?.comment;
 
-                                  // Get department-specific start and duration info
-                                  const deptStages = proj.departmentStages?.[dept];
-                                  const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
-
-                                  // Calculate the actual week index from the department's start date
-                                  const deptStartDate = deptFirstStage?.departmentStartDate;
-                                  const deptDuration = deptFirstStage?.durationWeeks || 0;
-
-                                  // Calculate department end date by adding weeks to start date
-                                  let deptEndDate = '';
-                                  if (deptStartDate && deptDuration > 0) {
-                                    const endDate = new Date(deptStartDate);
-                                    endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
-                                    deptEndDate = formatToISO(endDate);
-                                  }
+                                  // Get department-specific start/end info (precomputed)
+                                  const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
+                                  const deptStartDate = deptMeta?.deptStartDate;
+                                  const deptEndDate = deptMeta?.deptEndDate || '';
 
                                   // Check if current week is within department range using date comparison
                                   // For departments WITHOUT specific departmentStages, use project dates instead
-                                  const effectiveDeptStartDate = deptStartDate || proj.startDate;
-                                  const effectiveDeptEndDate = deptEndDate || proj.endDate;
+                                  const effectiveDeptStartDate = deptMeta?.effectiveStartDate || proj.startDate;
+                                  const effectiveDeptEndDate = deptMeta?.effectiveEndDate || proj.endDate;
                                   const isDeptWeekInRange = week >= effectiveDeptStartDate && week <= effectiveDeptEndDate;
                                   const isDeptFirstWeek = week === effectiveDeptStartDate;
 
