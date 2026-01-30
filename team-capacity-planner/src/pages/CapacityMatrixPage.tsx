@@ -502,76 +502,42 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     console.log('[CapacityMatrix] saveSubcontractedCapacity called:', { company, weekDate, capacity });
 
     try {
-      if (capacity === undefined || capacity === 0) {
-        // Don't save undefined or 0 values
-        console.log('[CapacityMatrix] Skipping Subcontracted save - capacity is', capacity);
+      if (capacity === undefined) {
+        console.log('[CapacityMatrix] Skipping Subcontracted save - capacity is undefined');
         return;
       }
 
       console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, weekDate, capacity);
-      let savedSuccessfully = false;
+      console.log('[CapacityMatrix] Sending CREATE request to API...');
+      const result = await subcontractedTeamCapacityApi.create({
+        company,
+        weekStartDate: weekDate,
+        capacity,
+      });
+      console.log('[CapacityMatrix] ✅ UPSERT succeeded:', result);
 
-      try {
-        console.log('[CapacityMatrix] Sending CREATE request to API...');
-        const result = await subcontractedTeamCapacityApi.create({
-          company,
-          weekStartDate: weekDate,
-          capacity,
-        });
-        console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
-        savedSuccessfully = true;
+      const normalizedWeek = normalizeWeekStartDate(result.weekStartDate || weekDate);
 
-        // Log activity
-        await activityLogApi.logActivity(
-          'created',
-          'SubcontractedTeamCapacity',
-          result.id,
-          { company, weekStartDate: weekDate, capacity }
-        );
-      } catch (createError) {
-        const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
-        console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
+      setSubcontractedPersonnel(prev => ({
+        ...prev,
+        [company]: {
+          ...(prev[company] || {}),
+          [normalizedWeek]: capacity,
+        },
+      }));
 
-        // If create fails due to unique constraint, try to update instead
-        if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-          console.log('[CapacityMatrix] Detected unique constraint violation, trying to find and update existing record...');
-          try {
-            const allRecords = await subcontractedTeamCapacityApi.getAll();
-            console.log('[CapacityMatrix] Fetched all Subcontracted records, total count:', allRecords.length);
+      setSubcontractedRecordIds(prev => ({
+        ...prev,
+        [`${company}-${normalizedWeek}`]: result.id,
+      }));
 
-            const existingRecord = allRecords.find(
-              (r: any) => r.company === company && r.weekStartDate === weekDate
-            );
-
-            if (existingRecord) {
-              console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
-              const updateResult = await subcontractedTeamCapacityApi.update(existingRecord.id, { capacity });
-              console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
-              savedSuccessfully = true;
-
-              // Log activity
-              await activityLogApi.logActivity(
-                'updated',
-                'SubcontractedTeamCapacity',
-                existingRecord.id,
-                { company, weekStartDate: weekDate, capacity }
-              );
-            } else {
-              console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
-              throw createError;
-            }
-          } catch (getError) {
-            console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
-            throw getError;
-          }
-        } else {
-          throw createError;
-        }
-      }
-
-      if (!savedSuccessfully) {
-        throw new Error('Failed to save Subcontracted capacity record');
-      }
+      // Log activity
+      await activityLogApi.logActivity(
+        'updated',
+        'SubcontractedTeamCapacity',
+        result.id,
+        { company, weekStartDate: normalizedWeek, capacity }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] ❌ Final error saving Subcontracted capacity:', errorMsg);
@@ -604,7 +570,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     console.log('[CapacityMatrix] Setting Subcontracted debounce timeout for key:', timeoutKey);
     subcontractedSaveTimeouts.current[timeoutKey] = setTimeout(() => {
       console.log('[CapacityMatrix] Subcontracted debounce timeout fired for key:', timeoutKey);
-      if (newCount !== undefined && newCount > 0) {
+      if (newCount !== undefined) {
         saveSubcontractedCapacity(company, weekDate, newCount);
       }
     }, 500);
@@ -615,76 +581,42 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     console.log('[CapacityMatrix] savePrgExternalCapacity called:', { teamName, weekDate, capacity });
 
     try {
-      if (capacity === undefined || capacity === 0) {
-        // Don't save undefined or 0 values
-        console.log('[CapacityMatrix] Skipping PRG External save - capacity is', capacity);
+      if (capacity === undefined) {
+        console.log('[CapacityMatrix] Skipping PRG External save - capacity is undefined');
         return;
       }
 
       console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, weekDate, capacity);
-      let savedSuccessfully = false;
+      console.log('[CapacityMatrix] Sending CREATE request to API...');
+      const result = await prgExternalTeamCapacityApi.create({
+        teamName,
+        weekStartDate: weekDate,
+        capacity,
+      });
+      console.log('[CapacityMatrix] ✅ UPSERT succeeded:', result);
 
-      try {
-        console.log('[CapacityMatrix] Sending CREATE request to API...');
-        const result = await prgExternalTeamCapacityApi.create({
-          teamName,
-          weekStartDate: weekDate,
-          capacity,
-        });
-        console.log('[CapacityMatrix] ✅ CREATE succeeded:', result);
-        savedSuccessfully = true;
+      const normalizedWeek = normalizeWeekStartDate(result.weekStartDate || weekDate);
 
-        // Log activity
-        await activityLogApi.logActivity(
-          'created',
-          'PrgExternalTeamCapacity',
-          result.id,
-          { teamName, weekStartDate: weekDate, capacity }
-        );
-      } catch (createError) {
-        const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
-        console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
+      setPRGExternalPersonnel(prev => ({
+        ...prev,
+        [teamName]: {
+          ...(prev[teamName] || {}),
+          [normalizedWeek]: capacity,
+        },
+      }));
 
-        // If create fails due to unique constraint, try to update instead
-        if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-          console.log('[CapacityMatrix] Detected unique constraint violation, trying to find and update existing record...');
-          try {
-            const allRecords = await prgExternalTeamCapacityApi.getAll();
-            console.log('[CapacityMatrix] Fetched all PRG External records, total count:', allRecords.length);
+      setPrgExternalRecordIds(prev => ({
+        ...prev,
+        [`${teamName}-${normalizedWeek}`]: result.id,
+      }));
 
-            const existingRecord = allRecords.find(
-              (r: any) => r.teamName === teamName && r.weekStartDate === weekDate
-            );
-
-            if (existingRecord) {
-              console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
-              const updateResult = await prgExternalTeamCapacityApi.update(existingRecord.id, { capacity });
-              console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
-              savedSuccessfully = true;
-
-              // Log activity
-              await activityLogApi.logActivity(
-                'updated',
-                'PrgExternalTeamCapacity',
-                existingRecord.id,
-                { teamName, weekStartDate: weekDate, capacity }
-              );
-            } else {
-              console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
-              throw createError;
-            }
-          } catch (getError) {
-            console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
-            throw getError;
-          }
-        } else {
-          throw createError;
-        }
-      }
-
-      if (!savedSuccessfully) {
-        throw new Error('Failed to save PRG External capacity record');
-      }
+      // Log activity
+      await activityLogApi.logActivity(
+        'updated',
+        'PrgExternalTeamCapacity',
+        result.id,
+        { teamName, weekStartDate: normalizedWeek, capacity }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] ❌ Final error saving PRG External capacity:', errorMsg);
@@ -713,7 +645,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     console.log('[CapacityMatrix] Setting PRG External debounce timeout for key:', timeoutKey);
     prgExternalSaveTimeouts.current[timeoutKey] = setTimeout(() => {
       console.log('[CapacityMatrix] PRG External debounce timeout fired for key:', timeoutKey);
-      if (newCount !== undefined && newCount > 0) {
+      if (newCount !== undefined) {
         savePrgExternalCapacity(teamName, weekDate, newCount);
       }
     }, 500);
