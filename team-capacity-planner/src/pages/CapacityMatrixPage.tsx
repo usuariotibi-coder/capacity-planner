@@ -291,20 +291,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             newSubcontractedRecordIds[`${company}-${weekDate}`] = record.id;
           }
         }
-        const currentWeekDate = currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.date : undefined;
         setSubcontractedPersonnel(prev => {
           const merged: Record<string, Record<string, number | undefined>> = { ...newSubcontractedPersonnel };
-          if (currentWeekDate) {
-            Object.keys(prev).forEach((company) => {
-              const prevValue = prev[company]?.[currentWeekDate];
-              if (prevValue !== undefined && merged[company]?.[currentWeekDate] === undefined) {
+          Object.keys(prev).forEach((company) => {
+            if (!merged[company]) {
+              merged[company] = { ...(prev[company] || {}) };
+              return;
+            }
+
+            Object.keys(prev[company] || {}).forEach((weekDate) => {
+              if (merged[company]?.[weekDate] === undefined) {
                 merged[company] = {
                   ...(merged[company] || {}),
-                  [currentWeekDate]: prevValue,
+                  [weekDate]: prev[company][weekDate],
                 };
               }
             });
-          }
+          });
           return merged;
         });
         setSubcontractedRecordIds(prev => ({ ...prev, ...newSubcontractedRecordIds }));
@@ -329,20 +332,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             newPrgExternalRecordIds[`${teamName}-${weekDate}`] = record.id;
           }
         }
-        const currentWeekDatePrg = currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.date : undefined;
         setPRGExternalPersonnel(prev => {
           const merged: Record<string, Record<string, number | undefined>> = { ...newPrgExternalPersonnel };
-          if (currentWeekDatePrg) {
-            Object.keys(prev).forEach((team) => {
-              const prevValue = prev[team]?.[currentWeekDatePrg];
-              if (prevValue !== undefined && merged[team]?.[currentWeekDatePrg] === undefined) {
+          Object.keys(prev).forEach((team) => {
+            if (!merged[team]) {
+              merged[team] = { ...(prev[team] || {}) };
+              return;
+            }
+
+            Object.keys(prev[team] || {}).forEach((weekDate) => {
+              if (merged[team]?.[weekDate] === undefined) {
                 merged[team] = {
                   ...(merged[team] || {}),
-                  [currentWeekDatePrg]: prevValue,
+                  [weekDate]: prev[team][weekDate],
                 };
               }
             });
-          }
+          });
           return merged;
         });
         setPrgExternalRecordIds(prev => ({ ...prev, ...newPrgExternalRecordIds }));
