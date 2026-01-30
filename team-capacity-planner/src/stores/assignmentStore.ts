@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Assignment } from '../types';
 import { assignmentsApi, isAuthenticated, activityLogApi } from '../services/api';
+import { normalizeWeekStartDate } from '../utils/dateUtils';
 import { getChangedFields } from '../utils/activityLog';
 
 interface AssignmentStore {
@@ -30,7 +31,11 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await assignmentsApi.getAll();
-      set({ assignments: data, isLoading: false, hasFetched: true });
+      const normalized = data.map((assignment) => ({
+        ...assignment,
+        weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
+      }));
+      set({ assignments: normalized, isLoading: false, hasFetched: true });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error al cargar asignaciones',
@@ -41,10 +46,19 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
   addAssignment: async (assignment) => {
     try {
-      console.log('[Store] Creating assignment:', assignment);
-      const newAssignment = await assignmentsApi.create(assignment);
+      const normalizedAssignment = {
+        ...assignment,
+        weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
+      };
+      console.log('[Store] Creating assignment:', normalizedAssignment);
+      const newAssignment = await assignmentsApi.create(normalizedAssignment);
       console.log('[Store] Assignment created:', newAssignment);
-      set((state) => ({ assignments: [...state.assignments, newAssignment] }));
+      set((state) => ({
+        assignments: [
+          ...state.assignments,
+          { ...newAssignment, weekStartDate: normalizeWeekStartDate(newAssignment.weekStartDate) },
+        ],
+      }));
 
       // Log activity
       await activityLogApi.logActivity(
@@ -65,18 +79,21 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   updateAssignment: async (id, updates) => {
     const originalAssignments = get().assignments;
     const originalAssignment = originalAssignments.find((assign) => assign.id === id);
-    const changedUpdates = getChangedFields(originalAssignment, updates);
+    const normalizedUpdates = updates.weekStartDate
+      ? { ...updates, weekStartDate: normalizeWeekStartDate(updates.weekStartDate) }
+      : updates;
+    const changedUpdates = getChangedFields(originalAssignment, normalizedUpdates);
 
     // Optimistic update
     set((state) => ({
       assignments: state.assignments.map((assign) =>
-        assign.id === id ? { ...assign, ...updates } : assign
+        assign.id === id ? { ...assign, ...normalizedUpdates } : assign
       ),
     }));
 
     try {
-      console.log('[Store] Updating assignment:', id, updates);
-      await assignmentsApi.update(id, updates);
+      console.log('[Store] Updating assignment:', id, normalizedUpdates);
+      await assignmentsApi.update(id, normalizedUpdates);
       console.log('[Store] Assignment updated successfully');
 
       // Log activity

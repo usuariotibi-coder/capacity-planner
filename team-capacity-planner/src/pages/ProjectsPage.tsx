@@ -5,7 +5,7 @@ import { useEmployeeStore } from '../stores/employeeStore';
 import type { Project, Department, DepartmentStageConfig } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
-import { getAllWeeksWithNextYear } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
 import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -74,17 +74,17 @@ export function ProjectsPage() {
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
 
   const calculateEndDate = (startDate: string, weeks: number): string => {
-    const start = new Date(startDate);
+    const start = parseISODate(startDate);
     start.setDate(start.getDate() + weeks * 7);
-    return start.toISOString().split('T')[0];
+    return formatToISO(start);
   };
 
   const getWeekStartsForProject = (startDate: string, weeks: number): string[] => {
     const weekStarts: string[] = [];
-    let current = new Date(startDate);
+    let current = parseISODate(startDate);
 
     for (let i = 0; i < weeks; i++) {
-      weekStarts.push(current.toISOString().split('T')[0]);
+      weekStarts.push(formatToISO(current));
       current.setDate(current.getDate() + 7);
     }
 

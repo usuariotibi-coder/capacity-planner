@@ -13,6 +13,19 @@ export const parseISODate = (dateStr: string): Date => {
   return new Date(year, month - 1, day);
 };
 
+export const normalizeWeekStartDate = (dateStr: string): string => {
+  const date = parseISODate(dateStr);
+  const day = date.getDay();
+  if (day === 0) {
+    // If stored as Sunday due to timezone shift, move to Monday
+    date.setDate(date.getDate() + 1);
+  } else if (day !== 1) {
+    // Fallback: move back to Monday of the same week
+    date.setDate(date.getDate() - (day - 1));
+  }
+  return formatToISO(date);
+};
+
 /**
  * Obtiene un array de strings con las fechas de inicio de semana en un rango
  */

@@ -5,7 +5,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
@@ -231,7 +231,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         for (const record of data) {
           const dept = record.department as Department;
-          const weekDate = record.weekStartDate;
+          const weekDate = normalizeWeekStartDate(record.weekStartDate);
           const capacity = record.capacity;
 
           if (dept && weekDate && newScioTeamMembers[dept]) {
@@ -279,7 +279,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         for (const record of subcontractedData) {
           const company = record.company;
-          const weekDate = record.weekStartDate;
+          const weekDate = normalizeWeekStartDate(record.weekStartDate);
           const capacity = record.capacity;
 
           if (company && weekDate) {
@@ -302,7 +302,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         for (const record of prgExternalData) {
           const teamName = record.teamName;
-          const weekDate = record.weekStartDate;
+          const weekDate = normalizeWeekStartDate(record.weekStartDate);
           const capacity = record.capacity;
 
           if (teamName && weekDate) {
@@ -1357,7 +1357,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (deptStartDate && deptDuration > 0) {
       const endDate = new Date(deptStartDate);
       endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
-      deptEndDate = endDate.toISOString().split('T')[0];
+      deptEndDate = formatToISO(endDate);
     }
 
     // Check if current week is within department range using date comparison
@@ -3231,7 +3231,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   if (deptStartDate && deptDuration > 0) {
                                     const endDate = new Date(deptStartDate);
                                     endDate.setDate(endDate.getDate() + (deptDuration * 7) - 1);
-                                    deptEndDate = endDate.toISOString().split('T')[0];
+                                    deptEndDate = formatToISO(endDate);
                                   }
 
                                   // Check if current week is within department range using date comparison
