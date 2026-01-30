@@ -830,6 +830,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     () => new Map(employees.map((emp) => [emp.id, emp.department])),
     [employees]
   );
+  const employeeById = useMemo(
+    () => new Map(employees.map((emp) => [emp.id, emp])),
+    [employees]
+  );
   const getAssignmentDepartment = (assignment: Assignment) =>
     employeeDeptMap.get(assignment.employeeId) || assignment.employee?.department;
   const employeeNameById = useMemo(
@@ -1077,6 +1081,34 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       ...prev,
       [projectId]: !prev[projectId],
     }));
+  };
+
+  const isPlaceholderEmployee = (emp?: Employee | null) =>
+    !!emp && (emp.role === 'Placeholder' || emp.name.endsWith('Placeholder'));
+
+  const getOrCreatePlaceholderEmployee = async (department: Department) => {
+    const placeholderName = `${department} Placeholder`;
+    let placeholder = employees.find(
+      (emp) => emp.department === department && emp.name === placeholderName
+    );
+
+    if (!placeholder) {
+      try {
+        placeholder = await addEmployee({
+          name: placeholderName,
+          role: 'Placeholder',
+          department,
+          capacity: 0,
+          isActive: false,
+          isSubcontractedMaterial: false,
+        });
+      } catch (error) {
+        console.error('[CapacityMatrix] Failed to create placeholder employee:', error);
+        return null;
+      }
+    }
+
+    return placeholder;
   };
 
   const handleCreateQuickProject = () => {
@@ -1346,7 +1378,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const firstAssignmentComment = deptAssignments.length > 0 ? deptAssignments[0].comment || '' : '';
 
     // Initialize selected employees from existing assignments
-    const assignedEmployeeIds = new Set(deptAssignments.map(a => a.employeeId));
+    const assignedEmployeeIds = new Set<string>();
+    deptAssignments.forEach((assignment) => {
+      const emp = employeeById.get(assignment.employeeId) || assignment.employee;
+      if (emp && emp.isActive && !isPlaceholderEmployee(emp)) {
+        assignedEmployeeIds.add(emp.id);
+      }
+    });
 
     // For BUILD and PRG departments, initialize SCIO and external hours separately
     let totalScioHours = 0;
@@ -1400,7 +1438,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const targetEmployeeIds = selectedEmployees.size > 0
       ? Array.from(selectedEmployees)
       : deptAssignments.map(a => a.employeeId);
-
     if (targetEmployeeIds.length > 0) {
       // Update or create assignments for selected employees
       targetEmployeeIds.forEach((employeeId) => {
@@ -1466,32 +1503,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         }
       });
     } else {
-      // Create new assignment for first available employee in department
+      // Create new assignment for placeholder resource when no one is selected
       console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
       console.log('[CapacityMatrix] All employees:', employees.map(e => ({ name: e.name, dept: e.department, active: e.isActive })));
-
-    let availableEmployee = employees.find(
-      (emp) => emp.department === editingCell.department && emp.isActive
-    );
-
-    // For MFG, allow using any existing employee or auto-create a placeholder
-    if (!availableEmployee && editingCell.department === 'MFG') {
-      availableEmployee = employees.find((emp) => emp.department === 'MFG');
-      if (!availableEmployee) {
-        try {
-          availableEmployee = await addEmployee({
-            name: 'MFG Placeholder',
-            role: 'Manufacturing',
-            department: 'MFG',
-            capacity: 0,
-            isActive: false,
-            isSubcontractedMaterial: false,
-          });
-        } catch (error) {
-          console.error('[CapacityMatrix] ❌ Failed to create MFG placeholder employee:', error);
-        }
-      }
-    }
+      const availableEmployee = await getOrCreatePlaceholderEmployee(editingCell.department);
 
       console.log('[CapacityMatrix] Found available employee:', availableEmployee);
       console.log('[CapacityMatrix] Project ID:', editingCell.projectId);
@@ -1515,18 +1530,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Creating new assignment:', newAssignment);
         addAssignment(newAssignment);
       } else {
-        // Show error if no employee found
-        if (!availableEmployee && editingCell.department !== 'MFG') {
-          console.error('[CapacityMatrix] ❌ No active employee found for department:', editingCell.department);
-          alert(`No hay empleados activos en el departamento ${editingCell.department}. Por favor agregue un empleado primero.`);
-        }
-        if (!availableEmployee && editingCell.department === 'MFG') {
-          console.error('[CapacityMatrix] ❌ No MFG placeholder employee available');
-          alert('No se pudo crear un recurso automático para MFG. Intenta de nuevo.');
+        if (!availableEmployee) {
+          console.error('[CapacityMatrix] No placeholder employee available for department:', editingCell.department);
+          alert('No se pudo crear un recurso automatico para guardar estas horas. Intenta de nuevo.');
         }
         if (!editingCell.projectId) {
-          console.error('[CapacityMatrix] ❌ No project ID available');
-          alert('Error: No se encontró el ID del proyecto.');
+          console.error('[CapacityMatrix] No project ID available');
+          alert('Error: No se encontro el ID del proyecto.');
         }
       }
     }
