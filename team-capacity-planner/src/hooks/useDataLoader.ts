@@ -5,6 +5,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useAuth } from '../context/AuthContext';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
+import { normalizeWeekStartDate } from '../utils/dateUtils';
 import {
   scioTeamCapacityApi,
   subcontractedTeamCapacityApi,
@@ -42,7 +43,7 @@ export const useDataLoader = () => {
               localStorage.setItem('scioTeamMembers', JSON.stringify(
                 results.reduce((acc: any, item: CapacityItem) => {
                   const dept = item.department;
-                  const weekDate = item.weekStartDate;
+                  const weekDate = normalizeWeekStartDate(item.weekStartDate);
                   if (!acc[dept]) acc[dept] = {};
                   acc[dept][weekDate] = item.capacity;
                   return acc;
@@ -56,7 +57,7 @@ export const useDataLoader = () => {
             if (results && Array.isArray(results)) {
               const subcontracted = results.reduce((acc: any, item: CapacityItem) => {
                 const company = item.company;
-                const weekDate = item.weekStartDate;
+                const weekDate = normalizeWeekStartDate(item.weekStartDate);
                 if (!acc[company]) acc[company] = {};
                 acc[company][weekDate] = item.capacity;
                 return acc;
@@ -74,7 +75,7 @@ export const useDataLoader = () => {
             if (results && Array.isArray(results)) {
               const prgExternal = results.reduce((acc: any, item: CapacityItem) => {
                 const teamName = item.teamName;
-                const weekDate = item.weekStartDate;
+                const weekDate = normalizeWeekStartDate(item.weekStartDate);
                 if (!acc[teamName]) acc[teamName] = {};
                 acc[teamName][weekDate] = item.capacity;
                 return acc;
@@ -94,7 +95,7 @@ export const useDataLoader = () => {
               localStorage.setItem('departmentWeeklyTotals', JSON.stringify(
                 results.reduce((acc: any, item: CapacityItem) => {
                   const dept = item.department;
-                  const weekDate = item.weekStartDate;
+                  const weekDate = normalizeWeekStartDate(item.weekStartDate);
                   if (!acc[dept]) acc[dept] = {};
                   acc[dept][weekDate] = item.totalHours;
                   return acc;

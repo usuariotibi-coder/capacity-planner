@@ -124,7 +124,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const saved = localStorage.getItem('subcontractedPersonnel');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Record<string, Record<string, number | undefined>>;
+        const normalized: Record<string, Record<string, number | undefined>> = {};
+        Object.entries(parsed || {}).forEach(([company, weeks]) => {
+          if (!weeks || typeof weeks !== 'object') return;
+          Object.entries(weeks).forEach(([weekDate, capacity]) => {
+            const normalizedWeek = normalizeWeekStartDate(weekDate);
+            if (!normalized[company]) {
+              normalized[company] = {};
+            }
+            normalized[company][normalizedWeek] = capacity;
+          });
+        });
+        return normalized;
       } catch (e) {
         console.error('Error loading subcontractedPersonnel from localStorage', e);
       }
@@ -153,7 +165,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const saved = localStorage.getItem('prgExternalPersonnel');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Record<string, Record<string, number | undefined>>;
+        const normalized: Record<string, Record<string, number | undefined>> = {};
+        Object.entries(parsed || {}).forEach(([team, weeks]) => {
+          if (!weeks || typeof weeks !== 'object') return;
+          Object.entries(weeks).forEach(([weekDate, capacity]) => {
+            const normalizedWeek = normalizeWeekStartDate(weekDate);
+            if (!normalized[team]) {
+              normalized[team] = {};
+            }
+            normalized[team][normalizedWeek] = capacity;
+          });
+        });
+        return normalized;
       } catch (e) {
         console.error('Error loading prgExternalPersonnel from localStorage', e);
       }
@@ -277,6 +301,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           'MG Electrical': {},
         };
         const newSubcontractedRecordIds: Record<string, string> = {};
+        const subcontractedLatestByKey: Record<string, number> = {};
 
         for (const record of subcontractedData) {
           const company = record.company;
@@ -284,11 +309,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           const capacity = record.capacity;
 
           if (company && weekDate) {
+            const recordKey = `${company}-${weekDate}`;
+            const timestampSource = record.updatedAt || record.createdAt;
+            const recordTimestamp = timestampSource ? new Date(timestampSource).getTime() : 0;
+            const safeTimestamp = Number.isNaN(recordTimestamp) ? 0 : recordTimestamp;
+            const existingTimestamp = subcontractedLatestByKey[recordKey];
+            if (existingTimestamp !== undefined && safeTimestamp < existingTimestamp) {
+              continue;
+            }
             if (!newSubcontractedPersonnel[company]) {
               newSubcontractedPersonnel[company] = {};
             }
             newSubcontractedPersonnel[company][weekDate] = capacity;
-            newSubcontractedRecordIds[`${company}-${weekDate}`] = record.id;
+            newSubcontractedRecordIds[recordKey] = record.id;
+            subcontractedLatestByKey[recordKey] = safeTimestamp;
           }
         }
         setSubcontractedPersonnel(prev => {
@@ -318,6 +352,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         const prgExternalData = await prgExternalTeamCapacityApi.getAll();
         const newPrgExternalPersonnel: Record<string, Record<string, number | undefined>> = {};
         const newPrgExternalRecordIds: Record<string, string> = {};
+        const prgExternalLatestByKey: Record<string, number> = {};
 
         for (const record of prgExternalData) {
           const teamName = record.teamName;
@@ -325,11 +360,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           const capacity = record.capacity;
 
           if (teamName && weekDate) {
+            const recordKey = `${teamName}-${weekDate}`;
+            const timestampSource = record.updatedAt || record.createdAt;
+            const recordTimestamp = timestampSource ? new Date(timestampSource).getTime() : 0;
+            const safeTimestamp = Number.isNaN(recordTimestamp) ? 0 : recordTimestamp;
+            const existingTimestamp = prgExternalLatestByKey[recordKey];
+            if (existingTimestamp !== undefined && safeTimestamp < existingTimestamp) {
+              continue;
+            }
             if (!newPrgExternalPersonnel[teamName]) {
               newPrgExternalPersonnel[teamName] = {};
             }
             newPrgExternalPersonnel[teamName][weekDate] = capacity;
-            newPrgExternalRecordIds[`${teamName}-${weekDate}`] = record.id;
+            newPrgExternalRecordIds[recordKey] = record.id;
+            prgExternalLatestByKey[recordKey] = safeTimestamp;
           }
         }
         setPRGExternalPersonnel(prev => {
@@ -535,7 +579,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Save Subcontracted Team Capacity to API
   const saveSubcontractedCapacity = async (company: string, weekDate: string, capacity: number | undefined) => {
-    console.log('[CapacityMatrix] saveSubcontractedCapacity called:', { company, weekDate, capacity });
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    console.log('[CapacityMatrix] saveSubcontractedCapacity called:', { company, weekDate: normalizedWeek, capacity });
 
     try {
       if (capacity === undefined) {
@@ -543,28 +588,28 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         return;
       }
 
-      console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, weekDate, capacity);
+      console.log('[CapacityMatrix] Saving Subcontracted capacity:', company, normalizedWeek, capacity);
       console.log('[CapacityMatrix] Sending CREATE request to API...');
       const result = await subcontractedTeamCapacityApi.create({
         company,
-        weekStartDate: weekDate,
+        weekStartDate: normalizedWeek,
         capacity,
       });
-      console.log('[CapacityMatrix] ✅ UPSERT succeeded:', result);
+      console.log('[CapacityMatrix] UPSERT succeeded:', result);
 
-      const normalizedWeek = normalizeWeekStartDate(result.weekStartDate || weekDate);
+      const resultWeek = normalizeWeekStartDate(result.weekStartDate || normalizedWeek);
 
       setSubcontractedPersonnel(prev => ({
         ...prev,
         [company]: {
           ...(prev[company] || {}),
-          [normalizedWeek]: capacity,
+          [resultWeek]: capacity,
         },
       }));
 
       setSubcontractedRecordIds(prev => ({
         ...prev,
-        [`${company}-${normalizedWeek}`]: result.id,
+        [`${company}-${resultWeek}`]: result.id,
       }));
 
       // Log activity
@@ -572,12 +617,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         'updated',
         'SubcontractedTeamCapacity',
         result.id,
-        { company, weekStartDate: normalizedWeek, capacity }
+        { company, weekStartDate: resultWeek, capacity }
       );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] ❌ Final error saving Subcontracted capacity:', errorMsg);
-      alert(`Error al guardar capacidad de ${company} (${weekDate}): ${errorMsg}`);
+      console.error('[CapacityMatrix] ERROR saving Subcontracted capacity:', errorMsg);
+      alert(`Error al guardar capacidad de ${company} (${normalizedWeek}): ${errorMsg}`);
     }
   };
 
@@ -586,19 +631,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const prgExternalSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleSubcontractedChange = (company: string, weekDate: string, newCount: number | undefined) => {
-    console.log('[CapacityMatrix] handleSubcontractedChange called:', { company, weekDate, newCount });
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    console.log('[CapacityMatrix] handleSubcontractedChange called:', { company, weekDate: normalizedWeek, newCount });
 
     // Update local state immediately
     setSubcontractedPersonnel(prev => ({
       ...prev,
       [company]: {
         ...(prev[company] || {}),
-        [weekDate]: newCount,
+        [normalizedWeek]: newCount,
       },
     }));
 
     // Debounce the API call
-    const timeoutKey = `${company}-${weekDate}`;
+    const timeoutKey = `${company}-${normalizedWeek}`;
     if (subcontractedSaveTimeouts.current[timeoutKey]) {
       console.log('[CapacityMatrix] Clearing previous Subcontracted timeout for key:', timeoutKey);
       clearTimeout(subcontractedSaveTimeouts.current[timeoutKey]);
@@ -607,14 +653,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     subcontractedSaveTimeouts.current[timeoutKey] = setTimeout(() => {
       console.log('[CapacityMatrix] Subcontracted debounce timeout fired for key:', timeoutKey);
       if (newCount !== undefined) {
-        saveSubcontractedCapacity(company, weekDate, newCount);
+        saveSubcontractedCapacity(company, normalizedWeek, newCount);
       }
     }, 500);
   };
 
   // Save PRG External Team Capacity to API
   const savePrgExternalCapacity = async (teamName: string, weekDate: string, capacity: number | undefined) => {
-    console.log('[CapacityMatrix] savePrgExternalCapacity called:', { teamName, weekDate, capacity });
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    console.log('[CapacityMatrix] savePrgExternalCapacity called:', { teamName, weekDate: normalizedWeek, capacity });
 
     try {
       if (capacity === undefined) {
@@ -622,28 +669,28 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         return;
       }
 
-      console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, weekDate, capacity);
+      console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, normalizedWeek, capacity);
       console.log('[CapacityMatrix] Sending CREATE request to API...');
       const result = await prgExternalTeamCapacityApi.create({
         teamName,
-        weekStartDate: weekDate,
+        weekStartDate: normalizedWeek,
         capacity,
       });
-      console.log('[CapacityMatrix] ✅ UPSERT succeeded:', result);
+      console.log('[CapacityMatrix] UPSERT succeeded:', result);
 
-      const normalizedWeek = normalizeWeekStartDate(result.weekStartDate || weekDate);
+      const resultWeek = normalizeWeekStartDate(result.weekStartDate || normalizedWeek);
 
       setPRGExternalPersonnel(prev => ({
         ...prev,
         [teamName]: {
           ...(prev[teamName] || {}),
-          [normalizedWeek]: capacity,
+          [resultWeek]: capacity,
         },
       }));
 
       setPrgExternalRecordIds(prev => ({
         ...prev,
-        [`${teamName}-${normalizedWeek}`]: result.id,
+        [`${teamName}-${resultWeek}`]: result.id,
       }));
 
       // Log activity
@@ -651,29 +698,30 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         'updated',
         'PrgExternalTeamCapacity',
         result.id,
-        { teamName, weekStartDate: normalizedWeek, capacity }
+        { teamName, weekStartDate: resultWeek, capacity }
       );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] ❌ Final error saving PRG External capacity:', errorMsg);
-      alert(`Error al guardar capacidad PRG (${teamName} - ${weekDate}): ${errorMsg}`);
+      console.error('[CapacityMatrix] ERROR saving PRG External capacity:', errorMsg);
+      alert(`Error al guardar capacidad PRG (${teamName} - ${normalizedWeek}): ${errorMsg}`);
     }
   };
 
   const handlePrgExternalChange = (teamName: string, weekDate: string, newCount: number | undefined) => {
-    console.log('[CapacityMatrix] handlePrgExternalChange called:', { teamName, weekDate, newCount });
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    console.log('[CapacityMatrix] handlePrgExternalChange called:', { teamName, weekDate: normalizedWeek, newCount });
 
     // Update local state immediately
     setPRGExternalPersonnel(prev => ({
       ...prev,
       [teamName]: {
         ...(prev[teamName] || {}),
-        [weekDate]: newCount,
+        [normalizedWeek]: newCount,
       },
     }));
 
     // Debounce the API call
-    const timeoutKey = `${teamName}-${weekDate}`;
+    const timeoutKey = `${teamName}-${normalizedWeek}`;
     if (prgExternalSaveTimeouts.current[timeoutKey]) {
       console.log('[CapacityMatrix] Clearing previous PRG External timeout for key:', timeoutKey);
       clearTimeout(prgExternalSaveTimeouts.current[timeoutKey]);
@@ -682,7 +730,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     prgExternalSaveTimeouts.current[timeoutKey] = setTimeout(() => {
       console.log('[CapacityMatrix] PRG External debounce timeout fired for key:', timeoutKey);
       if (newCount !== undefined) {
-        savePrgExternalCapacity(teamName, weekDate, newCount);
+        savePrgExternalCapacity(teamName, normalizedWeek, newCount);
       }
     }, 500);
   };
@@ -2530,7 +2578,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                           return (
                             <div
-                              key={`capacity-${dept}-${weekData.date}-${assignments.length}-${JSON.stringify(subcontractedPersonnel)}`}
+                              key={`capacity-${dept}-${weekData.date}`}
                               className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
                                 isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
                               }`}
@@ -3736,7 +3784,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                         // Create initial PrgExternalTeamCapacity record to persist the team
                         // This ensures the team appears after page refresh
-                        const currentWeekStart = formatToISO(new Date());
+                        const currentWeekStart = formatToISO(getWeekStart(new Date()));
                         await prgExternalTeamCapacityApi.create({
                           teamName: prgTeamName.trim(),
                           weekStartDate: currentWeekStart,
@@ -3844,7 +3892,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                         // Create initial SubcontractedTeamCapacity record to persist the team
                         // This ensures the team appears after page refresh
-                        const currentWeekStart = formatToISO(new Date());
+                        const currentWeekStart = formatToISO(getWeekStart(new Date()));
                         await subcontractedTeamCapacityApi.create({
                           company: buildTeamName.trim(),
                           weekStartDate: currentWeekStart,
