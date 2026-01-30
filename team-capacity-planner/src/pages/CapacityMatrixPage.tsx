@@ -850,7 +850,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         map[key] = { utilized: 0, forecast: 0 };
       }
 
-      if (assignment.weekStartDate <= currentWeekStart) {
+      if (assignment.weekStartDate < currentWeekStart) {
         map[key].utilized += assignment.hours;
       } else {
         map[key].forecast += assignment.hours;
@@ -1068,8 +1068,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Calculate utilization percentage for a department in a project
   // Formula: (Used Hours + Forecasted Hours / Quoted Hours) * 100
-  // Used Hours = sum of assignments up to and including current week
-  // Forecasted Hours = sum of assignments after current week
+  // Used Hours = sum of assignments before current week (excludes current week)
+  // Forecasted Hours = sum of assignments from current week onward (includes current week)
   // Quoted Hours = departmentHoursAllocated (budget)
   const getUtilizationPercent = (department: Department, projectId: string): number => {
     const project = projects.find(p => p.id === projectId);
