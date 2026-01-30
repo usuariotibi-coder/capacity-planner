@@ -24,7 +24,7 @@ export const getWeeksInRange = (startDate: string, endDate: string): string[] =>
   let current = getWeekStart(start);
 
   while (current <= end) {
-    weeks.push(current.toISOString().split('T')[0]);
+    weeks.push(formatToISO(current));
     current.setDate(current.getDate() + 7);
   }
 
@@ -35,7 +35,10 @@ export const getWeeksInRange = (startDate: string, endDate: string): string[] =>
  * Formatea una fecha a formato YYYY-MM-DD
  */
 export const formatToISO = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -83,7 +86,7 @@ export const getAllWeeksOfYear = (year?: number): string[] => {
       break;
     }
 
-    weeks.push(current.toISOString().split('T')[0]);
+    weeks.push(formatToISO(current));
     current = new Date(current);
     current.setDate(current.getDate() + 7);
   }
@@ -132,7 +135,7 @@ export const getAllWeeksWithNextYear = (year?: number): Array<{ date: string; we
     }
 
     weeks.push({
-      date: current.toISOString().split('T')[0],
+      date: formatToISO(current),
       weekNum: info.week,
       isNextYear: false
     });
@@ -145,7 +148,7 @@ export const getAllWeeksWithNextYear = (year?: number): Array<{ date: string; we
   for (let i = 0; i < 10; i++) {
     const info = getISOWeekInfo(current);
     weeks.push({
-      date: current.toISOString().split('T')[0],
+      date: formatToISO(current),
       weekNum: info.week,
       isNextYear: true
     });

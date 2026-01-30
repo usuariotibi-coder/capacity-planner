@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { projectsApi, scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
+import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
@@ -173,13 +173,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Per-project zoom levels
   const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
 
-  // Utilized hours editing state (Used Hours)
-  const [editingUtilized, setEditingUtilized] = useState<{ projectId: string; department: Department } | null>(null);
-  const [utilizedHours, setUtilizedHours] = useState<string>('');
-
-  // Forecasted hours editing state (Forecasted Hours)
-  const [editingForecast, setEditingForecast] = useState<{ projectId: string; department: Department } | null>(null);
-  const [forecastHours, setForecastHours] = useState<string>('');
+  // Utilized/Forecast hours are calculated automatically from assignments
 
   // Comment view state for General view (read-only comment display)
   const [viewingComment, setViewingComment] = useState<{ comment: string; projectName: string; department: string } | null>(null);
@@ -830,16 +824,41 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const allWeeksData = getAllWeeksWithNextYear(selectedYear);
-  const currentDate = formatToISO(new Date());
+  const today = new Date();
 
   // Find the current week - it's the week that contains today's date
   const currentDateWeekIndex = allWeeksData.findIndex((w) => {
-    const weekStart = new Date(w.date);
+    const weekStart = parseISODate(w.date);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
-    const today = new Date(currentDate);
     return today >= weekStart && today <= weekEnd;
   });
+  const currentWeekStart = currentDateWeekIndex >= 0
+    ? allWeeksData[currentDateWeekIndex]?.date
+    : formatToISO(getWeekStart(today));
+  const hoursByProjectDept = useMemo(() => {
+    const map: Record<string, { utilized: number; forecast: number }> = {};
+    if (!currentWeekStart) return map;
+
+    const employeeDeptMap = new Map(employees.map((emp) => [emp.id, emp.department]));
+    assignments.forEach((assignment) => {
+      const dept = employeeDeptMap.get(assignment.employeeId);
+      if (!dept) return;
+
+      const key = `${assignment.projectId}-${dept}`;
+      if (!map[key]) {
+        map[key] = { utilized: 0, forecast: 0 };
+      }
+
+      if (assignment.weekStartDate <= currentWeekStart) {
+        map[key].utilized += assignment.hours;
+      } else {
+        map[key].forecast += assignment.hours;
+      }
+    });
+
+    return map;
+  }, [assignments, employees, currentWeekStart]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -1049,18 +1068,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Calculate utilization percentage for a department in a project
   // Formula: (Used Hours + Forecasted Hours / Quoted Hours) * 100
-  // Used Hours = departmentHoursUtilized (manually entered)
-  // Forecasted Hours = departmentHoursForecast (manually entered)
+  // Used Hours = sum of assignments up to and including current week
+  // Forecasted Hours = sum of assignments after current week
   // Quoted Hours = departmentHoursAllocated (budget)
   const getUtilizationPercent = (department: Department, projectId: string): number => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return 0;
 
-    // Get utilized hours (manually entered)
-    const utilizedHoursValue = project.departmentHoursUtilized?.[department] || 0;
+    // Get utilized hours (calculated)
+    const utilizedHoursValue = getUtilizedHours(department, projectId);
 
-    // Get forecasted hours (manually entered)
-    const forecastedHoursValue = project.departmentHoursForecast?.[department] || 0;
+    // Get forecasted hours (calculated)
+    const forecastedHoursValue = getForecastedHours(department, projectId);
 
     // Get quoted hours (budget)
     const quotedHours = project.departmentHoursAllocated?.[department] || 0;
@@ -1072,16 +1091,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return Math.round((totalPlanned / quotedHours) * 100);
   };
 
-  // Get utilized hours (manually entered) for a department in a project
+  // Get utilized hours (calculated) for a department in a project
   const getUtilizedHours = (department: Department, projectId: string): number => {
-    const project = projects.find(p => p.id === projectId);
-    return project?.departmentHoursUtilized?.[department] || 0;
+    return hoursByProjectDept[`${projectId}-${department}`]?.utilized || 0;
   };
 
-  // Get forecasted hours (manually entered) for a department in a project
+  // Get forecasted hours (calculated) for a department in a project
   const getForecastedHours = (department: Department, projectId: string): number => {
-    const project = projects.find(p => p.id === projectId);
-    return project?.departmentHoursForecast?.[department] || 0;
+    return hoursByProjectDept[`${projectId}-${department}`]?.forecast || 0;
   };
 
   // Get quoted hours (budget) for a department in a project
@@ -1305,116 +1322,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingScioHoursInput('');
     setEditingExternalHoursInput('');
     setSelectedEmployees(new Set());
-  };
-
-  // Handlers for editing utilized hours (Used Hours)
-  const handleEditUtilized = (projectId: string, department: Department, currentHours: number) => {
-    setEditingUtilized({ projectId, department });
-    setUtilizedHours(currentHours.toString());
-  };
-
-  const handleSaveUtilized = async () => {
-    if (!editingUtilized) return;
-
-    const newValue = parseFloat(utilizedHours.replace(',', '.')) || 0;
-    const projectId = editingUtilized.projectId;
-    const department = editingUtilized.department;
-
-    try {
-      console.log('[CapacityMatrix] Saving utilized hours:', {
-        projectId: projectId,
-        department: department,
-        newValue: newValue,
-      });
-
-      // Call the new endpoint that directly updates ProjectBudget hours_utilized
-      await projectsApi.updateBudgetHours(projectId, {
-        department: department,
-        hoursUtilized: newValue,
-      });
-
-      console.log('[CapacityMatrix] ✓ Utilized hours saved successfully to backend');
-
-      // Close modal immediately
-      setEditingUtilized(null);
-      setUtilizedHours('');
-
-      // Refetch projects in the background to sync UI
-      console.log('[CapacityMatrix] Refetching projects from backend...');
-      const store = useProjectStore.getState();
-      await store.fetchProjects(true);
-      console.log('[CapacityMatrix] ✓ Projects refetched successfully');
-
-      // Show brief success message
-      const successMsg = `Horas utilizadas guardadas (${department}: ${newValue}h)`;
-      console.log('[CapacityMatrix] Success:', successMsg);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] Error saving utilized hours:', errorMsg);
-      alert(`Error al guardar horas utilizadas: ${errorMsg}`);
-      setEditingUtilized(null);
-      setUtilizedHours('');
-    }
-  };
-
-  const handleCancelUtilized = () => {
-    setEditingUtilized(null);
-    setUtilizedHours('');
-  };
-
-  // Handlers for editing forecasted hours (Forecasted Hours)
-  const handleEditForecast = (projectId: string, department: Department, currentHours: number) => {
-    setEditingForecast({ projectId, department });
-    setForecastHours(currentHours.toString());
-  };
-
-  const handleSaveForecast = async () => {
-    if (!editingForecast) return;
-
-    const newValue = parseFloat(forecastHours.replace(',', '.')) || 0;
-    const projectId = editingForecast.projectId;
-    const department = editingForecast.department;
-
-    try {
-      console.log('[CapacityMatrix] Saving forecasted hours:', {
-        projectId: projectId,
-        department: department,
-        newValue: newValue,
-      });
-
-      // Call the new endpoint that directly updates ProjectBudget hours_forecast
-      await projectsApi.updateBudgetHours(projectId, {
-        department: department,
-        hoursForecast: newValue,
-      });
-
-      console.log('[CapacityMatrix] ✓ Forecasted hours saved successfully to backend');
-
-      // Close modal immediately
-      setEditingForecast(null);
-      setForecastHours('');
-
-      // Refetch projects in the background to sync UI
-      console.log('[CapacityMatrix] Refetching projects from backend...');
-      const store = useProjectStore.getState();
-      await store.fetchProjects(true);
-      console.log('[CapacityMatrix] ✓ Projects refetched successfully');
-
-      // Show brief success message
-      const successMsg = `Horas pronosticadas guardadas (${department}: ${newValue}h)`;
-      console.log('[CapacityMatrix] Success:', successMsg);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] Error saving forecasted hours:', errorMsg);
-      alert(`Error al guardar horas pronosticadas: ${errorMsg}`);
-      setEditingForecast(null);
-      setForecastHours('');
-    }
-  };
-
-  const handleCancelForecast = () => {
-    setEditingForecast(null);
-    setForecastHours('');
   };
 
   const renderCellContent = (department: Department, weekStart: string, projectId?: string) => {
@@ -2571,25 +2478,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className="text-[10px] text-blue-700 font-bold">Quoted</div>
                                 <div className="text-[11px] font-black text-blue-700">{quotedHoursValue}h</div>
                               </div>
-                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center relative">
-                                <button
-                                  onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                                  className="absolute -top-1.5 -right-1.5 p-1 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow-lg"
-                                  title={t.editUsedHours}
-                                >
-                                  <Pencil size={10} />
-                                </button>
+                              <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-purple-700 font-bold">Used</div>
                                 <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
                               </div>
-                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center relative">
-                                <button
-                                  onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                                  className="absolute -top-1.5 -right-1.5 p-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow-lg"
-                                  title={t.editForecastedHours}
-                                >
-                                  <Pencil size={10} />
-                                </button>
+                              <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-orange-700 font-bold">Forecast</div>
                                 <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
                               </div>
@@ -2648,25 +2541,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="text-[7px] text-blue-600 font-semibold leading-none">Quoted</span>
                                 <span className="text-[9px] text-blue-700 font-bold leading-none">{quotedHoursValue}h</span>
                               </div>
-                              <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center relative flex flex-col">
-                                <button
-                                  onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                                  className="absolute -top-1 -right-1 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded-full transition shadow"
-                                  title={t.editUsedHours}
-                                >
-                                  <Pencil size={8} />
-                                </button>
+                              <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center flex flex-col">
                                 <span className="text-[7px] text-purple-600 font-semibold leading-none">Used</span>
                                 <span className="text-[9px] text-purple-700 font-bold leading-none">{utilizedHoursValue}h</span>
                               </div>
-                              <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center relative flex flex-col">
-                                <button
-                                  onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                                  className="absolute -top-1 -right-1 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded-full transition shadow"
-                                  title={t.editForecastedHours}
-                                >
-                                  <Pencil size={8} />
-                                </button>
+                              <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center flex flex-col">
                                 <span className="text-[7px] text-orange-600 font-semibold leading-none">Forecast</span>
                                 <span className="text-[9px] text-orange-700 font-bold leading-none">{forecastedHoursValue}h</span>
                               </div>
@@ -2728,31 +2607,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             <div className="text-xs font-black text-blue-700">{quotedHoursValue}h</div>
                           </div>
 
-                          {/* Used Hours (manually entered) with Edit Button */}
-                          <div className="bg-purple-100 rounded px-2 py-0.5 border border-purple-300 relative min-w-fit">
-                            <button
-                              onClick={() => handleEditUtilized(proj.id, dept, utilizedHoursValue)}
-                              className="absolute top-0.5 left-0.5 p-0.5 bg-purple-500 hover:bg-purple-600 text-white rounded transition"
-                              title={t.editUsedHours}
-                            >
-                              <Pencil size={8} />
-                            </button>
-                            <div className="text-center pl-3">
+                          {/* Used Hours (calculated) */}
+                          <div className="bg-purple-100 rounded px-2 py-0.5 border border-purple-300 min-w-fit">
+                            <div className="text-center">
                               <div className="text-xs text-purple-700 font-bold">{t.usedLabel}</div>
                               <div className="text-xs font-black text-purple-700">{utilizedHoursValue}h</div>
                             </div>
                           </div>
 
-                          {/* Forecasted Hours (manually entered) with Edit Button */}
-                          <div className="bg-orange-100 rounded px-2 py-0.5 border border-orange-300 relative min-w-fit">
-                            <button
-                              onClick={() => handleEditForecast(proj.id, dept, forecastedHoursValue)}
-                              className="absolute top-0.5 left-0.5 p-0.5 bg-orange-500 hover:bg-orange-600 text-white rounded transition"
-                              title={t.editForecastedHours}
-                            >
-                              <Pencil size={8} />
-                            </button>
-                            <div className="text-center pl-3">
+                          {/* Forecasted Hours (calculated) */}
+                          <div className="bg-orange-100 rounded px-2 py-0.5 border border-orange-300 min-w-fit">
+                            <div className="text-center">
                               <div className="text-xs text-orange-700 font-bold">{t.pronosticado}</div>
                               <div className="text-xs font-black text-orange-700">{forecastedHoursValue}h</div>
                             </div>
@@ -2923,173 +2788,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     </div>
                   )}
 
-                  {/* Utilized Hours editing modal - floating overlay centered on screen */}
-                  {(() => {
-                    const dept = departmentFilter as Department;
-                    const isEditingThisUtilized = editingUtilized?.projectId === proj.id && editingUtilized?.department === dept;
-                    const deptInfo = getDepartmentIcon(dept);
-
-                    if (!isEditingThisUtilized) return null;
-
-                    return (
-                      <>
-                        {/* Backdrop */}
-                        <div
-                          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                          onClick={handleCancelUtilized}
-                        />
-                        {/* Modal */}
-                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
-                          <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md">
-                            {/* Header */}
-                            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
-                              <div className="flex items-center gap-3">
-                                <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                <div>
-                                  <h3 className="text-lg font-bold text-gray-800">{getDepartmentLabel(dept as Department, t)}</h3>
-                                  <div className="text-xs text-gray-600">{t.editUsedHours}</div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={handleCancelUtilized}
-                                className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                                title={t.cancel}
-                              >
-                                <X size={20} />
-                              </button>
-                            </div>
-
-                            {/* Content */}
-                            <div className="p-6 space-y-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={utilizedHours}
-                                  onChange={(e) => {
-                                    const raw = e.target.value.replace(',', '.');
-                                    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                                      setUtilizedHours(raw);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleSaveUtilized();
-                                    }
-                                  }}
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                  autoFocus
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-                              <button
-                                onClick={handleCancelUtilized}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
-                              >
-                                {t.cancel}
-                              </button>
-                              <button
-                                onClick={handleSaveUtilized}
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition"
-                              >
-                                {t.save}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-
-                  {/* Forecasted Hours editing modal - floating overlay centered on screen */}
-                  {(() => {
-                    const dept = departmentFilter as Department;
-                    const isEditingThisForecast = editingForecast?.projectId === proj.id && editingForecast?.department === dept;
-                    const deptInfo = getDepartmentIcon(dept);
-
-                    if (!isEditingThisForecast) return null;
-
-                    return (
-                      <>
-                        {/* Backdrop */}
-                        <div
-                          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                          onClick={handleCancelForecast}
-                        />
-                        {/* Modal */}
-                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
-                          <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md">
-                            {/* Header */}
-                            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-orange-100">
-                              <div className="flex items-center gap-3">
-                                <span className={`text-3xl ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                <div>
-                                  <h3 className="text-lg font-bold text-gray-800">{getDepartmentLabel(dept as Department, t)}</h3>
-                                  <div className="text-xs text-gray-600">{t.editForecastedHours}</div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={handleCancelForecast}
-                                className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                                title={t.cancel}
-                              >
-                                <X size={20} />
-                              </button>
-                            </div>
-
-                            {/* Content */}
-                            <div className="p-6 space-y-4">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={forecastHours}
-                                  onChange={(e) => {
-                                    const raw = e.target.value.replace(',', '.');
-                                    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                                      setForecastHours(raw);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleSaveForecast();
-                                    }
-                                  }}
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                  autoFocus
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex gap-3 justify-end">
-                              <button
-                                onClick={handleCancelForecast}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition"
-                              >
-                                {t.cancel}
-                              </button>
-                              <button
-                                onClick={handleSaveForecast}
-                                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded hover:bg-orange-700 transition"
-                              >
-                                {t.save}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
                 </div>
               );
             })}
@@ -3373,7 +3071,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         {/* Show ALL 6 departments in 6 columns - NO edit buttons in General view */}
                         <div className="grid grid-cols-6 gap-0">
                           {DEPARTMENTS.map((dept) => {
-                            const utilizedHoursValue = proj.departmentHoursUtilized?.[dept] || 0;
+                            const utilizedHoursValue = getUtilizedHours(dept, proj.id);
                             const cotizadasHoursValue = proj.departmentHoursAllocated?.[dept] || 0;
                             const utilizationPercent = getUtilizationPercent(dept, proj.id);
                             const utilizationColorInfo = getUtilizationColor(utilizationPercent);
