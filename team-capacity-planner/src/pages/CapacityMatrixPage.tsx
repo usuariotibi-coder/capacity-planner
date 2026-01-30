@@ -12,7 +12,7 @@ import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
-import type { Department, Stage, Project, Assignment } from '../types';
+import type { Department, Stage, Project, Assignment, Employee } from '../types';
 
 type DepartmentFilter = 'General' | Department;
 
