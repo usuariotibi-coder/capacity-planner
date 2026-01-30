@@ -3300,8 +3300,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                                   // Get department-specific start/end info (precomputed)
                                   const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
-                                  const deptStartDate = deptMeta?.deptStartDate;
-                                  const deptEndDate = deptMeta?.deptEndDate || '';
 
                                   // Check if current week is within department range using date comparison
                                   // For departments WITHOUT specific departmentStages, use project dates instead
