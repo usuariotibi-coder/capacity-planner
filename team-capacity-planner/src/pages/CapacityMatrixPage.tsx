@@ -830,6 +830,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     () => new Map(employees.map((emp) => [emp.id, emp.department])),
     [employees]
   );
+  const getAssignmentDepartment = (assignment: Assignment) =>
+    employeeDeptMap.get(assignment.employeeId) || assignment.employee?.department;
   const employeeNameById = useMemo(
     () => new Map(employees.map((emp) => [emp.id, emp.name])),
     [employees]
@@ -964,7 +966,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!currentWeekStart) return map;
 
     assignments.forEach((assignment) => {
-      const dept = employeeDeptMap.get(assignment.employeeId);
+      const dept = getAssignmentDepartment(assignment);
       if (!dept) return;
       const normalizedWeekStart = normalizeWeekStartDate(assignment.weekStartDate);
 
@@ -989,7 +991,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptWeekExternalTotals = new Map<string, number>();
 
     assignments.forEach((assignment) => {
-      const dept = employeeDeptMap.get(assignment.employeeId);
+      const dept = getAssignmentDepartment(assignment);
       if (!dept) return;
       const normalizedWeekStart = normalizeWeekStartDate(assignment.weekStartDate);
 

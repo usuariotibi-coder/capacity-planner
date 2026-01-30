@@ -128,4 +128,6 @@ export interface Assignment {
   externalHours?: number; // External/subcontracted hours (BUILD and PRG only)
   stage: Stage;
   comment?: string; // Optional comment for this assignment
+  employee?: Employee;
+  project?: Project;
 }
