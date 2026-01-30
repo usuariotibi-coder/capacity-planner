@@ -291,8 +291,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             newSubcontractedRecordIds[`${company}-${weekDate}`] = record.id;
           }
         }
-        setSubcontractedPersonnel(newSubcontractedPersonnel);
-        setSubcontractedRecordIds(newSubcontractedRecordIds);
+        const currentWeekDate = currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.date : undefined;
+        setSubcontractedPersonnel(prev => {
+          const merged: Record<string, Record<string, number | undefined>> = { ...newSubcontractedPersonnel };
+          if (currentWeekDate) {
+            Object.keys(prev).forEach((company) => {
+              const prevValue = prev[company]?.[currentWeekDate];
+              if (prevValue !== undefined && merged[company]?.[currentWeekDate] === undefined) {
+                merged[company] = {
+                  ...(merged[company] || {}),
+                  [currentWeekDate]: prevValue,
+                };
+              }
+            });
+          }
+          return merged;
+        });
+        setSubcontractedRecordIds(prev => ({ ...prev, ...newSubcontractedRecordIds }));
         console.log('[CapacityMatrix] Subcontracted Team Capacity loaded');
 
         // Load PRG external team capacity data
@@ -314,8 +329,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             newPrgExternalRecordIds[`${teamName}-${weekDate}`] = record.id;
           }
         }
-        setPRGExternalPersonnel(newPrgExternalPersonnel);
-        setPrgExternalRecordIds(newPrgExternalRecordIds);
+        const currentWeekDatePrg = currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.date : undefined;
+        setPRGExternalPersonnel(prev => {
+          const merged: Record<string, Record<string, number | undefined>> = { ...newPrgExternalPersonnel };
+          if (currentWeekDatePrg) {
+            Object.keys(prev).forEach((team) => {
+              const prevValue = prev[team]?.[currentWeekDatePrg];
+              if (prevValue !== undefined && merged[team]?.[currentWeekDatePrg] === undefined) {
+                merged[team] = {
+                  ...(merged[team] || {}),
+                  [currentWeekDatePrg]: prevValue,
+                };
+              }
+            });
+          }
+          return merged;
+        });
+        setPrgExternalRecordIds(prev => ({ ...prev, ...newPrgExternalRecordIds }));
         console.log('[CapacityMatrix] PRG External Team Capacity loaded');
       } catch (error) {
         console.error('[CapacityMatrix] Error loading teams data:', error);
