@@ -41,7 +41,7 @@ export const stageColors: Record<string, { bg: string; text: string }> = {
   SUPPORT: { bg: 'bg-slate-100', text: 'text-slate-900' },
   SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-stone-100', text: 'text-stone-900' },
   ROBOT_SIMULATION: { bg: 'bg-zinc-100', text: 'text-zinc-900' },
-  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-neutral-100', text: 'text-neutral-900' },
+  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-rose-100', text: 'text-rose-900' },
 };
 
 /**
