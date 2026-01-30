@@ -1325,6 +1325,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return quotedHours;
   };
 
+  const formatHours = (value: number): string => {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value * 1000) / 1000;
+    return rounded.toFixed(3).replace(/\.?0+$/, '');
+  };
+
   // Check if a week is within a project's date range
   const isWeekInProjectRange = (weekStart: string, project: typeof projects[0]) => {
     return weekStart >= project.startDate && weekStart <= project.endDate;
@@ -1647,7 +1653,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           <div className="text-[10px] font-bold leading-tight">{talent}</div>
         ) : (
           <>
-            <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
+            <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
             <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
           </>
         )}
@@ -2636,15 +2642,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             <>
                               <div className="bg-blue-100 rounded px-2 py-1 border border-blue-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-blue-700 font-bold">Quoted</div>
-                                <div className="text-[11px] font-black text-blue-700">{quotedHoursValue}h</div>
+                                <div className="text-[11px] font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
                               </div>
                               <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-purple-700 font-bold">Used</div>
-                                <div className="text-[11px] font-black text-purple-700">{utilizedHoursValue}h</div>
+                                <div className="text-[11px] font-black text-purple-700">{formatHours(utilizedHoursValue)}h</div>
                               </div>
                               <div className="bg-orange-100 rounded px-2 py-1 border border-orange-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-orange-700 font-bold">Forecast</div>
-                                <div className="text-[11px] font-black text-orange-700">{forecastedHoursValue}h</div>
+                                <div className="text-[11px] font-black text-orange-700">{formatHours(forecastedHoursValue)}h</div>
                               </div>
                               <div className={`rounded px-2 py-1 border text-center min-w-fit flex flex-col justify-center ${utilizationColorInfo.bg}`}>
                                 <div className={`text-[10px] font-bold ${utilizationColorInfo.text}`}>Util</div>
@@ -2699,15 +2705,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             <>
                               <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center flex flex-col">
                                 <span className="text-[7px] text-blue-600 font-semibold leading-none">Quoted</span>
-                                <span className="text-[9px] text-blue-700 font-bold leading-none">{quotedHoursValue}h</span>
+                                <span className="text-[9px] text-blue-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
                               </div>
                               <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center flex flex-col">
                                 <span className="text-[7px] text-purple-600 font-semibold leading-none">Used</span>
-                                <span className="text-[9px] text-purple-700 font-bold leading-none">{utilizedHoursValue}h</span>
+                                <span className="text-[9px] text-purple-700 font-bold leading-none">{formatHours(utilizedHoursValue)}h</span>
                               </div>
                               <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center flex flex-col">
                                 <span className="text-[7px] text-orange-600 font-semibold leading-none">Forecast</span>
-                                <span className="text-[9px] text-orange-700 font-bold leading-none">{forecastedHoursValue}h</span>
+                                <span className="text-[9px] text-orange-700 font-bold leading-none">{formatHours(forecastedHoursValue)}h</span>
                               </div>
                               <div className={`rounded px-1.5 py-0.5 border text-center flex flex-col ${utilizationColorInfo.bg}`}>
                                 <span className={`text-[7px] font-semibold leading-none ${utilizationColorInfo.text}`}>Util</span>
@@ -2764,14 +2770,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           {/* Quoted Hours (budget) */}
                           <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center min-w-fit">
                             <div className="text-xs text-blue-700 font-bold">{t.quotedLabel}</div>
-                            <div className="text-xs font-black text-blue-700">{quotedHoursValue}h</div>
+                            <div className="text-xs font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
                           </div>
 
                           {/* Used Hours (calculated) */}
                           <div className="bg-purple-100 rounded px-2 py-0.5 border border-purple-300 min-w-fit">
                             <div className="text-center">
                               <div className="text-xs text-purple-700 font-bold">{t.usedLabel}</div>
-                              <div className="text-xs font-black text-purple-700">{utilizedHoursValue}h</div>
+                              <div className="text-xs font-black text-purple-700">{formatHours(utilizedHoursValue)}h</div>
                             </div>
                           </div>
 
@@ -2779,7 +2785,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           <div className="bg-orange-100 rounded px-2 py-0.5 border border-orange-300 min-w-fit">
                             <div className="text-center">
                               <div className="text-xs text-orange-700 font-bold">{t.pronosticado}</div>
-                              <div className="text-xs font-black text-orange-700">{forecastedHoursValue}h</div>
+                              <div className="text-xs font-black text-orange-700">{formatHours(forecastedHoursValue)}h</div>
                             </div>
                           </div>
 
@@ -3187,9 +3193,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
                                 </div>
                                 <div className="text-[10px] text-gray-700 mb-0 leading-tight">
-                                  <span className="font-semibold text-[10px]">{cotizadasHoursValue}</span>
+                                  <span className="font-semibold text-[10px]">{formatHours(cotizadasHoursValue)}</span>
                                   <span className="text-gray-500 text-[10px]">/</span>
-                                  <span className="font-semibold text-[10px]">{utilizedHoursValue}</span>
+                                  <span className="font-semibold text-[10px]">{formatHours(utilizedHoursValue)}</span>
                                 </div>
                                 <div className={`px-0 py-0 rounded text-[10px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
                                   {utilizationPercent}%
@@ -3376,7 +3382,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                           {!isDeptWeekInRange && (
                                             <div className="absolute top-0.5 -right-0.5 text-red-600 font-bold text-[10px]">⚠</div>
                                           )}
-                                          <div className="text-[10px] font-bold leading-tight">{totalHours}h</div>
+                                          <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
                                           {stageColor && assignmentStage && (
                                             <div className="text-[7px] font-semibold leading-tight">{assignmentStage}</div>
