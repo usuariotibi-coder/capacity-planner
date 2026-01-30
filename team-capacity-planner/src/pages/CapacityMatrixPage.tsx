@@ -12,7 +12,7 @@ import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
-import type { Department, Stage, Project } from '../types';
+import type { Department, Stage, Project, Assignment } from '../types';
 
 type DepartmentFilter = 'General' | Department;
 
@@ -825,6 +825,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const allWeeksData = getAllWeeksWithNextYear(selectedYear);
   const today = new Date();
+  const employeeDeptMap = useMemo(
+    () => new Map(employees.map((emp) => [emp.id, emp.department])),
+    [employees]
+  );
 
   // Find the current week - it's the week that contains today's date
   const currentDateWeekIndex = allWeeksData.findIndex((w) => {
@@ -840,7 +844,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const map: Record<string, { utilized: number; forecast: number }> = {};
     if (!currentWeekStart) return map;
 
-    const employeeDeptMap = new Map(employees.map((emp) => [emp.id, emp.department]));
     assignments.forEach((assignment) => {
       const dept = employeeDeptMap.get(assignment.employeeId);
       if (!dept) return;
@@ -858,7 +861,42 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     });
 
     return map;
-  }, [assignments, employees, currentWeekStart]);
+  }, [assignments, employeeDeptMap, currentWeekStart]);
+
+  const assignmentIndex = useMemo(() => {
+    const byCell = new Map<string, { totalHours: number; assignments: Assignment[]; stage: Stage | null; comment?: string }>();
+    const deptWeekTotals = new Map<string, number>();
+    const deptWeekExternalTotals = new Map<string, number>();
+
+    assignments.forEach((assignment) => {
+      const dept = employeeDeptMap.get(assignment.employeeId);
+      if (!dept) return;
+
+      const cellKey = `${assignment.projectId}|${dept}|${assignment.weekStartDate}`;
+      const cellEntry = byCell.get(cellKey) ?? { totalHours: 0, assignments: [], stage: null, comment: undefined };
+      cellEntry.totalHours += assignment.hours;
+      cellEntry.assignments.push(assignment);
+      if (!cellEntry.stage && assignment.stage) {
+        cellEntry.stage = assignment.stage;
+      }
+      if (cellEntry.comment === undefined && assignment.comment) {
+        cellEntry.comment = assignment.comment;
+      }
+      byCell.set(cellKey, cellEntry);
+
+      const deptWeekKey = `${dept}|${assignment.weekStartDate}`;
+      deptWeekTotals.set(deptWeekKey, (deptWeekTotals.get(deptWeekKey) || 0) + assignment.hours);
+
+      if (assignment.externalHours) {
+        deptWeekExternalTotals.set(
+          deptWeekKey,
+          (deptWeekExternalTotals.get(deptWeekKey) || 0) + assignment.externalHours
+        );
+      }
+    });
+
+    return { byCell, deptWeekTotals, deptWeekExternalTotals };
+  }, [assignments, employeeDeptMap]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -1051,19 +1089,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Get total hours and stage for a department in a week (optionally filtered by project)
   const getDepartmentWeekData = (department: Department, weekStart: string, projectId?: string) => {
-    // Filter assignments by week AND by department (through employee)
-    const deptAssignments = assignments.filter((a) => {
-      if (a.weekStartDate !== weekStart) return false;
-      if (projectId && a.projectId !== projectId) return false;
-      const emp = employees.find((e) => e.id === a.employeeId);
-      return emp && emp.department === department;
-    });
+    if (!projectId) {
+      const deptWeekKey = `${department}|${weekStart}`;
+      const totalHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
+      return { totalHours, talent: calculateTalent(totalHours), assignments: [], stage: null };
+    }
 
-    const totalHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+    const cellKey = `${projectId}|${department}|${weekStart}`;
+    const cellEntry = assignmentIndex.byCell.get(cellKey);
+    const assignmentsForCell = cellEntry?.assignments ?? [];
+    const totalHours = cellEntry?.totalHours ?? 0;
     const talent = calculateTalent(totalHours);
-    const stage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
+    const stage = cellEntry?.stage ?? (assignmentsForCell[0]?.stage ?? null);
 
-    return { totalHours, talent, assignments: deptAssignments, stage };
+    return { totalHours, talent, assignments: assignmentsForCell, stage };
   };
 
   // Calculate utilization percentage for a department in a project
@@ -1745,9 +1784,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       try {
                         if (editingCell) {
                           // Find and delete the assignment for this cell
-                          const cellAssignments = assignments.filter(
-                            a => a.projectId === editingCell.projectId && a.weekStartDate === editingCell.weekStart
-                          );
+                          const cellKey = `${editingCell.projectId}|${editingCell.department}|${editingCell.weekStart}`;
+                          const cellAssignments = assignmentIndex.byCell.get(cellKey)?.assignments || [];
 
                           // Delete all assignments for this cell
                           for (const assignment of cellAssignments) {
@@ -1971,12 +2009,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const isCurrentWeek = idx === currentDateWeekIndex;
 
                           // Calculate total occupied people for this department in this week
-                          const deptAssignments = assignments.filter(a => {
-                            const emp = employees.find(e => e.id === a.employeeId);
-                            return a.weekStartDate === weekData.date && emp?.department === dept;
-                          });
-
-                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                          const deptWeekKey = `${dept}|${weekData.date}`;
+                          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
 
                           // For MFG, show hours directly. For other departments, convert to people
                           const isMFG = dept === 'MFG';
@@ -2243,12 +2277,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             const isCurrentWeek = idx === currentDateWeekIndex;
 
                             // Calculate total external hours for this week across ALL projects
-                            const deptAssignments = assignments.filter(a => {
-                              const emp = employees.find(e => e.id === a.employeeId);
-                              return a.weekStartDate === weekData.date && emp?.department === dept;
-                            });
-
-                            const totalExternalHours = deptAssignments.reduce((sum, a) => sum + (a.externalHours || 0), 0);
+                            const deptWeekKey = `${dept}|${weekData.date}`;
+                            const totalExternalHours = assignmentIndex.deptWeekExternalTotals.get(deptWeekKey) || 0;
 
                             return (
                               <div
@@ -2277,19 +2307,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         </div>
 
                         {/* Week cells */}
-                        {allWeeksData.map((weekData, idx) => {
-                          const isCurrentWeek = idx === currentDateWeekIndex;
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
 
-                          // Get SCIO Team Members / Hours per Week capacity for this week
-                          const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
+                            // Get SCIO Team Members / Hours per Week capacity for this week
+                            const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
 
-                          // Calculate total hours occupied for this department this week
-                          const deptAssignments = assignments.filter(a => {
-                            const emp = employees.find(e => e.id === a.employeeId);
-                            return a.weekStartDate === weekData.date && emp?.department === dept;
-                          });
-
-                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                            // Calculate total hours occupied for this department this week
+                            const deptWeekKey = `${dept}|${weekData.date}`;
+                            const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
 
                           // For MFG: use hours directly. For other departments: convert to people
                           const isMFG = dept === 'MFG';
@@ -2858,12 +2884,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
 
                           // Calculate total hours occupied for this department this week
-                          const deptAssignments = assignments.filter(a => {
-                            const emp = employees.find(e => e.id === a.employeeId);
-                            return a.weekStartDate === weekData.date && emp?.department === dept;
-                          });
-
-                          const totalWeekHours = deptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                          const deptWeekKey = `${dept}|${weekData.date}`;
+                          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
 
                           // For MFG: use hours directly. For other departments: convert to people
                           const isMFG = dept === 'MFG';
@@ -3201,22 +3223,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                   const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
 
                                   // Get hours for this specific project-department-week combination
-                                  const projectDeptAssignments = assignments.filter((a) => {
-                                    if (a.projectId !== proj.id || a.weekStartDate !== week) return false;
-                                    const emp = employees.find((e) => e.id === a.employeeId);
-                                    return emp && emp.department === dept;
-                                  });
-
-                                  const totalHours = projectDeptAssignments.reduce((sum, a) => sum + a.hours, 0);
+                                  const cellKey = `${proj.id}|${dept}|${week}`;
+                                  const cellEntry = assignmentIndex.byCell.get(cellKey);
+                                  const totalHours = cellEntry?.totalHours ?? 0;
                                   const talent = calculateTalent(totalHours);
                                   const isInRange = isWeekInProjectRange(week, proj);
 
                                   // Get the stage from actual assignments (what was selected when adding hours)
-                                  const assignmentStage = projectDeptAssignments.length > 0 ? projectDeptAssignments[0].stage : null;
+                                  const assignmentStage = cellEntry?.stage ?? null;
                                   const stageColor = assignmentStage ? getStageColor(assignmentStage) : null;
 
                                   // Get comment from first assignment (comments are shared across assignments in same cell)
-                                  const cellComment = projectDeptAssignments.length > 0 ? projectDeptAssignments[0].comment : undefined;
+                                  const cellComment = cellEntry?.comment;
 
                                   // Get department-specific start and duration info
                                   const deptStages = proj.departmentStages?.[dept];
