@@ -128,16 +128,17 @@ export function ProjectsPage() {
     };
 
     DEPARTMENTS.forEach((dept) => {
-      if (deptStartDates[dept] && deptDurations[dept] > 0) {
+      if (deptDurations[dept] > 0) {
+        const departmentStartDate = deptStartDates[dept] || formData.startDate!;
         // Calculate the relative week within the project (not global year week)
-        const weekStart = calculateRelativeWeek(deptStartDates[dept], formData.startDate!, selectedYear);
+        const weekStart = calculateRelativeWeek(departmentStartDate, formData.startDate!, selectedYear);
         const weekEnd = weekStart + deptDurations[dept] - 1;
 
         calculatedDepartmentStages[dept] = [{
           stage: null,
           weekStart,
           weekEnd,
-          departmentStartDate: deptStartDates[dept], // Store the actual start date for this department
+          departmentStartDate, // Store the actual start date for this department
           durationWeeks: deptDurations[dept], // Store the duration for this department
         }];
       }
