@@ -1065,7 +1065,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       const cellKey = `${assignment.projectId}|${dept}|${normalizedWeekStart}`;
       const cellEntry = byCell.get(cellKey) ?? { totalHours: 0, assignments: [], stage: null, comment: undefined };
-      cellEntry.totalHours += assignment.hours;
+      const assignmentHours = Number.isFinite(assignment.totalHours)
+        ? assignment.totalHours
+        : (assignment.hours ?? 0);
+      cellEntry.totalHours += assignmentHours;
       cellEntry.assignments.push(assignment);
       if (!cellEntry.stage && assignment.stage) {
         cellEntry.stage = assignment.stage;
@@ -1718,7 +1721,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
 
     // Read-only display
-    if (totalHours === 0) {
+    if (totalHours === 0 && cellAssignments.length === 0) {
       const canEdit = departmentFilter !== 'General';
 
       // Apply visual indicators for department start/duration (like General view does)
@@ -2853,6 +2856,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               </span>
                             </>
                           )}
+                          <span className="text-gray-400">â€¢</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

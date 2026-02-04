@@ -145,6 +145,7 @@ export interface Assignment {
   hours: number; // Total hours: scioHours + externalHours (backward compatible)
   scioHours?: number; // Internal SCIO hours (BUILD and PRG only)
   externalHours?: number; // External/subcontracted hours (BUILD and PRG only)
+  totalHours?: number; // API computed: scioHours + externalHours or hours
   stage: Stage;
   comment?: string; // Optional comment for this assignment
   employee?: Employee;
