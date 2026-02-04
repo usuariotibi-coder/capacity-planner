@@ -168,12 +168,12 @@ class LargeResultsSetPagination(PageNumberPagination):
     Pagination for endpoints that return larger result sets.
 
     Used for reports and analytics:
-    - Default page size: 100 items
-    - Max page size: 2000 items
+    - Default page size: 200 items
+    - Max page size: 500 items
     """
-    page_size = 100
+    page_size = 200
     page_size_query_param = 'page_size'
-    max_page_size = 2000
+    max_page_size = 500
 
 
 # ==================== FILTER BACKENDS ====================

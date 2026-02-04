@@ -30,12 +30,18 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const data = await assignmentsApi.getAll();
-      const normalized = data.map((assignment) => ({
-        ...assignment,
-        weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
-      }));
-      set({ assignments: normalized, isLoading: false, hasFetched: true });
+      const aggregated: Assignment[] = [];
+      await assignmentsApi.getAll({
+        onPage: (page) => {
+          const normalizedPage = page.map((assignment) => ({
+            ...assignment,
+            weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
+          }));
+          aggregated.push(...normalizedPage);
+          set({ assignments: aggregated });
+        },
+      });
+      set({ assignments: aggregated, isLoading: false, hasFetched: true });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error al cargar asignaciones',

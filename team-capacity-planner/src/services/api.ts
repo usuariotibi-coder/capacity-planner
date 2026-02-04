@@ -408,17 +408,24 @@ export const projectsApi = {
 
 // Assignments API
 export const assignmentsApi = {
-  getAll: async () => {
+  getAll: async (options: { onPage?: (page: any[]) => void } = {}) => {
+    const { onPage } = options;
     let endpoint = '/api/assignments/?page_size=500';
     let allResults: any[] = [];
 
     while (endpoint) {
       const data = await apiFetch(endpoint);
       if (Array.isArray(data)) {
+        if (onPage) {
+          onPage(data);
+        }
         return data;
       }
 
       const results = data.results || [];
+      if (results.length > 0 && onPage) {
+        onPage(results);
+      }
       allResults = allResults.concat(results);
       endpoint = data.next ? normalizeApiEndpoint(data.next) : '';
     }
