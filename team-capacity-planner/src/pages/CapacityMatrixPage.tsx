@@ -2856,7 +2856,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               </span>
                             </>
                           )}
-                          <span className="text-gray-400">â€¢</span>
+                          <span className="text-gray-400">•</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
