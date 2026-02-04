@@ -954,6 +954,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
           deptStartDate = deptFirstStage?.departmentStartDate;
           deptDuration = deptFirstStage?.durationWeeks || 0;
+
+          if (!deptDuration && deptFirstStage?.weekEnd && deptFirstStage?.weekStart) {
+            deptDuration = deptFirstStage.weekEnd - deptFirstStage.weekStart + 1;
+          }
+
+          if (!deptStartDate && deptFirstStage?.weekStart && proj.startDate) {
+            const fallbackStart = parseISODate(proj.startDate);
+            fallbackStart.setDate(fallbackStart.getDate() + ((deptFirstStage.weekStart - 1) * 7));
+            deptStartDate = formatToISO(fallbackStart);
+          }
         }
 
         let deptEndDate = '';
@@ -2813,6 +2823,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
             {departmentProjects.map((proj) => {
               const dept = departmentFilter as Department;
+              const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
               return (
                 <div key={proj.id} className="mb-2 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
@@ -2842,6 +2853,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               </span>
                             </>
                           )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openChangeOrderModal(proj.id, dept);
+                            }}
+                            className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-semibold hover:bg-emerald-100 transition"
+                            title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
+                          >
+                            <ClipboardList size={10} />
+                            <span>CO {changeOrderSummary.count}</span>
+                            <span>{formatHours(changeOrderSummary.totalHours)}h</span>
+                          </button>
                         </div>
                       </div>
                       {/* Desktop: Metrics inline */}
@@ -2854,7 +2877,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const forecastedHoursValue = getForecastedHours(dept, proj.id);
                           const utilizationPercent = getUtilizationPercent(dept, proj.id);
                           const utilizationColorInfo = getUtilizationColor(utilizationPercent);
-                          const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
                           return (
                             <>
@@ -2862,9 +2884,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className="text-[10px] text-blue-700 font-bold">Quoted</div>
                                 <div className="text-[11px] font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
                               </div>
-                              <div className="bg-emerald-100 rounded px-2 py-1 border border-emerald-300 text-center min-w-fit flex flex-col justify-center" title={t.quotedChangeOrders}>
-                                <div className="text-[9px] text-emerald-700 font-bold leading-tight">{t.quotedChangeOrders}</div>
-                                <div className="text-[11px] font-black text-emerald-700">{formatHours(quotedChangeOrdersValue)}h</div>
+                              <div className="bg-emerald-100 rounded px-1.5 py-0.5 border border-emerald-300 text-center min-w-fit flex flex-col justify-center" title={t.quotedChangeOrders}>
+                                <div className="text-[8px] text-emerald-700 font-bold leading-tight">{t.quotedChangeOrdersShort}</div>
+                                <div className="text-[10px] font-black text-emerald-700">{formatHours(quotedChangeOrdersValue)}h</div>
                               </div>
                               <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-purple-700 font-bold">Used</div>
@@ -2875,18 +2897,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className="text-[11px] font-black text-orange-700">{formatHours(forecastedHoursValue)}h</div>
                               </div>
                               <div className={`rounded px-2 py-1 border text-center min-w-fit flex flex-col justify-center ${utilizationColorInfo.bg}`}>
-                                <div className={`text-[10px] font-bold ${utilizationColorInfo.text}`}>Util</div>
+                                <div className={`text-[9px] font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
                                 <div className={`text-[11px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
                               </div>
-                              <button
-                                onClick={() => openChangeOrderModal(proj.id, dept)}
-                                className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded px-2 py-1 text-center min-w-fit flex items-center gap-1 hover:bg-emerald-100 transition"
-                                title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
-                              >
-                                <ClipboardList size={12} />
-                                <span className="text-[9px] font-semibold">CO {changeOrderSummary.count}</span>
-                                <span className="text-[9px] font-semibold">{formatHours(changeOrderSummary.totalHours)}h</span>
-                              </button>
                             </>
                           );
                         })()}
@@ -2940,9 +2953,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="text-[7px] text-blue-600 font-semibold leading-none">Quoted</span>
                                 <span className="text-[9px] text-blue-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
                               </div>
-                              <div className="bg-emerald-100 rounded px-1.5 py-0.5 border border-emerald-300 text-center flex flex-col" title={t.quotedChangeOrders}>
+                              <div className="bg-emerald-100 rounded px-1 py-0.5 border border-emerald-300 text-center flex flex-col" title={t.quotedChangeOrders}>
                                 <span className="text-[6px] text-emerald-600 font-semibold leading-none">{t.quotedChangeOrdersShort}</span>
-                                <span className="text-[9px] text-emerald-700 font-bold leading-none">{formatHours(quotedChangeOrdersValue)}h</span>
+                                <span className="text-[8px] text-emerald-700 font-bold leading-none">{formatHours(quotedChangeOrdersValue)}h</span>
                               </div>
                               <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center flex flex-col">
                                 <span className="text-[7px] text-purple-600 font-semibold leading-none">Used</span>
@@ -2953,17 +2966,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className="text-[9px] text-orange-700 font-bold leading-none">{formatHours(forecastedHoursValue)}h</span>
                               </div>
                               <div className={`rounded px-1.5 py-0.5 border text-center flex flex-col ${utilizationColorInfo.bg}`}>
-                                <span className={`text-[7px] font-semibold leading-none ${utilizationColorInfo.text}`}>Util</span>
+                                <span className={`text-[6px] font-semibold leading-none ${utilizationColorInfo.text}`}>{t.utilizationLabel}</span>
                                 <span className={`text-[9px] font-bold leading-none ${utilizationColorInfo.text}`}>{utilizationPercent}%</span>
                               </div>
-                              <button
-                                onClick={() => openChangeOrderModal(proj.id, dept)}
-                                className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded px-1.5 py-0.5 text-center flex items-center gap-0.5"
-                                title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
-                              >
-                                <ClipboardList size={10} />
-                                <span className="text-[7px] font-semibold">CO {changeOrderSummary.count}</span>
-                              </button>
                             </>
                           );
                         })()}
