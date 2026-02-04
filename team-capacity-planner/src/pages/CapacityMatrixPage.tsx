@@ -2945,7 +2945,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           const forecastedHoursValue = getForecastedHours(dept, proj.id);
                           const utilizationPercent = getUtilizationPercent(dept, proj.id);
                           const utilizationColorInfo = getUtilizationColor(utilizationPercent);
-                          const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
                           return (
                             <>
