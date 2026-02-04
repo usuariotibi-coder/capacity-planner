@@ -611,6 +611,38 @@ export const projectBudgetsApi = {
   },
 };
 
+// Project Change Orders API
+export const changeOrdersApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/project-change-orders/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/project-change-orders/${id}/`);
+  },
+
+  create: async (changeOrder: any) => {
+    return apiFetch('/api/project-change-orders/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(changeOrder)),
+    });
+  },
+
+  update: async (id: string, changeOrder: any) => {
+    return apiFetch(`/api/project-change-orders/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(changeOrder)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/project-change-orders/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Activity Log API
 export const activityLogApi = {
   getAll: async () => {

@@ -15,6 +15,7 @@ from .models import (
     Assignment,
     DepartmentStageConfig,
     ProjectBudget,
+    ProjectChangeOrder,
     ActivityLog,
     Department,
     Facility,
@@ -1004,7 +1005,7 @@ class DepartmentStageConfigSerializer(serializers.ModelSerializer):
 
     project = ProjectSerializer(read_only=True)
     project_id = serializers.UUIDField(
-        write_only=True,
+        required=False,
         help_text="UUID of the project"
     )
     department_display = serializers.CharField(
@@ -1329,6 +1330,57 @@ class ProjectBudgetSerializer(serializers.ModelSerializer):
             )
 
         return data
+
+
+class ProjectChangeOrderSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ProjectChangeOrder model.
+
+    Represents change order quoted hours per project and department.
+    """
+
+    project = ProjectSerializer(read_only=True)
+    project_id = serializers.UUIDField(
+        write_only=True,
+        help_text="UUID of the project"
+    )
+    department_display = serializers.CharField(
+        source='get_department_display',
+        read_only=True,
+        help_text="Human-readable department name"
+    )
+
+    class Meta:
+        model = ProjectChangeOrder
+        fields = (
+            'id',
+            'project',
+            'project_id',
+            'department',
+            'department_display',
+            'name',
+            'hours_quoted',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at', 'department_display')
+
+    def validate_hours_quoted(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Quoted hours cannot be negative.")
+        return value
+
+    def create(self, validated_data):
+        project_id = self.initial_data.get('project_id')
+        if project_id:
+            validated_data['project_id'] = project_id
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        project_id = self.initial_data.get('project_id')
+        if project_id is not None:
+            validated_data['project_id'] = project_id
+        return super().update(instance, validated_data)
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

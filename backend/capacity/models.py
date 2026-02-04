@@ -188,6 +188,24 @@ class ProjectBudget(models.Model):
         return ((self.hours_utilized + self.hours_forecast) / self.hours_allocated) * 100
 
 
+class ProjectChangeOrder(models.Model):
+    """Change order quoted hours per project and department"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='change_orders')
+    department = models.CharField(max_length=10, choices=Department.choices)
+    name = models.CharField(max_length=50, help_text="Change order name (e.g., CO01)")
+    hours_quoted = models.FloatField(validators=[MinValueValidator(0)], help_text="Quoted hours for this change order")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['project', 'department', 'name']
+        unique_together = ['project', 'department', 'name']
+
+    def __str__(self):
+        return f"{self.project.name} - {self.department} - {self.name}"
+
+
 class ScioTeamCapacity(models.Model):
     """SCIO Team capacity per department and week"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

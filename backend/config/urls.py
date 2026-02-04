@@ -13,6 +13,7 @@ from capacity.views import (
     AssignmentViewSet,
     DepartmentStageConfigViewSet,
     ProjectBudgetViewSet,
+    ProjectChangeOrderViewSet,
     ActivityLogViewSet,
     ScioTeamCapacityViewSet,
     SubcontractedTeamCapacityViewSet,
@@ -35,6 +36,7 @@ router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'assignments', AssignmentViewSet, basename='assignment')
 router.register(r'department-stages', DepartmentStageConfigViewSet, basename='department-stage')
 router.register(r'project-budgets', ProjectBudgetViewSet, basename='project-budget')
+router.register(r'project-change-orders', ProjectChangeOrderViewSet, basename='project-change-order')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 router.register(r'scio-team-capacity', ScioTeamCapacityViewSet, basename='scio-team-capacity')
 router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
@@ -52,6 +54,7 @@ class RootView(APIView):
                 'assignments': '/assignments/',
                 'department-stages': '/department-stages/',
                 'project-budgets': '/project-budgets/',
+                'project-change-orders': '/project-change-orders/',
                 'activity-logs': '/activity-logs/',
                 'scio-team-capacity': '/scio-team-capacity/',
                 'subcontracted-team-capacity': '/subcontracted-team-capacity/',

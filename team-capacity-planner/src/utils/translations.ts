@@ -318,6 +318,16 @@ export const translations = {
     deleting: 'Eliminando...',
     errorDeletingTeam: 'Error al eliminar equipo',
     notConfigured: 'No configurado',
+    addChangeOrderBudget: 'Agregar presupuesto para Change Order',
+    changeOrderName: 'Nombre de Change Order',
+    changeOrderNamePlaceholder: 'Ej: CO01',
+    changeOrderQuotedHours: 'Horas cotizadas',
+    changeOrderHoursPlaceholder: '0',
+    quotedChangeOrders: 'Change Orders Cotizados',
+    quotedChangeOrdersShort: 'CO Cotizado',
+    changeOrdersSummary: 'Change Orders ingresados',
+    changeOrderTotalHours: 'Total Horas CO',
+    noChangeOrders: 'Sin Change Orders',
 
     // Activity Log
     search: 'Buscar...',
@@ -678,6 +688,16 @@ export const translations = {
     deleting: 'Deleting...',
     errorDeletingTeam: 'Error deleting team',
     notConfigured: 'Not configured',
+    addChangeOrderBudget: 'Add Change Order Budget',
+    changeOrderName: 'Change Order Name',
+    changeOrderNamePlaceholder: 'e.g. CO01',
+    changeOrderQuotedHours: 'Quoted Hours',
+    changeOrderHoursPlaceholder: '0',
+    quotedChangeOrders: 'Quoted Change Orders',
+    quotedChangeOrdersShort: 'Quoted CO',
+    changeOrdersSummary: 'Change Orders Entered',
+    changeOrderTotalHours: 'Total CO Hours',
+    noChangeOrders: 'No change orders yet',
 
     // Activity Log
     search: 'Search...',

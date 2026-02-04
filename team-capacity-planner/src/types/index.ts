@@ -105,6 +105,25 @@ export interface Project {
 }
 
 /**
+ * PROJECT CHANGE ORDER INTERFACE
+ * Represents quoted change order hours per project and department
+ * @property id - Unique identifier (UUID)
+ * @property projectId - Reference to Project
+ * @property department - Department assignment
+ * @property name - Change order name (e.g., CO01)
+ * @property hoursQuoted - Quoted hours for this change order
+ */
+export interface ProjectChangeOrder {
+  id: string;
+  projectId: string;
+  department: Department;
+  name: string;
+  hoursQuoted: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
  * ASSIGNMENT INTERFACE
  * Represents hours allocated to a specific project, department, and week
  * Links employees to projects for capacity tracking

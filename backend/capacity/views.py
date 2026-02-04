@@ -43,7 +43,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
     Employee, Project, Assignment, DepartmentStageConfig,
-    ProjectBudget, ActivityLog, Department, Facility, Stage,
+    ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
     DepartmentWeeklyTotal, EmailVerification
 )
@@ -51,7 +51,7 @@ from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
     ProjectSerializer, ProjectDetailSerializer,
     AssignmentSerializer, DepartmentStageConfigSerializer,
-    ProjectBudgetSerializer, ActivityLogSerializer,
+    ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
     UserRegistrationSerializer
@@ -1286,6 +1286,48 @@ class ProjectBudgetViewSet(viewsets.ModelViewSet):
             pass
 
         return queryset
+
+
+class ProjectChangeOrderViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for ProjectChangeOrder model.
+
+    Provides CRUD operations for project change orders:
+    - Filtering by project and department
+    - Search by change order name
+    - Ordering by creation date and hours
+
+    Endpoints:
+        GET /api/project-change-orders/ - List all change orders
+        POST /api/project-change-orders/ - Create new change order
+        GET /api/project-change-orders/{id}/ - Get change order details
+        PUT /api/project-change-orders/{id}/ - Update change order
+        DELETE /api/project-change-orders/{id}/ - Delete change order
+
+    Permissions:
+        - IsAuthenticated: User must be logged in
+
+    Query Parameters:
+        - project: Filter by project UUID
+        - department: Filter by department code
+        - search: Search by change order name
+        - ordering: Order by field
+        - page: Page number
+        - page_size: Items per page
+    """
+    queryset = (
+        ProjectChangeOrder.objects
+        .all()
+        .select_related('project')
+    )
+    serializer_class = ProjectChangeOrderSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['project', 'department']
+    search_fields = ['name']
+    ordering_fields = ['created_at', 'updated_at', 'hours_quoted', 'name']
+    ordering = ['-created_at']
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):

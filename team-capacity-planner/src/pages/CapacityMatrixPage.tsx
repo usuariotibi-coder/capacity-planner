@@ -4,15 +4,15 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, activityLogApi } from '../services/api';
+import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
-import type { Department, Stage, Project, Assignment, Employee } from '../types';
+import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrder } from '../types';
 
 type DepartmentFilter = 'General' | Department;
 
@@ -198,6 +198,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Per-project zoom levels
   const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
 
+  // Change Orders state (quoted hours per project/department)
+  const [changeOrders, setChangeOrders] = useState<ProjectChangeOrder[]>([]);
+  const [isChangeOrderModalOpen, setIsChangeOrderModalOpen] = useState(false);
+  const [changeOrderContext, setChangeOrderContext] = useState<{ projectId: string; department: Department } | null>(null);
+  const [changeOrderForm, setChangeOrderForm] = useState({ name: '', hoursQuoted: '' });
+  const [isSavingChangeOrder, setIsSavingChangeOrder] = useState(false);
+
   // Utilized/Forecast hours are calculated automatically from assignments
 
   // Comment view state for General view (read-only comment display)
@@ -274,6 +281,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
 
     loadScioTeamCapacity();
+  }, []);
+
+  // Load Project Change Orders from API on mount
+  useEffect(() => {
+    const loadChangeOrders = async () => {
+      try {
+        console.log('[CapacityMatrix] Loading Project Change Orders from API...');
+        const data = await changeOrdersApi.getAll();
+        const normalized = Array.isArray(data) ? data : [];
+        setChangeOrders(normalized);
+        console.log('[CapacityMatrix] Change Orders loaded:', normalized.length);
+      } catch (error) {
+        console.error('[CapacityMatrix] Error loading Change Orders:', error);
+      }
+    };
+
+    loadChangeOrders();
   }, []);
 
   // Load BUILD and PRG teams from API, and load subcontracted/external personnel capacity data
@@ -860,6 +884,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     () => new Map(projects.map((proj) => [proj.id, proj])),
     [projects]
   );
+  const changeOrderSummaryByProjectDept = useMemo(() => {
+    const map = new Map<string, { totalHours: number; count: number; orders: ProjectChangeOrder[] }>();
+
+    changeOrders.forEach((order) => {
+      const key = `${order.projectId}|${order.department}`;
+      const entry = map.get(key) || { totalHours: 0, count: 0, orders: [] };
+      entry.totalHours += order.hoursQuoted || 0;
+      entry.count += 1;
+      entry.orders.push(order);
+      map.set(key, entry);
+    });
+
+    return map;
+  }, [changeOrders]);
   const weekDataByDate = useMemo(
     () => new Map(allWeeksData.map((week) => [week.date, week])),
     [allWeeksData]
@@ -1328,7 +1366,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   // Calculate utilization percentage for a department in a project
-  // Formula: (Used Hours + Forecasted Hours / Quoted Hours) * 100
+  // Formula: (Used Hours + Forecasted Hours) / (Quoted Hours + Quoted Change Orders) * 100
   // Used Hours = sum of assignments before current week (excludes current week)
   // Forecasted Hours = sum of assignments from current week onward (includes current week)
   // Quoted Hours = departmentHoursAllocated (budget)
@@ -1342,14 +1380,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     // Get forecasted hours (calculated)
     const forecastedHoursValue = getForecastedHours(department, projectId);
 
-    // Get quoted hours (budget)
+    // Get quoted hours (budget) and quoted change orders
     const quotedHours = project.departmentHoursAllocated?.[department] || 0;
+    const quotedChangeOrders = getQuotedChangeOrders(department, projectId);
     const totalPlanned = utilizedHoursValue + forecastedHoursValue;
-    if (quotedHours === 0) {
+    const totalQuoted = quotedHours + quotedChangeOrders;
+    if (totalQuoted === 0) {
       return totalPlanned > 0 ? 100 : 0;
     }
 
-    return Math.round((totalPlanned / quotedHours) * 100);
+    return Math.round((totalPlanned / totalQuoted) * 100);
   };
 
   // Get utilized hours (calculated) for a department in a project
@@ -1375,10 +1415,64 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return quotedHours;
   };
 
+  const getQuotedChangeOrders = (department: Department, projectId: string): number => {
+    const summary = changeOrderSummaryByProjectDept.get(`${projectId}|${department}`);
+    return summary?.totalHours || 0;
+  };
+
+  const getChangeOrderSummary = (department: Department, projectId: string) => {
+    return changeOrderSummaryByProjectDept.get(`${projectId}|${department}`) || { totalHours: 0, count: 0, orders: [] as ProjectChangeOrder[] };
+  };
+
   const formatHours = (value: number): string => {
     if (!Number.isFinite(value)) return '0';
     const rounded = Math.round(value * 1000) / 1000;
     return rounded.toFixed(3).replace(/\.?0+$/, '');
+  };
+
+  const openChangeOrderModal = (projectId: string, department: Department) => {
+    setChangeOrderContext({ projectId, department });
+    setChangeOrderForm({ name: '', hoursQuoted: '' });
+    setIsChangeOrderModalOpen(true);
+  };
+
+  const closeChangeOrderModal = () => {
+    setIsChangeOrderModalOpen(false);
+    setChangeOrderContext(null);
+    setChangeOrderForm({ name: '', hoursQuoted: '' });
+    setIsSavingChangeOrder(false);
+  };
+
+  const handleSaveChangeOrder = async () => {
+    if (!changeOrderContext) return;
+    const name = changeOrderForm.name.trim();
+    if (!name) {
+      alert(t.changeOrderName || 'Change Order Name is required');
+      return;
+    }
+    const hoursValue = Number(changeOrderForm.hoursQuoted);
+    if (Number.isNaN(hoursValue) || hoursValue < 0) {
+      alert(t.changeOrderQuotedHours || 'Quoted Hours must be a valid number');
+      return;
+    }
+
+    try {
+      setIsSavingChangeOrder(true);
+      const created = await changeOrdersApi.create({
+        projectId: changeOrderContext.projectId,
+        department: changeOrderContext.department,
+        name,
+        hoursQuoted: hoursValue,
+      });
+      setChangeOrders((prev) => [...prev, created]);
+      setChangeOrderForm({ name: '', hoursQuoted: '' });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('[CapacityMatrix] Error saving Change Order:', errorMsg);
+      alert(`Error al guardar Change Order: ${errorMsg}`);
+    } finally {
+      setIsSavingChangeOrder(false);
+    }
   };
 
   // Check if a week is within a project's date range
@@ -2049,6 +2143,100 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
       {/* Edit Cell Modal */}
       {renderEditModal()}
+      {/* Change Order Modal */}
+      {isChangeOrderModalOpen && changeOrderContext && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border-2 border-emerald-200 w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-emerald-100">
+              <div>
+                <h3 className="text-lg font-bold text-emerald-800">{t.addChangeOrderBudget}</h3>
+                <p className="text-xs text-gray-500">
+                  {projectById.get(changeOrderContext.projectId)?.name || 'Project'} | {changeOrderContext.department}
+                </p>
+              </div>
+              <button
+                onClick={closeChangeOrderModal}
+                className="text-gray-500 hover:text-gray-700 p-1 rounded"
+                title={t.close || 'Close'}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">{t.changeOrderName}</label>
+                <input
+                  type="text"
+                  value={changeOrderForm.name}
+                  onChange={(e) => setChangeOrderForm({ ...changeOrderForm, name: e.target.value })}
+                  placeholder={t.changeOrderNamePlaceholder}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">{t.changeOrderQuotedHours}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={changeOrderForm.hoursQuoted}
+                  onChange={(e) => setChangeOrderForm({ ...changeOrderForm, hoursQuoted: e.target.value })}
+                  placeholder={t.changeOrderHoursPlaceholder}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={closeChangeOrderModal}
+                  className="px-3 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={handleSaveChangeOrder}
+                  disabled={isSavingChangeOrder}
+                  className="px-3 py-2 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 transition disabled:opacity-60"
+                >
+                  {isSavingChangeOrder ? (language === 'es' ? 'Guardando...' : 'Saving...') : (t.addButton || 'Agregar')}
+                </button>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3">
+                {(() => {
+                  const summary = getChangeOrderSummary(changeOrderContext.department, changeOrderContext.projectId);
+                  const sortedOrders = [...summary.orders].sort((a, b) => a.name.localeCompare(b.name));
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-700">{t.changeOrdersSummary}</span>
+                        <span className="text-xs text-gray-500">CO: {summary.count}</span>
+                      </div>
+                      {summary.count === 0 ? (
+                        <div className="text-xs text-gray-400 italic">{t.noChangeOrders}</div>
+                      ) : (
+                        <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-md">
+                          {sortedOrders.map((order) => (
+                            <div key={order.id} className="flex items-center justify-between px-2 py-1 text-xs border-b border-gray-100 last:border-b-0">
+                              <span className="font-semibold text-gray-700">{order.name}</span>
+                              <span className="text-emerald-700 font-bold">{formatHours(order.hoursQuoted)}h</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-2 text-xs font-semibold text-emerald-700">
+                        <span>{t.changeOrderTotalHours}</span>
+                        <span>{formatHours(summary.totalHours)}h</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sticky Header - Responsive */}
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
         <div className="px-1 py-1 flex flex-wrap items-center gap-1">
@@ -2661,16 +2849,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         {(() => {
                           const dept = departmentFilter as Department;
                           const quotedHoursValue = getQuotedHours(dept, proj.id);
+                          const quotedChangeOrdersValue = getQuotedChangeOrders(dept, proj.id);
                           const utilizedHoursValue = getUtilizedHours(dept, proj.id);
                           const forecastedHoursValue = getForecastedHours(dept, proj.id);
                           const utilizationPercent = getUtilizationPercent(dept, proj.id);
                           const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+                          const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
                           return (
                             <>
                               <div className="bg-blue-100 rounded px-2 py-1 border border-blue-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-blue-700 font-bold">Quoted</div>
                                 <div className="text-[11px] font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
+                              </div>
+                              <div className="bg-emerald-100 rounded px-2 py-1 border border-emerald-300 text-center min-w-fit flex flex-col justify-center" title={t.quotedChangeOrders}>
+                                <div className="text-[9px] text-emerald-700 font-bold leading-tight">{t.quotedChangeOrders}</div>
+                                <div className="text-[11px] font-black text-emerald-700">{formatHours(quotedChangeOrdersValue)}h</div>
                               </div>
                               <div className="bg-purple-100 rounded px-2 py-1 border border-purple-300 text-center min-w-fit flex flex-col justify-center">
                                 <div className="text-[10px] text-purple-700 font-bold">Used</div>
@@ -2684,6 +2878,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <div className={`text-[10px] font-bold ${utilizationColorInfo.text}`}>Util</div>
                                 <div className={`text-[11px] font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
                               </div>
+                              <button
+                                onClick={() => openChangeOrderModal(proj.id, dept)}
+                                className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded px-2 py-1 text-center min-w-fit flex items-center gap-1 hover:bg-emerald-100 transition"
+                                title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
+                              >
+                                <ClipboardList size={12} />
+                                <span className="text-[9px] font-semibold">CO {changeOrderSummary.count}</span>
+                                <span className="text-[9px] font-semibold">{formatHours(changeOrderSummary.totalHours)}h</span>
+                              </button>
                             </>
                           );
                         })()}
@@ -2724,16 +2927,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         {(() => {
                           const dept = departmentFilter as Department;
                           const quotedHoursValue = getQuotedHours(dept, proj.id);
+                          const quotedChangeOrdersValue = getQuotedChangeOrders(dept, proj.id);
                           const utilizedHoursValue = getUtilizedHours(dept, proj.id);
                           const forecastedHoursValue = getForecastedHours(dept, proj.id);
                           const utilizationPercent = getUtilizationPercent(dept, proj.id);
                           const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+                          const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
                           return (
                             <>
                               <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center flex flex-col">
                                 <span className="text-[7px] text-blue-600 font-semibold leading-none">Quoted</span>
                                 <span className="text-[9px] text-blue-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
+                              </div>
+                              <div className="bg-emerald-100 rounded px-1.5 py-0.5 border border-emerald-300 text-center flex flex-col" title={t.quotedChangeOrders}>
+                                <span className="text-[6px] text-emerald-600 font-semibold leading-none">{t.quotedChangeOrdersShort}</span>
+                                <span className="text-[9px] text-emerald-700 font-bold leading-none">{formatHours(quotedChangeOrdersValue)}h</span>
                               </div>
                               <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center flex flex-col">
                                 <span className="text-[7px] text-purple-600 font-semibold leading-none">Used</span>
@@ -2747,6 +2956,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 <span className={`text-[7px] font-semibold leading-none ${utilizationColorInfo.text}`}>Util</span>
                                 <span className={`text-[9px] font-bold leading-none ${utilizationColorInfo.text}`}>{utilizationPercent}%</span>
                               </div>
+                              <button
+                                onClick={() => openChangeOrderModal(proj.id, dept)}
+                                className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded px-1.5 py-0.5 text-center flex items-center gap-0.5"
+                                title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
+                              >
+                                <ClipboardList size={10} />
+                                <span className="text-[7px] font-semibold">CO {changeOrderSummary.count}</span>
+                              </button>
                             </>
                           );
                         })()}
@@ -2817,7 +3034,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             </div>
                           </div>
 
-                          {/* Utilization % = (Used + Forecasted / Quoted) * 100 */}
+                          {/* Utilization % = (Used + Forecasted) / (Quoted + Change Orders) * 100 */}
                           <div className={`rounded px-1.5 py-0.5 border text-center min-w-fit ${utilizationColorInfo.bg}`}>
                             <div className={`text-xs font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
                             <div className={`text-xs font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
