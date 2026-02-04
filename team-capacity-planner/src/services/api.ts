@@ -409,7 +409,7 @@ export const projectsApi = {
 // Assignments API
 export const assignmentsApi = {
   getAll: async () => {
-    let endpoint = '/api/assignments/?page_size=2000';
+    let endpoint = '/api/assignments/?page_size=500';
     let allResults: any[] = [];
 
     while (endpoint) {
