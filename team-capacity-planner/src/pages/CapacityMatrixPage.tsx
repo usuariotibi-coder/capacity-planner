@@ -244,9 +244,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     budgetHours: 0,
   });
 
-  // Initialize with all projects expanded by default
+  // Initialize with all projects collapsed by default
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
-    projects.reduce((acc, proj) => ({ ...acc, [proj.id]: true }), {})
+    projects.reduce((acc, proj) => ({ ...acc, [proj.id]: false }), {})
   );
 
   // No need to handle resize - always showing desktop view with scrollable containers
