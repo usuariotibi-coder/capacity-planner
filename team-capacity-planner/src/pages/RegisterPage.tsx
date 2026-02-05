@@ -4,6 +4,8 @@ import { Mail, Lock, Eye, EyeOff, User, Building2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
+import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
+import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
 import type { Language, UserDepartment, OtherDepartment } from '../types';
 
 const DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
@@ -42,6 +44,7 @@ const RegisterPage: React.FC = () => {
   const t = useTranslation(language);
   const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
   const passwordsMatch = hasConfirmPassword && formData.password === formData.confirmPassword;
+  const passwordCriteria = getPasswordCriteria(formData.password);
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -51,26 +54,12 @@ const RegisterPage: React.FC = () => {
     }
   }, [resendCooldown]);
 
-  const calculatePasswordStrength = (password: string): 'weak' | 'medium' | 'strong' => {
-    if (password.length < 8) return 'weak';
-
-    let strength = 0;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z\d]/.test(password)) strength++;
-
-    if (strength >= 3) return 'strong';
-    if (strength >= 2) return 'medium';
-    return 'weak';
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
     if (name === 'password') {
-      setPasswordStrength(value ? calculatePasswordStrength(value) : null);
+      setPasswordStrength(value ? getPasswordStrength(value) : null);
     }
   };
 
@@ -157,7 +146,7 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    const strength = calculatePasswordStrength(formData.password);
+    const strength = getPasswordStrength(formData.password);
     if (strength === 'weak') {
       setError(t.passwordMustBeStrong || 'Password must be strong');
       return;
@@ -713,6 +702,7 @@ const RegisterPage: React.FC = () => {
               )}
 
               <p className="text-xs text-zinc-400 mt-2">{t.passwordRequirements}</p>
+              <PasswordRequirementsChecklist criteria={passwordCriteria} t={t} />
             </div>
 
             {/* Confirm password field */}

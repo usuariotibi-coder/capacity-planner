@@ -5,6 +5,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation, type Language } from '../utils/translations';
+import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
+import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
 const API_URL = `${BASE_URL}/api`;
@@ -25,27 +27,14 @@ export const ChangePasswordPage = () => {
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | null>(null);
-
-  const calculatePasswordStrength = (password: string): 'weak' | 'medium' | 'strong' => {
-    if (password.length < 8) return 'weak';
-
-    let strength = 0;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z\d]/.test(password)) strength++;
-
-    if (strength >= 3) return 'strong';
-    if (strength >= 2) return 'medium';
-    return 'weak';
-  };
+  const passwordCriteria = getPasswordCriteria(newPassword);
 
   const hasConfirmPassword = confirmPassword.trim().length > 0;
   const passwordsMatch = hasConfirmPassword && newPassword === confirmPassword;
 
   const handleNewPasswordChange = (value: string) => {
     setNewPassword(value);
-    setPasswordStrength(value ? calculatePasswordStrength(value) : null);
+    setPasswordStrength(value ? getPasswordStrength(value) : null);
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -258,6 +247,7 @@ export const ChangePasswordPage = () => {
                 </div>
               )}
               <p className="text-xs text-zinc-400 mt-2">{t.passwordRequirements}</p>
+              <PasswordRequirementsChecklist criteria={passwordCriteria} t={t} />
             </div>
 
             <div className="space-y-2">
