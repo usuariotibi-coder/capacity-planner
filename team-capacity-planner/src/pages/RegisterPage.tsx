@@ -4,7 +4,7 @@ import { Mail, Lock, Eye, EyeOff, User, Building2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
-import type { Department, Language, UserDepartment, OtherDepartment } from '../types';
+import type { Language, UserDepartment, OtherDepartment } from '../types';
 
 const DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
 const OTHER_DEPARTMENTS: OtherDepartment[] = [
