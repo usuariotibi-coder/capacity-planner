@@ -298,7 +298,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       try {
         console.log('[CapacityMatrix] Loading Project Change Orders from API...');
         const data = await changeOrdersApi.getAll();
-        const normalized = Array.isArray(data) ? data : [];
+        const normalized = (Array.isArray(data) ? data : [])
+          .map((row: any): ProjectChangeOrder | null => {
+            const projectId = row?.projectId || row?.project?.id;
+            if (!row?.id || !projectId || !row?.department) return null;
+            return {
+              id: row.id,
+              projectId,
+              department: row.department,
+              name: row.name || '',
+              hoursQuoted: Number(row.hoursQuoted ?? 0),
+              createdAt: row.createdAt,
+              updatedAt: row.updatedAt,
+            };
+          })
+          .filter((row): row is ProjectChangeOrder => Boolean(row));
+
         setChangeOrders(normalized);
         console.log('[CapacityMatrix] Change Orders loaded:', normalized.length);
       } catch (error) {
@@ -1520,7 +1535,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         name,
         hoursQuoted: hoursValue,
       });
-      setChangeOrders((prev) => [...prev, created]);
+      const projectId = (created as any)?.projectId || (created as any)?.project?.id || changeOrderContext.projectId;
+      setChangeOrders((prev) => [
+        ...prev,
+        {
+          id: (created as any)?.id,
+          projectId,
+          department: (created as any)?.department || changeOrderContext.department,
+          name: (created as any)?.name || name,
+          hoursQuoted: Number((created as any)?.hoursQuoted ?? hoursValue),
+          createdAt: (created as any)?.createdAt,
+          updatedAt: (created as any)?.updatedAt,
+        },
+      ]);
       setChangeOrderForm({ name: '', hoursQuoted: '' });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
