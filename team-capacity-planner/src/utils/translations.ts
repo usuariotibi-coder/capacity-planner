@@ -293,6 +293,13 @@ export const translations = {
 
     // Navigation extras
     selectDepartment: '-- Selecciona Departamento --',
+    departmentOther: 'Otros',
+    otherDepartmentLabel: 'Selecciona el departamento',
+    selectOtherDepartment: '-- Selecciona el departamento --',
+    departmentOperations: 'Operaciones',
+    departmentFinance: 'Finanzas',
+    departmentHumanResources: 'Recursos Humanos',
+    departmentBusinessIntelligence: 'Business Intelligence',
     logout: 'Cerrar Sesión',
 
     // Capacity Matrix extras
@@ -663,6 +670,13 @@ export const translations = {
 
     // Navigation extras
     selectDepartment: '-- Select Department --',
+    departmentOther: 'Other',
+    otherDepartmentLabel: 'Select the department',
+    selectOtherDepartment: '-- Select the department --',
+    departmentOperations: 'Operations',
+    departmentFinance: 'Finance',
+    departmentHumanResources: 'Human Resources',
+    departmentBusinessIntelligence: 'Business Intelligence',
     logout: 'Logout',
 
     // Capacity Matrix extras

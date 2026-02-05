@@ -271,6 +271,7 @@ export const authApi = {
     first_name: string;
     last_name: string;
     department: string;
+    other_department?: string;
   }) => {
     const response = await fetch(`${API_URL}/api/register/`, {
       method: 'POST',

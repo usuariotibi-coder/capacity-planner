@@ -10,6 +10,7 @@ import { getAllWeeksWithNextYear } from '../utils/dateUtils';
 import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../context/AuthContext';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 
@@ -21,12 +22,26 @@ export function ResourcesPage() {
   const { activeTeams: prgActiveTeams } = usePRGTeamsStore();
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const { hasFullAccess, isReadOnly, currentUserDepartment } = useAuth();
+  const canCreateEmployee = hasFullAccess || (!isReadOnly && Boolean(currentUserDepartment));
+  const canEditEmployee = (department: Department) => {
+    if (hasFullAccess) return true;
+    if (isReadOnly) return false;
+    return currentUserDepartment === department;
+  };
+  const getDefaultDepartment = (): Department => {
+    if (!hasFullAccess && !isReadOnly && currentUserDepartment && DEPARTMENTS.includes(currentUserDepartment as Department)) {
+      return currentUserDepartment as Department;
+    }
+    return 'PM';
+  };
+  const lockedDepartment = (!hasFullAccess && !isReadOnly && currentUserDepartment) ? currentUserDepartment : null;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Employee>>({
     name: '',
     role: '',
-    department: 'PM',
+    department: getDefaultDepartment(),
     capacity: 40,
     isSubcontractedMaterial: false,
     subcontractCompany: '',
@@ -87,21 +102,26 @@ export function ResourcesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveDepartment = (lockedDepartment || formData.department) as Department | undefined;
+    const canSubmit = editingId
+      ? Boolean(effectiveDepartment && canEditEmployee(effectiveDepartment))
+      : canCreateEmployee;
+    if (!canSubmit) return;
 
-    if (!formData.name || !formData.role || !formData.department) {
+    if (!formData.name || !formData.role || !effectiveDepartment) {
       alert(t.completeAllFields);
       return;
     }
 
     if (editingId) {
-      updateEmployee(editingId, formData);
+      updateEmployee(editingId, { ...formData, department: effectiveDepartment });
       setEditingId(null);
     } else {
       const newEmployee: Employee = {
         id: generateId(),
         name: formData.name,
         role: formData.role,
-        department: formData.department,
+        department: effectiveDepartment,
         capacity: formData.capacity || 40,
         isActive: true,
         isSubcontractedMaterial: formData.isSubcontractedMaterial,
@@ -110,11 +130,12 @@ export function ResourcesPage() {
       addEmployee(newEmployee);
     }
 
-    setFormData({ name: '', role: '', department: 'PM', capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
     setIsFormOpen(false);
   };
 
   const handleEdit = (employee: Employee) => {
+    if (!canEditEmployee(employee.department)) return;
     setFormData(employee);
     setEditingId(employee.id);
     setIsFormOpen(true);
@@ -123,7 +144,7 @@ export function ResourcesPage() {
   const handleCancel = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', role: '', department: 'PM', capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
   };
 
   const getDepartmentColor = (dept: Department) => {
@@ -158,8 +179,18 @@ export function ResourcesPage() {
               </select>
             </div>
             <button
-              onClick={() => setIsFormOpen(true)}
-              className="flex items-center justify-center sm:justify-start gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base"
+              onClick={() => {
+                if (!canCreateEmployee) return;
+                setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+                setEditingId(null);
+                setIsFormOpen(true);
+              }}
+              disabled={!canCreateEmployee}
+              className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base ${
+                canCreateEmployee
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             >
               <Plus size={18} className="sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">{t.addEmployee}</span>
@@ -213,9 +244,10 @@ export function ResourcesPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.department}</label>
                   <select
-                    value={formData.department || 'PM'}
+                    value={(lockedDepartment as Department) || formData.department || 'PM'}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value as Department })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting || Boolean(lockedDepartment)}
                   >
                     {DEPARTMENTS.map((dept) => (
                       <option key={dept} value={dept}>
@@ -451,15 +483,21 @@ export function ResourcesPage() {
                         {/* Actions */}
                         <div className="flex gap-1">
                           <button
-                            onClick={() => handleEdit(emp)}
-                            className="p-1.5 text-blue-500 hover:bg-blue-100 rounded transition"
+                            onClick={() => canEditEmployee(emp.department) && handleEdit(emp)}
+                            disabled={!canEditEmployee(emp.department)}
+                            className={`p-1.5 rounded transition ${
+                              canEditEmployee(emp.department) ? 'text-blue-500 hover:bg-blue-100' : 'text-gray-400 cursor-not-allowed'
+                            }`}
                             title={t.edit}
                           >
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() => deleteEmployee(emp.id)}
-                            className="p-1.5 text-red-500 hover:bg-red-100 rounded transition"
+                            onClick={() => canEditEmployee(emp.department) && deleteEmployee(emp.id)}
+                            disabled={!canEditEmployee(emp.department)}
+                            className={`p-1.5 rounded transition ${
+                              canEditEmployee(emp.department) ? 'text-red-500 hover:bg-red-100' : 'text-gray-400 cursor-not-allowed'
+                            }`}
                             title={t.delete}
                           >
                             <Trash2 size={16} />

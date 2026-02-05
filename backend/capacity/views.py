@@ -39,14 +39,14 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
     Employee, Project, Assignment, DepartmentStageConfig,
     ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
-    DepartmentWeeklyTotal, EmailVerification
+    DepartmentWeeklyTotal, EmailVerification, UserDepartment, OtherDepartment
 )
 from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
@@ -118,6 +118,60 @@ class IsAdminOrReadOnly(BasePermission):
             return True
         return request.user and request.user.is_staff
 
+
+# ==================== USER ACCESS HELPERS ====================
+
+def _resolve_user_department(user):
+    """Return (department, other_department) for a user, if available."""
+    try:
+        profile = getattr(user, 'profile', None)
+        if profile:
+            return profile.department, profile.other_department
+    except Exception:
+        pass
+
+    # Fallback: if user is linked to an Employee record, use that department
+    try:
+        employee = getattr(user, 'employee', None)
+        if employee:
+            return employee.department, None
+    except Exception:
+        pass
+
+    return None, None
+
+
+def _has_full_access(user):
+    # Preserve existing behavior for staff/superuser or missing metadata
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+
+    department, other_department = _resolve_user_department(user)
+    if department is None:
+        return True
+    if department == UserDepartment.PM:
+        return True
+    if department == UserDepartment.OTHER and other_department == OtherDepartment.BUSINESS_INTELLIGENCE:
+        return True
+    return False
+
+
+def _is_read_only_user(user):
+    department, other_department = _resolve_user_department(user)
+    return department == UserDepartment.OTHER and other_department != OtherDepartment.BUSINESS_INTELLIGENCE
+
+
+def _can_edit_department(user, department_code):
+    if _has_full_access(user):
+        return True
+    if _is_read_only_user(user):
+        return False
+    user_department, _ = _resolve_user_department(user)
+    if not user_department:
+        return False
+    return user_department == department_code
 
 class CanViewActivityLog(BasePermission):
     """
@@ -266,6 +320,28 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
 
         return queryset
+
+    def _ensure_employee_edit_permission(self, department):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not department or not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify this department.")
+
+    def perform_create(self, serializer):
+        department = serializer.validated_data.get('department') or self.request.data.get('department')
+        self._ensure_employee_edit_permission(department)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        department = serializer.validated_data.get('department') or serializer.instance.department
+        self._ensure_employee_edit_permission(department)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_employee_edit_permission(instance.department)
+        instance.delete()
 
     @action(detail=True, methods=['get'])
     def capacity_summary(self, request, pk=None):
@@ -518,6 +594,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
 
         return queryset
+
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify projects.")
+
+    def perform_create(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
 
     @action(detail=True, methods=['get'])
     def statistics(self, request, pk=None):
@@ -925,6 +1017,34 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 pass
 
         return queryset
+
+    def _ensure_assignment_edit_permission(self, employee):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not employee or not _can_edit_department(self.request.user, employee.department):
+            raise PermissionDenied("No permission to modify this department.")
+
+    def perform_create(self, serializer):
+        employee_id = serializer.validated_data.get('employee_id') or self.request.data.get('employee_id')
+        employee = Employee.objects.filter(id=employee_id).first() if employee_id else None
+        self._ensure_assignment_edit_permission(employee)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        employee_id = self.request.data.get('employee_id')
+        employee = None
+        if employee_id:
+            employee = Employee.objects.filter(id=employee_id).first()
+        if employee is None:
+            employee = serializer.instance.employee
+        self._ensure_assignment_edit_permission(employee)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_assignment_edit_permission(instance.employee)
+        instance.delete()
 
     @action(detail=False, methods=['get'], url_path='summary-by-project-dept')
     def summary_by_project_dept(self, request):
@@ -1336,6 +1456,22 @@ class DepartmentStageConfigViewSet(viewsets.ModelViewSet):
     ordering_fields = ['project', 'department', 'week_start']
     ordering = ['project', 'department']
 
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify department stages.")
+
+    def perform_create(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
+
 
 class ProjectBudgetViewSet(viewsets.ModelViewSet):
     """
@@ -1376,6 +1512,22 @@ class ProjectBudgetViewSet(viewsets.ModelViewSet):
     filterset_fields = ['project', 'department']
     ordering_fields = ['project', 'department', 'utilization_percent']
     ordering = ['project', 'department']
+
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify project budgets.")
+
+    def perform_create(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
 
     def get_queryset(self):
         """Add filtering for budget status if requested."""
@@ -1430,6 +1582,28 @@ class ProjectChangeOrderViewSet(viewsets.ModelViewSet):
     search_fields = ['name']
     ordering_fields = ['created_at', 'updated_at', 'hours_quoted', 'name']
     ordering = ['-created_at']
+
+    def _ensure_change_order_permission(self, department):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify this department.")
+
+    def perform_create(self, serializer):
+        department = serializer.validated_data.get('department') or self.request.data.get('department')
+        self._ensure_change_order_permission(department)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        department = serializer.validated_data.get('department') or serializer.instance.department
+        self._ensure_change_order_permission(department)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_change_order_permission(instance.department)
+        instance.delete()
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):
@@ -1518,12 +1692,17 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['department', 'week_start_date', 'capacity']
     ordering = ['department', 'week_start_date']
 
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify SCIO team capacity.")
+
     def create(self, request, *args, **kwargs):
         """
         Override create to support upsert behavior.
         If a record with the same department+week_start_date exists, update it.
         Otherwise create a new one.
         """
+        self._ensure_full_access()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1542,6 +1721,14 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
         # Return the serialized object
         result_serializer = self.get_serializer(obj)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
 
 
 # ==================== SUBCONTRACTED TEAM CAPACITY VIEWSET ====================
@@ -1563,12 +1750,17 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['company', 'week_start_date', 'capacity']
     ordering = ['company', 'week_start_date']
 
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify subcontracted team capacity.")
+
     def create(self, request, *args, **kwargs):
         """
         Override create to support upsert behavior.
         If a record with the same company+week_start_date exists, update it.
         Otherwise create a new one.
         """
+        self._ensure_full_access()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1587,6 +1779,14 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
         # Return the serialized object
         result_serializer = self.get_serializer(obj)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
 
 
 # ==================== PRG EXTERNAL TEAM CAPACITY VIEWSET ====================
@@ -1608,12 +1808,17 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['team_name', 'week_start_date', 'capacity']
     ordering = ['team_name', 'week_start_date']
 
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify PRG external team capacity.")
+
     def create(self, request, *args, **kwargs):
         """
         Override create to support upsert behavior.
         If a record with the same team_name+week_start_date exists, update it.
         Otherwise create a new one.
         """
+        self._ensure_full_access()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1633,6 +1838,14 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
         result_serializer = self.get_serializer(obj)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
+
 
 class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
     """
@@ -1649,6 +1862,22 @@ class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
     filterset_fields = ['department', 'week_start_date']
     ordering_fields = ['department', 'week_start_date', 'total_hours']
     ordering = ['department', 'week_start_date']
+
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify department weekly totals.")
+
+    def perform_create(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
 
 
 # ==================== USER REGISTRATION VIEWS ====================

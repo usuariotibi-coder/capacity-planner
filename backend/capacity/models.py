@@ -21,6 +21,25 @@ class Department(models.TextChoices):
     PRG = 'PRG', 'Programming PLC'
 
 
+class UserDepartment(models.TextChoices):
+    """Department choices for user registration/permissions"""
+    PM = 'PM', 'Project Manager'
+    MED = 'MED', 'Mechanical Design'
+    HD = 'HD', 'Hardware Design'
+    MFG = 'MFG', 'Manufacturing'
+    BUILD = 'BUILD', 'Assembly'
+    PRG = 'PRG', 'Programming PLC'
+    OTHER = 'OTHER', 'Other'
+
+
+class OtherDepartment(models.TextChoices):
+    """Sub-departments for users registered under OTHER"""
+    OPERATIONS = 'OPERATIONS', 'Operations'
+    FINANCE = 'FINANCE', 'Finance'
+    HUMAN_RESOURCES = 'HUMAN_RESOURCES', 'Human Resources'
+    BUSINESS_INTELLIGENCE = 'BUSINESS_INTELLIGENCE', 'Business Intelligence'
+
+
 class Facility(models.TextChoices):
     """Facility/location choices for projects"""
     AL = 'AL', 'Facility A'
@@ -368,3 +387,22 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"Session for {self.user.username} - Created: {self.created_at}"
+
+
+class UserProfile(models.Model):
+    """Stores department metadata and access scope for a user."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    department = models.CharField(max_length=20, choices=UserDepartment.choices)
+    other_department = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'user__username']
+        indexes = [
+            models.Index(fields=['department']),
+        ]
+
+    def __str__(self):
+        other = f" ({self.other_department})" if self.other_department else ""
+        return f"{self.user.username} - {self.department}{other}"

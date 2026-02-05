@@ -4,9 +4,15 @@ import { Mail, Lock, Eye, EyeOff, User, Building2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
-import type { Department, Language } from '../types';
+import type { Department, Language, UserDepartment, OtherDepartment } from '../types';
 
-const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+const DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
+const OTHER_DEPARTMENTS: OtherDepartment[] = [
+  'OPERATIONS',
+  'FINANCE',
+  'HUMAN_RESOURCES',
+  'BUSINESS_INTELLIGENCE',
+];
 
 type Step = 'register' | 'verify' | 'success';
 
@@ -18,7 +24,8 @@ const RegisterPage: React.FC = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    department: '' as Department | '',
+    department: '' as UserDepartment | '',
+    otherDepartment: '' as OtherDepartment | '',
   });
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,6 +135,10 @@ const RegisterPage: React.FC = () => {
       setError(t.completeAllFields);
       return;
     }
+    if (formData.department === 'OTHER' && !formData.otherDepartment) {
+      setError(t.selectOtherDepartment || t.completeAllFields);
+      return;
+    }
 
     if (!validateEmail(formData.email)) {
       setError(t.invalidEmailDomain);
@@ -160,6 +171,7 @@ const RegisterPage: React.FC = () => {
         first_name: formData.firstName,
         last_name: formData.lastName,
         department: formData.department as string,
+        other_department: formData.department === 'OTHER' ? formData.otherDepartment : undefined,
       });
 
       setStep('success');
@@ -601,11 +613,41 @@ const RegisterPage: React.FC = () => {
                 >
                   <option value="">{t.selectDepartment}</option>
                   {DEPARTMENTS.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <option key={dept} value={dept}>
+                      {dept === 'OTHER' ? t.departmentOther : dept}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
+
+            {formData.department === 'OTHER' && (
+              <div>
+                <label htmlFor="otherDepartment" className="block text-sm font-medium text-zinc-300 mb-2">
+                  {t.otherDepartmentLabel}
+                </label>
+                <select
+                  id="otherDepartment"
+                  name="otherDepartment"
+                  value={formData.otherDepartment}
+                  onChange={handleChange}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white
+                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                  disabled={isSubmitting}
+                >
+                  <option value="">{t.selectOtherDepartment}</option>
+                  {OTHER_DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept === 'OPERATIONS' && t.departmentOperations}
+                      {dept === 'FINANCE' && t.departmentFinance}
+                      {dept === 'HUMAN_RESOURCES' && t.departmentHumanResources}
+                      {dept === 'BUSINESS_INTELLIGENCE' && t.departmentBusinessIntelligence}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Password field */}
             <div>

@@ -17,6 +17,12 @@ export type Department = 'PM' | 'MED' | 'HD' | 'MFG' | 'BUILD' | 'PRG';
 // PRG: Programming PLC
 
 /**
+ * USER DEPARTMENT TYPES (for permissions/registration)
+ */
+export type UserDepartment = Department | 'OTHER';
+export type OtherDepartment = 'OPERATIONS' | 'FINANCE' | 'HUMAN_RESOURCES' | 'BUSINESS_INTELLIGENCE';
+
+/**
  * FACILITY TYPES
  * Represents the 3 physical facilities/locations
  */

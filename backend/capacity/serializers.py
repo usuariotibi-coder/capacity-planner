@@ -18,6 +18,8 @@ from .models import (
     ProjectChangeOrder,
     ActivityLog,
     Department,
+    UserDepartment,
+    OtherDepartment,
     Facility,
     Stage,
     SubcontractCompany,
@@ -25,6 +27,7 @@ from .models import (
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
     DepartmentWeeklyTotal,
+    UserProfile,
 )
 
 
@@ -64,9 +67,16 @@ class UserRegistrationSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=True, max_length=150)
     last_name = serializers.CharField(required=True, max_length=150)
     department = serializers.ChoiceField(
-        choices=Department.choices,
+        choices=UserDepartment.choices,
         required=True,
-        help_text="Employee department"
+        help_text="User department"
+    )
+    other_department = serializers.ChoiceField(
+        choices=OtherDepartment.choices,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Sub-department when department is OTHER"
     )
 
     def validate_email(self, value):
@@ -111,6 +121,16 @@ class UserRegistrationSerializer(serializers.Serializer):
                 "confirm_password": "Passwords do not match."
             })
 
+        department = data.get('department')
+        other_department = data.get('other_department')
+        if department == UserDepartment.OTHER:
+            if not other_department:
+                raise serializers.ValidationError({
+                    "other_department": "Please select a sub-department."
+                })
+        else:
+            data['other_department'] = None
+
         return data
 
     def create(self, validated_data):
@@ -126,8 +146,9 @@ class UserRegistrationSerializer(serializers.Serializer):
         # Remove confirm_password from data
         validated_data.pop('confirm_password')
 
-        # Extract department (stored as metadata, not used for Employee creation)
+        # Extract department metadata (stored in UserProfile, not used for Employee creation)
         department = validated_data.pop('department')
+        other_department = validated_data.pop('other_department', None)
 
         # Create ACTIVE user (no email verification required)
         # Domain validation (@na.scio-automation.com) ensures only company employees can register
@@ -150,6 +171,13 @@ class UserRegistrationSerializer(serializers.Serializer):
             ]
         )
         user.user_permissions.set(permissions)
+
+        # Store department metadata for permission handling
+        UserProfile.objects.create(
+            user=user,
+            department=department,
+            other_department=other_department
+        )
 
         print(f"[REGISTER] User {user.email} created and activated successfully")
 
@@ -1793,15 +1821,29 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                     )
 
                 refresh = RefreshToken.for_user(user)
+                profile = getattr(user, 'profile', None)
+                department = getattr(profile, 'department', None)
+                other_department = getattr(profile, 'other_department', None)
+                if not department:
+                    try:
+                        employee = getattr(user, 'employee', None)
+                        if employee:
+                            department = employee.department
+                    except Exception:
+                        department = None
                 # Add custom claims to the access token
                 refresh['username'] = user.username
                 refresh['email'] = user.email
                 refresh['first_name'] = user.first_name
                 refresh['last_name'] = user.last_name
+                refresh['department'] = department
+                refresh['other_department'] = other_department
                 refresh.access_token['username'] = user.username
                 refresh.access_token['email'] = user.email
                 refresh.access_token['first_name'] = user.first_name
                 refresh.access_token['last_name'] = user.last_name
+                refresh.access_token['department'] = department
+                refresh.access_token['other_department'] = other_department
 
                 # Create a new session record (safely handle missing request context)
                 try:

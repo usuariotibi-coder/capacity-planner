@@ -11,6 +11,7 @@ import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
 import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrder } from '../types';
 
@@ -59,6 +60,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     });
   }, [projects]);
   const { language } = useLanguage();
+  const { hasFullAccess, isReadOnly, currentUserDepartment } = useAuth();
   const t = useTranslation(language);
   const locale = language === 'es' ? 'es-ES' : 'en-US';
 
@@ -603,6 +605,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const scioSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleScioTeamChange = (dept: Department, weekDate: string, newCapacity: number) => {
+    if (!hasFullAccess) {
+      return;
+    }
     console.log('[CapacityMatrix] handleScioTeamChange called:', { dept, weekDate, newCapacity });
 
     // Update local state immediately
@@ -681,6 +686,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const prgExternalSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleSubcontractedChange = (company: string, weekDate: string, newCount: number | undefined) => {
+    if (!hasFullAccess) {
+      return;
+    }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
     console.log('[CapacityMatrix] handleSubcontractedChange called:', { company, weekDate: normalizedWeek, newCount });
 
@@ -758,6 +766,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handlePrgExternalChange = (teamName: string, weekDate: string, newCount: number | undefined) => {
+    if (!hasFullAccess) {
+      return;
+    }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
     console.log('[CapacityMatrix] handlePrgExternalChange called:', { teamName, weekDate: normalizedWeek, newCount });
 
@@ -787,6 +798,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Delete team handler
   const handleDeleteTeam = async () => {
+    if (!hasFullAccess) {
+      return;
+    }
     if (!deleteConfirmation.isOpen || !deleteConfirmation.teamName || !deleteConfirmation.type) {
       return;
     }
@@ -1503,6 +1517,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return rounded.toFixed(3).replace(/\.?0+$/, '');
   };
 
+  const canEditDepartment = (department: Department): boolean => {
+    if (hasFullAccess) return true;
+    if (isReadOnly) return false;
+    return currentUserDepartment === department;
+  };
+
   const openChangeOrderModal = (projectId: string, department: Department) => {
     setChangeOrderContext({ projectId, department });
     setChangeOrderForm({ name: '', hoursQuoted: '' });
@@ -1794,7 +1814,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     // Read-only display
     if (totalHours === 0 && cellAssignments.length === 0) {
-      const canEdit = departmentFilter !== 'General';
+      const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
 
       // Apply visual indicators for department start/duration (like General view does)
       let cellBgClass = 'bg-gray-50';
@@ -2374,7 +2394,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           </button>
 
           {/* Create Project Button - Only in department view (except PM) */}
-          {departmentFilter !== 'General' && departmentFilter !== 'PM' && (
+          {hasFullAccess && departmentFilter !== 'General' && departmentFilter !== 'PM' && (
             <button
               onClick={() => setShowQuickProjectModal(true)}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
@@ -2386,7 +2406,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           )}
 
           {/* Import Existing Project Button - Only in department view (except PM) */}
-          {departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
+          {hasFullAccess && departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
@@ -2538,11 +2558,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                 type="number"
                                 step="0.1"
                                 value={scioTeamMembers[dept]?.[weekData.date] || ''}
+                                disabled={!hasFullAccess}
                                 onChange={(e) => {
                                   const newCapacity = parseFloat(e.target.value) || 0;
                                   handleScioTeamChange(dept, weekData.date, newCapacity);
                                 }}
-                                className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 ${
+                                className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-60 ${
                                   isCurrentWeek ? 'ring-2 ring-red-600 shadow-md border-red-500 bg-gradient-to-b from-red-50 to-orange-50' : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
                                 }`}
                                 placeholder="0"
@@ -2563,19 +2584,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               {/* Company Label with delete button */}
                               <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border-violet-400 shadow-sm hover:shadow-md transition-all">
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
-                                <button
-                                  onClick={() => {
-                                    setDeleteConfirmation({
-                                      isOpen: true,
-                                      type: 'subcontracted',
-                                      teamName: company,
-                                    });
-                                  }}
-                                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title={`${t.removeTeamTitle} ${company}`}
-                                >
-                                  <Minus size={8} className="text-white font-bold" />
-                                </button>
+                                {hasFullAccess && (
+                                  <button
+                                    onClick={() => {
+                                      setDeleteConfirmation({
+                                        isOpen: true,
+                                        type: 'subcontracted',
+                                        teamName: company,
+                                      });
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title={`${t.removeTeamTitle} ${company}`}
+                                  >
+                                    <Minus size={8} className="text-white font-bold" />
+                                  </button>
+                                )}
                               </div>
 
                               {/* Week inputs for subcontracted personnel - Smaller size */}
@@ -2595,6 +2618,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         type="text"
                                         inputMode="decimal"
                                         value={subcontractedInputs[`${company}-${weekData.date}`] ?? (subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : '')}
+                                        disabled={!hasFullAccess}
                                         onChange={(e) => {
                                           const raw = e.target.value;
                                           const normalized = raw.replace(',', '.');
@@ -2612,7 +2636,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                             handleSubcontractedChange(company, weekData.date, newCount);
                                           }
                                         }}
-                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-violet-900"
+                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-violet-900 disabled:cursor-not-allowed disabled:text-gray-400"
                                         style={{textAlign: 'center'}}
                                         placeholder="0"
                                         title={`${company} - ${t.week} ${weekData.weekNum}`}
@@ -2625,16 +2649,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           ))}
 
                           {/* Add Team button - clicking label opens popup */}
-                          <div className="flex gap-0.5 mb-0.5">
-                            {/* Label column - clickable to open popup */}
-                            <button
-                              onClick={() => setIsBuildModalOpen(true)}
-                              className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all"
-                              title={t.clickToAddSubcontractedTeam}
-                            >
-                              {t.addButton}
-                            </button>
-                          </div>
+                          {hasFullAccess && (
+                            <div className="flex gap-0.5 mb-0.5">
+                              {/* Label column - clickable to open popup */}
+                              <button
+                                onClick={() => setIsBuildModalOpen(true)}
+                                className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all"
+                                title={t.clickToAddSubcontractedTeam}
+                              >
+                                {t.addButton}
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -2647,19 +2673,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                               {/* Team Label with delete button */}
                               <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all">
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
-                                <button
-                                  onClick={() => {
-                                    setDeleteConfirmation({
-                                      isOpen: true,
-                                      type: 'prg',
-                                      teamName: team,
-                                    });
-                                  }}
-                                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title={`${t.removeTeamTitle} ${team}`}
-                                >
-                                  <Minus size={8} className="text-white font-bold" />
-                                </button>
+                                {hasFullAccess && (
+                                  <button
+                                    onClick={() => {
+                                      setDeleteConfirmation({
+                                        isOpen: true,
+                                        type: 'prg',
+                                        teamName: team,
+                                      });
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 hover:bg-red-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title={`${t.removeTeamTitle} ${team}`}
+                                  >
+                                    <Minus size={8} className="text-white font-bold" />
+                                  </button>
+                                )}
                               </div>
 
                               {/* Week inputs for external personnel */}
@@ -2679,6 +2707,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                         type="text"
                                         inputMode="decimal"
                                         value={prgExternalInputs[`${team}-${weekData.date}`] ?? (prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : '')}
+                                        disabled={!hasFullAccess}
                                         onChange={(e) => {
                                           const raw = e.target.value;
                                           const normalized = raw.replace(',', '.');
@@ -2696,7 +2725,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                             handlePrgExternalChange(team, weekData.date, newCount);
                                           }
                                         }}
-                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900"
+                                        className="w-8 text-[8px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900 disabled:cursor-not-allowed disabled:text-gray-400"
                                         style={{textAlign: 'center'}}
                                         placeholder="0"
                                         title={`${team} - ${t.week} ${weekData.weekNum}`}
@@ -2709,16 +2738,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           ))}
 
                           {/* Add External Team button - clicking label opens popup */}
-                          <div className="flex gap-0.5 mb-0.5">
-                            {/* Label column - clickable to open popup */}
-                            <button
-                              onClick={() => setIsPRGModalOpen(true)}
-                              className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all"
-                              title={t.clickToAddExternalTeam}
-                            >
-                              {t.addButton}
-                            </button>
-                          </div>
+                          {hasFullAccess && (
+                            <div className="flex gap-0.5 mb-0.5">
+                              {/* Label column - clickable to open popup */}
+                              <button
+                                onClick={() => setIsPRGModalOpen(true)}
+                                className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all"
+                                title={t.clickToAddExternalTeam}
+                              >
+                                {t.addButton}
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -2932,9 +2963,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              openChangeOrderModal(proj.id, dept);
+                              if (canEditDepartment(dept)) {
+                                openChangeOrderModal(proj.id, dept);
+                              }
                             }}
-                            className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-semibold hover:bg-emerald-100 transition"
+                            disabled={!canEditDepartment(dept)}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition ${
+                              canEditDepartment(dept)
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                            }`}
                             title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
                           >
                             <ClipboardList size={10} />
@@ -3793,7 +3831,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* Quick Project Creation Modal */}
-        {showQuickProjectModal && (
+        {showQuickProjectModal && hasFullAccess && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -3919,7 +3957,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* Import Existing Project Modal */}
-        {showImportProjectModal && (
+        {showImportProjectModal && hasFullAccess && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -4034,7 +4072,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* PRG External Team Modal */}
-        {isPRGModalOpen && (
+        {isPRGModalOpen && hasFullAccess && (
           <>
             {/* Backdrop */}
             <div
@@ -4142,7 +4180,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* BUILD Subcontracted Team Modal */}
-        {isBuildModalOpen && (
+        {isBuildModalOpen && hasFullAccess && (
           <>
             {/* Backdrop */}
             <div

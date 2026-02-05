@@ -22,6 +22,10 @@ interface AuthContextType {
   logout: () => void;
   error: string | null;
   currentUser: string | null;
+  currentUserDepartment: string | null;
+  currentUserOtherDepartment: string | null;
+  hasFullAccess: boolean;
+  isReadOnly: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,17 +35,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [currentUserDepartment, setCurrentUserDepartment] = useState<string | null>(null);
+  const [currentUserOtherDepartment, setCurrentUserOtherDepartment] = useState<string | null>(null);
+  const [hasFullAccess, setHasFullAccess] = useState<boolean>(true);
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
+
+  const updateAccessFlags = (department: string | null, otherDepartment: string | null) => {
+    const full = department === null
+      || department === 'PM'
+      || (department === 'OTHER' && otherDepartment === 'BUSINESS_INTELLIGENCE');
+    const readOnly = department === 'OTHER' && otherDepartment !== 'BUSINESS_INTELLIGENCE';
+    setHasFullAccess(full);
+    setIsReadOnly(readOnly);
+  };
 
   // Extract user name from token
   const extractUsername = () => {
     const token = getAccessToken();
     if (!token) {
       setCurrentUser(null);
+      setCurrentUserDepartment(null);
+      setCurrentUserOtherDepartment(null);
+      updateAccessFlags(null, null);
       return;
     }
 
     const decoded = decodeToken(token);
     if (decoded) {
+      const dept = decoded.department || null;
+      const otherDept = decoded.other_department || decoded.otherDepartment || null;
+      setCurrentUserDepartment(dept);
+      setCurrentUserOtherDepartment(otherDept);
+      updateAccessFlags(dept, otherDept);
+
       // Use first_name and last_name from token if available
       if (decoded.first_name || decoded.last_name) {
         const firstName = decoded.first_name || '';
@@ -73,6 +99,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       extractUsername();
     } else {
       setCurrentUser(null);
+      setCurrentUserDepartment(null);
+      setCurrentUserOtherDepartment(null);
+      updateAccessFlags(null, null);
     }
     setIsLoading(false);
   }, []);
@@ -88,6 +117,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         extractUsername();
       } else {
         setCurrentUser(null);
+        setCurrentUserDepartment(null);
+        setCurrentUserOtherDepartment(null);
+        updateAccessFlags(null, null);
       }
     };
 
@@ -129,6 +161,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Immediately update local state
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setCurrentUserDepartment(null);
+    setCurrentUserOtherDepartment(null);
+    updateAccessFlags(null, null);
 
     // Clear any cached data
     localStorage.removeItem('employees');
@@ -137,7 +172,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isLoading, login, logout, error, currentUser }}>
+    <AuthContext.Provider value={{
+      isLoggedIn,
+      isLoading,
+      login,
+      logout,
+      error,
+      currentUser,
+      currentUserDepartment,
+      currentUserOtherDepartment,
+      hasFullAccess,
+      isReadOnly,
+    }}>
       {children}
     </AuthContext.Provider>
   );

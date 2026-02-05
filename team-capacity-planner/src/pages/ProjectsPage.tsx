@@ -9,6 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dat
 import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
+import { useAuth } from '../context/AuthContext';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const FACILITIES = ['AL', 'MI', 'MX'] as const;
@@ -28,6 +29,7 @@ export function ProjectsPage() {
   const { employees } = useEmployeeStore();
   const { language } = useLanguage();
   const t = useTranslation(language);
+  const { hasFullAccess } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Project>>({
@@ -109,6 +111,7 @@ export function ProjectsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasFullAccess) return;
 
     if (!formData.name || !formData.client || !formData.startDate || !formData.facility) {
       alert(t.completeAllFields);
@@ -224,6 +227,7 @@ export function ProjectsPage() {
   };
 
   const handleEditProject = (proj: Project) => {
+    if (!hasFullAccess) return;
     setFormData(proj);
     setEditingId(proj.id);
     setNumberOfWeeks(proj.numberOfWeeks);
@@ -322,8 +326,11 @@ export function ProjectsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">{t.projects}</h1>
         <button
-          onClick={() => setIsFormOpen(true)}
-          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+          onClick={() => hasFullAccess && setIsFormOpen(true)}
+          disabled={!hasFullAccess}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+            hasFullAccess ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
         >
           <Plus size={20} />
           {t.addNewJob}
@@ -610,29 +617,40 @@ export function ProjectsPage() {
                   </span>
                 </td>
                 <td className="border border-gray-200 px-4 py-3 text-center">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => handleEditProject(proj)}
-                      className="p-2 text-blue-600 bg-blue-100 hover:bg-blue-200 rounded-lg transition transform hover:scale-110 shadow-sm"
-                      title={t.edit}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (window.confirm(language === 'es' ? `¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
-                          try {
-                            await deleteProject(proj.id);
-                          } catch (error) {
-                            console.error('Error deleting project:', error);
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => hasFullAccess && handleEditProject(proj)}
+                        disabled={!hasFullAccess}
+                        className={`p-2 rounded-lg transition transform shadow-sm ${
+                          hasFullAccess
+                            ? 'text-blue-600 bg-blue-100 hover:bg-blue-200 hover:scale-110'
+                            : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                        }`}
+                        title={t.edit}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!hasFullAccess) return;
+                          if (window.confirm(language === 'es' ? `¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
+                            try {
+                              await deleteProject(proj.id);
+                            } catch (error) {
+                              console.error('Error deleting project:', error);
+                            }
                           }
-                        }
-                      }}
-                      className="p-2 text-red-600 bg-red-100 hover:bg-red-200 rounded-lg transition transform hover:scale-110 shadow-sm"
-                      title={t.delete}
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                        }}
+                        disabled={!hasFullAccess}
+                        className={`p-2 rounded-lg transition transform shadow-sm ${
+                          hasFullAccess
+                            ? 'text-red-600 bg-red-100 hover:bg-red-200 hover:scale-110'
+                            : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                        }`}
+                        title={t.delete}
+                      >
+                        <Trash2 size={18} />
+                      </button>
                   </div>
                 </td>
               </tr>
