@@ -1690,13 +1690,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       editingCell.projectId
     );
 
-    // If user selected specific employees, use those; otherwise use existing assignments
-    const targetEmployeeIds = selectedEmployees.size > 0
-      ? Array.from(selectedEmployees)
-      : deptAssignments.map(a => a.employeeId);
+    // Persist exactly what user selected in the modal.
+    // If selection is empty, we should remove current assignments instead of restoring previous ones.
+    const targetEmployeeIds = Array.from(selectedEmployees);
     if (targetEmployeeIds.length > 0) {
       // Update or create assignments for selected employees
-      targetEmployeeIds.forEach((employeeId) => {
+      for (const employeeId of targetEmployeeIds) {
         const existingAssign = deptAssignments.find(a => a.employeeId === employeeId);
         const hoursPerEmployee = Math.round((totalHours / targetEmployeeIds.length) * 100) / 100;
 
@@ -1722,7 +1721,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         if (existingAssign) {
           // Update existing assignment
-          updateAssignment(existingAssign.id, updateData);
+          await updateAssignment(existingAssign.id, updateData);
         } else {
           // Create new assignment
           if (editingCell.projectId) {
@@ -1742,23 +1741,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             }
 
             console.log('[CapacityMatrix] Creating new assignment for employee:', employeeId, newAssignment);
-            addAssignment(newAssignment);
+            await addAssignment(newAssignment);
           }
         }
-      });
+      }
 
       // Delete assignments for employees that were deselected
-      deptAssignments.forEach((assign) => {
-        if (!targetEmployeeIds.includes(assign.employeeId)) {
-          // Note: We don't have a deleteAssignment function, so we'll set hours to 0
-          // This is a limitation of the current data model
-          updateAssignment(assign.id, {
-            hours: 0,
-            stage: editingStage,
-          });
-        }
-      });
+      const assignmentsToDelete = deptAssignments.filter((assign) => !targetEmployeeIds.includes(assign.employeeId));
+      for (const assign of assignmentsToDelete) {
+        await deleteAssignment(assign.id);
+      }
     } else {
+      // No resources selected: remove existing assignments first.
+      for (const assign of deptAssignments) {
+        await deleteAssignment(assign.id);
+      }
+
       // Create new assignment for placeholder resource when no one is selected
       console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
       console.log('[CapacityMatrix] All employees:', employees.map(e => ({ name: e.name, dept: e.department, active: e.isActive })));
