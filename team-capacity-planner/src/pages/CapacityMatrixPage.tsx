@@ -1422,6 +1422,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }));
   };
 
+  const isGeneralView = departmentFilter === 'General';
+
+  // In department views, project zoom follows the global zoom control.
+  const getEffectiveProjectZoom = (projectId: string): number => {
+    if (isGeneralView) {
+      return getProjectZoom(projectId);
+    }
+    return zoom;
+  };
+
+  const updateProjectZoom = (projectId: string, zoomLevel: number) => {
+    const boundedZoom = Math.max(50, Math.min(200, zoomLevel));
+    if (isGeneralView) {
+      setProjectZoom(projectId, boundedZoom);
+      return;
+    }
+    setZoom(boundedZoom);
+  };
+
   // Effect to reset scroll to first week when departmentFilter changes
   useEffect(() => {
     // Reset scroll position to start of year (first week)
@@ -3026,7 +3045,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       <div className="hidden md:flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         <span className="text-[9px] font-semibold text-indigo-900">Z:</span>
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom Out"
                         >
@@ -3037,18 +3056,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           min="50"
                           max="200"
                           step="10"
-                          value={getProjectZoom(proj.id)}
-                          onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                          value={getEffectiveProjectZoom(proj.id)}
+                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
                           className="w-12 cursor-pointer h-1"
                         />
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom In"
                         >
                           <ZoomIn size={10} />
                         </button>
-                        <span className="text-[9px] font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
+                        <span className="text-[9px] font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
                       </div>
                     </div>
                     {/* Row 2: Mobile only - Metrics and Zoom in separate row */}
@@ -3094,7 +3113,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       <div className="flex items-center gap-0.5">
                         <span className="text-[8px] font-semibold text-indigo-900">Z:</span>
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom Out"
                         >
@@ -3105,18 +3124,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           min="50"
                           max="200"
                           step="10"
-                          value={getProjectZoom(proj.id)}
-                          onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                          value={getEffectiveProjectZoom(proj.id)}
+                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
                           className="w-10 cursor-pointer h-1"
                         />
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom In"
                         >
                           <ZoomIn size={10} />
                         </button>
-                        <span className="text-[8px] font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
+                        <span className="text-[8px] font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
                       </div>
                     </div>
                   </div>
@@ -3169,7 +3188,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-semibold text-indigo-900">Z:</span>
                       <button
-                        onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                        onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
                         className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                         title="Zoom Out"
                       >
@@ -3180,18 +3199,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         min="50"
                         max="200"
                         step="10"
-                        value={getProjectZoom(proj.id)}
-                        onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                        value={getEffectiveProjectZoom(proj.id)}
+                        onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
                         className="w-12 cursor-pointer h-1.5"
                       />
                       <button
-                        onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                        onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
                         className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                         title="Zoom In"
                       >
                         <ZoomIn size={12} />
                       </button>
-                      <span className="text-xs font-semibold text-indigo-900">{getProjectZoom(proj.id)}%</span>
+                      <span className="text-xs font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
                     </div>
 
                     {/* Collapse/Expand toggle */}
@@ -3205,7 +3224,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   </div>
 
                   {expandedProjects[proj.id] && (
-                    <div style={{ zoom: `${getProjectZoom(proj.id) / 100}` }}>
+                    <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}>
                       <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
                       <table className="border-collapse text-xs w-full">
                         <thead>
@@ -3515,7 +3534,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       <div className="flex items-center gap-0.5 ml-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs font-semibold text-indigo-900">Z:</span>
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.max(50, getProjectZoom(proj.id) - 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom Out"
                         >
@@ -3526,18 +3545,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                           min="50"
                           max="200"
                           step="10"
-                          value={getProjectZoom(proj.id)}
-                          onChange={(e) => setProjectZoom(proj.id, parseInt(e.target.value))}
+                          value={getEffectiveProjectZoom(proj.id)}
+                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
                           className="w-12 cursor-pointer h-1.5"
                         />
                         <button
-                          onClick={() => setProjectZoom(proj.id, Math.min(200, getProjectZoom(proj.id) + 10))}
+                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
                           className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
                           title="Zoom In"
                         >
                           <ZoomIn size={12} />
                         </button>
-                        <span className="text-xs font-semibold text-indigo-900 ml-0.5">{getProjectZoom(proj.id)}%</span>
+                        <span className="text-xs font-semibold text-indigo-900 ml-0.5">{getEffectiveProjectZoom(proj.id)}%</span>
                       </div>
                     </div>
 
@@ -3576,7 +3595,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto" style={{ scrollBehavior: 'smooth', zoom: `${getProjectZoom(proj.id) / 100}` }} ref={(el) => {
+                      <div className="overflow-x-auto" style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }} ref={(el) => {
                         if (el) {
                           projectTableRefs.current.set(proj.id, el);
                         }
@@ -4409,3 +4428,4 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     </div>
   );
 }
+
