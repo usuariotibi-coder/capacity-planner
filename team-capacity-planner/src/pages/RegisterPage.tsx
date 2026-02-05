@@ -40,6 +40,8 @@ const RegisterPage: React.FC = () => {
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
+  const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
+  const passwordsMatch = hasConfirmPassword && formData.password === formData.confirmPassword;
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -605,15 +607,16 @@ const RegisterPage: React.FC = () => {
                   name="department"
                   value={formData.department}
                   onChange={handleChange}
-                  className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white
                              focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
-                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900
+                             [&>option]:bg-zinc-900 [&>option]:text-white"
                   required
                   disabled={isSubmitting}
                 >
-                  <option value="">{t.selectDepartment}</option>
+                  <option value="" className="bg-zinc-900 text-white">{t.selectDepartment}</option>
                   {DEPARTMENTS.map(dept => (
-                    <option key={dept} value={dept}>
+                    <option key={dept} value={dept} className="bg-zinc-900 text-white">
                       {dept === 'OTHER' ? t.departmentOther : dept}
                     </option>
                   ))}
@@ -631,14 +634,15 @@ const RegisterPage: React.FC = () => {
                   name="otherDepartment"
                   value={formData.otherDepartment}
                   onChange={handleChange}
-                  className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white
                              focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
-                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
+                             transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900
+                             [&>option]:bg-zinc-900 [&>option]:text-white"
                   disabled={isSubmitting}
                 >
-                  <option value="">{t.selectOtherDepartment}</option>
+                  <option value="" className="bg-zinc-900 text-white">{t.selectOtherDepartment}</option>
                   {OTHER_DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>
+                    <option key={dept} value={dept} className="bg-zinc-900 text-white">
                       {dept === 'OPERATIONS' && t.departmentOperations}
                       {dept === 'FINANCE' && t.departmentFinance}
                       {dept === 'HUMAN_RESOURCES' && t.departmentHumanResources}
@@ -742,6 +746,11 @@ const RegisterPage: React.FC = () => {
                   {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {hasConfirmPassword && (
+                <p className={`text-xs mt-2 ${passwordsMatch ? 'text-green-400' : 'text-red-400'}`}>
+                  {passwordsMatch ? (t.passwordsMatch || 'Passwords match') : t.passwordsDoNotMatch}
+                </p>
+              )}
             </div>
 
             {/* Submit button */}
