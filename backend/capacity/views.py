@@ -1287,6 +1287,79 @@ class ProjectBudgetViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=['get'], url_path='summary-by-project-dept')
+    def summary_by_project_dept(self, request):
+        """
+        Return utilized/forecast hours aggregated by project + employee department.
+
+        This is used by the frontend to calculate project metrics across ALL years
+        without downloading every assignment row.
+
+        Query params:
+          - project_ids: comma-separated UUIDs (required)
+          - department: optional department code (e.g. MED) to filter
+          - current_week_start: optional ISO date (YYYY-MM-DD) to split used vs forecast
+        """
+        project_ids_param = (request.query_params.get('project_ids') or '').strip()
+        if not project_ids_param:
+            return Response(
+                {'detail': 'project_ids query param is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        project_ids = [pid.strip() for pid in project_ids_param.split(',') if pid.strip()]
+        department = (request.query_params.get('department') or '').strip() or None
+
+        current_week_start = request.query_params.get('current_week_start')
+        if current_week_start:
+            try:
+                split_date = datetime.strptime(current_week_start, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'detail': 'current_week_start must be in YYYY-MM-DD format.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            today = timezone.localdate()
+            split_date = today - timedelta(days=today.weekday())  # Monday of current week
+
+        qs = Assignment.objects.filter(project_id__in=project_ids).select_related('employee')
+        if department:
+            qs = qs.filter(employee__department=department)
+
+        rows = (
+            qs.values('project_id', 'employee__department')
+            .annotate(
+                utilized=Sum(
+                    Case(
+                        When(week_start_date__lt=split_date, then=F('hours')),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    )
+                ),
+                forecast=Sum(
+                    Case(
+                        When(week_start_date__gte=split_date, then=F('hours')),
+                        default=Value(0),
+                        output_field=FloatField(),
+                    )
+                ),
+            )
+        )
+
+        results = [
+            {
+                'project_id': str(row['project_id']),
+                'department': row['employee__department'],
+                'utilized': float(row['utilized'] or 0),
+                'forecast': float(row['forecast'] or 0),
+            }
+            for row in rows
+            if row.get('employee__department')
+        ]
+
+        return Response(results)
+
 
 class ProjectChangeOrderViewSet(viewsets.ModelViewSet):
     """

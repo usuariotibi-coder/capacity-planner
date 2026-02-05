@@ -4,7 +4,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, activityLogApi } from '../services/api';
+import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon } from '../utils/departmentIcons';
@@ -42,6 +42,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const addEmployee = useEmployeeStore((state) => state.addEmployee);
   const assignments = useAssignmentStore((state) => state.assignments);
   const fetchAssignments = useAssignmentStore((state) => state.fetchAssignments);
+  const assignmentMutationVersion = useAssignmentStore((state) => state.mutationVersion);
   const projects = useProjectStore((state) => state.projects);
   const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
@@ -1036,7 +1037,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const currentWeekStart = currentDateWeekIndex >= 0
     ? allWeeksData[currentDateWeekIndex]?.date
     : formatToISO(getWeekStart(today));
-  const hoursByProjectDept = useMemo(() => {
+  const hoursByProjectDeptFallback = useMemo(() => {
     const map: Record<string, { utilized: number; forecast: number }> = {};
     if (!currentWeekStart) return map;
 
@@ -1059,6 +1060,35 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     return map;
   }, [assignments, employeeDeptMap, currentWeekStart]);
+
+  const [hoursByProjectDeptAll, setHoursByProjectDeptAll] = useState<Record<string, { utilized: number; forecast: number }>>({});
+
+  useEffect(() => {
+    const projectIds = projects.map((p) => p.id).filter(Boolean);
+    if (!currentWeekStart || projectIds.length === 0) {
+      return;
+    }
+
+    const department = departmentFilter === 'General' ? undefined : (departmentFilter as Department);
+
+    assignmentsApi.getSummaryByProjectDept({ projectIds, department, currentWeekStart })
+      .then((rows: any[]) => {
+        const map: Record<string, { utilized: number; forecast: number }> = {};
+        (rows || []).forEach((row) => {
+          if (!row?.projectId || !row?.department) return;
+          map[`${row.projectId}-${row.department}`] = {
+            utilized: row.utilized || 0,
+            forecast: row.forecast || 0,
+          };
+        });
+        setHoursByProjectDeptAll(map);
+      })
+      .catch((error) => {
+        console.error('[CapacityMatrix] Error loading assignment summary:', error);
+        // Keep fallback values (year-range assignments) so UI doesn't go blank.
+        setHoursByProjectDeptAll({});
+      });
+  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion]);
 
   const assignmentIndex = useMemo(() => {
     const byCell = new Map<string, { totalHours: number; assignments: Assignment[]; stage: Stage | null; comment?: string }>();
@@ -1414,12 +1444,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Get utilized hours (calculated) for a department in a project
   const getUtilizedHours = (department: Department, projectId: string): number => {
-    return hoursByProjectDept[`${projectId}-${department}`]?.utilized || 0;
+    const key = `${projectId}-${department}`;
+    return (hoursByProjectDeptAll[key]?.utilized ?? hoursByProjectDeptFallback[key]?.utilized ?? 0);
   };
 
   // Get forecasted hours (calculated) for a department in a project
   const getForecastedHours = (department: Department, projectId: string): number => {
-    return hoursByProjectDept[`${projectId}-${department}`]?.forecast || 0;
+    const key = `${projectId}-${department}`;
+    return (hoursByProjectDeptAll[key]?.forecast ?? hoursByProjectDeptFallback[key]?.forecast ?? 0);
   };
 
   // Get quoted hours (budget) for a department in a project

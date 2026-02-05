@@ -9,6 +9,7 @@ interface AssignmentStore {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
+  mutationVersion: number;
   fetchAssignments: (options?: boolean | { force?: boolean; startDate?: string; endDate?: string }) => Promise<void>;
   addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
   updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
@@ -23,6 +24,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   isLoading: false,
   error: null,
   hasFetched: false,
+  mutationVersion: 0,
 
   fetchAssignments: async (options = false) => {
     const normalizedOptions = typeof options === 'boolean' ? { force: options } : options;
@@ -68,6 +70,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
           ...state.assignments,
           { ...newAssignment, weekStartDate: normalizeWeekStartDate(newAssignment.weekStartDate) },
         ],
+        mutationVersion: state.mutationVersion + 1,
       }));
 
       // Log activity
@@ -105,6 +108,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       console.log('[Store] Updating assignment:', id, normalizedUpdates);
       await assignmentsApi.update(id, normalizedUpdates);
       console.log('[Store] Assignment updated successfully');
+      set((state) => ({ mutationVersion: state.mutationVersion + 1 }));
 
       // Log activity
       if (Object.keys(changedUpdates).length > 0) {
@@ -142,6 +146,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       console.log('[Store] Deleting assignment:', id);
       await assignmentsApi.delete(id);
       console.log('[Store] Assignment deleted successfully');
+      set((state) => ({ mutationVersion: state.mutationVersion + 1 }));
 
       // Log activity
       await activityLogApi.logActivity(

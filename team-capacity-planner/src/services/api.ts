@@ -448,6 +448,22 @@ export const assignmentsApi = {
     return allResults;
   },
 
+  getSummaryByProjectDept: async (options: {
+    projectIds: string[];
+    department?: string;
+    currentWeekStart?: string;
+  }) => {
+    const params = new URLSearchParams();
+    params.set('project_ids', options.projectIds.join(','));
+    if (options.department) {
+      params.set('department', options.department);
+    }
+    if (options.currentWeekStart) {
+      params.set('current_week_start', options.currentWeekStart);
+    }
+    return apiFetch(`/api/assignments/summary-by-project-dept/?${params.toString()}`);
+  },
+
   get: async (id: string) => {
     return apiFetch(`/api/assignments/${id}/`);
   },
