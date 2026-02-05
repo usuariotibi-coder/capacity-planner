@@ -280,11 +280,21 @@ export const authApi = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = Object.entries(errorData)
-        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-        .join('; ');
-      throw new Error(errorMessage || 'Registration failed');
+      const errorText = await response.text();
+      let errorMessage = 'Registration failed';
+
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = (errorData.detail as string) || Object.entries(errorData)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+          .join('; ') || errorMessage;
+      } catch {
+        errorMessage = errorText
+          ? `${errorMessage} (HTTP ${response.status})`
+          : `${errorMessage} (HTTP ${response.status})`;
+      }
+
+      throw new Error(errorMessage);
     }
 
     return response.json();

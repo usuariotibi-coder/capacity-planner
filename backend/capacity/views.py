@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from functools import reduce
 from operator import or_
 import uuid
+import logging
 
 from django.contrib.auth.models import User
 from django.db.models import (
@@ -1913,7 +1914,7 @@ class RegisteredUserViewSet(viewsets.ModelViewSet):
     """
     queryset = (
         User.objects
-        .filter(profile__isnull=False)
+        .filter(is_staff=False, is_superuser=False)
         .select_related('profile')
         .order_by('-date_joined')
     )
@@ -1936,6 +1937,8 @@ class RegisteredUserViewSet(viewsets.ModelViewSet):
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 
 class UserRegistrationView(generics.CreateAPIView):
@@ -1976,8 +1979,17 @@ class UserRegistrationView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         """Override create to customize response."""
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+        except ValidationError:
+            raise
+        except Exception:
+            logger.exception("Unexpected error during user registration")
+            return Response(
+                {"detail": "Registration temporarily unavailable. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         return Response(
             {

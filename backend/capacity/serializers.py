@@ -9,6 +9,8 @@ budgets, and activity logs with proper validation and nested relationships.
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db import IntegrityError, transaction
+from django.db.models import Q
 from .models import (
     Employee,
     Project,
@@ -174,20 +176,23 @@ class UserRegistrationSerializer(serializers.Serializer):
         Validate email domain and uniqueness.
         """
         from django.conf import settings
+        normalized_email = value.strip().lower()
 
         # Check domain
-        if not value.lower().endswith(settings.REGISTRATION_EMAIL_DOMAIN):
+        if not normalized_email.endswith(settings.REGISTRATION_EMAIL_DOMAIN):
             raise serializers.ValidationError(
                 f"Email must be from domain {settings.REGISTRATION_EMAIL_DOMAIN}"
             )
 
-        # Check if email already exists
-        if User.objects.filter(email=value).exists():
+        # Check if email/username already exists (case-insensitive)
+        if User.objects.filter(
+            Q(email__iexact=normalized_email) | Q(username__iexact=normalized_email)
+        ).exists():
             raise serializers.ValidationError(
                 "A user with this email already exists."
             )
 
-        return value.lower()
+        return normalized_email
 
     def validate_password(self, value):
         """
@@ -232,7 +237,6 @@ class UserRegistrationSerializer(serializers.Serializer):
         but can retry sending via the resend endpoint.
         """
         from django.contrib.auth.models import Permission
-        import secrets
         # Remove confirm_password from data
         validated_data.pop('confirm_password')
 
@@ -240,37 +244,42 @@ class UserRegistrationSerializer(serializers.Serializer):
         department = validated_data.pop('department')
         other_department = validated_data.pop('other_department', None)
 
-        # Create ACTIVE user (no email verification required)
-        # Domain validation (@na.scio-automation.com) ensures only company employees can register
-        user = User.objects.create_user(
-            username=validated_data['email'],
-            email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            password=validated_data['password'],
-            is_active=True  # User is active immediately
-        )
+        try:
+            with transaction.atomic():
+                # Create ACTIVE user (no email verification required)
+                # Domain validation (@na.scio-automation.com) ensures only company employees can register
+                user = User.objects.create_user(
+                    username=validated_data['email'],
+                    email=validated_data['email'],
+                    first_name=validated_data['first_name'],
+                    last_name=validated_data['last_name'],
+                    password=validated_data['password'],
+                    is_active=True  # User is active immediately
+                )
 
-        # Assign basic permissions: view and change for employees, projects, and assignments
-        permissions = Permission.objects.filter(
-            codename__in=[
-                'view_employee', 'change_employee', 'add_employee',
-                'view_project', 'change_project', 'add_project',
-                'view_assignment', 'change_assignment', 'add_assignment',
-                'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
-            ]
-        )
-        user.user_permissions.set(permissions)
+                # Assign basic permissions: view and change for employees, projects, and assignments
+                permissions = Permission.objects.filter(
+                    codename__in=[
+                        'view_employee', 'change_employee', 'add_employee',
+                        'view_project', 'change_project', 'add_project',
+                        'view_assignment', 'change_assignment', 'add_assignment',
+                        'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
+                    ]
+                )
+                user.user_permissions.set(permissions)
 
-        # Store department metadata for permission handling
-        UserProfile.objects.create(
-            user=user,
-            department=department,
-            other_department=other_department
-        )
+                # Store department metadata for permission handling
+                UserProfile.objects.create(
+                    user=user,
+                    department=department,
+                    other_department=other_department
+                )
+        except IntegrityError:
+            raise serializers.ValidationError({
+                "email": "A user with this email already exists."
+            })
 
         print(f"[REGISTER] User {user.email} created and activated successfully")
-
         return user
 
     def _send_verification_code_email(self, user, code):
