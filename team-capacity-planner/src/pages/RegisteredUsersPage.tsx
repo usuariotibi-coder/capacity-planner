@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, Pencil, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
 import { registeredUsersApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -32,6 +32,7 @@ export function RegisteredUsersPage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RegisteredUser | null>(null);
 
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -146,11 +147,7 @@ export function RegisteredUsersPage() {
     }
   };
 
-  const handleDelete = async (user: RegisteredUser) => {
-    const userLabel = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-    const confirmed = window.confirm(`${t.delete} "${userLabel}"?`);
-    if (!confirmed) return;
-
+  const confirmDeleteUser = async (user: RegisteredUser) => {
     setIsDeletingId(user.id);
     setError(null);
     try {
@@ -159,6 +156,7 @@ export function RegisteredUsersPage() {
       if (editState?.id === user.id) {
         setEditState(null);
       }
+      setDeleteTarget(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : (t.registeredUsersDeleteError || 'Error deleting user'));
     } finally {
@@ -364,7 +362,7 @@ export function RegisteredUsersPage() {
                               {t.edit}
                             </button>
                             <button
-                              onClick={() => handleDelete(user)}
+                              onClick={() => setDeleteTarget(user)}
                               disabled={isDeletingId === user.id}
                               className="inline-flex items-center gap-1 rounded px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:bg-red-400"
                             >
@@ -382,6 +380,72 @@ export function RegisteredUsersPage() {
           </div>
         )}
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4">
+          <div
+            className="absolute inset-0"
+            onClick={() => {
+              if (isDeletingId) return;
+              setDeleteTarget(null);
+            }}
+          />
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-red-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-rose-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 border border-red-200 flex items-center justify-center">
+                  <AlertTriangle size={20} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {t.delete || 'Delete'} {t.registeredUsers || 'User'}
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    {t.deleteConfirm || 'Please confirm this action.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-semibold text-slate-900">
+                  {`${deleteTarget.firstName || ''} ${deleteTarget.lastName || ''}`.trim() || '-'}
+                </p>
+                <p className="text-xs text-slate-600">{deleteTarget.email}</p>
+              </div>
+              <p className="text-sm text-slate-700">
+                {language === 'es'
+                  ? 'Esta accion eliminara el usuario de forma permanente.'
+                  : 'This action will permanently delete the user.'}
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-white">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={Boolean(isDeletingId)}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold disabled:opacity-60"
+              >
+                <X size={14} />
+                {t.cancel}
+              </button>
+              <button
+                onClick={() => confirmDeleteUser(deleteTarget)}
+                disabled={isDeletingId === deleteTarget.id}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold disabled:bg-red-400"
+              >
+                {isDeletingId === deleteTarget.id ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                {t.delete}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
