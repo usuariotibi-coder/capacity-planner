@@ -408,9 +408,24 @@ export const projectsApi = {
 
 // Assignments API
 export const assignmentsApi = {
-  getAll: async (options: { onPage?: (page: any[]) => void } = {}) => {
-    const { onPage } = options;
-    let endpoint = '/api/assignments/?page_size=500';
+  getAll: async (
+    options: {
+      onPage?: (page: any[]) => void;
+      startDate?: string;
+      endDate?: string;
+      pageSize?: number;
+    } = {}
+  ) => {
+    const { onPage, startDate, endDate, pageSize } = options;
+    const params = new URLSearchParams();
+    params.set('page_size', String(pageSize ?? 200));
+    if (startDate) {
+      params.set('start_date', startDate);
+    }
+    if (endDate) {
+      params.set('end_date', endDate);
+    }
+    let endpoint = `/api/assignments/?${params.toString()}`;
     let allResults: any[] = [];
 
     while (endpoint) {

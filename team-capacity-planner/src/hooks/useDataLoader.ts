@@ -30,11 +30,14 @@ export const useDataLoader = () => {
 
   useEffect(() => {
     if (isLoggedIn) {
+      const currentYear = new Date().getFullYear();
+      const rangeStart = `${currentYear}-01-01`;
+      const rangeEnd = `${currentYear + 1}-12-31`;
       // Load all data in parallel
       Promise.all([
         fetchEmployees(),
         fetchProjects(),
-        fetchAssignments(),
+        fetchAssignments({ startDate: rangeStart, endDate: rangeEnd }),
         // Load SCIO team capacity from backend
         scioTeamCapacityApi.getAll()
           .then((results: CapacityItem[]) => {

@@ -41,6 +41,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const employees = useEmployeeStore((state) => state.employees);
   const addEmployee = useEmployeeStore((state) => state.addEmployee);
   const assignments = useAssignmentStore((state) => state.assignments);
+  const fetchAssignments = useAssignmentStore((state) => state.fetchAssignments);
   const projects = useProjectStore((state) => state.projects);
   const updateAssignment = useAssignmentStore((state) => state.updateAssignment);
   const addAssignment = useAssignmentStore((state) => state.addAssignment);
@@ -84,6 +85,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     { length: maxYearOption - minYearOption + 1 },
     (_, idx) => minYearOption + idx
   );
+
+  useEffect(() => {
+    const rangeStart = `${selectedYear}-01-01`;
+    const rangeEnd = `${selectedYear + 1}-12-31`;
+    fetchAssignments({ force: true, startDate: rangeStart, endDate: rangeEnd });
+  }, [selectedYear, fetchAssignments]);
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }

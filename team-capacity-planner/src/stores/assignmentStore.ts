@@ -9,7 +9,7 @@ interface AssignmentStore {
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
-  fetchAssignments: (force?: boolean) => Promise<void>;
+  fetchAssignments: (options?: boolean | { force?: boolean; startDate?: string; endDate?: string }) => Promise<void>;
   addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
   updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => Promise<void>;
@@ -24,7 +24,9 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   error: null,
   hasFetched: false,
 
-  fetchAssignments: async (force = false) => {
+  fetchAssignments: async (options = false) => {
+    const normalizedOptions = typeof options === 'boolean' ? { force: options } : options;
+    const { force = false, startDate, endDate } = normalizedOptions;
     if (!isAuthenticated()) return;
     if (get().hasFetched && !force) return;
 
@@ -32,6 +34,8 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     try {
       const aggregated: Assignment[] = [];
       await assignmentsApi.getAll({
+        startDate,
+        endDate,
         onPage: (page) => {
           const normalizedPage = page.map((assignment) => ({
             ...assignment,
