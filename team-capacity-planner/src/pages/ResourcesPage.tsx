@@ -404,15 +404,22 @@ export function ResourcesPage() {
         {/* Employees grouped by department */}
         {DEPARTMENTS.map((dept) => {
           // Filter out system placeholder employees (names like "MFG Employee 1", "PM Employee 1", etc.)
-          const isPlaceholderEmployee = (name: string) =>
-            /^(PM|MED|HD|MFG|PRG|BUILD) Employee \d+$/.test(name) || name === 'MFG Placeholder';
+          const isPlaceholderEmployee = (employee: Employee) => {
+            const name = employee.name?.trim() || '';
+            const role = employee.role?.trim().toLowerCase() || '';
+            return (
+              role === 'placeholder' ||
+              /^(PM|MED|HD|MFG|PRG|BUILD) Employee \d+$/.test(name) ||
+              /^(PM|MED|HD|MFG|PRG|BUILD) Placeholder$/.test(name)
+            );
+          };
           const isCompanyPlaceholder = (e: any) =>
             e.isSubcontractedMaterial &&
             e.subcontractCompany &&
             e.subcontractCompany === e.name &&
             (e.capacity === 0 || e.capacity === 0.0);
           const deptEmployees = employees.filter(
-            (e) => e.department === dept && !isPlaceholderEmployee(e.name) && !isCompanyPlaceholder(e)
+            (e) => e.department === dept && !isPlaceholderEmployee(e) && !isCompanyPlaceholder(e)
           );
           if (deptEmployees.length === 0) return null;
 
