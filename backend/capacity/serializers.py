@@ -1928,12 +1928,16 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                 refresh['last_name'] = user.last_name
                 refresh['department'] = department
                 refresh['other_department'] = other_department
+                refresh['is_staff'] = user.is_staff
+                refresh['is_superuser'] = user.is_superuser
                 refresh.access_token['username'] = user.username
                 refresh.access_token['email'] = user.email
                 refresh.access_token['first_name'] = user.first_name
                 refresh.access_token['last_name'] = user.last_name
                 refresh.access_token['department'] = department
                 refresh.access_token['other_department'] = other_department
+                refresh.access_token['is_staff'] = user.is_staff
+                refresh.access_token['is_superuser'] = user.is_superuser
 
                 # Create a new session record (safely handle missing request context)
                 try:

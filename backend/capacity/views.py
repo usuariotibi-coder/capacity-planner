@@ -143,15 +143,12 @@ def _resolve_user_department(user):
 
 
 def _has_full_access(user):
-    # Preserve existing behavior for staff/superuser or missing metadata
     if not user or not getattr(user, 'is_authenticated', False):
         return False
     if user.is_superuser or user.is_staff:
         return True
 
     department, other_department = _resolve_user_department(user)
-    if department is None:
-        return True
     if department == UserDepartment.PM:
         return True
     if department == UserDepartment.OTHER and other_department == OtherDepartment.BUSINESS_INTELLIGENCE:

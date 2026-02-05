@@ -40,8 +40,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [hasFullAccess, setHasFullAccess] = useState<boolean>(true);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
 
-  const updateAccessFlags = (department: string | null, otherDepartment: string | null) => {
-    const full = department === null
+  const updateAccessFlags = (
+    department: string | null,
+    otherDepartment: string | null,
+    isStaff = false,
+    isSuperuser = false
+  ) => {
+    const full = isSuperuser
+      || isStaff
       || department === 'PM'
       || (department === 'OTHER' && otherDepartment === 'BUSINESS_INTELLIGENCE');
     const readOnly = department === 'OTHER' && otherDepartment !== 'BUSINESS_INTELLIGENCE';
@@ -66,7 +72,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const otherDept = decoded.other_department || decoded.otherDepartment || null;
       setCurrentUserDepartment(dept);
       setCurrentUserOtherDepartment(otherDept);
-      updateAccessFlags(dept, otherDept);
+      updateAccessFlags(
+        dept,
+        otherDept,
+        Boolean(decoded.is_staff ?? decoded.isStaff),
+        Boolean(decoded.is_superuser ?? decoded.isSuperuser)
+      );
 
       // Use first_name and last_name from token if available
       if (decoded.first_name || decoded.last_name) {
