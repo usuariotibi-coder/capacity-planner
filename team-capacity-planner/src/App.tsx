@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock, User } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock, User, Building2 } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -131,6 +131,48 @@ function MainApp() {
       icon: <User size={20} />,
     });
   }
+
+  const departmentDisplayLabel = (() => {
+    if (!currentUserDepartment) return '';
+    if (currentUserDepartment !== 'OTHER') return currentUserDepartment;
+    if (!currentUserOtherDepartment) return t.departmentOther || 'Other';
+    if (currentUserOtherDepartment === 'OPERATIONS') return t.departmentOperations || 'Operations';
+    if (currentUserOtherDepartment === 'FINANCE') return t.departmentFinance || 'Finance';
+    if (currentUserOtherDepartment === 'HUMAN_RESOURCES') return t.departmentHumanResources || 'Human Resources';
+    if (currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE') return t.departmentBusinessIntelligence || 'Business Intelligence';
+    return currentUserOtherDepartment;
+  })();
+
+  const departmentChipTone = (() => {
+    switch (currentUserDepartment) {
+      case 'PM':
+        return 'bg-blue-500/25 text-blue-50 border-blue-200/40';
+      case 'MED':
+        return 'bg-cyan-500/25 text-cyan-50 border-cyan-200/40';
+      case 'HD':
+        return 'bg-purple-500/25 text-purple-50 border-purple-200/40';
+      case 'MFG':
+        return 'bg-orange-500/25 text-orange-50 border-orange-200/40';
+      case 'BUILD':
+        return 'bg-emerald-500/25 text-emerald-50 border-emerald-200/40';
+      case 'PRG':
+        return 'bg-lime-500/25 text-lime-50 border-lime-200/40';
+      case 'OTHER':
+        return 'bg-teal-500/25 text-teal-50 border-teal-200/40';
+      default:
+        return 'bg-white/20 text-white border-white/30';
+    }
+  })();
+
+  const mobileDepartmentCode = (() => {
+    if (!currentUserDepartment) return '';
+    if (currentUserDepartment !== 'OTHER') return currentUserDepartment;
+    if (currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE') return 'BI';
+    if (currentUserOtherDepartment === 'HUMAN_RESOURCES') return 'HR';
+    if (currentUserOtherDepartment === 'OPERATIONS') return 'OPS';
+    if (currentUserOtherDepartment === 'FINANCE') return 'FIN';
+    return 'OTH';
+  })();
 
   const renderPage = () => {
     switch (currentPage) {
@@ -261,29 +303,48 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-blue-600 to-blue-500 rounded-lg md:rounded-xl border border-blue-400 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
-                <div className="w-8 md:w-10 h-8 md:h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
+              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2.5 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 rounded-xl border border-blue-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
+                <div className="relative w-8 md:w-10 h-8 md:h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs md:text-sm font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-blue-600"></span>
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs md:text-sm font-bold text-white truncate">
                     {currentUser}
                   </span>
-                  <span className="text-[10px] md:text-xs text-blue-100 font-medium">
-                    {t.loggedIn || 'Logged in'}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    <span className="text-[10px] md:text-xs text-blue-100 font-medium whitespace-nowrap">
+                      {t.loggedIn || 'Logged in'}
+                    </span>
+                    {departmentDisplayLabel && (
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${departmentChipTone}`}>
+                        <Building2 size={10} />
+                        <span className="truncate max-w-[140px]">{departmentDisplayLabel}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Mobile User Icon Only */}
+            {/* Mobile User Widget */}
             {currentUser && (
-              <div className="sm:hidden w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center border border-blue-400 shadow-lg shadow-blue-500/30 flex-shrink-0" title={currentUser}>
-                <span className="text-xs font-bold text-white">
-                  {currentUser.charAt(0).toUpperCase()}
-                </span>
+              <div className="sm:hidden flex items-center gap-1 flex-shrink-0">
+                <div
+                  className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center border border-blue-400 shadow-lg shadow-blue-500/30"
+                  title={departmentDisplayLabel ? `${currentUser} - ${departmentDisplayLabel}` : currentUser}
+                >
+                  <span className="text-xs font-bold text-white">
+                    {currentUser.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                {mobileDepartmentCode && (
+                  <span className="px-1.5 py-0.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-bold">
+                    {mobileDepartmentCode}
+                  </span>
+                )}
               </div>
             )}
 
@@ -314,7 +375,8 @@ function MainApp() {
             </div>
 
             {currentPage === 'capacity' && departmentFilter !== 'General' && (
-              <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded flex-shrink-0">
+              <div className="text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-2 py-1 rounded-md flex items-center gap-1 flex-shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                 {t.viewing} {departmentFilter}
               </div>
             )}
