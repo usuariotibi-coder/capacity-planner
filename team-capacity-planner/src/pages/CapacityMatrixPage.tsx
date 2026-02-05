@@ -91,7 +91,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const weeks = getAllWeeksWithNextYear(selectedYear);
     const rangeStart = weeks[0]?.date || `${selectedYear}-01-01`;
     const rangeEnd = weeks[weeks.length - 1]?.date || `${selectedYear + 1}-12-31`;
-    fetchAssignments({ force: true, startDate: rangeStart, endDate: rangeEnd });
+    // Do not force here: useDataLoader already fetches the current-year range on login.
+    // We only want to refetch when the range actually changes (e.g. user selects another year).
+    fetchAssignments({ startDate: rangeStart, endDate: rangeEnd });
   }, [selectedYear, fetchAssignments]);
 
   // SCIO Team Members state - store capacity per department and per week
@@ -899,7 +901,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     [employees]
   );
   const getAssignmentDepartment = (assignment: Assignment) =>
-    employeeDeptMap.get(assignment.employeeId) || assignment.employee?.department;
+    assignment.department || employeeDeptMap.get(assignment.employeeId) || assignment.employee?.department;
   const employeeNameById = useMemo(
     () => new Map(employees.map((emp) => [emp.id, emp.name])),
     [employees]

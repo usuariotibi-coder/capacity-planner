@@ -22,6 +22,7 @@ Version: 1.1.0 - Added upsert support for team capacity endpoints
 from datetime import datetime, timedelta
 from functools import reduce
 from operator import or_
+import uuid
 
 from django.db.models import (
     Q, Sum, Count, F, Value, Case, When, CharField, FloatField,
@@ -50,7 +51,7 @@ from .models import (
 from .serializers import (
     EmployeeSerializer, EmployeeDetailSerializer,
     ProjectSerializer, ProjectDetailSerializer,
-    AssignmentSerializer, DepartmentStageConfigSerializer,
+    AssignmentSerializer, AssignmentListSerializer, DepartmentStageConfigSerializer,
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
@@ -874,9 +875,37 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     ordering_fields = ['week_start_date', 'employee', 'project', 'hours']
     ordering = ['-week_start_date', 'employee']
 
+    def get_serializer_class(self):
+        # List responses are large; keep them compact for faster initial render.
+        if self.action == 'list':
+            return AssignmentListSerializer
+        return AssignmentSerializer
+
     def get_queryset(self):
         """Filter queryset by date range if provided."""
         queryset = super().get_queryset()
+
+        # Optional filter: employee department (used by frontend to reduce payload)
+        department = self.request.query_params.get('department')
+        if department:
+            queryset = queryset.filter(employee__department=department)
+
+        # Optional filter: limit to a set of project UUIDs (comma-separated)
+        project_ids_param = self.request.query_params.get('project_ids')
+        if project_ids_param:
+            project_ids = []
+            for raw in project_ids_param.split(','):
+                raw = (raw or '').strip()
+                if not raw:
+                    continue
+                try:
+                    uuid.UUID(raw)
+                except ValueError:
+                    continue
+                project_ids.append(raw)
+
+            if project_ids:
+                queryset = queryset.filter(project_id__in=project_ids)
 
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')

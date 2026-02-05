@@ -61,7 +61,8 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       pageSize = pageSize ?? last?.pageSize;
     }
 
-    const effectivePageSize = pageSize ?? 200;
+    // Bigger pages reduce the number of rerenders/network roundtrips on the Capacity Matrix.
+    const effectivePageSize = pageSize ?? 500;
     const fetchKey = JSON.stringify({
       startDate: startDate ?? null,
       endDate: endDate ?? null,
@@ -72,12 +73,16 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
       return;
     }
 
-    const requestId = get().fetchRequestId + 1;
+    const prevState = get();
+    const shouldClear = prevState.lastFetchKey !== fetchKey;
+    const requestId = prevState.fetchRequestId + 1;
     set({
-      assignments: [],
+      // Avoid flicker when we are just force-refreshing the same range (e.g. after an edit).
+      // When the range changes (year switch), we clear so the UI doesn't show wrong data.
+      assignments: shouldClear ? [] : prevState.assignments,
       isLoading: true,
       error: null,
-      hasFetched: false,
+      hasFetched: shouldClear ? false : prevState.hasFetched,
       fetchRequestId: requestId,
       lastFetchKey: fetchKey,
       lastFetchParams: { startDate, endDate, pageSize: effectivePageSize },
@@ -85,11 +90,11 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
     try {
       let aggregated: Assignment[] = [];
-      await assignmentsApi.getAll({
+      const results = await assignmentsApi.getAll({
         startDate,
         endDate,
         pageSize: effectivePageSize,
-        onPage: (page) => {
+        onPage: shouldClear ? (page) => {
           if (get().fetchRequestId !== requestId) return;
 
           const normalizedPage = page.map((assignment) => ({
@@ -99,11 +104,16 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
           aggregated = aggregated.concat(normalizedPage);
           set({ assignments: aggregated });
-        },
+        } : undefined,
       });
 
       if (get().fetchRequestId !== requestId) return;
-      set({ assignments: aggregated, isLoading: false, hasFetched: true });
+      // Normalize again from the full result set in case we didn't stream pages.
+      const normalizedAll = (results || []).map((assignment) => ({
+        ...assignment,
+        weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
+      }));
+      set({ assignments: normalizedAll, isLoading: false, hasFetched: true });
     } catch (error) {
       if (get().fetchRequestId !== requestId) return;
       set({

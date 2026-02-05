@@ -141,6 +141,7 @@ export interface Assignment {
   id: string;
   employeeId: string;
   projectId: string;
+  department?: Department; // Optional: backend may include employee department for faster rendering
   weekStartDate: string; // ISO format YYYY-MM-DD
   hours: number; // Total hours: scioHours + externalHours (backward compatible)
   scioHours?: number; // Internal SCIO hours (BUILD and PRG only)

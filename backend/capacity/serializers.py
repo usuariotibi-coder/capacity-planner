@@ -995,6 +995,35 @@ class AssignmentSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class AssignmentListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for Assignment list views.
+
+    The Capacity Matrix UI only needs ids + week + hours (+ stage/comment) and the
+    employee department to place the value in the correct row. Returning full
+    nested Employee/Project objects for hundreds of rows makes initial render slow.
+    """
+
+    employee_id = serializers.UUIDField(read_only=True)
+    project_id = serializers.UUIDField(read_only=True)
+    department = serializers.CharField(source='employee.department', read_only=True)
+
+    class Meta:
+        model = Assignment
+        fields = (
+            'id',
+            'employee_id',
+            'project_id',
+            'department',
+            'week_start_date',
+            'hours',
+            'scio_hours',
+            'external_hours',
+            'stage',
+            'comment',
+        )
+
+
 class DepartmentStageConfigSerializer(serializers.ModelSerializer):
     """
     Serializer for DepartmentStageConfig model.
