@@ -4,13 +4,28 @@ import { assignmentsApi, isAuthenticated, activityLogApi } from '../services/api
 import { normalizeWeekStartDate } from '../utils/dateUtils';
 import { getChangedFields } from '../utils/activityLog';
 
+type FetchAssignmentsOptions = {
+  force?: boolean;
+  startDate?: string;
+  endDate?: string;
+  pageSize?: number;
+  /**
+   * When true, missing params are taken from the last successful fetch.
+   * This keeps legacy calls like fetchAssignments(true) working as "force refresh".
+   */
+  reuseLastParams?: boolean;
+};
+
 interface AssignmentStore {
   assignments: Assignment[];
   isLoading: boolean;
   error: string | null;
   hasFetched: boolean;
+  lastFetchKey: string | null;
+  lastFetchParams: Omit<FetchAssignmentsOptions, 'force' | 'reuseLastParams'> | null;
+  fetchRequestId: number;
   mutationVersion: number;
-  fetchAssignments: (options?: boolean | { force?: boolean; startDate?: string; endDate?: string }) => Promise<void>;
+  fetchAssignments: (options?: boolean | FetchAssignmentsOptions) => Promise<void>;
   addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
   updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => Promise<void>;
@@ -24,31 +39,73 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
   isLoading: false,
   error: null,
   hasFetched: false,
+  lastFetchKey: null,
+  lastFetchParams: null,
+  fetchRequestId: 0,
   mutationVersion: 0,
 
   fetchAssignments: async (options = false) => {
-    const normalizedOptions = typeof options === 'boolean' ? { force: options } : options;
-    const { force = false, startDate, endDate } = normalizedOptions;
-    if (!isAuthenticated()) return;
-    if (get().hasFetched && !force) return;
+    const normalizedOptions: FetchAssignmentsOptions = typeof options === 'boolean'
+      ? { force: options, reuseLastParams: true }
+      : options;
 
-    set({ isLoading: true, error: null });
+    const { force = false, reuseLastParams = false } = normalizedOptions;
+    let { startDate, endDate, pageSize } = normalizedOptions;
+
+    if (!isAuthenticated()) return;
+
+    if (reuseLastParams) {
+      const last = get().lastFetchParams;
+      startDate = startDate ?? last?.startDate;
+      endDate = endDate ?? last?.endDate;
+      pageSize = pageSize ?? last?.pageSize;
+    }
+
+    const effectivePageSize = pageSize ?? 200;
+    const fetchKey = JSON.stringify({
+      startDate: startDate ?? null,
+      endDate: endDate ?? null,
+      pageSize: effectivePageSize,
+    });
+
+    if (get().lastFetchKey === fetchKey && !force) {
+      return;
+    }
+
+    const requestId = get().fetchRequestId + 1;
+    set({
+      assignments: [],
+      isLoading: true,
+      error: null,
+      hasFetched: false,
+      fetchRequestId: requestId,
+      lastFetchKey: fetchKey,
+      lastFetchParams: { startDate, endDate, pageSize: effectivePageSize },
+    });
+
     try {
-      const aggregated: Assignment[] = [];
+      let aggregated: Assignment[] = [];
       await assignmentsApi.getAll({
         startDate,
         endDate,
+        pageSize: effectivePageSize,
         onPage: (page) => {
+          if (get().fetchRequestId !== requestId) return;
+
           const normalizedPage = page.map((assignment) => ({
             ...assignment,
             weekStartDate: normalizeWeekStartDate(assignment.weekStartDate),
           }));
-          aggregated.push(...normalizedPage);
+
+          aggregated = aggregated.concat(normalizedPage);
           set({ assignments: aggregated });
         },
       });
+
+      if (get().fetchRequestId !== requestId) return;
       set({ assignments: aggregated, isLoading: false, hasFetched: true });
     } catch (error) {
+      if (get().fetchRequestId !== requestId) return;
       set({
         error: error instanceof Error ? error.message : 'Error al cargar asignaciones',
         isLoading: false
@@ -122,7 +179,7 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
 
       // Refetch assignments to ensure UI is in sync with backend
       console.log('[Store] Refetching assignments after update...');
-      await get().fetchAssignments();
+      await get().fetchAssignments(true);
       console.log('[Store] Assignments refetched successfully');
     } catch (error) {
       // Revert on error

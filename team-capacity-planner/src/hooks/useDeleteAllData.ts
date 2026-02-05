@@ -60,6 +60,10 @@ export const useDeleteAllData = () => {
         hasFetched: false,
         isLoading: false,
         error: null,
+        lastFetchKey: null,
+        lastFetchParams: null,
+        fetchRequestId: 0,
+        mutationVersion: 0,
       });
 
       // Clear team stores (use arrays, not Sets)

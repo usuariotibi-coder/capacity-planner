@@ -5,7 +5,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useAuth } from '../context/AuthContext';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { normalizeWeekStartDate } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, normalizeWeekStartDate } from '../utils/dateUtils';
 import {
   scioTeamCapacityApi,
   subcontractedTeamCapacityApi,
@@ -31,8 +31,9 @@ export const useDataLoader = () => {
   useEffect(() => {
     if (isLoggedIn) {
       const currentYear = new Date().getFullYear();
-      const rangeStart = `${currentYear}-01-01`;
-      const rangeEnd = `${currentYear + 1}-12-31`;
+      const weeks = getAllWeeksWithNextYear(currentYear);
+      const rangeStart = weeks[0]?.date || `${currentYear}-01-01`;
+      const rangeEnd = weeks[weeks.length - 1]?.date || `${currentYear + 1}-12-31`;
       // Load all data in parallel
       Promise.all([
         fetchEmployees(),

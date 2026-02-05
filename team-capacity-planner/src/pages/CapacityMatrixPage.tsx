@@ -88,8 +88,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   );
 
   useEffect(() => {
-    const rangeStart = `${selectedYear}-01-01`;
-    const rangeEnd = `${selectedYear + 1}-12-31`;
+    const weeks = getAllWeeksWithNextYear(selectedYear);
+    const rangeStart = weeks[0]?.date || `${selectedYear}-01-01`;
+    const rangeEnd = weeks[weeks.length - 1]?.date || `${selectedYear + 1}-12-31`;
     fetchAssignments({ force: true, startDate: rangeStart, endDate: rangeEnd });
   }, [selectedYear, fetchAssignments]);
 
@@ -1088,7 +1089,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Keep fallback values (year-range assignments) so UI doesn't go blank.
         setHoursByProjectDeptAll({});
       });
-  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion]);
+  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion, selectedYear]);
 
   const assignmentIndex = useMemo(() => {
     const byCell = new Map<string, { totalHours: number; assignments: Assignment[]; stage: Stage | null; comment?: string }>();
