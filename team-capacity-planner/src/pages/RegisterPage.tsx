@@ -696,20 +696,13 @@ const RegisterPage: React.FC = () => {
                       {passwordStrength === 'strong' && t.strong}
                     </span>
                   </div>
-                  <div className="flex gap-1">
-                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                      passwordStrength === 'weak' ? 'bg-red-500 shadow-lg shadow-red-500/50' :
-                      'bg-zinc-700'
-                    }`} />
-                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                      passwordStrength === 'medium' || passwordStrength === 'strong'
-                        ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
-                        : 'bg-zinc-700'
-                    }`} />
-                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                      passwordStrength === 'strong'
-                        ? 'bg-green-500 shadow-lg shadow-green-500/50'
-                        : 'bg-zinc-700'
+                  <div className="h-1.5 w-full rounded-full bg-zinc-700 overflow-hidden">
+                    <div className={`h-full w-full rounded-full transition-all duration-500 ${
+                      passwordStrength === 'weak'
+                        ? 'bg-red-500 shadow-lg shadow-red-500/50'
+                        : passwordStrength === 'medium'
+                          ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50'
+                          : 'bg-green-500 shadow-lg shadow-green-500/50'
                     }`} />
                   </div>
                 </div>
