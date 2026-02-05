@@ -1531,6 +1531,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return currentUserDepartment === department;
   };
 
+  useEffect(() => {
+    if (!editingCell) return;
+    if (canEditDepartment(editingCell.department)) return;
+    setEditingCell(null);
+    setShowDeleteConfirm(false);
+  }, [editingCell, hasFullAccess, isReadOnly, currentUserDepartment]);
+
   const openChangeOrderModal = (projectId: string, department: Department) => {
     setChangeOrderContext({ projectId, department });
     setChangeOrderForm({ name: '', hoursQuoted: '' });
@@ -1595,6 +1602,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const handleEditCell = (department: Department, weekStart: string, projectId?: string) => {
     if (departmentFilter === 'General') return; // No edit in General view
+    if (!canEditDepartment(department)) return;
 
     const { totalHours, assignments: deptAssignments } = getDepartmentWeekData(department, weekStart, projectId);
     const firstAssignmentStage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
@@ -1633,6 +1641,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handleSaveCell = async () => {
+    if (!editingCell) return;
+    if (!canEditDepartment(editingCell.department)) {
+      alert(t.readOnlyView || 'Read-only view');
+      return;
+    }
+
     // For BUILD and PRG, use separate SCIO and external hours
     const isBuildOrPRG = editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG');
     const totalHours = isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours;
@@ -2172,6 +2186,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   </button>
                   <button
                     onClick={async () => {
+                      if (!editingCell || !canEditDepartment(editingCell.department)) {
+                        return;
+                      }
                       setIsDeleting(true);
                       try {
                         if (editingCell) {
@@ -3275,12 +3292,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         {allWeeksData.map((weekData, weekIdx) => {
                           const week = weekData.date;
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
+                          const canEditThisDepartment = canEditDepartment(dept);
                           return (
                             <td
                               key={`${proj.id}-${dept}-${week}`}
                               data-week-index={weekIdx}
-                              onClick={() => handleEditCell(dept, week, proj.id)}
-                              className={`border p-0 relative text-xs cursor-pointer transition-all hover:shadow-md ${
+                              onClick={() => canEditThisDepartment && handleEditCell(dept, week, proj.id)}
+                              className={`border p-0 relative text-xs transition-all ${
+                                canEditThisDepartment ? 'cursor-pointer hover:shadow-md' : ''
+                              } ${
                                 isCurrentWeekColumn
                                   ? 'border-red-500 border-2 shadow-md bg-gradient-to-b from-red-50 to-orange-50'
                                   : 'border-gray-300'
