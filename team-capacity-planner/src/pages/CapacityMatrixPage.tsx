@@ -2932,9 +2932,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             {/* Global zoom controls for departments view */}
             <div className="flex items-center gap-1.5 mb-2 p-1.5 bg-blue-50 rounded-lg border border-blue-200">
               <span className="text-xs font-semibold text-blue-900">{t.zoomLabel}</span>
-              <button onClick={() => setZoom(Math.max(50, zoom - 10))} className="p-0.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition" title={t.zoomOut}>
-                <ZoomOut size={14} />
-              </button>
               <input
                 type="range"
                 min="50"
@@ -2944,9 +2941,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 onChange={(e) => setZoom(parseInt(e.target.value))}
                 className="w-20 cursor-pointer h-1.5"
               />
-              <button onClick={() => setZoom(Math.min(200, zoom + 10))} className="p-0.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition" title={t.zoomIn}>
-                <ZoomIn size={14} />
-              </button>
               <span className="text-xs font-semibold text-blue-900">{zoom}%</span>
             </div>
 
