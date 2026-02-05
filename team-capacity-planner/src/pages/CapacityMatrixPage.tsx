@@ -2468,7 +2468,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         {/* Tabla de Departamentos - Only show for department-specific views */}
         {departmentFilter !== 'General' && (
-          <>
+          <div style={{ zoom: `${zoom / 100}` }}>
             {/* Department Weekly Occupancy Summary Panel */}
             {(() => {
               const dept = departmentFilter as Department;
@@ -3224,7 +3224,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   </div>
 
                   {expandedProjects[proj.id] && (
-                    <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}>
+                    <div style={{ zoom: `${(isGeneralView ? getEffectiveProjectZoom(proj.id) : 100) / 100}` }}>
                       <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
                       <table className="border-collapse text-xs w-full">
                         <thead>
@@ -3318,7 +3318,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 </div>
               );
             })}
-            </>
+            </div>
         )}
 
         {/* Projects Table - Only in General View */}
