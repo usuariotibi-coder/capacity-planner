@@ -2929,21 +2929,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">{t.projectsSection}</h2>
 
-            {/* Global zoom controls for departments view */}
-            <div className="flex items-center gap-1.5 mb-2 p-1.5 bg-blue-50 rounded-lg border border-blue-200">
-              <span className="text-xs font-semibold text-blue-900">{t.zoomLabel}</span>
-              <input
-                type="range"
-                min="50"
-                max="200"
-                step="10"
-                value={zoom}
-                onChange={(e) => setZoom(parseInt(e.target.value))}
-                className="w-20 cursor-pointer h-1.5"
-              />
-              <span className="text-xs font-semibold text-blue-900">{zoom}%</span>
-            </div>
-
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
             {departmentProjects.map((proj) => {
