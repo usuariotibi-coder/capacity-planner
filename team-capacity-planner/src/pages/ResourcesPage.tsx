@@ -108,6 +108,14 @@ export function ResourcesPage() {
     return colors[projectIndex % colors.length];
   };
 
+  const formatHours = (value: number): string => {
+    const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+    if (Number.isInteger(rounded)) {
+      return rounded.toString();
+    }
+    return rounded.toFixed(2).replace(/\.?0+$/, '');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveDepartment = (lockedDepartment || formData.department) as Department | undefined;
@@ -478,7 +486,7 @@ export function ResourcesPage() {
                                     {uniqueProjects.length} {uniqueProjects.length !== 1 ? t.projectsCount : t.projectLabel}
                                   </span>
                                   <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                                    {totalAssignedHours}h {t.total}
+                                    {formatHours(totalAssignedHours)}h {t.total}
                                   </span>
                                 </div>
                               ) : (
@@ -555,7 +563,7 @@ export function ResourcesPage() {
                                         : 'bg-white border-gray-200'
                                     }`}
                                     title={hasAssignment
-                                      ? `${t.weekAbbr} ${weekData.weekNum}: ${weekTotalHours}h - ${weekProjects.map(pId => projects.find(p => p.id === pId)?.name).join(', ')}`
+                                      ? `${t.weekAbbr} ${weekData.weekNum}: ${formatHours(weekTotalHours)}h - ${weekProjects.map(pId => projects.find(p => p.id === pId)?.name).join(', ')}`
                                       : `${t.weekAbbr} ${weekData.weekNum}: ${t.noAssignment}`
                                     }
                                   >
@@ -564,7 +572,7 @@ export function ResourcesPage() {
                                     </span>
                                     {hasAssignment && (
                                       <span className="text-xs font-semibold text-gray-600">
-                                        {weekTotalHours}h
+                                        {formatHours(weekTotalHours)}h
                                       </span>
                                     )}
                                   </div>
