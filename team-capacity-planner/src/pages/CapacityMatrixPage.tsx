@@ -1083,13 +1083,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           };
         });
         setHoursByProjectDeptAll(map);
+        console.log('[CapacityMatrix] Assignment summary loaded:', {
+          rows: Array.isArray(rows) ? rows.length : 'non-array',
+          entries: Object.keys(map).length,
+        });
       })
       .catch((error) => {
-        console.error('[CapacityMatrix] Error loading assignment summary:', error);
-        // Keep fallback values (year-range assignments) so UI doesn't go blank.
-        setHoursByProjectDeptAll({});
+        console.error('[CapacityMatrix] Error loading assignment summary (keeping last good values):', error);
+        // Do not clear hoursByProjectDeptAll here; fallback will still work and we preserve last good values.
       });
-  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion, selectedYear]);
+  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion]);
 
   const assignmentIndex = useMemo(() => {
     const byCell = new Map<string, { totalHours: number; assignments: Assignment[]; stage: Stage | null; comment?: string }>();
