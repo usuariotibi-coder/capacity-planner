@@ -13,6 +13,7 @@ import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
 
 export function ResourcesPage() {
   const { employees, addEmployee, deleteEmployee, updateEmployee } = useEmployeeStore();
@@ -27,6 +28,13 @@ export function ResourcesPage() {
   const canEditEmployee = (department: Department) => {
     if (hasFullAccess) return true;
     if (isReadOnly) return false;
+    if (
+      currentUserDepartment &&
+      SHARED_EDIT_DEPARTMENTS.includes(currentUserDepartment as Department) &&
+      SHARED_EDIT_DEPARTMENTS.includes(department)
+    ) {
+      return true;
+    }
     return currentUserDepartment === department;
   };
   const getDefaultDepartment = (): Department => {

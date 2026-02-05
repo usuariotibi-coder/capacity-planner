@@ -172,6 +172,9 @@ def _can_edit_department(user, department_code):
     user_department, _ = _resolve_user_department(user)
     if not user_department:
         return False
+    shared_departments = {UserDepartment.BUILD, UserDepartment.MFG}
+    if user_department in shared_departments and department_code in shared_departments:
+        return True
     return user_department == department_code
 
 

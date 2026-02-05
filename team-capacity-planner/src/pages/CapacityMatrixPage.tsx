@@ -18,6 +18,7 @@ import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrd
 type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
 
 const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
   'HD': ['SWITCH_LAYOUT_REVISION', 'CONTROLS_DESIGN', 'RELEASE', 'RED_LINES', 'SUPPORT'],
@@ -1520,6 +1521,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const canEditDepartment = (department: Department): boolean => {
     if (hasFullAccess) return true;
     if (isReadOnly) return false;
+    if (
+      currentUserDepartment &&
+      SHARED_EDIT_DEPARTMENTS.includes(currentUserDepartment as Department) &&
+      SHARED_EDIT_DEPARTMENTS.includes(department)
+    ) {
+      return true;
+    }
     return currentUserDepartment === department;
   };
 
