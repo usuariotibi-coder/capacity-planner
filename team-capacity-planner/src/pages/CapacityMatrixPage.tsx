@@ -1631,7 +1631,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const assignedEmployeeIds = new Set<string>();
     deptAssignments.forEach((assignment) => {
       const emp = employeeById.get(assignment.employeeId) || assignment.employee;
-      if (emp && emp.isActive && !isPlaceholderEmployee(emp)) {
+      if (assignment.hours > 0 && emp && emp.isActive && !isPlaceholderEmployee(emp)) {
         assignedEmployeeIds.add(emp.id);
       }
     });
@@ -1689,6 +1689,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       editingCell.weekStart,
       editingCell.projectId
     );
+
+    const resetAssignmentsToZero = async (assignmentsToReset: Assignment[]) => {
+      if (assignmentsToReset.length === 0) return;
+      const resetPayload: any = {
+        hours: 0,
+        stage: null,
+        comment: '',
+      };
+      if (isBuildOrPRG) {
+        resetPayload.scioHours = 0;
+        resetPayload.externalHours = 0;
+      }
+      for (const assign of assignmentsToReset) {
+        await assignmentsApi.update(assign.id, resetPayload);
+      }
+      await fetchAssignments(true);
+    };
 
     // Persist exactly what user selected in the modal.
     // If selection is empty, we should remove current assignments instead of restoring previous ones.
@@ -1748,14 +1765,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       // Delete assignments for employees that were deselected
       const assignmentsToDelete = deptAssignments.filter((assign) => !targetEmployeeIds.includes(assign.employeeId));
-      for (const assign of assignmentsToDelete) {
-        await deleteAssignment(assign.id);
-      }
+      await resetAssignmentsToZero(assignmentsToDelete);
     } else {
-      // No resources selected: remove existing assignments first.
-      for (const assign of deptAssignments) {
-        await deleteAssignment(assign.id);
-      }
+      const existingPlaceholderAssignment = deptAssignments.find((assign) => {
+        const emp = employeeById.get(assign.employeeId) || assign.employee;
+        return !!emp && isPlaceholderEmployee(emp);
+      });
+
+      // No resources selected: keep at most one placeholder assignment with the entered hours.
+      // Reset all non-placeholder assignments to avoid delete throttling.
+      const assignmentsToReset = deptAssignments.filter((assign) => assign.id !== existingPlaceholderAssignment?.id);
+      await resetAssignmentsToZero(assignmentsToReset);
 
       // Create new assignment for placeholder resource when no one is selected
       console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
@@ -1766,10 +1786,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       console.log('[CapacityMatrix] Project ID:', editingCell.projectId);
 
       if (availableEmployee && editingCell.projectId) {
-        const newAssignment: any = {
-          employeeId: availableEmployee.id,
-          projectId: editingCell.projectId,
-          weekStartDate: editingCell.weekStart,
+        const placeholderUpdateData: any = {
           hours: totalHours,
           stage: editingStage,
           comment: editingComment || undefined,
@@ -1777,12 +1794,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Add SCIO and external hours for BUILD and PRG departments
         if (isBuildOrPRG) {
-          newAssignment.scioHours = editingScioHours;
-          newAssignment.externalHours = editingExternalHours;
+          placeholderUpdateData.scioHours = editingScioHours;
+          placeholderUpdateData.externalHours = editingExternalHours;
         }
 
-        console.log('[CapacityMatrix] Creating new assignment:', newAssignment);
-        addAssignment(newAssignment);
+        if (existingPlaceholderAssignment) {
+          await updateAssignment(existingPlaceholderAssignment.id, placeholderUpdateData);
+        } else {
+          const newAssignment: any = {
+            employeeId: availableEmployee.id,
+            projectId: editingCell.projectId,
+            weekStartDate: editingCell.weekStart,
+            ...placeholderUpdateData,
+          };
+          console.log('[CapacityMatrix] Creating new assignment:', newAssignment);
+          await addAssignment(newAssignment);
+        }
       } else {
         if (!availableEmployee) {
           console.error('[CapacityMatrix] No placeholder employee available for department:', editingCell.department);
