@@ -336,6 +336,31 @@ export const authApi = {
   },
 };
 
+// Registered Users API (Business Intelligence only)
+export const registeredUsersApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/registered-users/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/registered-users/${id}/`);
+  },
+
+  update: async (id: string, userData: any) => {
+    return apiFetch(`/api/registered-users/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(userData)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/registered-users/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Employees API
 export const employeesApi = {
   getAll: async () => {

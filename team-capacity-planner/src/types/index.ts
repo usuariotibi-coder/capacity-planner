@@ -130,6 +130,23 @@ export interface ProjectChangeOrder {
 }
 
 /**
+ * REGISTERED USER INTERFACE
+ * Represents users created through the registration flow (BI management view)
+ */
+export interface RegisteredUser {
+  id: string;
+  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+  dateJoined: string;
+  lastLogin?: string | null;
+  department?: UserDepartment | null;
+  otherDepartment?: OtherDepartment | null;
+}
+
+/**
  * ASSIGNMENT INTERFACE
  * Represents hours allocated to a specific project, department, and week
  * Links employees to projects for capacity tracking

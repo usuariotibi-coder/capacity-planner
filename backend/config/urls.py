@@ -19,6 +19,7 @@ from capacity.views import (
     SubcontractedTeamCapacityViewSet,
     PrgExternalTeamCapacityViewSet,
     DepartmentWeeklyTotalViewSet,
+    RegisteredUserViewSet,
     UserRegistrationView,
     EmailVerificationView,
     ResendVerificationEmailView,
@@ -42,6 +43,7 @@ router.register(r'scio-team-capacity', ScioTeamCapacityViewSet, basename='scio-t
 router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
 router.register(r'prg-external-team-capacity', PrgExternalTeamCapacityViewSet, basename='prg-external-team-capacity')
 router.register(r'department-weekly-total', DepartmentWeeklyTotalViewSet, basename='department-weekly-total')
+router.register(r'registered-users', RegisteredUserViewSet, basename='registered-user')
 
 class RootView(APIView):
     def get(self, request):
@@ -60,6 +62,7 @@ class RootView(APIView):
                 'subcontracted-team-capacity': '/subcontracted-team-capacity/',
                 'prg-external-team-capacity': '/prg-external-team-capacity/',
                 'department-weekly-total': '/department-weekly-total/',
+                'registered-users': '/registered-users/',
                 'token': '/token/',
                 'token-refresh': '/token/refresh/',
             }

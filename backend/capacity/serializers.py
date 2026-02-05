@@ -43,6 +43,96 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
+class RegisteredUserSerializer(serializers.ModelSerializer):
+    """Serializer for BI-only user management view."""
+    department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    other_department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'is_active',
+            'date_joined',
+            'last_login',
+            'department',
+            'other_department',
+        )
+        read_only_fields = ('id', 'username', 'date_joined', 'last_login')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        profile = getattr(instance, 'profile', None)
+        data['department'] = getattr(profile, 'department', None)
+        data['other_department'] = getattr(profile, 'other_department', None)
+        return data
+
+    def validate(self, attrs):
+        department = attrs.get('department')
+        other_department = attrs.get('other_department')
+
+        if self.instance is not None:
+            profile = getattr(self.instance, 'profile', None)
+            if department is None:
+                department = getattr(profile, 'department', None)
+            if other_department is None:
+                other_department = getattr(profile, 'other_department', None)
+
+        valid_departments = {choice[0] for choice in UserDepartment.choices}
+        valid_other_departments = {choice[0] for choice in OtherDepartment.choices}
+
+        if department is not None and department != '' and department not in valid_departments:
+            raise serializers.ValidationError({
+                'department': 'Invalid department value.'
+            })
+
+        if department == UserDepartment.OTHER:
+            if not other_department:
+                raise serializers.ValidationError({
+                    'other_department': 'Please select a sub-department.'
+                })
+            if other_department not in valid_other_departments:
+                raise serializers.ValidationError({
+                    'other_department': 'Invalid sub-department value.'
+                })
+        elif department:
+            attrs['other_department'] = None
+        elif other_department:
+            raise serializers.ValidationError({
+                'department': 'Department is required when setting sub-department.'
+            })
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        department = validated_data.pop('department', None)
+        other_department = validated_data.pop('other_department', None)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+
+        if department is not None or other_department is not None:
+            profile, _ = UserProfile.objects.get_or_create(
+                user=instance,
+                defaults={
+                    'department': department or UserDepartment.OTHER,
+                    'other_department': other_department,
+                }
+            )
+            if department is not None:
+                profile.department = department
+            if other_department is not None or department != UserDepartment.OTHER:
+                profile.other_department = other_department if (department == UserDepartment.OTHER) else None
+            profile.save()
+
+        return instance
+
+
 class UserRegistrationSerializer(serializers.Serializer):
     """
     Serializer for user registration.

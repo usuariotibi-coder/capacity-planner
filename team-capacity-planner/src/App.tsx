@@ -4,12 +4,13 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
 import { ActivityLogPage } from './pages/ActivityLogPage';
+import { RegisteredUsersPage } from './pages/RegisteredUsersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock, User } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -17,7 +18,7 @@ import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
 import { useInactivityLogout } from './hooks/useInactivityLogout';
 
-type Page = 'resources' | 'projects' | 'capacity' | 'activity-log';
+type Page = 'resources' | 'projects' | 'capacity' | 'activity-log' | 'registered-users';
 type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
@@ -50,7 +51,18 @@ function MainApp() {
   });
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
-  const { isLoggedIn, isLoading, logout, currentUser } = useAuth();
+  const {
+    isLoggedIn,
+    isLoading,
+    logout,
+    currentUser,
+    currentUserDepartment,
+    currentUserOtherDepartment,
+  } = useAuth();
+
+  const canManageRegisteredUsers =
+    currentUserDepartment === 'OTHER' &&
+    currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE';
 
   console.log('[MainApp] Render: isLoggedIn=', isLoggedIn, 'isLoading=', isLoading);
 
@@ -64,6 +76,12 @@ function MainApp() {
     // Save current page to localStorage
     localStorage.setItem('currentPage', currentPage);
   }, [currentPage]);
+
+  useEffect(() => {
+    if (!canManageRegisteredUsers && currentPage === 'registered-users') {
+      setCurrentPage('capacity');
+    }
+  }, [canManageRegisteredUsers, currentPage]);
 
   useEffect(() => {
     // Save department filter to localStorage
@@ -106,6 +124,13 @@ function MainApp() {
     { id: 'projects', label: t.projects, icon: <Briefcase size={20} /> },
     { id: 'activity-log', label: t.activityLog || 'Activity Log', icon: <FileText size={20} /> },
   ];
+  if (canManageRegisteredUsers) {
+    navItems.push({
+      id: 'registered-users',
+      label: t.registeredUsers || 'Registered Users',
+      icon: <User size={20} />,
+    });
+  }
 
   const renderPage = () => {
     switch (currentPage) {
@@ -115,6 +140,8 @@ function MainApp() {
         return <ProjectsPage />;
       case 'activity-log':
         return <ActivityLogPage />;
+      case 'registered-users':
+        return <RegisteredUsersPage />;
       case 'capacity':
         return <CapacityMatrixPage departmentFilter={departmentFilter} />;
       default:

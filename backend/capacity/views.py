@@ -24,6 +24,7 @@ from functools import reduce
 from operator import or_
 import uuid
 
+from django.contrib.auth.models import User
 from django.db.models import (
     Q, Sum, Count, F, Value, Case, When, CharField, FloatField,
     Avg, Max, Min, ExpressionWrapper, Prefetch
@@ -55,7 +56,7 @@ from .serializers import (
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
-    UserRegistrationSerializer
+    UserRegistrationSerializer, RegisteredUserSerializer
 )
 
 
@@ -173,6 +174,19 @@ def _can_edit_department(user, department_code):
         return False
     return user_department == department_code
 
+
+def _has_bi_management_access(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    department, other_department = _resolve_user_department(user)
+    return (
+        department == UserDepartment.OTHER
+        and other_department == OtherDepartment.BUSINESS_INTELLIGENCE
+    )
+
+
 class CanViewActivityLog(BasePermission):
     """
     Permission for viewing activity logs.
@@ -192,6 +206,13 @@ class CanViewActivityLog(BasePermission):
             return True
         # Regular users can only view their own logs
         return obj.user == request.user
+
+
+class IsBusinessIntelligenceManager(BasePermission):
+    """Allow access only to Business Intelligence users (or superuser)."""
+
+    def has_permission(self, request, view):
+        return _has_bi_management_access(request.user)
 
 
 # ==================== PAGINATION ====================
@@ -1877,6 +1898,36 @@ class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_full_access()
+        instance.delete()
+
+
+class RegisteredUserViewSet(viewsets.ModelViewSet):
+    """
+    BI-only management for registered users.
+
+    Endpoints:
+        GET /api/registered-users/
+        GET /api/registered-users/{id}/
+        PATCH /api/registered-users/{id}/
+        DELETE /api/registered-users/{id}/
+    """
+    queryset = (
+        User.objects
+        .filter(profile__isnull=False)
+        .select_related('profile')
+        .order_by('-date_joined')
+    )
+    serializer_class = RegisteredUserSerializer
+    permission_classes = [IsAuthenticated, IsBusinessIntelligenceManager]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'profile__department', 'profile__other_department']
+    ordering_fields = ['date_joined', 'email', 'first_name', 'last_name', 'is_active']
+    ordering = ['-date_joined']
+
+    def perform_destroy(self, instance):
+        if instance.id == self.request.user.id:
+            raise ValidationError({'detail': 'You cannot delete your own account from this view.'})
         instance.delete()
 
 
