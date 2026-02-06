@@ -2169,11 +2169,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       emp.isActive &&
       !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0)
     );
+    const isBuildOrPRGDepartment = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
     const selectedEmployeeList = Array.from(selectedEmployees)
       .map((empId) => employees.find((e) => e.id === empId))
       .filter(Boolean);
-    const hasExternalSelected = selectedEmployeeList.some((emp) => emp?.isSubcontractedMaterial);
-    const hasInternalSelected = selectedEmployeeList.some((emp) => !emp?.isSubcontractedMaterial);
+    const hasExternalSelected = isBuildOrPRGDepartment && selectedEmployeeList.some(
+      (emp) => !!(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
+    );
+    const hasInternalSelected = selectedEmployeeList.some(
+      (emp) => !(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
+    );
     const scioInputLocked = selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
@@ -2362,6 +2367,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             newSelected.delete(emp.id);
                           }
                           setSelectedEmployees(newSelected);
+
+                          // BUILD/PRG: external hours field should only exist when an external is selected.
+                          if (isBuildOrPRGDepartment) {
+                            const updatedSelectedList = Array.from(newSelected)
+                              .map((empId) => employees.find((e) => e.id === empId))
+                              .filter(Boolean);
+                            const stillHasExternal = updatedSelectedList.some(
+                              (selectedEmp) => !!(selectedEmp?.isSubcontractedMaterial && selectedEmp?.subcontractCompany)
+                            );
+                            if (!stillHasExternal) {
+                              setEditingExternalHours(0);
+                              setEditingExternalHoursInput('');
+                              setEditingHours(editingScioHours);
+                            }
+                          }
                         }}
                         className="w-4 h-4 text-blue-500 rounded cursor-pointer"
                       />
