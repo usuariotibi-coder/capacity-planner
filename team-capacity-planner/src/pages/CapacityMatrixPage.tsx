@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, AlertTriangle, GripVertical } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -41,6 +41,7 @@ interface CapacityMatrixPageProps {
 }
 
 type FormValidationScope = 'quick' | 'import';
+const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -256,12 +257,35 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, proj) => ({ ...acc, [proj.id]: false }), {})
   );
+  const [projectOrderByScope, setProjectOrderByScope] = useState<Record<string, string[]>>(() => {
+    try {
+      const raw = localStorage.getItem(PROJECT_ORDER_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, string[]>;
+      }
+    } catch (error) {
+      console.error('[CapacityMatrix] Failed to load project order from localStorage:', error);
+    }
+    return {};
+  });
+  const [dragState, setDragState] = useState<{ projectId: string; scopeKey: string } | null>(null);
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!formValidationPopup) return;
     const timeout = setTimeout(() => setFormValidationPopup(null), 4500);
     return () => clearTimeout(timeout);
   }, [formValidationPopup]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PROJECT_ORDER_STORAGE_KEY, JSON.stringify(projectOrderByScope));
+    } catch (error) {
+      console.error('[CapacityMatrix] Failed to persist project order:', error);
+    }
+  }, [projectOrderByScope]);
 
   // No need to handle resize - always showing desktop view with scrollable containers
 
@@ -1229,6 +1253,91 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return projectOverlapsRange || hasAssignmentsInRange;
     });
   }, [projects, departmentFilter, weekRange, assignmentProjectIdsInRange]);
+
+  const getProjectOrderScopeKey = (filter: DepartmentFilter): string => {
+    return filter === 'General' ? 'GENERAL' : `DEPT:${filter}`;
+  };
+
+  const buildOrderedProjectIds = (projectList: Project[], scopeKey: string): string[] => {
+    const baseIds = projectList.map((proj) => proj.id);
+    const baseIdSet = new Set(baseIds);
+    const stored = (projectOrderByScope[scopeKey] || []).filter((id) => baseIdSet.has(id));
+    const storedSet = new Set(stored);
+    const missing = baseIds.filter((id) => !storedSet.has(id));
+    return [...stored, ...missing];
+  };
+
+  const sortProjectsByStoredOrder = (projectList: Project[], scopeKey: string): Project[] => {
+    const byId = new Map(projectList.map((proj) => [proj.id, proj]));
+    return buildOrderedProjectIds(projectList, scopeKey)
+      .map((id) => byId.get(id))
+      .filter((proj): proj is Project => Boolean(proj));
+  };
+
+  const saveProjectOrderForScope = (scopeKey: string, orderedIds: string[]) => {
+    setProjectOrderByScope((prev) => ({
+      ...prev,
+      [scopeKey]: orderedIds,
+    }));
+  };
+
+  const reorderProjectsInScope = (
+    sourceProjectId: string,
+    targetProjectId: string,
+    scopeKey: string,
+    currentProjectsInScope: Project[]
+  ) => {
+    if (sourceProjectId === targetProjectId) return;
+
+    const currentOrder = buildOrderedProjectIds(currentProjectsInScope, scopeKey);
+    const sourceIdx = currentOrder.indexOf(sourceProjectId);
+    const targetIdx = currentOrder.indexOf(targetProjectId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const nextOrder = [...currentOrder];
+    const [moved] = nextOrder.splice(sourceIdx, 1);
+    nextOrder.splice(targetIdx, 0, moved);
+
+    saveProjectOrderForScope(scopeKey, nextOrder);
+  };
+
+  const handleProjectDragStart = (
+    e: DragEvent<HTMLButtonElement>,
+    projectId: string,
+    scopeKey: string
+  ) => {
+    setDragState({ projectId, scopeKey });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', projectId);
+  };
+
+  const handleProjectDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleProjectDrop = (
+    e: DragEvent<HTMLDivElement>,
+    targetProjectId: string,
+    scopeKey: string,
+    currentProjectsInScope: Project[]
+  ) => {
+    e.preventDefault();
+    if (!dragState || dragState.scopeKey !== scopeKey) return;
+    reorderProjectsInScope(dragState.projectId, targetProjectId, scopeKey, currentProjectsInScope);
+    setDragState(null);
+    setDragOverProjectId(null);
+  };
+
+  const orderedDepartmentProjects = useMemo(() => {
+    const scopeKey = getProjectOrderScopeKey(departmentFilter);
+    return sortProjectsByStoredOrder(departmentProjects, scopeKey);
+  }, [departmentProjects, departmentFilter, projectOrderByScope]);
+
+  const orderedGeneralProjects = useMemo(() => {
+    const scopeKey = getProjectOrderScopeKey('General');
+    return sortProjectsByStoredOrder(generalProjects, scopeKey);
+  }, [generalProjects, projectOrderByScope]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -3024,16 +3133,47 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
-            {departmentProjects.map((proj) => {
+            {orderedDepartmentProjects.map((proj) => {
               const dept = departmentFilter as Department;
+              const scopeKey = getProjectOrderScopeKey(departmentFilter);
               const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
 
               return (
-                <div key={proj.id} className="mb-2 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+                <div
+                  key={proj.id}
+                  className={`mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                    dragOverProjectId === proj.id && dragState?.scopeKey === scopeKey
+                      ? 'border-blue-500 ring-2 ring-blue-200'
+                      : 'border-gray-300'
+                  } ${
+                    dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
+                      ? 'opacity-70'
+                      : ''
+                  }`}
+                  onDragOver={handleProjectDragOver}
+                  onDragEnter={() => {
+                    if (dragState?.scopeKey === scopeKey) setDragOverProjectId(proj.id);
+                  }}
+                  onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedDepartmentProjects)}
+                >
                   {/* Project header - Includes metrics for department view */}
                   <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     {/* Row 1: Project info */}
                     <div className="p-1 flex items-center gap-1">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
+                        onDragEnd={() => {
+                          setDragState(null);
+                          setDragOverProjectId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition"
+                        title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
+                      >
+                        <GripVertical size={12} />
+                      </button>
                       {expandedProjects[proj.id] ? (
                         <ChevronUp size={14} className="text-gray-600 flex-shrink-0" />
                       ) : (
@@ -3574,11 +3714,43 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">Projects Matrix</h2>
 
-              {generalProjects.map((proj) => (
-                <div key={proj.id} className="mb-1 border border-gray-300 rounded-lg shadow-sm bg-white overflow-hidden">
+              {orderedGeneralProjects.map((proj) => {
+                const scopeKey = getProjectOrderScopeKey('General');
+                return (
+                <div
+                  key={proj.id}
+                  className={`mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                    dragOverProjectId === proj.id && dragState?.scopeKey === scopeKey
+                      ? 'border-blue-500 ring-2 ring-blue-200'
+                      : 'border-gray-300'
+                  } ${
+                    dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
+                      ? 'opacity-70'
+                      : ''
+                  }`}
+                  onDragOver={handleProjectDragOver}
+                  onDragEnter={() => {
+                    if (dragState?.scopeKey === scopeKey) setDragOverProjectId(proj.id);
+                  }}
+                  onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedGeneralProjects)}
+                >
                   {/* Project header */}
                   <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     <div className="flex items-center justify-between gap-1">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
+                        onDragEnd={() => {
+                          setDragState(null);
+                          setDragOverProjectId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition"
+                        title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
+                      >
+                        <GripVertical size={12} />
+                      </button>
                       {expandedProjects[proj.id] ? (
                         <ChevronUp size={14} className="text-gray-600" />
                       ) : (
@@ -3862,7 +4034,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     </>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
         )}
       </div>
