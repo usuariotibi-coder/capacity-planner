@@ -15,6 +15,7 @@ export const useInactivityLogout = () => {
 
     let inactivityTimer: ReturnType<typeof setTimeout>;
     let sessionCheckTimer: ReturnType<typeof setTimeout>;
+    let sessionStatusEndpointAvailable = true;
 
     const resetTimer = () => {
       // Clear existing timer
@@ -29,6 +30,10 @@ export const useInactivityLogout = () => {
 
     // Check session status with backend
     const checkSessionStatus = async () => {
+      if (!sessionStatusEndpointAvailable) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem('access_token');
         if (!token) {
@@ -42,12 +47,27 @@ export const useInactivityLogout = () => {
           },
         });
 
-        if (!response.ok) {
+        // Only force logout for explicit auth failures.
+        if (response.status === 401 || response.status === 403) {
           console.log('[useInactivityLogout] Session inactive on backend, logging out...');
           logout();
+          return;
+        }
+
+        // Some deployments don't expose this endpoint. Don't treat that as an inactive session.
+        if (response.status === 404) {
+          sessionStatusEndpointAvailable = false;
+          clearInterval(sessionCheckTimer);
+          console.warn('[useInactivityLogout] /session-status/ returned 404. Disabling backend session checks and keeping local inactivity timer.');
+          return;
+        }
+
+        if (!response.ok) {
+          console.warn('[useInactivityLogout] Session status check failed with status:', response.status);
         }
       } catch (error) {
-        console.error('[useInactivityLogout] Error checking session status:', error);
+        // Transient network issues should not log out users.
+        console.warn('[useInactivityLogout] Error checking session status (ignored):', error);
       }
     };
 
