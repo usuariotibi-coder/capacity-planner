@@ -2,9 +2,93 @@
  * API Service - Handles all communication with the Django REST API
  */
 
-import { API_BASE_URL } from '../utils/apiUrl';
+import { API_BASE_URL, API_FALLBACK_BASE_URL } from '../utils/apiUrl';
 
-const API_URL = API_BASE_URL;
+const API_BASE_URL_CANDIDATES = Array.from(new Set([API_BASE_URL, API_FALLBACK_BASE_URL].filter(Boolean)));
+let ACTIVE_API_BASE_URL = API_BASE_URL_CANDIDATES[0];
+
+const buildApiUrl = (baseUrl: string, endpoint: string): string => {
+  if (endpoint.startsWith('http')) return endpoint;
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${baseUrl}${normalizedEndpoint}`;
+};
+
+const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: string): Promise<boolean> => {
+  if (API_BASE_URL_CANDIDATES.length < 2 || response.ok) return false;
+
+  const authOrSessionEndpoints = [
+    '/api/token/',
+    '/api/token/refresh/',
+    '/api/register/',
+    '/api/logout/',
+    '/api/verify-email/',
+    '/api/verify-code/',
+    '/api/resend-verification-email/',
+    '/api/session-status/',
+  ];
+
+  if (response.status === 404 && authOrSessionEndpoints.some(prefix => endpoint.startsWith(prefix))) {
+    return true;
+  }
+
+  if (response.status === 404) {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) return true;
+    try {
+      const bodyPreview = (await response.clone().text()).slice(0, 200).toLowerCase();
+      if (bodyPreview.includes('<!doctype html') || bodyPreview.includes('<html') || bodyPreview.includes('<title>not found</title>')) {
+        return true;
+      }
+    } catch {
+      // ignore body parse issues here
+    }
+  }
+
+  return false;
+};
+
+const fetchWithApiFallback = async (endpoint: string, options: RequestInit = {}): Promise<{ response: Response; requestUrl: string }> => {
+  if (endpoint.startsWith('http')) {
+    const response = await fetch(endpoint, options);
+    return { response, requestUrl: endpoint };
+  }
+
+  const candidates = [ACTIVE_API_BASE_URL, ...API_BASE_URL_CANDIDATES.filter(base => base !== ACTIVE_API_BASE_URL)];
+  let lastNetworkError: unknown = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidateBase = candidates[i];
+    const requestUrl = buildApiUrl(candidateBase, endpoint);
+
+    try {
+      const response = await fetch(requestUrl, options);
+      if (response.ok) {
+        if (candidateBase !== ACTIVE_API_BASE_URL) {
+          console.warn('[API] Switching active API base URL to fallback:', candidateBase);
+          ACTIVE_API_BASE_URL = candidateBase;
+        }
+        return { response, requestUrl };
+      }
+
+      const canRetry = i < candidates.length - 1 && await shouldRetryWithAlternateApiBase(response, endpoint);
+      if (canRetry) {
+        console.warn('[API] Retrying request with alternate API base URL after non-API response:', requestUrl);
+        continue;
+      }
+
+      return { response, requestUrl };
+    } catch (error) {
+      lastNetworkError = error;
+      if (i < candidates.length - 1) {
+        console.warn('[API] Network error on current API base URL, trying fallback:', requestUrl);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastNetworkError ?? new Error('Unable to reach API service');
+};
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -85,7 +169,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
   if (!refreshToken) return null;
 
   try {
-    const response = await fetch(`${API_URL}/api/token/refresh/`, {
+    const { response } = await fetchWithApiFallback('/api/token/refresh/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh: refreshToken }),
@@ -121,11 +205,11 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
       console.log('[API] Request body:', options.body);
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
-    const response = await fetch(url, {
+    const { response, requestUrl } = await fetchWithApiFallback(endpoint, {
       ...options,
       headers,
     });
+    console.log('[API] Request URL:', requestUrl);
 
     return response;
   };
@@ -171,7 +255,7 @@ const normalizeApiEndpoint = (endpoint: string): string => {
   if (endpoint.startsWith('http')) {
     try {
       const url = new URL(endpoint);
-      const apiHost = new URL(API_URL).host;
+      const apiHost = new URL(ACTIVE_API_BASE_URL).host;
       if (url.host === apiHost) {
         return `${url.pathname}${url.search}`;
       }
@@ -186,15 +270,16 @@ const normalizeApiEndpoint = (endpoint: string): string => {
 export const authApi = {
   login: async (username: string, password: string) => {
     console.log('[LOGIN] Starting login request...');
-    console.log('[LOGIN] API URL:', `${API_URL}/api/token/`);
+    console.log('[LOGIN] API URL:', buildApiUrl(ACTIVE_API_BASE_URL, '/api/token/'));
     console.log('[LOGIN] Username:', username);
 
     try {
-      const response = await fetch(`${API_URL}/api/token/`, {
+      const { response, requestUrl } = await fetchWithApiFallback('/api/token/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
+      console.log('[LOGIN] Request URL:', requestUrl);
 
       console.log('[LOGIN] Response status:', response.status);
       console.log('[LOGIN] Response ok:', response.ok);
@@ -248,7 +333,7 @@ export const authApi = {
     // Call backend to deactivate the session
     if (refreshToken && accessToken) {
       try {
-        await fetch(`${API_URL}/api/logout/`, {
+        await fetchWithApiFallback('/api/logout/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -275,7 +360,7 @@ export const authApi = {
     department: string;
     other_department?: string;
   }) => {
-    const response = await fetch(`${API_URL}/api/register/`, {
+    const { response } = await fetchWithApiFallback('/api/register/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -303,7 +388,7 @@ export const authApi = {
   },
 
   verifyEmail: async (token: string) => {
-    const response = await fetch(`${API_URL}/api/verify-email/${token}/`, {
+    const { response } = await fetchWithApiFallback(`/api/verify-email/${token}/`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -317,7 +402,7 @@ export const authApi = {
   },
 
   resendVerificationEmail: async (email: string) => {
-    const response = await fetch(`${API_URL}/api/resend-verification-email/`, {
+    const { response } = await fetchWithApiFallback('/api/resend-verification-email/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -333,7 +418,7 @@ export const authApi = {
   },
 
   verifyCode: async (email: string, code: string) => {
-    const response = await fetch(`${API_URL}/api/verify-code/`, {
+    const { response } = await fetchWithApiFallback('/api/verify-code/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
