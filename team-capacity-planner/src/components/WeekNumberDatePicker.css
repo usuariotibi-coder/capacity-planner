@@ -139,24 +139,44 @@
   border: 1px solid rgba(255, 255, 255, 0.32);
   background: rgba(255, 255, 255, 0.18);
   overflow: hidden;
-  width: 5.3rem;
+  width: 6.2rem;
+  height: 2rem;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month input.cur-year {
-  width: 3.7rem;
+  width: 4.4rem;
+  height: 2rem;
   font-weight: 800;
   text-align: center;
   color: #ffffff;
+  padding-right: 1.45rem;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowUp,
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowDown {
+  width: 1.45rem;
+  right: 0;
   border-color: rgba(255, 255, 255, 0.28);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowUp:hover,
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowDown:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowUp:after {
+  border-left-width: 5px;
+  border-right-width: 5px;
+  border-bottom-width: 6px;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .flatpickr-current-month .numInputWrapper span.arrowDown:after {
+  border-left-width: 5px;
+  border-right-width: 5px;
+  border-top-width: 6px;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-weekday {
