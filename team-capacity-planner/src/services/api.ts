@@ -6,11 +6,60 @@ import { API_BASE_URL, API_FALLBACK_BASE_URL } from '../utils/apiUrl';
 
 const API_BASE_URL_CANDIDATES = Array.from(new Set([API_BASE_URL, API_FALLBACK_BASE_URL].filter(Boolean)));
 let ACTIVE_API_BASE_URL = API_BASE_URL_CANDIDATES[0];
+const API_BASE_URL_UNAVAILABLE_TTL_MS = 60 * 1000;
+const API_BASE_URL_UNAVAILABLE_UNTIL = new Map<string, number>();
 
 const buildApiUrl = (baseUrl: string, endpoint: string): string => {
   if (endpoint.startsWith('http')) return endpoint;
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${normalizedEndpoint}`;
+};
+
+const getMatchingApiBaseForAbsoluteEndpoint = (endpoint: string): string | null => {
+  if (!endpoint.startsWith('http')) return null;
+
+  try {
+    const endpointHost = new URL(endpoint).host;
+    return API_BASE_URL_CANDIDATES.find(base => new URL(base).host === endpointHost) || null;
+  } catch {
+    return null;
+  }
+};
+
+const toRelativeApiEndpoint = (endpoint: string): string => {
+  const matchingBase = getMatchingApiBaseForAbsoluteEndpoint(endpoint);
+  if (!matchingBase) return endpoint;
+
+  try {
+    const url = new URL(endpoint);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return endpoint;
+  }
+};
+
+const markApiBaseTemporarilyUnavailable = (baseUrl: string): void => {
+  API_BASE_URL_UNAVAILABLE_UNTIL.set(baseUrl, Date.now() + API_BASE_URL_UNAVAILABLE_TTL_MS);
+};
+
+const clearApiBaseUnavailable = (baseUrl: string): void => {
+  API_BASE_URL_UNAVAILABLE_UNTIL.delete(baseUrl);
+};
+
+const isApiBaseTemporarilyUnavailable = (baseUrl: string): boolean => {
+  const unavailableUntil = API_BASE_URL_UNAVAILABLE_UNTIL.get(baseUrl);
+  if (!unavailableUntil) return false;
+  if (unavailableUntil <= Date.now()) {
+    API_BASE_URL_UNAVAILABLE_UNTIL.delete(baseUrl);
+    return false;
+  }
+  return true;
+};
+
+const getApiBaseCandidates = (preferredBase: string): string[] => {
+  const orderedBases = [preferredBase, ...API_BASE_URL_CANDIDATES.filter(base => base !== preferredBase)];
+  const availableBases = orderedBases.filter(base => !isApiBaseTemporarilyUnavailable(base));
+  return availableBases.length > 0 ? availableBases : orderedBases;
 };
 
 const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: string): Promise<boolean> => {
@@ -48,21 +97,26 @@ const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: str
 };
 
 const fetchWithApiFallback = async (endpoint: string, options: RequestInit = {}): Promise<{ response: Response; requestUrl: string }> => {
-  if (endpoint.startsWith('http')) {
-    const response = await fetch(endpoint, options);
-    return { response, requestUrl: endpoint };
+  const matchingBase = getMatchingApiBaseForAbsoluteEndpoint(endpoint);
+  const normalizedEndpoint = toRelativeApiEndpoint(endpoint);
+
+  if (normalizedEndpoint.startsWith('http')) {
+    const response = await fetch(normalizedEndpoint, options);
+    return { response, requestUrl: normalizedEndpoint };
   }
 
-  const candidates = [ACTIVE_API_BASE_URL, ...API_BASE_URL_CANDIDATES.filter(base => base !== ACTIVE_API_BASE_URL)];
+  const preferredBase = matchingBase || ACTIVE_API_BASE_URL;
+  const candidates = getApiBaseCandidates(preferredBase);
   let lastNetworkError: unknown = null;
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidateBase = candidates[i];
-    const requestUrl = buildApiUrl(candidateBase, endpoint);
+    const requestUrl = buildApiUrl(candidateBase, normalizedEndpoint);
 
     try {
       const response = await fetch(requestUrl, options);
       if (response.ok) {
+        clearApiBaseUnavailable(candidateBase);
         if (candidateBase !== ACTIVE_API_BASE_URL) {
           console.warn('[API] Switching active API base URL to fallback:', candidateBase);
           ACTIVE_API_BASE_URL = candidateBase;
@@ -70,7 +124,7 @@ const fetchWithApiFallback = async (endpoint: string, options: RequestInit = {})
         return { response, requestUrl };
       }
 
-      const canRetry = i < candidates.length - 1 && await shouldRetryWithAlternateApiBase(response, endpoint);
+      const canRetry = i < candidates.length - 1 && await shouldRetryWithAlternateApiBase(response, normalizedEndpoint);
       if (canRetry) {
         console.warn('[API] Retrying request with alternate API base URL after non-API response:', requestUrl);
         continue;
@@ -78,6 +132,7 @@ const fetchWithApiFallback = async (endpoint: string, options: RequestInit = {})
 
       return { response, requestUrl };
     } catch (error) {
+      markApiBaseTemporarilyUnavailable(candidateBase);
       lastNetworkError = error;
       if (i < candidates.length - 1) {
         console.warn('[API] Network error on current API base URL, trying fallback:', requestUrl);
@@ -252,18 +307,7 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<an
 
 const normalizeApiEndpoint = (endpoint: string): string => {
   if (!endpoint) return endpoint;
-  if (endpoint.startsWith('http')) {
-    try {
-      const url = new URL(endpoint);
-      const apiHost = new URL(ACTIVE_API_BASE_URL).host;
-      if (url.host === apiHost) {
-        return `${url.pathname}${url.search}`;
-      }
-    } catch {
-      return endpoint;
-    }
-  }
-  return endpoint;
+  return toRelativeApiEndpoint(endpoint);
 };
 
 // Auth API
