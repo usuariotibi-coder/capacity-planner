@@ -16,6 +16,10 @@ type FetchAssignmentsOptions = {
   reuseLastParams?: boolean;
 };
 
+type UpdateAssignmentOptions = {
+  skipRefetch?: boolean;
+};
+
 interface AssignmentStore {
   assignments: Assignment[];
   isLoading: boolean;
@@ -27,7 +31,7 @@ interface AssignmentStore {
   mutationVersion: number;
   fetchAssignments: (options?: boolean | FetchAssignmentsOptions) => Promise<void>;
   addAssignment: (assignment: Omit<Assignment, 'id'>) => Promise<void>;
-  updateAssignment: (id: string, assignment: Partial<Assignment>) => void;
+  updateAssignment: (id: string, assignment: Partial<Assignment>, options?: UpdateAssignmentOptions) => Promise<void>;
   deleteAssignment: (id: string) => Promise<void>;
   removeAssignmentsByProject: (projectId: string) => void;
   getAssignmentsByEmployee: (employeeId: string) => Assignment[];
@@ -156,7 +160,8 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
     }
   },
 
-  updateAssignment: async (id, updates) => {
+  updateAssignment: async (id, updates, options = {}) => {
+    const { skipRefetch = false } = options;
     const originalAssignments = get().assignments;
     const originalAssignment = originalAssignments.find((assign) => assign.id === id);
     const normalizedUpdates = updates.weekStartDate
@@ -187,10 +192,12 @@ export const useAssignmentStore = create<AssignmentStore>((set, get) => ({
         );
       }
 
-      // Refetch assignments to ensure UI is in sync with backend
-      console.log('[Store] Refetching assignments after update...');
-      await get().fetchAssignments(true);
-      console.log('[Store] Assignments refetched successfully');
+      if (!skipRefetch) {
+        // Refetch assignments to ensure UI is in sync with backend
+        console.log('[Store] Refetching assignments after update...');
+        await get().fetchAssignments(true);
+        console.log('[Store] Assignments refetched successfully');
+      }
     } catch (error) {
       // Revert on error
       const errorMsg = error instanceof Error ? error.message : 'Error al actualizar asignación';

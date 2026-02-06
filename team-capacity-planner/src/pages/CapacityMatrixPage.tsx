@@ -1877,10 +1877,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         resetPayload.scioHours = 0;
         resetPayload.externalHours = 0;
       }
-      for (const assign of assignmentsToReset) {
-        await assignmentsApi.update(assign.id, resetPayload);
-      }
-      await fetchAssignments(true);
+      await Promise.all(
+        assignmentsToReset.map((assign) =>
+          updateAssignment(assign.id, resetPayload, { skipRefetch: true })
+        )
+      );
     };
 
     // Persist exactly what user selected in the modal.
@@ -1888,7 +1889,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const targetEmployeeIds = Array.from(selectedEmployees);
     if (targetEmployeeIds.length > 0) {
       // Update or create assignments for selected employees
-      for (const employeeId of targetEmployeeIds) {
+      const upsertPromises = targetEmployeeIds.map(async (employeeId) => {
         const existingAssign = deptAssignments.find(a => a.employeeId === employeeId);
         const hoursPerEmployee = Math.round((totalHours / targetEmployeeIds.length) * 100) / 100;
 
@@ -1914,7 +1915,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         if (existingAssign) {
           // Update existing assignment
-          await updateAssignment(existingAssign.id, updateData);
+          await updateAssignment(existingAssign.id, updateData, { skipRefetch: true });
         } else {
           // Create new assignment
           if (editingCell.projectId) {
@@ -1937,7 +1938,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             await addAssignment(newAssignment);
           }
         }
-      }
+      });
+      await Promise.all(upsertPromises);
 
       // Delete assignments for employees that were deselected
       const assignmentsToDelete = deptAssignments.filter((assign) => !targetEmployeeIds.includes(assign.employeeId));
@@ -1975,7 +1977,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         }
 
         if (existingPlaceholderAssignment) {
-          await updateAssignment(existingPlaceholderAssignment.id, placeholderUpdateData);
+          await updateAssignment(existingPlaceholderAssignment.id, placeholderUpdateData, { skipRefetch: true });
         } else {
           const newAssignment: any = {
             employeeId: availableEmployee.id,
@@ -1997,6 +1999,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         }
       }
     }
+
+    // Single refresh after all mutations to avoid N+1 refetch overhead during save.
+    await fetchAssignments(true);
 
     setEditingCell(null);
     setEditingStage(null);
