@@ -1,32 +1,48 @@
 .tc-week-picker .tc-week-picker-icon {
-  position: absolute;
-  left: 0.8rem;
-  top: 50%;
-  transform: translateY(-50%);
   color: #2563eb;
-  pointer-events: none;
-  z-index: 2;
 }
 
-.tc-week-picker .tc-week-picker-badge {
+.tc-week-picker .tc-week-picker-icon-btn {
   position: absolute;
-  right: 0.55rem;
+  left: 0.45rem;
   top: 50%;
   transform: translateY(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3rem;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.tc-week-picker .tc-week-picker-icon-btn:hover {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-color: #93c5fd;
+}
+
+.tc-week-picker .tc-week-picker-icon-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.45);
+  outline-offset: 1px;
+}
+
+.tc-week-picker .tc-week-picker-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.3rem;
   padding: 0.15rem 0.45rem;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 800;
   color: #1d4ed8;
   background: linear-gradient(135deg, #dbeafe, #e0e7ff);
   border: 1px solid #93c5fd;
   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
-  pointer-events: none;
-  z-index: 2;
+  white-space: nowrap;
 }
 
 .tc-week-picker .tc-week-picker-input {
@@ -36,6 +52,35 @@
 
 .tc-week-picker .tc-week-picker-input:focus {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.tc-week-picker .tc-week-picker-right {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 2;
+}
+
+.tc-week-picker .tc-week-picker-clear {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 9999px;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  background: #fff5f5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tc-week-picker .tc-week-picker-clear:hover {
+  border-color: #f87171;
+  background: #fee2e2;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar {
@@ -106,4 +151,3 @@
   font-weight: 700;
   line-height: 1;
 }
-
