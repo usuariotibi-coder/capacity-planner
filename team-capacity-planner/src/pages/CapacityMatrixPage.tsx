@@ -271,7 +271,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return {};
   });
   const [dragState, setDragState] = useState<{ projectId: string; scopeKey: string } | null>(null);
-  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
+  const [dragOverState, setDragOverState] = useState<{
+    projectId: string;
+    scopeKey: string;
+    position: 'before' | 'after';
+  } | null>(null);
 
   useEffect(() => {
     if (!formValidationPopup) return;
@@ -1285,7 +1289,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     sourceProjectId: string,
     targetProjectId: string,
     scopeKey: string,
-    currentProjectsInScope: Project[]
+    currentProjectsInScope: Project[],
+    insertAfter: boolean
   ) => {
     if (sourceProjectId === targetProjectId) return;
 
@@ -1296,7 +1301,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     const nextOrder = [...currentOrder];
     const [moved] = nextOrder.splice(sourceIdx, 1);
-    nextOrder.splice(targetIdx, 0, moved);
+    let insertIndex = targetIdx;
+    if (sourceIdx < targetIdx) {
+      insertIndex -= 1;
+    }
+    if (insertAfter) {
+      insertIndex += 1;
+    }
+    insertIndex = Math.max(0, Math.min(nextOrder.length, insertIndex));
+    nextOrder.splice(insertIndex, 0, moved);
 
     saveProjectOrderForScope(scopeKey, nextOrder);
   };
@@ -1316,6 +1329,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const updateDragOverPosition = (
+    e: DragEvent<HTMLDivElement>,
+    targetProjectId: string,
+    scopeKey: string
+  ) => {
+    if (!dragState || dragState.scopeKey !== scopeKey || dragState.projectId === targetProjectId) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const position: 'before' | 'after' = offsetY < rect.height / 2 ? 'before' : 'after';
+    setDragOverState({ projectId: targetProjectId, scopeKey, position });
+  };
+
   const handleProjectDrop = (
     e: DragEvent<HTMLDivElement>,
     targetProjectId: string,
@@ -1324,9 +1349,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   ) => {
     e.preventDefault();
     if (!dragState || dragState.scopeKey !== scopeKey) return;
-    reorderProjectsInScope(dragState.projectId, targetProjectId, scopeKey, currentProjectsInScope);
+    const insertAfter = dragOverState?.projectId === targetProjectId &&
+      dragOverState?.scopeKey === scopeKey &&
+      dragOverState.position === 'after';
+    reorderProjectsInScope(dragState.projectId, targetProjectId, scopeKey, currentProjectsInScope, insertAfter);
     setDragState(null);
-    setDragOverProjectId(null);
+    setDragOverState(null);
   };
 
   const orderedDepartmentProjects = useMemo(() => {
@@ -3141,21 +3169,30 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               return (
                 <div
                   key={proj.id}
-                  className={`mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
-                    dragOverProjectId === proj.id && dragState?.scopeKey === scopeKey
+                  className={`relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                    dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
                       : 'border-gray-300'
                   } ${
                     dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
-                      ? 'opacity-70'
+                      ? 'opacity-75 shadow-lg'
                       : ''
                   }`}
-                  onDragOver={handleProjectDragOver}
-                  onDragEnter={() => {
-                    if (dragState?.scopeKey === scopeKey) setDragOverProjectId(proj.id);
+                  onDragOver={(e) => {
+                    handleProjectDragOver(e);
+                    updateDragOverPosition(e, proj.id, scopeKey);
                   }}
                   onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedDepartmentProjects)}
                 >
+                  {dragOverState?.projectId === proj.id &&
+                    dragOverState?.scopeKey === scopeKey &&
+                    dragState?.projectId !== proj.id && (
+                      <div
+                        className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
+                          dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
+                        }`}
+                      />
+                    )}
                   {/* Project header - Includes metrics for department view */}
                   <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     {/* Row 1: Project info */}
@@ -3166,10 +3203,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
                         onDragEnd={() => {
                           setDragState(null);
-                          setDragOverProjectId(null);
+                          setDragOverState(null);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition"
+                        className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
+                          dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
+                        }`}
                         title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
                       >
                         <GripVertical size={12} />
@@ -3719,21 +3758,30 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 return (
                 <div
                   key={proj.id}
-                  className={`mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
-                    dragOverProjectId === proj.id && dragState?.scopeKey === scopeKey
+                  className={`relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                    dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
                       : 'border-gray-300'
                   } ${
                     dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
-                      ? 'opacity-70'
+                      ? 'opacity-75 shadow-lg'
                       : ''
                   }`}
-                  onDragOver={handleProjectDragOver}
-                  onDragEnter={() => {
-                    if (dragState?.scopeKey === scopeKey) setDragOverProjectId(proj.id);
+                  onDragOver={(e) => {
+                    handleProjectDragOver(e);
+                    updateDragOverPosition(e, proj.id, scopeKey);
                   }}
                   onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedGeneralProjects)}
                 >
+                  {dragOverState?.projectId === proj.id &&
+                    dragOverState?.scopeKey === scopeKey &&
+                    dragState?.projectId !== proj.id && (
+                      <div
+                        className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
+                          dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
+                        }`}
+                      />
+                    )}
                   {/* Project header */}
                   <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     <div className="flex items-center justify-between gap-1">
@@ -3743,10 +3791,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                         onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
                         onDragEnd={() => {
                           setDragState(null);
-                          setDragOverProjectId(null);
+                          setDragOverState(null);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition"
+                        className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
+                          dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
+                        }`}
                         title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
                       >
                         <GripVertical size={12} />
