@@ -1848,12 +1848,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     // Special case for PM: use project start date and total duration
     // PM department spans the entire project lifecycle
-    const deptStartDate = deptMeta?.deptStartDate;
-    const deptEndDate = deptMeta?.deptEndDate || '';
+    const effectiveDeptStartDate = deptMeta?.effectiveStartDate || project?.startDate || '';
+    const effectiveDeptEndDate = deptMeta?.effectiveEndDate || project?.endDate || project?.startDate || '';
 
     // Check if current week is within department range using date comparison
-    const isDeptWeekInRange = deptStartDate && deptEndDate && weekStart >= deptStartDate && weekStart <= deptEndDate;
-    const isDeptFirstWeek = deptStartDate && weekStart === deptStartDate;
+    const isDeptWeekInRange = !!effectiveDeptStartDate && !!effectiveDeptEndDate && weekStart >= effectiveDeptStartDate && weekStart <= effectiveDeptEndDate;
+    const isDeptFirstWeek = !!effectiveDeptStartDate && weekStart === effectiveDeptStartDate;
 
     // Get stage color for styling
     const stageColor = stage ? getStageColor(stage) : null;
@@ -1871,8 +1871,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     // Calculate consecutive week number within the department using dates
     let deptConsecutiveWeek = 0;
-    if (isDeptWeekInRange && deptStartDate) {
-      const startMs = new Date(deptStartDate).getTime();
+    if (isDeptWeekInRange && effectiveDeptStartDate) {
+      const startMs = new Date(effectiveDeptStartDate).getTime();
       const currentMs = new Date(weekStart).getTime();
       const weeksDiff = Math.floor((currentMs - startMs) / (7 * 24 * 60 * 60 * 1000));
       deptConsecutiveWeek = weeksDiff + 1;
@@ -1894,7 +1894,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           indicatorContent = (
             <div className="flex flex-col items-center gap-0.5">
               <span className="font-bold">{t.starts}</span>
-              <span className="text-xs opacity-75">{deptStartDate}</span>
+              <span className="text-xs opacity-75">{effectiveDeptStartDate}</span>
             </div>
           );
         } else {
@@ -1935,11 +1935,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       utilizationColor = getUtilizationColor(utilizationPercent);
     }
 
+    const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
+
     return (
       <div
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
-        } ${stageColor ? stageColor.text : 'text-blue-900'}`}
+        } ${stageColor ? stageColor.text : 'text-blue-900'} ${
+          outOfEstimatedRange ? 'border border-dashed border-red-500 bg-red-50' : ''
+        }`}
         title={tooltipText}
       >
         {isGeneralView ? (
@@ -1957,6 +1961,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           </div>
         )}
         {stage && <div className="text-[10px] opacity-60 font-normal leading-tight">{stage}</div>}
+        {outOfEstimatedRange && (
+          <div className="absolute top-0.5 -right-0.5 text-red-600 font-bold text-[10px]">⚠</div>
+        )}
         {/* Comment indicator - shows when cell has a comment */}
         {cellComment && (
           <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
