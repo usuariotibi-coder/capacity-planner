@@ -25,12 +25,7 @@ export function WeekNumberDatePicker({
   placeholder,
 }: WeekNumberDatePickerProps) {
   const pickerRef = useRef<any>(null);
-
-  const selectedDate = useMemo(() => {
-    if (!value) return [];
-    const parsed = parseISODate(value);
-    return Number.isNaN(parsed.getTime()) ? [] : [parsed];
-  }, [value]);
+  const pickerValue = value || '';
 
   const currentWeek = useMemo(() => {
     if (!value) return null;
@@ -41,8 +36,6 @@ export function WeekNumberDatePicker({
 
   const options: Partial<BaseOptions> = useMemo(() => ({
     dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: language === 'es' ? 'd/m/Y' : 'm/d/Y',
     allowInput: true,
     weekNumbers: true,
     locale: language === 'es' ? Spanish : { firstDayOfWeek: 1 },
@@ -119,7 +112,7 @@ export function WeekNumberDatePicker({
       </button>
       <Flatpickr
         ref={pickerRef}
-        value={selectedDate}
+        value={pickerValue}
         options={options}
         onChange={(selectedDates) => {
           if (!selectedDates || selectedDates.length === 0) {
