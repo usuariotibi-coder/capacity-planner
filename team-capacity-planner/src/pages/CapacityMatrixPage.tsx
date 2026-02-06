@@ -2118,7 +2118,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
         } ${stageColor ? stageColor.text : 'text-blue-900'} ${
-          outOfEstimatedRange ? 'border border-dashed border-red-500 bg-red-50' : ''
+          outOfEstimatedRange ? 'border border-dashed border-red-500' : ''
         }`}
         title={tooltipText}
       >
@@ -4052,7 +4052,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                                       ) : (
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
-                                        } ${!isDeptWeekInRange ? 'border border-dashed border-red-500 bg-red-50' : ''}`}>
+                                        } ${!isDeptWeekInRange ? 'border border-dashed border-red-500' : ''}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
