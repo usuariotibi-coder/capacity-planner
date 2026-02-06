@@ -7,8 +7,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTranslation, type Language } from '../utils/translations';
 import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
 import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
+import { API_BASE_URL } from '../utils/apiUrl';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
+const BASE_URL = API_BASE_URL;
 const API_URL = `${BASE_URL}/api`;
 
 export const ChangePasswordPage = () => {

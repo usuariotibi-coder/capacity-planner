@@ -2,7 +2,9 @@
  * API Service - Handles all communication with the Django REST API
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
+import { API_BASE_URL } from '../utils/apiUrl';
+
+const API_URL = API_BASE_URL;
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';

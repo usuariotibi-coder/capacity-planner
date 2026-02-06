@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../utils/apiUrl';
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 const SESSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check session status every 5 minutes
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://capacity-planner-production.up.railway.app';
+const BASE_URL = API_BASE_URL;
 const API_URL = `${BASE_URL}/api`;
 
 export const useInactivityLogout = () => {
