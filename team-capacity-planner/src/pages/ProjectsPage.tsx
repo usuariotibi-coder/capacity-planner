@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useProjectStore } from '../stores/projectStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
@@ -6,7 +6,7 @@ import type { Project, Department, DepartmentStageConfig } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
-import { Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plus, Trash2, X, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,8 @@ interface HoursPerDepartment {
   BUILD: number;
   PRG: number;
 }
+
+type FormNoticeType = 'success' | 'warning' | 'error';
 
 export function ProjectsPage() {
   const { projects, addProject, deleteProject, updateProject } = useProjectStore();
@@ -75,6 +77,13 @@ export function ProjectsPage() {
   const [selectedYear] = useState<number>(2025);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<{ type: FormNoticeType; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!formNotice) return;
+    const timeout = setTimeout(() => setFormNotice(null), 4200);
+    return () => clearTimeout(timeout);
+  }, [formNotice]);
 
   const calculateEndDate = (startDate: string, weeks: number): string => {
     const start = parseISODate(startDate);
@@ -115,7 +124,10 @@ export function ProjectsPage() {
     if (!hasFullAccess) return;
 
     if (!formData.name || !formData.client || !formData.startDate || !formData.facility) {
-      alert(t.completeAllFields);
+      setFormNotice({
+        type: 'warning',
+        message: t.completeAllFields || (language === 'es' ? 'Completa todos los campos obligatorios.' : 'Please complete all required fields.'),
+      });
       return;
     }
 
@@ -162,7 +174,10 @@ export function ProjectsPage() {
         console.log('[ProjectsPage] ✓ Project updated successfully');
         setEditingId(null);
         setIsFormOpen(false);
-        alert('✓ Proyecto actualizado exitosamente');
+        setFormNotice({
+          type: 'success',
+          message: language === 'es' ? 'Proyecto actualizado exitosamente.' : 'Project updated successfully.',
+        });
       } else {
         const newProject: Project = {
           id: generateId(),
@@ -210,7 +225,10 @@ export function ProjectsPage() {
           }
         }
       });
-      alert('✓ Proyecto creado exitosamente');
+      setFormNotice({
+        type: 'success',
+        message: language === 'es' ? 'Proyecto creado exitosamente.' : 'Project created successfully.',
+      });
       }
 
       // Reset form
@@ -223,7 +241,10 @@ export function ProjectsPage() {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[ProjectsPage] Error saving project:', errorMsg);
-      alert(`❌ Error al guardar proyecto: ${errorMsg}`);
+      setFormNotice({
+        type: 'error',
+        message: `${language === 'es' ? 'Error al guardar proyecto' : 'Error saving project'}: ${errorMsg}`,
+      });
     }
   };
 
@@ -303,6 +324,7 @@ export function ProjectsPage() {
     setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
     setSelectedProjectManagerId(null);
+    setFormNotice(null);
   };
 
   const formatDate = (dateStr: string) => {
@@ -327,7 +349,11 @@ export function ProjectsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">{t.projects}</h1>
         <button
-          onClick={() => hasFullAccess && setIsFormOpen(true)}
+          onClick={() => {
+            if (!hasFullAccess) return;
+            setFormNotice(null);
+            setIsFormOpen(true);
+          }}
           disabled={!hasFullAccess}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
             hasFullAccess ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -337,6 +363,78 @@ export function ProjectsPage() {
           {t.addNewJob}
         </button>
       </div>
+
+      {formNotice && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[90] w-[92vw] max-w-lg">
+          <div
+            className={`rounded-xl border shadow-xl px-4 py-3 backdrop-blur-sm ${
+              formNotice.type === 'success'
+                ? 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50'
+                : formNotice.type === 'warning'
+                  ? 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50'
+                  : 'border-rose-300 bg-gradient-to-r from-rose-50 to-red-50'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full ${
+                  formNotice.type === 'success'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : formNotice.type === 'warning'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-rose-100 text-rose-700'
+                }`}
+              >
+                {formNotice.type === 'success' && <CheckCircle2 size={16} />}
+                {formNotice.type === 'warning' && <AlertTriangle size={16} />}
+                {formNotice.type === 'error' && <XCircle size={16} />}
+              </div>
+              <div className="flex-1">
+                <p
+                  className={`text-sm font-bold ${
+                    formNotice.type === 'success'
+                      ? 'text-emerald-900'
+                      : formNotice.type === 'warning'
+                        ? 'text-amber-900'
+                        : 'text-rose-900'
+                  }`}
+                >
+                  {formNotice.type === 'success'
+                    ? (language === 'es' ? 'Operación exitosa' : 'Operation successful')
+                    : formNotice.type === 'warning'
+                      ? (language === 'es' ? 'Faltan datos' : 'Missing data')
+                      : (language === 'es' ? 'Ocurrió un error' : 'An error occurred')}
+                </p>
+                <p
+                  className={`text-xs ${
+                    formNotice.type === 'success'
+                      ? 'text-emerald-800'
+                      : formNotice.type === 'warning'
+                        ? 'text-amber-800'
+                        : 'text-rose-800'
+                  }`}
+                >
+                  {formNotice.message}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormNotice(null)}
+                className={`rounded p-1 ${
+                  formNotice.type === 'success'
+                    ? 'text-emerald-700 hover:bg-emerald-100'
+                    : formNotice.type === 'warning'
+                      ? 'text-amber-700 hover:bg-amber-100'
+                      : 'text-rose-700 hover:bg-rose-100'
+                }`}
+                aria-label="Close notice"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Formulario */}
       {isFormOpen && (
