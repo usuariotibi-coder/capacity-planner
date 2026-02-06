@@ -233,7 +233,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     startDate: '',
     numberOfWeeks: '' as any,
     facility: 'AL' as 'AL' | 'MI',
-    budgetHours: 0,
+    budgetHours: '' as any,
   });
 
   // Import existing project modal state
@@ -242,7 +242,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     projectId: '',
     startDate: '',
     numberOfWeeks: '' as any,
-    budgetHours: 0,
+    budgetHours: '' as any,
   });
 
   // Initialize with all projects collapsed by default
@@ -1261,6 +1261,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const dept = departmentFilter as Department;
     const startDateISO = quickProjectForm.startDate;
     const numberOfWeeks = quickProjectForm.numberOfWeeks as number;
+    const budgetHours = Number(quickProjectForm.budgetHours || 0);
 
     // Calculate end date based on start date and number of weeks
     const endDate = new Date(startDateISO);
@@ -1302,7 +1303,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         MFG: 0,
         BUILD: 0,
         PRG: 0,
-        [dept]: quickProjectForm.budgetHours,
+        [dept]: Number.isFinite(budgetHours) ? budgetHours : 0,
       },
       departmentHoursUtilized: {
         PM: 0,
@@ -1323,7 +1324,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       startDate: '',
       numberOfWeeks: '',
       facility: 'AL',
-      budgetHours: 0,
+      budgetHours: '',
     });
   };
 
@@ -1343,6 +1344,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     const startDateISO = importProjectForm.startDate;
     const numberOfWeeks = importProjectForm.numberOfWeeks as number;
+    const budgetHours = Number(importProjectForm.budgetHours || 0);
 
     // Build new departmentStages - add this department's configuration
     const existingStages = selectedProject.departmentStages;
@@ -1372,7 +1374,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       BUILD: existingHours?.BUILD || 0,
       PRG: existingHours?.PRG || 0,
     };
-    newDepartmentHoursAllocated[dept] = importProjectForm.budgetHours;
+    newDepartmentHoursAllocated[dept] = Number.isFinite(budgetHours) ? budgetHours : 0;
 
     // Build new visibleInDepartments - add this department
     const currentVisible = selectedProject.visibleInDepartments || [];
@@ -1392,7 +1394,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       projectId: '',
       startDate: '',
       numberOfWeeks: '',
-      budgetHours: 0,
+      budgetHours: '',
     });
   };
 
@@ -3985,7 +3987,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === '' || /^\d+$/.test(value)) {
-                        const num = value === '' ? 0 : parseInt(value);
+                        const num = value === '' ? '' : parseInt(value);
                         setQuickProjectForm({ ...quickProjectForm, budgetHours: num });
                       }
                     }}
@@ -4100,7 +4102,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === '' || /^\d+$/.test(value)) {
-                        const num = value === '' ? 0 : parseInt(value);
+                        const num = value === '' ? '' : parseInt(value);
                         setImportProjectForm({ ...importProjectForm, budgetHours: num });
                       }
                     }}
