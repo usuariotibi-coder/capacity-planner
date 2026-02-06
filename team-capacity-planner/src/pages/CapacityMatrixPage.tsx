@@ -1819,14 +1819,24 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
     });
 
-    // For BUILD and PRG departments, initialize SCIO and external hours separately
+    // For BUILD and PRG departments, initialize SCIO and external hours separately.
+    // Use the whole cell totals (sum of assignments), not only first assignment.
     let totalScioHours = 0;
     let totalExternalHours = 0;
 
     if ((department === 'BUILD' || department === 'PRG') && deptAssignments.length > 0) {
-      const firstAssignment = deptAssignments[0];
-      totalScioHours = firstAssignment.scioHours || 0;
-      totalExternalHours = firstAssignment.externalHours || 0;
+      const summedScioHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.scioHours || 0), 0);
+      const summedExternalHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.externalHours || 0), 0);
+      const summedSplitHours = summedScioHours + summedExternalHours;
+
+      if (summedSplitHours > 0) {
+        totalScioHours = Math.round(summedScioHours * 100) / 100;
+        totalExternalHours = Math.round(summedExternalHours * 100) / 100;
+      } else {
+        // Legacy data (before split fields existed): treat all stored hours as SCIO.
+        totalScioHours = totalHours;
+        totalExternalHours = 0;
+      }
     }
 
     setEditingCell({ department, weekStart, projectId });
