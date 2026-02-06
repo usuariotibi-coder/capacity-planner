@@ -1803,11 +1803,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const firstAssignmentStage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
     const firstAssignmentComment = deptAssignments.length > 0 ? deptAssignments[0].comment || '' : '';
 
-    // Initialize selected employees from existing assignments
+    const isSelectableModalEmployee = (emp?: Employee | null): emp is Employee =>
+      !!emp &&
+      emp.department === department &&
+      emp.isActive &&
+      !isPlaceholderEmployee(emp) &&
+      !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+
+    // Initialize selected employees from existing assignments (only selectable employees visible in modal)
     const assignedEmployeeIds = new Set<string>();
     deptAssignments.forEach((assignment) => {
-      const emp = employeeById.get(assignment.employeeId) || assignment.employee;
-      if (assignment.hours > 0 && emp && emp.isActive && !isPlaceholderEmployee(emp)) {
+      const emp = employeeById.get(assignment.employeeId);
+      if (assignment.hours > 0 && isSelectableModalEmployee(emp)) {
         assignedEmployeeIds.add(emp.id);
       }
     });
@@ -1886,7 +1893,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     // Persist exactly what user selected in the modal.
     // If selection is empty, we should remove current assignments instead of restoring previous ones.
-    const targetEmployeeIds = Array.from(selectedEmployees);
+    const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
+      const emp = employeeById.get(employeeId);
+      return !!emp &&
+        emp.isActive &&
+        !isPlaceholderEmployee(emp) &&
+        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+    });
     if (targetEmployeeIds.length > 0) {
       // Update or create assignments for selected employees
       const upsertPromises = targetEmployeeIds.map(async (employeeId) => {
@@ -2172,14 +2185,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const isBuildOrPRGDepartment = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
     const selectedEmployeeList = Array.from(selectedEmployees)
       .map((empId) => employees.find((e) => e.id === empId))
-      .filter(Boolean);
+      .filter((emp): emp is Employee =>
+        Boolean(
+          emp &&
+          emp.department === editingCell.department &&
+          emp.isActive &&
+          !isPlaceholderEmployee(emp) &&
+          !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0)
+        )
+      );
     const hasExternalSelected = isBuildOrPRGDepartment && selectedEmployeeList.some(
       (emp) => !!(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
     );
     const hasInternalSelected = selectedEmployeeList.some(
       (emp) => !(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
     );
-    const scioInputLocked = selectedEmployees.size > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
+    const scioInputLocked = selectedEmployeeList.length > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
@@ -2262,7 +2283,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               </div>
 
               {/* External Hours input - conditionally shown based on selected external resource */}
-              {selectedEmployees.size > 0 && hasExternalSelected && (
+              {selectedEmployeeList.length > 0 && hasExternalSelected && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t.enterExternalHours}</label>
                   <input
@@ -2403,9 +2424,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   );
                 })}
               </div>
-              {selectedEmployees.size > 0 && (
+              {selectedEmployeeList.length > 0 && (
                 <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
-                  ✓ {selectedEmployees.size} {selectedEmployees.size !== 1 ? t.resourcesSelected : t.resourceSelected}
+                  ✓ {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
             </div>
