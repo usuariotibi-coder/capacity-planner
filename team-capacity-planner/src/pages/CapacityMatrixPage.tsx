@@ -2089,6 +2089,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   type="text"
                   inputMode="decimal"
                   value={editingScioHoursInput}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => {
                     const raw = e.target.value;
                     const normalized = raw.replace(',', '.');
@@ -2121,6 +2122,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                     type="text"
                     inputMode="decimal"
                     value={editingExternalHoursInput}
+                    onFocus={(e) => e.currentTarget.select()}
                     onChange={(e) => {
                       const raw = e.target.value;
                       const normalized = raw.replace(',', '.');
@@ -2152,6 +2154,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 type="text"
                 inputMode="decimal"
                 value={editingHoursInput}
+                onFocus={(e) => e.currentTarget.select()}
                 onChange={(e) => {
                   const raw = e.target.value;
                   const normalized = raw.replace(',', '.');
