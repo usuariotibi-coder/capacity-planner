@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -39,6 +39,8 @@ interface CellEditState {
 interface CapacityMatrixPageProps {
   departmentFilter: DepartmentFilter;
 }
+
+type FormValidationScope = 'quick' | 'import';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -244,11 +246,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     numberOfWeeks: '' as any,
     budgetHours: '' as any,
   });
+  const [formValidationPopup, setFormValidationPopup] = useState<{
+    scope: FormValidationScope;
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Initialize with all projects collapsed by default
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, proj) => ({ ...acc, [proj.id]: false }), {})
   );
+
+  useEffect(() => {
+    if (!formValidationPopup) return;
+    const timeout = setTimeout(() => setFormValidationPopup(null), 4500);
+    return () => clearTimeout(timeout);
+  }, [formValidationPopup]);
 
   // No need to handle resize - always showing desktop view with scrollable containers
 
@@ -1254,7 +1267,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const handleCreateQuickProject = () => {
     if (!quickProjectForm.name || !quickProjectForm.client || !quickProjectForm.startDate || !quickProjectForm.numberOfWeeks) {
-      alert(t.completeAllFields);
+      const missing: string[] = [];
+      if (!quickProjectForm.name) missing.push(t.job || 'Project');
+      if (!quickProjectForm.client) missing.push(t.customer || 'Client');
+      if (!quickProjectForm.startDate) missing.push(t.startDate || 'Start Date');
+      if (!quickProjectForm.numberOfWeeks) missing.push(t.numberOfWeeks || 'Number of Weeks');
+      const title = language === 'es' ? 'Faltan datos obligatorios' : 'Required fields missing';
+      const prefix = language === 'es' ? 'Completa:' : 'Please complete:';
+      setFormValidationPopup({
+        scope: 'quick',
+        title,
+        message: `${prefix} ${missing.join(', ')}`,
+      });
       return;
     }
 
@@ -1317,6 +1341,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     };
 
     addProject(newProject);
+    setFormValidationPopup(null);
     setShowQuickProjectModal(false);
     setQuickProjectForm({
       name: '',
@@ -1331,7 +1356,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Handle importing an existing project to the current department
   const handleImportProject = async () => {
     if (!importProjectForm.projectId || !importProjectForm.startDate || !importProjectForm.numberOfWeeks) {
-      alert(t.completeAllFields);
+      const missing: string[] = [];
+      if (!importProjectForm.projectId) missing.push(t.selectProject || 'Project');
+      if (!importProjectForm.startDate) missing.push(t.startDate || 'Start Date');
+      if (!importProjectForm.numberOfWeeks) missing.push(t.numberOfWeeks || 'Number of Weeks');
+      const title = language === 'es' ? 'Faltan datos obligatorios' : 'Required fields missing';
+      const prefix = language === 'es' ? 'Completa:' : 'Please complete:';
+      setFormValidationPopup({
+        scope: 'import',
+        title,
+        message: `${prefix} ${missing.join(', ')}`,
+      });
       return;
     }
 
@@ -1389,6 +1424,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       visibleInDepartments: newVisibleInDepartments,
     } as Partial<Project>);
 
+    setFormValidationPopup(null);
     setShowImportProjectModal(false);
     setImportProjectForm({
       projectId: '',
@@ -3898,7 +3934,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">➕ {t.createProject}</h2>
                 <button
-                  onClick={() => setShowQuickProjectModal(false)}
+                  onClick={() => {
+                    setShowQuickProjectModal(false);
+                    setFormValidationPopup(null);
+                  }}
                   className="hover:bg-blue-700 p-1 rounded transition"
                 >
                   <X size={20} />
@@ -3906,6 +3945,27 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); handleCreateQuickProject(); }} className="p-6 space-y-4">
+                {formValidationPopup?.scope === 'quick' && (
+                  <div className="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-3 py-2 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                        <AlertTriangle size={14} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-amber-900">{formValidationPopup.title}</p>
+                        <p className="text-xs text-amber-800">{formValidationPopup.message}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormValidationPopup(null)}
+                        className="text-amber-700 hover:text-amber-900"
+                        aria-label="Close validation message"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Job */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.job}</label>
@@ -4000,7 +4060,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     type="button"
-                    onClick={() => setShowQuickProjectModal(false)}
+                    onClick={() => {
+                      setShowQuickProjectModal(false);
+                      setFormValidationPopup(null);
+                    }}
                     className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                   >
                     {t.cancel}
@@ -4024,7 +4087,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">📂 {t.importProject || 'Import Existing Project'}</h2>
                 <button
-                  onClick={() => setShowImportProjectModal(false)}
+                  onClick={() => {
+                    setShowImportProjectModal(false);
+                    setFormValidationPopup(null);
+                  }}
                   className="hover:bg-amber-700 p-1 rounded transition"
                 >
                   <X size={20} />
@@ -4032,6 +4098,27 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               </div>
 
               <form onSubmit={(e) => { e.preventDefault(); handleImportProject(); }} className="p-6 space-y-4">
+                {formValidationPopup?.scope === 'import' && (
+                  <div className="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-3 py-2 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                        <AlertTriangle size={14} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-amber-900">{formValidationPopup.title}</p>
+                        <p className="text-xs text-amber-800">{formValidationPopup.message}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormValidationPopup(null)}
+                        className="text-amber-700 hover:text-amber-900"
+                        aria-label="Close validation message"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Select Project */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.selectProject || 'Select Project'}</label>
@@ -4115,7 +4202,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     type="button"
-                    onClick={() => setShowImportProjectModal(false)}
+                    onClick={() => {
+                      setShowImportProjectModal(false);
+                      setFormValidationPopup(null);
+                    }}
                     className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                   >
                     {t.cancel}
