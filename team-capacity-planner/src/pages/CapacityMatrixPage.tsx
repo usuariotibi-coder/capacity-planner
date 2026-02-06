@@ -3338,23 +3338,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
                           return (
                             <>
-                              <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center flex flex-col">
+                              <div className="bg-blue-100 rounded px-1 py-0.5 border border-blue-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
                                 <span className="text-[7px] text-blue-600 font-semibold leading-none">{t.quotedLabel}</span>
                                 <span className="text-[9px] text-blue-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
                               </div>
-                              <div className="bg-emerald-100 rounded px-1 py-0.5 border border-emerald-300 text-center flex flex-col" title={t.quotedChangeOrders}>
+                              <div className="bg-emerald-100 rounded px-1 py-0.5 border border-emerald-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center" title={t.quotedChangeOrders}>
                                 <span className="text-[6px] text-emerald-600 font-semibold leading-none">{t.quotedChangeOrdersShort}</span>
                                 <span className="text-[8px] text-emerald-700 font-bold leading-none">{formatHours(quotedChangeOrdersValue)}h</span>
                               </div>
-                              <div className="bg-purple-100 rounded px-1.5 py-0.5 border border-purple-300 text-center flex flex-col">
+                              <div className="bg-purple-100 rounded px-1 py-0.5 border border-purple-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
                                 <span className="text-[7px] text-purple-600 font-semibold leading-none">{t.usedLabel}</span>
                                 <span className="text-[9px] text-purple-700 font-bold leading-none">{formatHours(utilizedHoursValue)}h</span>
                               </div>
-                              <div className="bg-orange-100 rounded px-1.5 py-0.5 border border-orange-300 text-center flex flex-col">
+                              <div className="bg-orange-100 rounded px-1 py-0.5 border border-orange-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
                                 <span className="text-[7px] text-orange-600 font-semibold leading-none">{t.pronosticado}</span>
                                 <span className="text-[9px] text-orange-700 font-bold leading-none">{formatHours(forecastedHoursValue)}h</span>
                               </div>
-                              <div className={`rounded px-1.5 py-0.5 border text-center flex flex-col ${utilizationColorInfo.bg}`}>
+                              <div className={`rounded px-1 py-0.5 border text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center ${utilizationColorInfo.bg}`}>
                                 <span className={`text-[6px] font-semibold leading-none ${utilizationColorInfo.text}`}>{t.utilizationLabel}</span>
                                 <span className={`text-[9px] font-bold leading-none ${utilizationColorInfo.text}`}>{utilizationPercent}%</span>
                               </div>
