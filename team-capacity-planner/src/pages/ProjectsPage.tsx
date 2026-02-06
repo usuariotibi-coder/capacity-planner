@@ -10,6 +10,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
+import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const FACILITIES = ['AL', 'MI', 'MX'] as const;
@@ -379,10 +380,10 @@ export function ProjectsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
-                      <input
-                        type="date"
+                      <WeekNumberDatePicker
                         value={formData.startDate || ''}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        onChange={(date) => setFormData({ ...formData, startDate: date })}
+                        language={language}
                         className="w-full border-2 border-blue-200 rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
                       />
                     </div>
@@ -512,10 +513,10 @@ export function ProjectsPage() {
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="block text-xs font-medium mb-0.5 text-gray-600">{t.startDate}</label>
-                                <input
-                                  type="date"
+                                <WeekNumberDatePicker
                                   value={deptStartDates[dept]}
-                                  onChange={(e) => setDeptStartDates({ ...deptStartDates, [dept]: e.target.value })}
+                                  onChange={(date) => setDeptStartDates({ ...deptStartDates, [dept]: date })}
+                                  language={language}
                                   className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
                                 />
                               </div>

@@ -14,6 +14,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
 import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrder } from '../types';
+import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 
 type DepartmentFilter = 'General' | Department;
 
@@ -3930,10 +3931,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 {/* Start Date */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
-                  <input
-                    type="date"
+                  <WeekNumberDatePicker
                     value={quickProjectForm.startDate}
-                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, startDate: e.target.value })}
+                    onChange={(date) => setQuickProjectForm({ ...quickProjectForm, startDate: date })}
+                    language={language}
                     className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
                   />
                 </div>
@@ -4058,10 +4059,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                 {/* Start Date for this department */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDateDept || 'Start Date for'} {departmentFilter}</label>
-                  <input
-                    type="date"
+                  <WeekNumberDatePicker
                     value={importProjectForm.startDate}
-                    onChange={(e) => setImportProjectForm({ ...importProjectForm, startDate: e.target.value })}
+                    onChange={(date) => setImportProjectForm({ ...importProjectForm, startDate: date })}
+                    language={language}
                     className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
                   />
                 </div>
