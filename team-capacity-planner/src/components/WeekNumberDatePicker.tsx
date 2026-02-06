@@ -48,7 +48,8 @@ export function WeekNumberDatePicker({
     locale: language === 'es' ? Spanish : { firstDayOfWeek: 1 },
     disableMobile: true,
     position: 'auto center',
-    monthSelectorType: 'static',
+    monthSelectorType: 'dropdown',
+    static: true,
     prevArrow: '<span class="tc-fp-arrow">‹</span>',
     nextArrow: '<span class="tc-fp-arrow">›</span>',
   }), [language]);
