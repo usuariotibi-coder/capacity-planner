@@ -2013,9 +2013,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
     }
 
-    // Single refresh after all mutations to avoid N+1 refetch overhead during save.
-    await fetchAssignments(true);
-
     setEditingCell(null);
     setEditingStage(null);
     setEditingComment('');
@@ -2026,6 +2023,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingScioHoursInput('');
     setEditingExternalHoursInput('');
     setSelectedEmployees(new Set());
+
+    // Refresh in background so the modal closes immediately after save.
+    void fetchAssignments(true);
   };
 
   const renderCellContent = (department: Department, weekStart: string, project?: Project) => {
