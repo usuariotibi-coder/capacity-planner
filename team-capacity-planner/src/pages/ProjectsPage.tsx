@@ -517,6 +517,7 @@ export function ProjectsPage() {
                                   value={deptStartDates[dept]}
                                   onChange={(date) => setDeptStartDates({ ...deptStartDates, [dept]: date })}
                                   language={language}
+                                  compact
                                   className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
                                 />
                               </div>

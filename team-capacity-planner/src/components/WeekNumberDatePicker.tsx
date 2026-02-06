@@ -15,6 +15,7 @@ interface WeekNumberDatePickerProps {
   language: PickerLanguage;
   className?: string;
   placeholder?: string;
+  compact?: boolean;
 }
 
 export function WeekNumberDatePicker({
@@ -23,6 +24,7 @@ export function WeekNumberDatePicker({
   language,
   className,
   placeholder,
+  compact = false,
 }: WeekNumberDatePickerProps) {
   const pickerRef = useRef<any>(null);
   const pickerValue = value || '';
@@ -100,8 +102,12 @@ export function WeekNumberDatePicker({
     pickerRef.current?.flatpickr?.clear();
   };
 
+  const showWeekBadge = !compact;
+  const showClearButton = !compact;
+  const inputPaddingClass = compact ? '!pl-10 !pr-10' : '!pl-10 !pr-28';
+
   return (
-    <div className="tc-week-picker relative w-full">
+    <div className={`tc-week-picker relative w-full ${compact ? 'tc-week-picker-compact' : ''}`}>
       <button
         type="button"
         onClick={openCalendar}
@@ -123,11 +129,11 @@ export function WeekNumberDatePicker({
         }}
         onReady={(_selectedDates, _dateStr, instance) => enhanceCalendar(instance)}
         onOpen={(_selectedDates, _dateStr, instance) => enhanceCalendar(instance)}
-        className={`${className || ''} tc-week-picker-input !pl-10 !pr-28`}
+        className={`${className || ''} tc-week-picker-input ${inputPaddingClass}`}
         placeholder={placeholder || (language === 'es' ? 'Selecciona una fecha' : 'Select a date')}
       />
       <div className="tc-week-picker-right">
-        {value && (
+        {showClearButton && value && (
           <button
             type="button"
             onClick={clearDate}
@@ -138,7 +144,7 @@ export function WeekNumberDatePicker({
             <X size={12} />
           </button>
         )}
-        {weekLabel && <span className="tc-week-picker-badge">{weekLabel}</span>}
+        {showWeekBadge && weekLabel && <span className="tc-week-picker-badge">{weekLabel}</span>}
       </div>
     </div>
   );
