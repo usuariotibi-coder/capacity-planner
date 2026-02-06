@@ -3,7 +3,7 @@ import Flatpickr from 'react-flatpickr';
 import { Spanish } from 'flatpickr/dist/l10n/es';
 import type { BaseOptions } from 'flatpickr/dist/types/options';
 import { CalendarDays, X } from 'lucide-react';
-import { formatToISO, getWeekNumber, parseISODate } from '../utils/dateUtils';
+import { formatToISO, getWeekNumber, getWeekStart, parseISODate } from '../utils/dateUtils';
 import 'flatpickr/dist/themes/material_blue.css';
 import './WeekNumberDatePicker.css';
 
@@ -62,6 +62,46 @@ export function WeekNumberDatePicker({
     pickerRef.current?.flatpickr?.open();
   };
 
+  const enhanceCalendar = (instance: any) => {
+    const calendar = instance?.calendarContainer as HTMLElement | undefined;
+    if (!calendar) return;
+    calendar.classList.add('tc-week-picker-calendar');
+
+    if (calendar.querySelector('.tc-week-picker-footer')) return;
+
+    const footer = document.createElement('div');
+    footer.className = 'tc-week-picker-footer';
+
+    const todayBtn = document.createElement('button');
+    todayBtn.type = 'button';
+    todayBtn.className = 'tc-week-picker-footer-btn primary';
+    todayBtn.textContent = language === 'es' ? 'Hoy' : 'Today';
+    todayBtn.addEventListener('click', () => {
+      instance.setDate(new Date(), true);
+    });
+
+    const weekStartBtn = document.createElement('button');
+    weekStartBtn.type = 'button';
+    weekStartBtn.className = 'tc-week-picker-footer-btn secondary';
+    weekStartBtn.textContent = language === 'es' ? 'Inicio semana' : 'Week start';
+    weekStartBtn.addEventListener('click', () => {
+      instance.setDate(getWeekStart(new Date()), true);
+    });
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'tc-week-picker-footer-btn danger';
+    clearBtn.textContent = language === 'es' ? 'Limpiar' : 'Clear';
+    clearBtn.addEventListener('click', () => {
+      instance.clear();
+    });
+
+    footer.appendChild(todayBtn);
+    footer.appendChild(weekStartBtn);
+    footer.appendChild(clearBtn);
+    calendar.appendChild(footer);
+  };
+
   const clearDate = () => {
     onChange('');
     pickerRef.current?.flatpickr?.clear();
@@ -88,9 +128,8 @@ export function WeekNumberDatePicker({
           }
           onChange(formatToISO(selectedDates[0]));
         }}
-        onOpen={(_selectedDates, _dateStr, instance) => {
-          instance.calendarContainer.classList.add('tc-week-picker-calendar');
-        }}
+        onReady={(_selectedDates, _dateStr, instance) => enhanceCalendar(instance)}
+        onOpen={(_selectedDates, _dateStr, instance) => enhanceCalendar(instance)}
         className={`${className || ''} tc-week-picker-input !pl-10 !pr-28`}
         placeholder={placeholder || (language === 'es' ? 'Selecciona una fecha' : 'Select a date')}
       />

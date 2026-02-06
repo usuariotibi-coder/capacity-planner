@@ -1,5 +1,5 @@
 .tc-week-picker .tc-week-picker-icon {
-  color: #2563eb;
+  color: #0f766e;
 }
 
 .tc-week-picker .tc-week-picker-icon-btn {
@@ -13,15 +13,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #ecfeff, #ccfbf1);
+  border: 1px solid #99f6e4;
   z-index: 2;
   transition: all 0.2s ease;
 }
 
 .tc-week-picker .tc-week-picker-icon-btn:hover {
-  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-  border-color: #93c5fd;
+  background: linear-gradient(135deg, #ccfbf1, #99f6e4);
+  border-color: #5eead4;
 }
 
 .tc-week-picker .tc-week-picker-icon-btn:focus-visible {
@@ -38,20 +38,22 @@
   border-radius: 9999px;
   font-size: 0.66rem;
   font-weight: 800;
-  color: #1d4ed8;
-  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
-  border: 1px solid #93c5fd;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+  color: #7c2d12;
+  background: linear-gradient(135deg, #ffedd5, #fde68a);
+  border: 1px solid #fdba74;
+  box-shadow: 0 1px 3px rgba(194, 65, 12, 0.18);
   white-space: nowrap;
 }
 
 .tc-week-picker .tc-week-picker-input {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  border-color: #99f6e4 !important;
   transition: all 0.2s ease;
 }
 
 .tc-week-picker .tc-week-picker-input:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
 }
 
 .tc-week-picker .tc-week-picker-right {
@@ -69,9 +71,9 @@
   width: 1.35rem;
   height: 1.35rem;
   border-radius: 9999px;
-  border: 1px solid #fca5a5;
-  color: #dc2626;
-  background: #fff5f5;
+  border: 1px solid #f5c2c7;
+  color: #be123c;
+  background: #fff1f2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -84,14 +86,14 @@
 }
 
 .flatpickr-calendar.tc-week-picker-calendar {
-  border: 1px solid #bfdbfe;
+  border: 1px solid #99f6e4;
   border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
   overflow: hidden;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-months {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #0e7490 50%, #1d4ed8 100%);
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-month {
@@ -158,41 +160,41 @@
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-weekday {
-  color: #1d4ed8;
+  color: #0f766e;
   font-weight: 800;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-day:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
+  background: #ccfbf1;
+  border-color: #5eead4;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.today {
-  border-color: #2563eb;
-  color: #1d4ed8;
+  border-color: #0f766e;
+  color: #0f766e;
   font-weight: 800;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.selected,
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.startRange,
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.endRange {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  border-color: #1d4ed8;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-color: #c2410c;
   color: #ffffff;
-  box-shadow: 0 4px 10px rgba(29, 78, 216, 0.3);
+  box-shadow: 0 4px 10px rgba(194, 65, 12, 0.28);
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-weekwrapper {
-  background: #f8fbff;
-  border-right: 1px solid #dbeafe;
+  background: #f0fdfa;
+  border-right: 1px solid #ccfbf1;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-weekwrapper .flatpickr-weekday {
-  color: #2563eb;
+  color: #0f766e;
 }
 
 .flatpickr-calendar.tc-week-picker-calendar .flatpickr-weekwrapper span.flatpickr-day {
-  color: #1e3a8a;
+  color: #115e59;
   font-weight: 700;
 }
 
@@ -201,4 +203,57 @@
   font-size: 1.2rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.flatpickr-disabled,
+.flatpickr-calendar.tc-week-picker-calendar .flatpickr-day.flatpickr-disabled:hover {
+  color: #94a3b8;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-top: 1px solid #ccfbf1;
+  background: linear-gradient(180deg, #ffffff, #f0fdfa);
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn {
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.35rem 0.45rem;
+  transition: all 0.2s ease;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.primary {
+  background: linear-gradient(135deg, #0ea5e9, #1d4ed8);
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.primary:hover {
+  filter: brightness(1.05);
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.secondary {
+  background: #ecfeff;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.secondary:hover {
+  background: #ccfbf1;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.flatpickr-calendar.tc-week-picker-calendar .tc-week-picker-footer-btn.danger:hover {
+  background: #ffe4e6;
 }
