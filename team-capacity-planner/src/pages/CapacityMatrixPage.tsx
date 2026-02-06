@@ -234,7 +234,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     client: '',
     startDate: '',
     numberOfWeeks: '' as any,
-    facility: 'AL' as 'AL' | 'MI',
+    facility: 'AL' as 'AL' | 'MI' | 'MX',
     budgetHours: '' as any,
   });
 
@@ -4033,11 +4033,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">🏭 {t.facility}</label>
                   <select
                     value={quickProjectForm.facility}
-                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, facility: e.target.value as 'AL' | 'MI' })}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, facility: e.target.value as 'AL' | 'MI' | 'MX' })}
                     className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
                   >
                     <option value="AL">AL</option>
                     <option value="MI">MI</option>
+                    <option value="MX">MX</option>
                   </select>
                 </div>
 
