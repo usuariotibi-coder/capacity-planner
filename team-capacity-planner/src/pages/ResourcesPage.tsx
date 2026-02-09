@@ -588,8 +588,28 @@ export function ResourcesPage() {
                                 const weekTotalHours = weekAssignments.reduce((sum, a) => sum + getAssignmentHours(a), 0);
                                 const hasAssignment = weekAssignments.length > 0;
 
-                                // Get unique projects for this week
-                                const weekProjects = [...new Set(weekAssignments.map(a => a.projectId))];
+                                // Aggregate hours by project for this week (for tooltip and color logic).
+                                const weekProjectHours = weekAssignments.reduce<Record<string, number>>((acc, assignment) => {
+                                  const assignmentHours = getAssignmentHours(assignment);
+                                  if (assignmentHours <= 0) return acc;
+                                  acc[assignment.projectId] = (acc[assignment.projectId] || 0) + assignmentHours;
+                                  return acc;
+                                }, {});
+                                const weekProjects = Object.keys(weekProjectHours);
+                                const sortedProjectBreakdown = Object.entries(weekProjectHours)
+                                  .sort(([, hoursA], [, hoursB]) => hoursB - hoursA);
+                                const weekTooltip = hasAssignment
+                                  ? [
+                                      `${t.weekAbbr} ${weekData.weekNum}: ${formatHours(weekTotalHours)}h`,
+                                      `${weekProjects.length} ${weekProjects.length === 1 ? t.projectLabel : t.projectsCount}`,
+                                      ...sortedProjectBreakdown.map(([projectId, projectHours]) => {
+                                        const projectName =
+                                          projects.find((p) => p.id === projectId)?.name ||
+                                          (language === 'es' ? 'Proyecto' : 'Project');
+                                        return `- ${projectName}: ${formatHours(projectHours)}h`;
+                                      }),
+                                    ].join('\n')
+                                  : `${t.weekAbbr} ${weekData.weekNum}: ${t.noAssignment}`;
 
                                 return (
                                   <div
@@ -601,10 +621,7 @@ export function ResourcesPage() {
                                           : 'bg-gradient-to-b from-blue-200 to-purple-200 border-purple-300'
                                         : 'bg-white border-gray-200'
                                     }`}
-                                    title={hasAssignment
-                                      ? `${t.weekAbbr} ${weekData.weekNum}: ${formatHours(weekTotalHours)}h - ${weekProjects.map(pId => projects.find(p => p.id === pId)?.name).join(', ')}`
-                                      : `${t.weekAbbr} ${weekData.weekNum}: ${t.noAssignment}`
-                                    }
+                                    title={weekTooltip}
                                   >
                                     <span className={`text-xs font-bold ${hasAssignment ? 'text-gray-700' : 'text-gray-400'}`}>
                                       {weekData.weekNum}
