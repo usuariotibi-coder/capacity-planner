@@ -218,6 +218,8 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 # Registration Configuration
-REGISTRATION_EMAIL_DOMAIN = '@na.scio-automation.com'
+# Leave empty to allow any email domain.
+# Example to restrict: REGISTRATION_EMAIL_DOMAIN='@na.scio-automation.com'
+REGISTRATION_EMAIL_DOMAIN = config('REGISTRATION_EMAIL_DOMAIN', default='')
 EMAIL_VERIFICATION_TOKEN_LIFETIME = timedelta(hours=48)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')

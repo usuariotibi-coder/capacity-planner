@@ -84,10 +84,6 @@ const RegisterPage: React.FC = () => {
     }
   };
 
-  const validateEmail = (email: string): boolean => {
-    return email.toLowerCase().endsWith('@na.scio-automation.com');
-  };
-
   // Handle verification code input
   const handleCodeChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -149,11 +145,6 @@ const RegisterPage: React.FC = () => {
     }
     if (formData.department === 'OTHER' && !formData.otherDepartment) {
       setError(t.selectOtherDepartment || t.completeAllFields);
-      return;
-    }
-
-    if (!validateEmail(formData.email)) {
-      setError(t.invalidEmailDomain);
       return;
     }
 
@@ -599,12 +590,11 @@ const RegisterPage: React.FC = () => {
                   className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
                              focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
                              transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
-                  placeholder="user@na.scio-automation.com"
+                  placeholder="user@example.com"
                   required
                   disabled={isSubmitting}
                 />
               </div>
-              <p className="text-xs text-zinc-400 mt-1">{t.emailDomainRequired}</p>
             </div>
 
             {/* Department field */}

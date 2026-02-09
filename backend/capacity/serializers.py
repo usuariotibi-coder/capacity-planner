@@ -189,11 +189,12 @@ class UserRegistrationSerializer(serializers.Serializer):
         """
         from django.conf import settings
         normalized_email = value.strip().lower()
+        required_domain = (getattr(settings, 'REGISTRATION_EMAIL_DOMAIN', '') or '').strip().lower()
 
-        # Check domain
-        if not normalized_email.endswith(settings.REGISTRATION_EMAIL_DOMAIN):
+        # Domain restriction is optional. If empty/"*" accept all domains.
+        if required_domain and required_domain not in {'*', 'all'} and not normalized_email.endswith(required_domain):
             raise serializers.ValidationError(
-                f"Email must be from domain {settings.REGISTRATION_EMAIL_DOMAIN}"
+                f"Email must be from domain {required_domain}"
             )
 
         # Check if email/username already exists (case-insensitive)
