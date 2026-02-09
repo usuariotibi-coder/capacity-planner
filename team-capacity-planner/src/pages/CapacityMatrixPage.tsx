@@ -1633,7 +1633,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!projectId) {
       const deptWeekKey = `${department}|${weekStart}`;
       const totalHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
-      return { totalHours, talent: calculateTalent(totalHours), assignments: [], stage: null };
+      return { totalHours, talent: calculateTalent(totalHours), assignments: [], stage: null, comment: undefined as string | undefined };
     }
 
     const cellKey = `${projectId}|${department}|${weekStart}`;
@@ -1642,8 +1642,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const totalHours = cellEntry?.totalHours ?? 0;
     const talent = calculateTalent(totalHours);
     const stage = cellEntry?.stage ?? (assignmentsForCell[0]?.stage ?? null);
+    const comment = cellEntry?.comment ?? assignmentsForCell.find(
+      (assignment) => typeof assignment.comment === 'string' && assignment.comment.trim().length > 0
+    )?.comment;
 
-    return { totalHours, talent, assignments: assignmentsForCell, stage };
+    return { totalHours, talent, assignments: assignmentsForCell, stage, comment };
   };
 
   // Calculate utilization percentage for a department in a project
@@ -1799,11 +1802,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (departmentFilter === 'General') return; // No edit in General view
     if (!canEditDepartment(department)) return;
 
-    const { totalHours, assignments: deptAssignments, stage: cellStage } = getDepartmentWeekData(department, weekStart, projectId);
+    const { totalHours, assignments: deptAssignments, stage: cellStage, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
     const initialStage = cellStage ?? deptAssignments.find((assignment) => assignment.stage)?.stage ?? null;
-    const initialComment = deptAssignments.find(
+    const initialComment = (cellComment ?? deptAssignments.find(
       (assignment) => typeof assignment.comment === 'string' && assignment.comment.trim().length > 0
-    )?.comment || '';
+    )?.comment) || '';
 
     const isSelectableModalEmployee = (emp?: Employee | null): emp is Employee =>
       !!emp &&
@@ -2042,11 +2045,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const renderCellContent = (department: Department, weekStart: string, project?: Project) => {
     const projectId = project?.id;
-    const { totalHours, talent, stage, assignments: cellAssignments } = getDepartmentWeekData(department, weekStart, projectId);
+    const { totalHours, talent, stage, assignments: cellAssignments, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
     const weekNum = weekDataByDate.get(weekStart)?.weekNum || 1;
-
-    // Get comment from first assignment (comments are shared across assignments in same cell)
-    const cellComment = cellAssignments.length > 0 ? cellAssignments[0].comment : undefined;
 
     // Get project and department stage info for visual indicators
     const projectMetaKey = projectId ? `${projectId}|${department}` : '';
