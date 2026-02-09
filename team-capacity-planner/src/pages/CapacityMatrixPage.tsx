@@ -2383,7 +2383,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">👥 {t.availableResources} ({deptEmployees.length})</label>
-              <div className="space-y-2 max-h-32 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
+              <div className="space-y-2 min-h-[180px] max-h-52 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
                   const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
