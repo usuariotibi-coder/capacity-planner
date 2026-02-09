@@ -1403,6 +1403,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handleCreateQuickProject = () => {
+    if (departmentFilter === 'General' || departmentFilter === 'PM') {
+      return;
+    }
+
+    const dept = departmentFilter as Department;
+    if (!canEditDepartment(dept)) {
+      alert(language === 'es'
+        ? 'No tienes permiso para crear proyectos en este departamento.'
+        : 'You do not have permission to create projects in this department.');
+      return;
+    }
+
     if (!quickProjectForm.name || !quickProjectForm.client || !quickProjectForm.startDate || !quickProjectForm.numberOfWeeks) {
       const missing: string[] = [];
       if (!quickProjectForm.name) missing.push(t.job || 'Project');
@@ -1419,7 +1431,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return;
     }
 
-    const dept = departmentFilter as Department;
     const startDateISO = quickProjectForm.startDate;
     const numberOfWeeks = quickProjectForm.numberOfWeeks as number;
     const budgetHours = Number(quickProjectForm.budgetHours || 0);
@@ -1492,6 +1503,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Handle importing an existing project to the current department
   const handleImportProject = async () => {
+    if (departmentFilter === 'General' || departmentFilter === 'PM') {
+      return;
+    }
+
+    const dept = departmentFilter as Department;
+    if (!canEditDepartment(dept)) {
+      alert(language === 'es'
+        ? 'No tienes permiso para importar proyectos en este departamento.'
+        : 'You do not have permission to import projects in this department.');
+      return;
+    }
+
     if (!importProjectForm.projectId || !importProjectForm.startDate || !importProjectForm.numberOfWeeks) {
       const missing: string[] = [];
       if (!importProjectForm.projectId) missing.push(t.selectProject || 'Project');
@@ -1507,7 +1530,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return;
     }
 
-    const dept = departmentFilter as Department;
     const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
     if (!selectedProject) {
       alert('Project not found');
@@ -1728,6 +1750,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
     return currentUserDepartment === department;
   };
+
+  const canManageProjectsInCurrentDepartment =
+    departmentFilter !== 'General' &&
+    departmentFilter !== 'PM' &&
+    canEditDepartment(departmentFilter as Department);
 
   useEffect(() => {
     if (!editingCell) return;
@@ -2707,7 +2734,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           </button>
 
           {/* Create Project Button - Only in department view (except PM) */}
-          {hasFullAccess && departmentFilter !== 'General' && departmentFilter !== 'PM' && (
+          {canManageProjectsInCurrentDepartment && (
             <button
               onClick={() => setShowQuickProjectModal(true)}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
@@ -2719,7 +2746,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           )}
 
           {/* Import Existing Project Button - Only in department view (except PM) */}
-          {hasFullAccess && departmentFilter !== 'General' && departmentFilter !== 'PM' && getAvailableProjectsForImport().length > 0 && (
+          {canManageProjectsInCurrentDepartment && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
@@ -4211,7 +4238,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* Quick Project Creation Modal */}
-        {showQuickProjectModal && hasFullAccess && (
+        {showQuickProjectModal && canManageProjectsInCurrentDepartment && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -4365,7 +4392,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         )}
 
         {/* Import Existing Project Modal */}
-        {showImportProjectModal && hasFullAccess && (
+        {showImportProjectModal && canManageProjectsInCurrentDepartment && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">

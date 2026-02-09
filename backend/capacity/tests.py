@@ -7,7 +7,18 @@ from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Assignment, Department, Employee, Facility, Project, UserSession
+from .models import (
+    Assignment,
+    Department,
+    DepartmentStageConfig,
+    Employee,
+    Facility,
+    Project,
+    ProjectBudget,
+    UserDepartment,
+    UserProfile,
+    UserSession,
+)
 
 
 class ProjectSoftDeleteTests(APITestCase):
@@ -83,6 +94,153 @@ class ProjectSoftDeleteTests(APITestCase):
         all_assignments = self._extract_results(all_assignments_response)
         all_ids = {str(item['id']) for item in all_assignments}
         self.assertIn(str(self.assignment.id), all_ids)
+
+
+class ProjectDepartmentPermissionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='prg-dept-user',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(
+            user=self.user,
+            department=UserDepartment.PRG,
+        )
+        self.client.force_authenticate(user=self.user)
+
+        self.existing_project = Project.objects.create(
+            name='Existing Shared Project',
+            client='Internal',
+            start_date=date(2026, 1, 6),
+            end_date=date(2026, 2, 2),
+            facility=Facility.MX,
+            number_of_weeks=4,
+            visible_in_departments=[Department.MED],
+        )
+        DepartmentStageConfig.objects.create(
+            project=self.existing_project,
+            department=Department.MED,
+            stage=None,
+            week_start=1,
+            week_end=4,
+            department_start_date=date(2026, 1, 6),
+            duration_weeks=4,
+        )
+        ProjectBudget.objects.create(
+            project=self.existing_project,
+            department=Department.MED,
+            hours_allocated=20,
+        )
+
+    @staticmethod
+    def _create_payload_for_department(department):
+        return {
+            'name': f'Quick Create {department}',
+            'client': 'Internal',
+            'start_date': '2026-01-06',
+            'end_date': '2026-02-02',
+            'facility': Facility.MX,
+            'number_of_weeks': 4,
+            'visible_in_departments': [department],
+            'department_stages': {
+                department: [
+                    {
+                        'stage': None,
+                        'week_start': 1,
+                        'week_end': 4,
+                        'department_start_date': '2026-01-06',
+                        'duration_weeks': 4,
+                    }
+                ]
+            },
+            'department_hours_allocated': {
+                Department.PM: 0,
+                Department.MED: 0,
+                Department.HD: 0,
+                Department.MFG: 0,
+                Department.BUILD: 0,
+                Department.PRG: 0,
+                department: 20,
+            },
+        }
+
+    def test_department_user_can_create_project_for_own_department(self):
+        payload = self._create_payload_for_department(Department.PRG)
+
+        response = self.client.post(reverse('project-list'), payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn(Department.PRG, response.data.get('visible_in_departments', []))
+
+    def test_department_user_cannot_create_project_for_other_department(self):
+        payload = self._create_payload_for_department(Department.MED)
+
+        response = self.client.post(reverse('project-list'), payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_department_user_can_import_project_into_own_department(self):
+        payload = {
+            'department_stages': {
+                Department.MED: [
+                    {
+                        'stage': None,
+                        'week_start': 1,
+                        'week_end': 4,
+                        'department_start_date': '2026-01-06',
+                        'duration_weeks': 4,
+                    }
+                ],
+                Department.PRG: [
+                    {
+                        'stage': None,
+                        'week_start': 1,
+                        'week_end': 5,
+                        'department_start_date': '2026-01-13',
+                        'duration_weeks': 5,
+                    }
+                ],
+            },
+            'department_hours_allocated': {
+                Department.MED: 20,
+                Department.PRG: 35,
+            },
+            'visible_in_departments': [Department.MED, Department.PRG],
+        }
+
+        response = self.client.patch(
+            reverse('project-detail', args=[self.existing_project.id]),
+            payload,
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.existing_project.refresh_from_db()
+        self.assertIn(Department.PRG, self.existing_project.visible_in_departments or [])
+        self.assertTrue(
+            DepartmentStageConfig.objects.filter(
+                project=self.existing_project,
+                department=Department.PRG,
+            ).exists()
+        )
+        self.assertEqual(
+            ProjectBudget.objects.get(
+                project=self.existing_project,
+                department=Department.PRG,
+            ).hours_allocated,
+            35,
+        )
+
+    def test_department_user_cannot_modify_other_department_allocation(self):
+        response = self.client.patch(
+            reverse('project-detail', args=[self.existing_project.id]),
+            {'department_hours_allocated': {Department.MED: 25}},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class SessionControlTests(APITestCase):

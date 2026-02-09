@@ -643,16 +643,268 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @staticmethod
+    def _department_codes():
+        return {code for code, _ in Department.choices}
+
+    @classmethod
+    def _normalize_department_code(cls, value):
+        if not isinstance(value, str):
+            return None
+        code = value.strip().upper()
+        return code if code in cls._department_codes() else None
+
+    @staticmethod
+    def _get_first_present_value(data, keys):
+        for key in keys:
+            if key in data:
+                return data.get(key), True
+        return None, False
+
+    @staticmethod
+    def _coerce_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _as_comparable(value):
+        if value in {'', None}:
+            return None
+        if hasattr(value, 'isoformat'):
+            return value.isoformat()
+        if isinstance(value, bool):
+            return str(value).lower()
+        return str(value)
+
+    @classmethod
+    def _normalize_stage_entry(cls, stage_data):
+        if not isinstance(stage_data, dict):
+            return None
+
+        stage = stage_data.get('stage') or None
+        week_start = stage_data.get('week_start', stage_data.get('weekStart'))
+        week_end = stage_data.get('week_end', stage_data.get('weekEnd'))
+        department_start = stage_data.get(
+            'department_start_date',
+            stage_data.get('departmentStartDate'),
+        )
+
+        if week_start in {None, ''} or week_end in {None, ''}:
+            return None
+
+        try:
+            normalized_start = int(week_start)
+            normalized_end = int(week_end)
+        except (TypeError, ValueError):
+            return None
+
+        if hasattr(department_start, 'isoformat'):
+            department_start = department_start.isoformat()
+        department_start = None if department_start in {'', None} else str(department_start)
+
+        return stage, normalized_start, normalized_end, department_start
+
+    @classmethod
+    def _normalize_stage_entries(cls, stage_entries):
+        if not isinstance(stage_entries, list):
+            return tuple()
+
+        normalized = []
+        for entry in stage_entries:
+            signature = cls._normalize_stage_entry(entry)
+            if signature is not None:
+                normalized.append(signature)
+        normalized.sort()
+        return tuple(normalized)
+
+    def _extract_create_scope_departments(self, data):
+        scope_departments = set()
+
+        visible_departments, has_visible = self._get_first_present_value(
+            data,
+            ('visible_in_departments', 'visibleInDepartments'),
+        )
+        if has_visible and isinstance(visible_departments, list):
+            for raw_department in visible_departments:
+                department = self._normalize_department_code(raw_department)
+                if department:
+                    scope_departments.add(department)
+
+        stage_payload, has_stage_payload = self._get_first_present_value(
+            data,
+            ('department_stages', 'departmentStages'),
+        )
+        if has_stage_payload and isinstance(stage_payload, dict):
+            for raw_department, stages in stage_payload.items():
+                department = self._normalize_department_code(raw_department)
+                if department and isinstance(stages, list) and len(stages) > 0:
+                    scope_departments.add(department)
+
+        if scope_departments:
+            return scope_departments
+
+        hours_payload, has_hours_payload = self._get_first_present_value(
+            data,
+            ('department_hours_allocated', 'departmentHoursAllocated'),
+        )
+        if has_hours_payload and isinstance(hours_payload, dict):
+            for raw_department, raw_hours in hours_payload.items():
+                department = self._normalize_department_code(raw_department)
+                if not department:
+                    continue
+                if abs(self._coerce_float(raw_hours, default=0.0)) > 1e-6:
+                    scope_departments.add(department)
+
+        return scope_departments
+
+    def _changed_departments_from_payload(self, project, data):
+        changed_departments = set()
+
+        stage_payload, has_stage_payload = self._get_first_present_value(
+            data,
+            ('department_stages', 'departmentStages'),
+        )
+        if has_stage_payload and isinstance(stage_payload, dict):
+            existing_stages = {}
+            for config in project.department_stages.all():
+                existing_stages.setdefault(config.department, []).append(
+                    (
+                        config.stage or None,
+                        int(config.week_start),
+                        int(config.week_end),
+                        config.department_start_date.isoformat()
+                        if config.department_start_date
+                        else None,
+                    )
+                )
+            existing_stage_signatures = {
+                dept: tuple(sorted(entries))
+                for dept, entries in existing_stages.items()
+            }
+
+            payload_stage_signatures = {}
+            for raw_department, entries in stage_payload.items():
+                department = self._normalize_department_code(raw_department)
+                if not department:
+                    continue
+                payload_stage_signatures[department] = self._normalize_stage_entries(entries)
+
+            existing_departments = set(existing_stage_signatures.keys())
+            payload_departments = set(payload_stage_signatures.keys())
+
+            # department_stages is treated as full replacement by serializer.update
+            changed_departments.update(existing_departments - payload_departments)
+
+            for department in payload_departments:
+                if payload_stage_signatures.get(department) != existing_stage_signatures.get(
+                    department,
+                    tuple(),
+                ):
+                    changed_departments.add(department)
+
+        hours_payload, has_hours_payload = self._get_first_present_value(
+            data,
+            ('department_hours_allocated', 'departmentHoursAllocated'),
+        )
+        if has_hours_payload and isinstance(hours_payload, dict):
+            existing_hours = {
+                budget.department: float(budget.hours_allocated)
+                for budget in project.budgets.all()
+            }
+            for raw_department, raw_hours in hours_payload.items():
+                department = self._normalize_department_code(raw_department)
+                if not department:
+                    continue
+                incoming_value = self._coerce_float(raw_hours, default=0.0)
+                existing_value = self._coerce_float(existing_hours.get(department), default=0.0)
+                if abs(incoming_value - existing_value) > 1e-6:
+                    changed_departments.add(department)
+
+        visible_departments, has_visible = self._get_first_present_value(
+            data,
+            ('visible_in_departments', 'visibleInDepartments'),
+        )
+        if has_visible and isinstance(visible_departments, list):
+            incoming_visible = {
+                dept for dept in (
+                    self._normalize_department_code(raw_department)
+                    for raw_department in visible_departments
+                )
+                if dept
+            }
+            current_visible = {
+                dept for dept in (
+                    self._normalize_department_code(raw_department)
+                    for raw_department in (project.visible_in_departments or [])
+                )
+                if dept
+            }
+            changed_departments.update(incoming_visible.symmetric_difference(current_visible))
+
+        return changed_departments
+
+    def _shared_project_fields_modified(self, project, data):
+        shared_field_specs = (
+            (('name',), project.name),
+            (('client',), project.client),
+            (('start_date', 'startDate'), project.start_date),
+            (('end_date', 'endDate'), project.end_date),
+            (('facility',), project.facility),
+            (('number_of_weeks', 'numberOfWeeks'), project.number_of_weeks),
+            (('project_manager_id', 'projectManagerId'), project.project_manager_id),
+        )
+
+        for keys, current_value in shared_field_specs:
+            incoming_value, is_present = self._get_first_present_value(data, keys)
+            if not is_present:
+                continue
+            if self._as_comparable(incoming_value) != self._as_comparable(current_value):
+                return True
+
+        return False
+
+    def _ensure_project_create_permission(self):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("No permission to modify projects.")
+
+        request_data = self.request.data if isinstance(self.request.data, dict) else {}
+        target_departments = self._extract_create_scope_departments(request_data)
+        if not target_departments:
+            raise PermissionDenied("No permission to create projects without department scope.")
+
+        if any(not _can_edit_department(self.request.user, dept) for dept in target_departments):
+            raise PermissionDenied("No permission to modify projects for this department.")
+
+    def _ensure_project_update_permission(self, serializer):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("No permission to modify projects.")
+
+        project = serializer.instance
+        request_data = self.request.data if isinstance(self.request.data, dict) else {}
+
+        if self._shared_project_fields_modified(project, request_data):
+            raise PermissionDenied("No permission to modify shared project fields.")
+
+        changed_departments = self._changed_departments_from_payload(project, request_data)
+        if any(not _can_edit_department(self.request.user, dept) for dept in changed_departments):
+            raise PermissionDenied("No permission to modify projects for this department.")
+
     def _ensure_full_access(self):
         if not _has_full_access(self.request.user):
             raise PermissionDenied("No permission to modify projects.")
 
     def perform_create(self, serializer):
-        self._ensure_full_access()
+        self._ensure_project_create_permission()
         serializer.save()
 
     def perform_update(self, serializer):
-        self._ensure_full_access()
+        self._ensure_project_update_permission(serializer)
         serializer.save()
 
     def perform_destroy(self, instance):
