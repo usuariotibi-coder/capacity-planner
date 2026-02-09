@@ -1799,9 +1799,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (departmentFilter === 'General') return; // No edit in General view
     if (!canEditDepartment(department)) return;
 
-    const { totalHours, assignments: deptAssignments } = getDepartmentWeekData(department, weekStart, projectId);
-    const firstAssignmentStage = deptAssignments.length > 0 ? deptAssignments[0].stage : null;
-    const firstAssignmentComment = deptAssignments.length > 0 ? deptAssignments[0].comment || '' : '';
+    const { totalHours, assignments: deptAssignments, stage: cellStage } = getDepartmentWeekData(department, weekStart, projectId);
+    const initialStage = cellStage ?? deptAssignments.find((assignment) => assignment.stage)?.stage ?? null;
+    const initialComment = deptAssignments.find(
+      (assignment) => typeof assignment.comment === 'string' && assignment.comment.trim().length > 0
+    )?.comment || '';
 
     const isSelectableModalEmployee = (emp?: Employee | null): emp is Employee =>
       !!emp &&
@@ -1847,8 +1849,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingHoursInput(totalHours ? totalHours.toString() : '');
     setEditingScioHoursInput(totalScioHours ? totalScioHours.toString() : '');
     setEditingExternalHoursInput(totalExternalHours ? totalExternalHours.toString() : '');
-    setEditingStage(firstAssignmentStage);
-    setEditingComment(firstAssignmentComment);
+    setEditingStage(initialStage);
+    setEditingComment(initialComment);
     setSelectedEmployees(assignedEmployeeIds);
   };
 
