@@ -1,5 +1,12 @@
 const FALLBACK_API_BASE_URL = 'https://capacity-planner-production.up.railway.app';
 
+const normalizePath = (pathname: string): string => {
+  const trimmed = pathname.replace(/\/+$/, '');
+  if (!trimmed || trimmed === '/') return '';
+  if (trimmed.toLowerCase() === '/api') return '';
+  return trimmed;
+};
+
 const normalizeBaseUrl = (input?: string): string => {
   if (!input) return FALLBACK_API_BASE_URL;
 
@@ -12,8 +19,7 @@ const normalizeBaseUrl = (input?: string): string => {
     const parsed = new URL(withProtocol);
     // DNS hostnames cannot contain underscores; if present, the URL will fail to resolve.
     if (parsed.hostname.includes('_')) return FALLBACK_API_BASE_URL;
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '');
-    return `${parsed.origin}${parsed.pathname}`;
+    return `${parsed.origin}${normalizePath(parsed.pathname)}`;
   } catch {
     return FALLBACK_API_BASE_URL;
   }

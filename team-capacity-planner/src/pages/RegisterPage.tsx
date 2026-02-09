@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, User, Building2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -20,6 +20,7 @@ type Step = 'register' | 'verify' | 'success';
 
 const RegisterPage: React.FC = () => {
   const [step, setStep] = useState<Step>('register');
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -38,6 +39,7 @@ const RegisterPage: React.FC = () => {
   const [isResendingCode, setIsResendingCode] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const initializedFromQuery = useRef(false);
 
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { language, setLanguage } = useLanguage();
@@ -45,6 +47,25 @@ const RegisterPage: React.FC = () => {
   const hasConfirmPassword = formData.confirmPassword.trim().length > 0;
   const passwordsMatch = hasConfirmPassword && formData.password === formData.confirmPassword;
   const passwordCriteria = getPasswordCriteria(formData.password);
+
+  useEffect(() => {
+    if (initializedFromQuery.current) return;
+    initializedFromQuery.current = true;
+
+    const emailFromQuery = (searchParams.get('email') || '').trim().toLowerCase();
+    const startStep = (searchParams.get('step') || '').trim().toLowerCase();
+
+    if (!emailFromQuery) return;
+
+    setFormData(prev => ({
+      ...prev,
+      email: prev.email || emailFromQuery,
+    }));
+
+    if (startStep === 'verify') {
+      setStep('verify');
+    }
+  }, [searchParams]);
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -165,7 +186,9 @@ const RegisterPage: React.FC = () => {
         other_department: formData.department === 'OTHER' ? formData.otherDepartment : undefined,
       });
 
-      setStep('success');
+      setVerificationCode(['', '', '', '', '', '']);
+      setResendMessage(t.codeSent || 'Code sent to your email');
+      setStep('verify');
     } catch (err) {
       setError(err instanceof Error ? err.message : t.registrationError);
     } finally {
@@ -286,7 +309,9 @@ const RegisterPage: React.FC = () => {
               </div>
 
               <h2 className="text-2xl font-bold text-white mb-2">{t.registrationSuccessTitle || 'Registration Successful!'}</h2>
-              <p className="text-zinc-400 mb-8">{t.registrationSuccessMessage || 'Your account has been created. You can now log in.'}</p>
+              <p className="text-zinc-400 mb-8">
+                {t.registrationSuccessMessage || 'Your email has been verified. You can now log in.'}
+              </p>
 
               <button
                 type="button"

@@ -318,25 +318,21 @@ class UserRegistrationSerializer(serializers.Serializer):
 
     def _send_verification_code_email(self, user, code):
         """
-        Send 6-digit verification code to user via SendGrid API.
+        Send 6-digit verification code email.
+        Uses SendGrid when SENDGRID_API_KEY is configured; otherwise falls back
+        to Django's configured email backend (SMTP, console, etc.).
         """
         from django.conf import settings
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail
+        from django.core.mail import EmailMultiAlternatives
 
         sendgrid_api_key = getattr(settings, 'SENDGRID_API_KEY', None)
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
-
-        print(f"[SENDGRID] API Key: {'SET (' + sendgrid_api_key[:10] + '...)' if sendgrid_api_key else 'NOT SET'}")
-        print(f"[SENDGRID] From Email: {from_email}")
-        print(f"[SENDGRID] To Email: {user.email}")
-
-        if not sendgrid_api_key:
-            print(f"[SENDGRID] ERROR: API key not configured!")
-            return
+        from_email = (
+            getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            or getattr(settings, 'EMAIL_HOST_USER', None)
+        )
 
         if not from_email:
-            print(f"[SENDGRID] ERROR: FROM email not configured!")
+            logger.warning("Verification email not sent: sender email is not configured")
             return
 
         subject = "Your verification code - Team Capacity Planner"
@@ -369,18 +365,45 @@ If you didn't request this code, please ignore this email.
 
 - Team Capacity Planner"""
 
-        message = Mail(
-            from_email=from_email,
-            to_emails=user.email,
-            subject=subject,
-            plain_text_content=text_content,
-            html_content=html_content
-        )
+        if sendgrid_api_key:
+            try:
+                from sendgrid import SendGridAPIClient
+                from sendgrid.helpers.mail import Mail
 
-        print(f"[SENDGRID] Sending email...")
-        sg = SendGridAPIClient(sendgrid_api_key)
-        response = sg.send(message)
-        print(f"[SENDGRID] Response status: {response.status_code}")
+                message = Mail(
+                    from_email=from_email,
+                    to_emails=user.email,
+                    subject=subject,
+                    plain_text_content=text_content,
+                    html_content=html_content
+                )
+                sg = SendGridAPIClient(sendgrid_api_key)
+                response = sg.send(message)
+                logger.info(
+                    "Verification email sent via SendGrid to %s (status=%s)",
+                    user.email,
+                    response.status_code,
+                )
+                return
+            except Exception:
+                logger.exception(
+                    "SendGrid failed for %s, falling back to Django email backend",
+                    user.email,
+                )
+
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=from_email,
+            to=[user.email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        sent_count = msg.send(fail_silently=False)
+        logger.info(
+            "Verification email sent via Django backend to %s (sent=%s)",
+            user.email,
+            sent_count,
+        )
 
 
 class EmployeeSerializer(serializers.ModelSerializer):

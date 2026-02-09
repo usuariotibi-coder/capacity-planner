@@ -10,13 +10,25 @@ const API_BASE_URL_UNAVAILABLE_TTL_MS = 60 * 1000;
 const API_BASE_URL_UNAVAILABLE_UNTIL = new Map<string, number>();
 
 const buildApiUrl = (baseUrl: string, endpoint: string): string => {
-  if (endpoint.startsWith('http')) return endpoint;
-  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${baseUrl}${normalizedEndpoint}`;
+  const safeEndpoint = typeof endpoint === 'string' ? endpoint : '';
+  if (safeEndpoint.startsWith('http')) return safeEndpoint;
+
+  const normalizedBaseUrl = (baseUrl || '').replace(/\/+$/, '');
+  let normalizedEndpoint = safeEndpoint.startsWith('/') ? safeEndpoint : `/${safeEndpoint}`;
+
+  // Avoid accidental /api/api duplication when env base URL already includes /api.
+  if (
+    normalizedBaseUrl.toLowerCase().endsWith('/api') &&
+    normalizedEndpoint.toLowerCase().startsWith('/api/')
+  ) {
+    normalizedEndpoint = normalizedEndpoint.slice(4);
+  }
+
+  return `${normalizedBaseUrl}${normalizedEndpoint}`;
 };
 
 const getMatchingApiBaseForAbsoluteEndpoint = (endpoint: string): string | null => {
-  if (!endpoint.startsWith('http')) return null;
+  if (typeof endpoint !== 'string' || !endpoint.startsWith('http')) return null;
 
   try {
     const endpointHost = new URL(endpoint).host;
@@ -27,6 +39,7 @@ const getMatchingApiBaseForAbsoluteEndpoint = (endpoint: string): string | null 
 };
 
 const toRelativeApiEndpoint = (endpoint: string): string => {
+  if (typeof endpoint !== 'string') return '';
   const matchingBase = getMatchingApiBaseForAbsoluteEndpoint(endpoint);
   if (!matchingBase) return endpoint;
 
