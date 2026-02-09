@@ -122,6 +122,8 @@ class Project(models.Model):
     number_of_weeks = models.IntegerField(validators=[MinValueValidator(1)])
     project_manager = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name='managed_projects')
     visible_in_departments = models.JSONField(default=list, blank=True, help_text="Departments where this project is visible (for quick-created projects)")
+    is_hidden = models.BooleanField(default=False, db_index=True, help_text="Soft-delete flag. Hidden projects are excluded from active UI lists.")
+    hidden_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when project was hidden via soft delete.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

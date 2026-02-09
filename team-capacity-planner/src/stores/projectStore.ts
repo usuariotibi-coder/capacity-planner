@@ -135,20 +135,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const originalProjects = get().projects;
     const projectToDelete = originalProjects.find(p => p.id === id);
 
-    console.log('[Store] Starting delete for project:', id, projectToDelete?.name);
+    console.log('[Store] Starting hide for project:', id, projectToDelete?.name);
 
-    // Optimistic update - remove from UI immediately
+    // Optimistic update - remove from active UI immediately.
     set((state) => ({
       projects: state.projects.filter((proj) => proj.id !== id),
     }));
 
-    // Optimistic update - remove assignments tied to this project
-    useAssignmentStore.getState().removeAssignmentsByProject(id);
-
     try {
-      console.log('[Store] Sending DELETE request to API for project:', id);
+      console.log('[Store] Sending soft-delete request to API for project:', id);
       await projectsApi.delete(id);
-      console.log('[Store] ✅ Project deleted successfully from server:', id);
+      console.log('[Store] Soft-delete completed successfully on server:', id);
 
       // Log activity
       await activityLogApi.logActivity(
@@ -158,15 +155,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         { project: projectToDelete }
       );
 
-      // Refetch assignments to ensure totals are recalculated from backend
+      // Refetch projects/assignments to ensure hidden projects disappear from active views.
+      await get().fetchProjects(true);
       await useAssignmentStore.getState().fetchAssignments(true);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al eliminar proyecto';
-      console.error('[Store] ❌ Error deleting project:', errorMsg);
+      console.error('[Store] Error hiding project:', errorMsg);
       console.error('[Store] Reverting optimistic update...');
       set({ projects: originalProjects });
-      // Restore assignments from backend if delete failed
-      await useAssignmentStore.getState().fetchAssignments(true);
       set({ error: errorMsg });
       alert(`Error al eliminar proyecto: ${errorMsg}`);
       throw error;

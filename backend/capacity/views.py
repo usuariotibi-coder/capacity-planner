@@ -188,6 +188,24 @@ def _has_bi_management_access(user):
     )
 
 
+def _query_param_as_bool(value, default=False):
+    """
+    Parse common query-string boolean representations.
+    Returns `default` when value is missing or unrecognized.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {'1', 'true', 'yes', 'y', 'on'}:
+        return True
+    if normalized in {'0', 'false', 'no', 'n', 'off'}:
+        return False
+    return default
+
+
 class CanViewActivityLog(BasePermission):
     """
     Permission for viewing activity logs.
@@ -585,6 +603,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Optimize queryset with related data."""
         queryset = super().get_queryset()
+        include_hidden = _query_param_as_bool(
+            self.request.query_params.get('include_hidden'),
+            default=False,
+        )
+
+        if not include_hidden:
+            queryset = queryset.filter(is_hidden=False)
 
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')
@@ -631,7 +656,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_full_access()
-        instance.delete()
+        # Soft delete: keep assignments/budgets/history but hide project from active UI.
+        if not instance.is_hidden:
+            instance.is_hidden = True
+            instance.hidden_at = timezone.now()
+            instance.save(update_fields=['is_hidden', 'hidden_at', 'updated_at'])
 
     @action(detail=True, methods=['get'])
     def statistics(self, request, pk=None):
@@ -998,6 +1027,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter queryset by date range if provided."""
         queryset = super().get_queryset()
+        include_hidden = _query_param_as_bool(
+            self.request.query_params.get('include_hidden'),
+            default=False,
+        )
+
+        if not include_hidden:
+            queryset = queryset.filter(project__is_hidden=False)
 
         # Optional filter: employee department (used by frontend to reduce payload)
         department = self.request.query_params.get('department')
@@ -1105,6 +1141,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             split_date = today - timedelta(days=today.weekday())  # Monday of current week
 
         qs = Assignment.objects.filter(project_id__in=project_ids).select_related('employee')
+        include_hidden = _query_param_as_bool(
+            request.query_params.get('include_hidden'),
+            default=False,
+        )
+
+        if not include_hidden:
+            qs = qs.filter(project__is_hidden=False)
+
         if department:
             qs = qs.filter(employee__department=department)
 

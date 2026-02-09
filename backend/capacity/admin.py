@@ -11,8 +11,8 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ['name', 'client', 'facility', 'start_date', 'end_date', 'project_manager']
-    list_filter = ['facility', 'start_date']
+    list_display = ['name', 'client', 'facility', 'start_date', 'end_date', 'project_manager', 'is_hidden', 'hidden_at']
+    list_filter = ['facility', 'start_date', 'is_hidden']
     search_fields = ['name', 'client']
 
 

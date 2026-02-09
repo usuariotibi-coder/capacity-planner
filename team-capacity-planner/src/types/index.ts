@@ -103,6 +103,8 @@ export interface Project {
   facility: Facility;
   numberOfWeeks: number;
   projectManagerId?: string; // ID of the assigned Project Manager (PM department)
+  isHidden?: boolean;
+  hiddenAt?: string | null;
   departmentStages?: Record<Department, DepartmentStageConfig[]>;
   departmentHoursAllocated?: Record<Department, number>; // Budget hours per department (presupuesto/cotizado)
   departmentHoursUtilized?: Record<Department, number>; // Hours utilized/used per department (horas utilizadas - manually entered)

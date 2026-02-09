@@ -541,6 +541,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'number_of_weeks',
             'project_manager',
             'project_manager_id',
+            'is_hidden',
+            'hidden_at',
             'assignment_count',
             'active_assignments',
             'department_stages',
@@ -555,7 +557,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'id', 'created_at', 'updated_at', 'assignment_count',
             'active_assignments', 'department_stages',
             'department_hours_allocated', 'department_hours_utilized',
-            'department_hours_forecast', 'project_manager_id'
+            'department_hours_forecast', 'project_manager_id',
+            'is_hidden', 'hidden_at'
         )
 
     def get_project_manager_id(self, obj):
