@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import type { Employee, Department } from '../types';
+import type { Assignment, Employee, Department } from '../types';
 import { generateId } from '../utils/id';
 import { getAllWeeksWithNextYear } from '../utils/dateUtils';
 import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X } from 'lucide-react';
@@ -18,6 +18,7 @@ const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
 export function ResourcesPage() {
   const { employees, addEmployee, deleteEmployee, updateEmployee } = useEmployeeStore();
   const assignments = useAssignmentStore((state) => state.assignments);
+  const fetchAssignments = useAssignmentStore((state) => state.fetchAssignments);
   const projects = useProjectStore((state) => state.projects);
   const { activeTeams } = useBuildTeamsStore();
   const { activeTeams: prgActiveTeams } = usePRGTeamsStore();
@@ -70,6 +71,37 @@ export function ResourcesPage() {
     52
   );
 
+  const getAssignmentHours = (assignment: Assignment): number => {
+    if (typeof assignment.totalHours === 'number') {
+      return assignment.totalHours;
+    }
+
+    if (typeof assignment.hours === 'number' && assignment.hours !== 0) {
+      return assignment.hours;
+    }
+
+    const scioHours = typeof assignment.scioHours === 'number' ? assignment.scioHours : 0;
+    const externalHours = typeof assignment.externalHours === 'number' ? assignment.externalHours : 0;
+    return scioHours + externalHours;
+  };
+
+  const hasWorkHours = (assignment: Assignment): boolean => getAssignmentHours(assignment) > 0;
+
+  // Keep resources view in sync with backend for the selected year.
+  useEffect(() => {
+    const weeks = getAllWeeksWithNextYear(selectedYear);
+    const rangeStart = weeks[0]?.date || `${selectedYear}-01-01`;
+    const rangeEnd = weeks[weeks.length - 1]?.date || `${selectedYear + 1}-12-31`;
+
+    const refreshAssignments = () => {
+      void fetchAssignments({ startDate: rangeStart, endDate: rangeEnd, force: true });
+    };
+
+    refreshAssignments();
+    const intervalId = window.setInterval(refreshAssignments, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [selectedYear, fetchAssignments]);
+
   // Toggle calendar visibility for an employee
   const toggleEmployeeCalendar = (employeeId: string) => {
     setExpandedEmployees((prev) => {
@@ -85,7 +117,7 @@ export function ResourcesPage() {
 
   // Get assignments for an employee
   const getEmployeeAssignments = (employeeId: string) => {
-    return assignments.filter((a) => a.employeeId === employeeId);
+    return assignments.filter((a) => a.employeeId === employeeId && hasWorkHours(a));
   };
 
   // Get project color based on project index for visual distinction
@@ -430,7 +462,7 @@ export function ResourcesPage() {
                 {deptEmployees.map((emp) => {
                   const empAssignments = getEmployeeAssignments(emp.id);
                   const isExpanded = expandedEmployees.has(emp.id);
-                  const totalAssignedHours = empAssignments.reduce((sum, a) => sum + a.hours, 0);
+                  const totalAssignedHours = empAssignments.reduce((sum, a) => sum + getAssignmentHours(a), 0);
                   const uniqueProjects = [...new Set(empAssignments.map(a => a.projectId))];
 
                   return (
@@ -553,7 +585,7 @@ export function ResourcesPage() {
                             <div className="flex gap-0.5 min-w-max">
                               {allWeeksData.map((weekData) => {
                                 const weekAssignments = empAssignments.filter(a => a.weekStartDate === weekData.date);
-                                const weekTotalHours = weekAssignments.reduce((sum, a) => sum + a.hours, 0);
+                                const weekTotalHours = weekAssignments.reduce((sum, a) => sum + getAssignmentHours(a), 0);
                                 const hasAssignment = weekAssignments.length > 0;
 
                                 // Get unique projects for this week
