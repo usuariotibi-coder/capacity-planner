@@ -2450,9 +2450,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full min-h-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
               placeholder={t.commentPlaceholder}
-              rows={2}
+              rows={4}
             />
           </div>
 
