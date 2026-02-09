@@ -1,24 +1,29 @@
 """
 Management command to cleanup inactive user sessions.
 
-Marks sessions as inactive if they haven't had any activity in 30 minutes.
+Marks sessions as inactive if they haven't had any activity in configured timeout.
 This should be run periodically (e.g., via cron job or Celery beat).
 """
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from capacity.models import UserSession
 
 
 class Command(BaseCommand):
-    help = 'Cleanup inactive user sessions (older than 30 minutes)'
+    help = 'Cleanup inactive user sessions (older than configured inactivity timeout)'
 
     def add_arguments(self, parser):
+        default_minutes = max(
+            1,
+            int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 20)),
+        )
         parser.add_argument(
             '--minutes',
             type=int,
-            default=30,
-            help='Minutes of inactivity before marking session as inactive (default: 30)',
+            default=default_minutes,
+            help=f'Minutes of inactivity before marking session as inactive (default: {default_minutes})',
         )
 
     def handle(self, *args, **options):

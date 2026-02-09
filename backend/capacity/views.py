@@ -33,6 +33,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import (
@@ -2403,35 +2404,53 @@ class LogoutView(APIView):
     """
     Logout view that deactivates the current user session.
 
-    Marks the session associated with the current refresh token as inactive,
-    allowing another device to login if the user has reached the 2-device limit.
+    Marks the session associated with the current access/refresh token as inactive,
+    allowing another device to login if the user reached the device limit.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         from capacity.models import UserSession
-        from rest_framework_simplejwt.tokens import TokenError
-        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from rest_framework_simplejwt.tokens import UntypedToken
 
         try:
-            # Get the refresh token from request
             refresh_token = request.data.get('refresh')
+            session_id = None
 
-            if refresh_token:
-                # Mark the session as inactive
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+            if auth_header.startswith('Bearer '):
+                access_token = auth_header.split(' ')[1]
+                try:
+                    decoded = UntypedToken(access_token)
+                    session_id = decoded.get('session_id')
+                except Exception:
+                    session_id = None
+
+            if session_id:
                 UserSession.objects.filter(
                     user=request.user,
-                    refresh_token=refresh_token
-                ).update(is_active=False)
+                    id=session_id,
+                    is_active=True,
+                ).update(is_active=False, last_activity=timezone.now())
+            elif refresh_token:
+                UserSession.objects.filter(
+                    user=request.user,
+                    refresh_token=refresh_token,
+                    is_active=True,
+                ).update(is_active=False, last_activity=timezone.now())
+            else:
+                UserSession.objects.filter(
+                    user=request.user,
+                    is_active=True,
+                ).update(is_active=False, last_activity=timezone.now())
 
             return Response({
-                'detail': 'Sesión cerrada exitosamente.'
+                'detail': 'Sesion cerrada exitosamente.'
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
-                'detail': f'Error al cerrar sesión: {str(e)}'
+                'detail': f'Error al cerrar sesion: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class SessionStatusView(APIView):
     """
@@ -2445,33 +2464,64 @@ class SessionStatusView(APIView):
 
     def get(self, request):
         from capacity.models import UserSession
-        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from rest_framework_simplejwt.tokens import UntypedToken
+
+        inactivity_timeout_minutes = max(
+            1,
+            int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 20)),
+        )
+        inactivity_threshold = timezone.now() - timedelta(minutes=inactivity_timeout_minutes)
 
         try:
-            # Get the access token from the request
             auth_header = request.META.get('HTTP_AUTHORIZATION', '')
 
             if auth_header.startswith('Bearer '):
                 token = auth_header.split(' ')[1]
+                decoded = UntypedToken(token)
+                session_id = decoded.get('session_id')
 
-                # Check if there's an active session for this user with this token info
-                # We'll use a simple check - if user is authenticated and has active sessions
+                UserSession.objects.filter(
+                    user=request.user,
+                    is_active=True,
+                    last_activity__lt=inactivity_threshold,
+                ).update(is_active=False)
+
+                if session_id:
+                    session = UserSession.objects.filter(
+                        id=session_id,
+                        user=request.user,
+                    ).first()
+
+                    if session and session.is_active:
+                        return Response({
+                            'status': 'active',
+                            'detail': 'Sesion activa',
+                            'user': request.user.username,
+                            'session_id': str(session.id),
+                        }, status=status.HTTP_200_OK)
+
+                    return Response({
+                        'status': 'inactive',
+                        'detail': 'Sesion inactiva o ha sido cerrada.',
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+
+                # Backward compatibility for tokens minted before `session_id` claim.
                 active_sessions = UserSession.objects.filter(
                     user=request.user,
-                    is_active=True
+                    is_active=True,
                 ).count()
 
                 if active_sessions > 0:
                     return Response({
                         'status': 'active',
-                        'detail': 'Sesión activa',
+                        'detail': 'Sesion activa',
                         'user': request.user.username,
                     }, status=status.HTTP_200_OK)
-                else:
-                    return Response({
-                        'status': 'inactive',
-                        'detail': 'Sesión inactiva o ha sido cerrada.',
-                    }, status=status.HTTP_401_UNAUTHORIZED)
+
+                return Response({
+                    'status': 'inactive',
+                    'detail': 'Sesion inactiva o ha sido cerrada.',
+                }, status=status.HTTP_401_UNAUTHORIZED)
 
             return Response({
                 'status': 'error',
@@ -2481,9 +2531,8 @@ class SessionStatusView(APIView):
         except Exception as e:
             return Response({
                 'status': 'error',
-                'detail': f'Error al verificar sesión: {str(e)}'
+                'detail': f'Error al verificar sesion: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class ChangePasswordView(APIView):
     """

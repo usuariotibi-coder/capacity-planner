@@ -6,8 +6,11 @@ It includes serializers for employees, projects, assignments, departments,
 budgets, and activity logs with proper validation and nested relationships.
 """
 
+import uuid
+
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -1902,7 +1905,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         from rest_framework_simplejwt.tokens import RefreshToken
-        from django.contrib.auth import authenticate
+        from datetime import timedelta
         from capacity.models import UserSession
 
         username = attrs.get('username')
@@ -1913,15 +1916,32 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
 
         if user and user.check_password(password):
             try:
-                # Check active sessions for this user (limit to 2)
+                inactivity_timeout_minutes = max(
+                    1,
+                    int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 20)),
+                )
+                max_active_sessions = max(
+                    1,
+                    int(getattr(settings, 'MAX_ACTIVE_SESSIONS_PER_USER', 2)),
+                )
+
+                # Cleanup stale sessions before checking active device limit.
+                inactivity_threshold = timezone.now() - timedelta(minutes=inactivity_timeout_minutes)
+                UserSession.objects.filter(
+                    user=user,
+                    is_active=True,
+                    last_activity__lt=inactivity_threshold,
+                ).update(is_active=False)
+
+                # Check active sessions for this user (limit to configured max).
                 active_sessions = UserSession.objects.filter(user=user, is_active=True).count()
 
-                if active_sessions >= 2:
-                    # Reject login if user already has 2 active sessions
+                if active_sessions >= max_active_sessions:
                     raise serializers.ValidationError(
-                        'Máximo de dispositivos conectados alcanzado. Por favor, cierre sesión en otro dispositivo.'
+                        f'Maximo de dispositivos conectados alcanzado ({max_active_sessions}). '
+                        'Por favor, cierre sesion en otro dispositivo.'
                     )
-
+                session_id = uuid.uuid4()
                 refresh = RefreshToken.for_user(user)
                 profile = getattr(user, 'profile', None)
                 department = getattr(profile, 'department', None)
@@ -1942,6 +1962,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                 refresh['other_department'] = other_department
                 refresh['is_staff'] = user.is_staff
                 refresh['is_superuser'] = user.is_superuser
+                refresh['session_id'] = str(session_id)
                 refresh.access_token['username'] = user.username
                 refresh.access_token['email'] = user.email
                 refresh.access_token['first_name'] = user.first_name
@@ -1950,6 +1971,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                 refresh.access_token['other_department'] = other_department
                 refresh.access_token['is_staff'] = user.is_staff
                 refresh.access_token['is_superuser'] = user.is_superuser
+                refresh.access_token['session_id'] = str(session_id)
 
                 # Create a new session record (safely handle missing request context)
                 try:
@@ -1965,6 +1987,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                     device_info = {}
 
                 UserSession.objects.create(
+                    id=session_id,
                     user=user,
                     refresh_token=str(refresh),
                     device_info=device_info,
@@ -1987,7 +2010,7 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                 print(f"Error during login: {str(e)}")
                 raise serializers.ValidationError('Error al procesar el login. Por favor, intente nuevamente.')
         else:
-            raise serializers.ValidationError('Credenciales inválidas')
+            raise serializers.ValidationError('Credenciales invalidas')
 
     def get_client_ip(self, request):
         """Get client IP address from request"""

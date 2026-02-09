@@ -2,6 +2,7 @@
 Middleware for session management and inactivity tracking.
 """
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -12,12 +13,16 @@ class SessionActivityMiddleware:
     """
     Middleware that:
     1. Updates last_activity timestamp for active sessions
-    2. Marks sessions as inactive if they exceed 30 minutes without activity
+    2. Marks sessions as inactive if they exceed configured inactivity timeout
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.INACTIVITY_TIMEOUT = timedelta(minutes=30)  # 30 minutes
+        inactivity_minutes = max(
+            1,
+            int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 20)),
+        )
+        self.INACTIVITY_TIMEOUT = timedelta(minutes=inactivity_minutes)
 
     def __call__(self, request):
         # Process request
@@ -29,8 +34,8 @@ class SessionActivityMiddleware:
         Called just before the view is called.
         Updates session activity and checks for inactive sessions.
         """
-        # Skip if this is a login or registration request
-        if request.path in ['/api/token/', '/api/register/', '/api/verify-email/', '/api/verify-code/']:
+        # Skip auth/registration endpoints that don't represent user activity for existing sessions
+        if request.path in ['/api/token/', '/api/token/refresh/', '/api/register/', '/api/verify-email/', '/api/verify-code/']:
             return None
 
         # Get the auth header
@@ -42,25 +47,35 @@ class SessionActivityMiddleware:
                 # Decode token to get user info
                 untyped_token = UntypedToken(token)
                 user_id = untyped_token.get('user_id')
+                session_id = untyped_token.get('session_id')
 
-                if user_id:
-                    # Find and update the session's last_activity
-                    sessions = UserSession.objects.filter(
-                        user_id=user_id,
-                        is_active=True
-                    )
+                now = timezone.now()
+                inactive_threshold = now - self.INACTIVITY_TIMEOUT
 
-                    # Update last_activity for all active sessions
-                    sessions.update(last_activity=timezone.now())
+                # Always cleanup stale sessions first.
+                UserSession.objects.filter(
+                    is_active=True,
+                    last_activity__lt=inactive_threshold
+                ).update(is_active=False)
 
-                    # Check for inactive sessions and mark them as inactive
-                    now = timezone.now()
-                    inactive_threshold = now - self.INACTIVITY_TIMEOUT
-
+                if user_id and session_id:
+                    # Preferred: update only current device/session.
                     UserSession.objects.filter(
+                        id=session_id,
+                        user_id=user_id,
                         is_active=True,
-                        last_activity__lt=inactive_threshold
-                    ).update(is_active=False)
+                    ).update(last_activity=now)
+                elif user_id:
+                    # Backward compatibility for tokens minted before `session_id` claim existed.
+                    latest_session = (
+                        UserSession.objects
+                        .filter(user_id=user_id, is_active=True)
+                        .order_by('-last_activity')
+                        .first()
+                    )
+                    if latest_session:
+                        latest_session.last_activity = now
+                        latest_session.save(update_fields=['last_activity'])
 
             except (InvalidToken, TokenError):
                 # Invalid token, let the view handle it

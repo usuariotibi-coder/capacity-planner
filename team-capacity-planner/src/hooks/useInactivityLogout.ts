@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../utils/apiUrl';
 
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
-const SESSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check session status every 5 minutes
+const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes in milliseconds
+const SESSION_CHECK_INTERVAL = 60 * 1000; // Check session status every 1 minute
 const BASE_URL = API_BASE_URL;
 const API_URL = `${BASE_URL}/api`;
 
@@ -14,7 +14,7 @@ export const useInactivityLogout = () => {
     if (!isLoggedIn) return;
 
     let inactivityTimer: ReturnType<typeof setTimeout>;
-    let sessionCheckTimer: ReturnType<typeof setTimeout>;
+    let sessionCheckTimer: ReturnType<typeof setInterval>;
     let sessionStatusEndpointAvailable = true;
 
     const resetTimer = () => {
@@ -23,7 +23,7 @@ export const useInactivityLogout = () => {
 
       // Set new timer for inactivity logout
       inactivityTimer = setTimeout(() => {
-        console.log('[useInactivityLogout] User inactive for 30 minutes, logging out...');
+        console.log('[useInactivityLogout] User inactive for 20 minutes, logging out...');
         logout();
       }, INACTIVITY_TIMEOUT);
     };
@@ -96,22 +96,23 @@ export const useInactivityLogout = () => {
     // Handle tab/window close - logout when user closes the tab/browser
     const handleBeforeUnload = () => {
       console.log('[useInactivityLogout] Tab/window closing, logging out...');
-      // Use sendBeacon to ensure logout request completes even if tab is closing
       const refreshToken = localStorage.getItem('refresh_token');
       const accessToken = localStorage.getItem('access_token');
 
       if (refreshToken && accessToken) {
         try {
-          // Use navigator.sendBeacon for reliable delivery when page unloads
-          navigator.sendBeacon(`${API_URL}/logout/`, JSON.stringify({
-            refresh: refreshToken,
+          // keepalive allows the request to continue while the page is unloading.
+          fetch(`${API_URL}/logout/`, {
+            method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${accessToken}`,
             },
-          }));
+            body: JSON.stringify({ refresh: refreshToken }),
+            keepalive: true,
+          }).catch(() => {});
         } catch (error) {
-          console.error('[useInactivityLogout] Error sending logout beacon:', error);
+          console.error('[useInactivityLogout] Error sending keepalive logout:', error);
         }
       }
     };

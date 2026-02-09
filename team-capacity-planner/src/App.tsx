@@ -69,7 +69,7 @@ function MainApp() {
   // Load data from API when authenticated
   useDataLoader();
 
-  // Handle inactivity logout (1 hour)
+  // Handle inactivity logout (20 minutes)
   useInactivityLogout();
 
   useEffect(() => {

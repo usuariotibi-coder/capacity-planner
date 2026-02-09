@@ -162,6 +162,18 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
+# Session Management
+SESSION_INACTIVITY_TIMEOUT_MINUTES = config(
+    'SESSION_INACTIVITY_TIMEOUT_MINUTES',
+    default=20,
+    cast=int,
+)
+MAX_ACTIVE_SESSIONS_PER_USER = config(
+    'MAX_ACTIVE_SESSIONS_PER_USER',
+    default=2,
+    cast=int,
+)
+
 # CORS Configuration for frontend access
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
