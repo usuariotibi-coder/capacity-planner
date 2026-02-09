@@ -205,7 +205,8 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
 
-# Email Configuration (SendGrid)
+# Email Configuration (Resend/SendGrid/SMTP fallback)
+RESEND_API_KEY = config('RESEND_API_KEY', default='')
 SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@example.com')
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')

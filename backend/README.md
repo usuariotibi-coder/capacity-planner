@@ -256,6 +256,26 @@ DB_PORT=5432
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
+### Configuración de Email (Resend recomendado)
+
+Para el flujo de verificación por código:
+
+```env
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
+DEFAULT_FROM_EMAIL=noreply@na.scio-automation.com
+```
+
+Opcional (fallback SMTP si no hay API key):
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.resend.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=resend
+EMAIL_HOST_PASSWORD=re_smtp_xxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
 ### Configuración de CORS
 
 Configurar CORS en `.env`:
@@ -368,3 +388,4 @@ Para problemas o preguntas, contactar al equipo de desarrollo.
 **Última Actualización**: 6 de enero de 2026
 **Versión**: 1.0.0
 **Estado**: Listo para Producción
+

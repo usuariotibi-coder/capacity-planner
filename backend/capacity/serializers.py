@@ -7,8 +7,11 @@ budgets, and activity logs with proper validation and nested relationships.
 """
 
 import logging
+import json
 import secrets
 import threading
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 import uuid
 
 from rest_framework import serializers
@@ -319,12 +322,15 @@ class UserRegistrationSerializer(serializers.Serializer):
     def _send_verification_code_email(self, user, code):
         """
         Send 6-digit verification code email.
-        Uses SendGrid when SENDGRID_API_KEY is configured; otherwise falls back
-        to Django's configured email backend (SMTP, console, etc.).
+        Priority order:
+        1) Resend API (RESEND_API_KEY)
+        2) SendGrid API (SENDGRID_API_KEY)
+        3) Django email backend (SMTP, console, etc.)
         """
         from django.conf import settings
         from django.core.mail import EmailMultiAlternatives
 
+        resend_api_key = getattr(settings, 'RESEND_API_KEY', None)
         sendgrid_api_key = getattr(settings, 'SENDGRID_API_KEY', None)
         from_email = (
             getattr(settings, 'DEFAULT_FROM_EMAIL', None)
@@ -365,6 +371,28 @@ If you didn't request this code, please ignore this email.
 
 - Team Capacity Planner"""
 
+        if resend_api_key:
+            try:
+                response_body = self._send_via_resend(
+                    api_key=resend_api_key,
+                    from_email=from_email,
+                    to_email=user.email,
+                    subject=subject,
+                    html_content=html_content,
+                    text_content=text_content,
+                )
+                logger.info(
+                    "Verification email sent via Resend to %s (response=%s)",
+                    user.email,
+                    response_body,
+                )
+                return
+            except Exception:
+                logger.exception(
+                    "Resend failed for %s, trying next provider",
+                    user.email,
+                )
+
         if sendgrid_api_key:
             try:
                 from sendgrid import SendGridAPIClient
@@ -404,6 +432,45 @@ If you didn't request this code, please ignore this email.
             user.email,
             sent_count,
         )
+
+    def _send_via_resend(self, api_key, from_email, to_email, subject, html_content, text_content):
+        """
+        Send email through Resend HTTP API.
+        """
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content,
+        }
+
+        request = urllib_request.Request(
+            url='https://api.resend.com/emails',
+            data=json.dumps(payload).encode('utf-8'),
+            method='POST',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+        )
+
+        try:
+            with urllib_request.urlopen(request, timeout=15) as response:
+                body = response.read().decode('utf-8', errors='ignore')
+                status_code = response.getcode()
+        except urllib_error.HTTPError as exc:
+            error_body = exc.read().decode('utf-8', errors='ignore')
+            raise RuntimeError(
+                f"Resend API error {exc.code}: {error_body}"
+            ) from exc
+        except urllib_error.URLError as exc:
+            raise RuntimeError(f"Resend connection error: {exc.reason}") from exc
+
+        if status_code < 200 or status_code >= 300:
+            raise RuntimeError(f"Resend returned unexpected status: {status_code}")
+
+        return body
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
