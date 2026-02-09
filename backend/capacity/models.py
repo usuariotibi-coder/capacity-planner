@@ -5,6 +5,8 @@ This module defines the core data models for managing projects, employees,
 assignments, and other capacity planning data.
 """
 
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator

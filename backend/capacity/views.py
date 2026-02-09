@@ -609,6 +609,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             default=False,
         )
 
+        if include_hidden and not _has_full_access(self.request.user):
+            raise PermissionDenied('No tienes permiso para consultar proyectos ocultos.')
+
         if not include_hidden:
             queryset = queryset.filter(is_hidden=False)
 
@@ -1285,6 +1288,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             default=False,
         )
 
+        if include_hidden and not _has_full_access(self.request.user):
+            raise PermissionDenied('No tienes permiso para consultar asignaciones ocultas.')
+
         if not include_hidden:
             queryset = queryset.filter(project__is_hidden=False)
 
@@ -1398,6 +1404,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             request.query_params.get('include_hidden'),
             default=False,
         )
+
+        if include_hidden and not _has_full_access(request.user):
+            raise PermissionDenied('No tienes permiso para consultar asignaciones ocultas.')
 
         if not include_hidden:
             qs = qs.filter(project__is_hidden=False)

@@ -6,6 +6,9 @@ It includes serializers for employees, projects, assignments, departments,
 budgets, and activity logs with proper validation and nested relationships.
 """
 
+import logging
+import secrets
+import threading
 import uuid
 
 from rest_framework import serializers
@@ -32,8 +35,11 @@ from .models import (
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
     DepartmentWeeklyTotal,
+    EmailVerification,
     UserProfile,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -249,15 +255,14 @@ class UserRegistrationSerializer(serializers.Serializer):
 
         try:
             with transaction.atomic():
-                # Create ACTIVE user (no email verification required)
-                # Domain validation (@na.scio-automation.com) ensures only company employees can register
+                # Keep new users inactive until verification code is confirmed.
                 user = User.objects.create_user(
                     username=validated_data['email'],
                     email=validated_data['email'],
                     first_name=validated_data['first_name'],
                     last_name=validated_data['last_name'],
                     password=validated_data['password'],
-                    is_active=True  # User is active immediately
+                    is_active=False,
                 )
 
                 # Assign basic permissions: view and change for employees, projects, and assignments
@@ -277,13 +282,39 @@ class UserRegistrationSerializer(serializers.Serializer):
                     department=department,
                     other_department=other_department
                 )
+
+                verification = EmailVerification.objects.create(
+                    user=user,
+                    token=secrets.token_urlsafe(32),
+                    code=EmailVerification.generate_code(),
+                    attempts=0,
+                )
+
+                transaction.on_commit(
+                    lambda: self._send_verification_code_email_async(user, verification.code)
+                )
         except IntegrityError:
             raise serializers.ValidationError({
                 "email": "A user with this email already exists."
             })
 
-        print(f"[REGISTER] User {user.email} created and activated successfully")
+        print(f"[REGISTER] User {user.email} created in pending verification state")
         return user
+
+    def _send_verification_code_email_async(self, user, code):
+        """Dispatch verification email in background after transaction commit."""
+        def send_email_background():
+            try:
+                self._send_verification_code_email(user, code)
+            except Exception as exc:
+                logger.exception(
+                    "Failed to send verification email to %s: %s",
+                    user.email,
+                    exc,
+                )
+
+        email_thread = threading.Thread(target=send_email_background, daemon=True)
+        email_thread.start()
 
     def _send_verification_code_email(self, user, code):
         """
@@ -1915,6 +1946,10 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
         user = User.objects.filter(username__iexact=username).first()
 
         if user and user.check_password(password):
+            if not user.is_active:
+                raise serializers.ValidationError(
+                    'Cuenta sin verificar. Confirma el codigo enviado a tu correo.'
+                )
             try:
                 inactivity_timeout_minutes = max(
                     1,

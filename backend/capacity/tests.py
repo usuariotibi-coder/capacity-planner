@@ -11,6 +11,7 @@ from .models import (
     Assignment,
     Department,
     DepartmentStageConfig,
+    EmailVerification,
     Employee,
     Facility,
     Project,
@@ -310,3 +311,148 @@ class SessionControlTests(APITestCase):
         session_status = self.client.get(reverse('session_status'), **self._auth_headers(access))
         self.assertEqual(session_status.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertFalse(UserSession.objects.get(id=session_id).is_active)
+
+
+class RegistrationVerificationTests(APITestCase):
+    def _registration_payload(self, email='new.user@na.scio-automation.com'):
+        return {
+            'email': email,
+            'password': 'StrongPassword123!',
+            'confirm_password': 'StrongPassword123!',
+            'first_name': 'New',
+            'last_name': 'User',
+            'department': UserDepartment.PRG,
+        }
+
+    def test_registration_creates_inactive_user_with_verification_code(self):
+        payload = self._registration_payload()
+
+        response = self.client.post(reverse('user_register'), payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email=payload['email'])
+        verification = EmailVerification.objects.get(user=user)
+        self.assertFalse(user.is_active)
+        self.assertIsNotNone(verification.code)
+        self.assertEqual(len(verification.code), 6)
+        self.assertIsNone(verification.verified_at)
+
+    def test_login_fails_until_user_is_verified(self):
+        payload = self._registration_payload(email='pending.user@na.scio-automation.com')
+        register_response = self.client.post(reverse('user_register'), payload, format='json')
+        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
+
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'username': payload['email'], 'password': payload['password']},
+            format='json',
+        )
+
+        self.assertEqual(login_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('verificar', str(login_response.data).lower())
+
+    def test_verify_code_activates_user_and_allows_login(self):
+        payload = self._registration_payload(email='verified.user@na.scio-automation.com')
+        register_response = self.client.post(reverse('user_register'), payload, format='json')
+        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
+
+        verification = EmailVerification.objects.get(user__email=payload['email'])
+        verify_response = self.client.post(
+            reverse('verify_code'),
+            {'email': payload['email'], 'code': verification.code},
+            format='json',
+        )
+        self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
+
+        user = User.objects.get(email=payload['email'])
+        self.assertTrue(user.is_active)
+
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'username': payload['email'], 'password': payload['password']},
+            format='json',
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', login_response.data)
+        self.assertIn('refresh', login_response.data)
+
+
+class HiddenDataAccessControlTests(APITestCase):
+    @staticmethod
+    def _extract_results(response):
+        if isinstance(response.data, dict) and 'results' in response.data:
+            return response.data['results']
+        return response.data
+
+    def setUp(self):
+        self.employee = Employee.objects.create(
+            name='Hidden Data Tester',
+            role='Engineer',
+            department=Department.PRG,
+            capacity=40,
+            is_active=True,
+        )
+        self.project = Project.objects.create(
+            name='Hidden Project',
+            client='Internal',
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=28),
+            facility=Facility.MX,
+            number_of_weeks=4,
+            is_hidden=True,
+            hidden_at=timezone.now(),
+        )
+        self.assignment = Assignment.objects.create(
+            employee=self.employee,
+            project=self.project,
+            week_start_date=date.today(),
+            hours=8,
+            stage=None,
+        )
+
+        self.department_user = User.objects.create_user(
+            username='department.user',
+            email='department.user@na.scio-automation.com',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(user=self.department_user, department=UserDepartment.PRG)
+
+        self.full_access_user = User.objects.create_user(
+            username='full-access-user',
+            email='full.access@na.scio-automation.com',
+            password='test-password',
+            is_active=True,
+            is_staff=True,
+        )
+
+    def test_department_user_cannot_include_hidden_projects(self):
+        self.client.force_authenticate(user=self.department_user)
+        response = self.client.get(reverse('project-list'), {'include_hidden': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_department_user_cannot_include_hidden_assignments(self):
+        self.client.force_authenticate(user=self.department_user)
+        response = self.client.get(reverse('assignment-list'), {'include_hidden': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_department_user_cannot_include_hidden_summary(self):
+        self.client.force_authenticate(user=self.department_user)
+        response = self.client.get(
+            reverse('assignment-summary-by-project-dept'),
+            {'project_ids': str(self.project.id), 'include_hidden': 'true'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_full_access_user_can_include_hidden_projects_and_assignments(self):
+        self.client.force_authenticate(user=self.full_access_user)
+
+        project_response = self.client.get(reverse('project-list'), {'include_hidden': 'true'})
+        self.assertEqual(project_response.status_code, status.HTTP_200_OK)
+        project_ids = {str(item['id']) for item in self._extract_results(project_response)}
+        self.assertIn(str(self.project.id), project_ids)
+
+        assignment_response = self.client.get(reverse('assignment-list'), {'include_hidden': 'true'})
+        self.assertEqual(assignment_response.status_code, status.HTTP_200_OK)
+        assignment_ids = {str(item['id']) for item in self._extract_results(assignment_response)}
+        self.assertIn(str(self.assignment.id), assignment_ids)
