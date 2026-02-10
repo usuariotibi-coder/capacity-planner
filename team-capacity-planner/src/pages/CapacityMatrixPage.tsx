@@ -1967,15 +1967,79 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const truncateText = (value: string, maxLength: number) =>
         value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 5;
+      const headerHeight = 20;
+      const sectionGap = 2.5;
+      const contentY = margin + headerHeight + sectionGap;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - contentY - margin;
+      const imagePadding = 1.5;
+      const maxImageWidth = contentWidth - imagePadding * 2;
+      const maxImageHeight = contentHeight - imagePadding * 2;
+      const pageAspectRatio = maxImageWidth / maxImageHeight;
+      const generatedLabel = language === 'es'
+        ? `Generado: ${new Date().toLocaleString('es-ES')}`
+        : `Generated: ${new Date().toLocaleString('en-US')}`;
+
+      const renderProjectPageHeader = (project: Project, sectionLabel?: string) => {
+        const weeks = projectDurationWeeksById.get(project.id) ?? project.numberOfWeeks;
+        const pmName = project.projectManagerId
+          ? (projectManagerNameById.get(project.id) || 'PM')
+          : (language === 'es' ? 'Sin PM' : 'No PM');
+        const viewLabel = departmentFilter === 'General'
+          ? (language === 'es' ? 'Vista General' : 'General View')
+          : `${language === 'es' ? 'Departamento' : 'Department'}: ${departmentFilter}`;
+
+        pdf.setFillColor(245, 247, 255);
+        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+        pdf.setFillColor(37, 99, 235);
+        pdf.roundedRect(margin, margin, contentWidth, headerHeight, 3, 3, 'F');
+
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(15);
+        pdf.text(truncateText(project.name || 'Project', 80), margin + 4, margin + 7.5);
+
+        const subtitle = `${project.client || '-'}  |  ${weeks} ${language === 'es' ? 'semanas' : 'weeks'}  |  PM: ${pmName}  |  ${viewLabel}`;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text(truncateText(subtitle, 150), margin + 4, margin + 14.5);
+
+        pdf.setFontSize(8.5);
+        const generatedLabelWidth = pdf.getTextWidth(generatedLabel) + 6;
+        const generatedLabelX = pageWidth - margin - generatedLabelWidth;
+        pdf.setFillColor(219, 234, 254);
+        pdf.roundedRect(generatedLabelX, margin + 2.2, generatedLabelWidth, 5.8, 2, 2, 'F');
+        pdf.setTextColor(29, 78, 216);
+        pdf.text(generatedLabel, generatedLabelX + 3, margin + 6.2);
+
+        if (sectionLabel) {
+          const sectionWidth = pdf.getTextWidth(sectionLabel) + 6;
+          const sectionX = pageWidth - margin - sectionWidth;
+          pdf.setFillColor(191, 219, 254);
+          pdf.roundedRect(sectionX, margin + 9.2, sectionWidth, 5.8, 2, 2, 'F');
+          pdf.setTextColor(30, 64, 175);
+          pdf.text(sectionLabel, sectionX + 3, margin + 13.2);
+        }
+
+        pdf.setDrawColor(191, 219, 254);
+        pdf.setLineWidth(0.4);
+        pdf.roundedRect(margin, contentY, contentWidth, contentHeight, 2, 2, 'S');
+      };
+
       for (const project of targetProjects) {
         const timelineContainer = projectTableRefs.current.get(project.id);
         if (!timelineContainer) continue;
 
-        const timelineTarget = (timelineContainer.querySelector('table') as HTMLElement | null) || timelineContainer;
-        const captureWidth = Math.max(timelineTarget.scrollWidth, timelineTarget.clientWidth);
-        const captureHeight = Math.max(timelineTarget.scrollHeight, timelineTarget.clientHeight);
+        const timelineTable = timelineContainer.querySelector('table') as HTMLTableElement | null;
+        if (!timelineTable) continue;
+        const captureWidth = Math.max(1, Math.ceil(timelineTable.scrollWidth));
+        const captureHeight = Math.max(1, Math.ceil(timelineTable.scrollHeight));
 
-        const canvas = await html2canvas(timelineTarget, {
+        const canvas = await html2canvas(timelineTable, {
           backgroundColor: '#ffffff',
           useCORS: true,
           scale: 2,
@@ -1988,78 +2052,66 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           scrollY: -window.scrollY,
         });
 
-        if (capturedCount > 0) {
-          pdf.addPage();
+        const chunkWidthPx = Math.max(1, Math.floor(canvas.height * pageAspectRatio));
+        const totalChunks = Math.max(1, Math.ceil(canvas.width / chunkWidthPx));
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+          const sourceX = chunkIndex * chunkWidthPx;
+          const sourceWidth = Math.min(chunkWidthPx, canvas.width - sourceX);
+          const sourceHeight = canvas.height;
+
+          const chunkCanvas = document.createElement('canvas');
+          chunkCanvas.width = sourceWidth;
+          chunkCanvas.height = sourceHeight;
+
+          const chunkCtx = chunkCanvas.getContext('2d');
+          if (!chunkCtx) {
+            continue;
+          }
+
+          chunkCtx.drawImage(
+            canvas,
+            sourceX,
+            0,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            sourceWidth,
+            sourceHeight
+          );
+
+          if (capturedCount > 0) {
+            pdf.addPage();
+          }
+
+          const sectionLabel = totalChunks > 1
+            ? (language === 'es'
+              ? `Seccion ${chunkIndex + 1}/${totalChunks}`
+              : `Section ${chunkIndex + 1}/${totalChunks}`)
+            : undefined;
+
+          renderProjectPageHeader(project, sectionLabel);
+
+          const ratio = Math.min(maxImageWidth / sourceWidth, maxImageHeight / sourceHeight);
+          const renderWidth = sourceWidth * ratio;
+          const renderHeight = sourceHeight * ratio;
+          const offsetX = margin + (contentWidth - renderWidth) / 2;
+          const offsetY = contentY + (contentHeight - renderHeight) / 2;
+
+          pdf.addImage(
+            chunkCanvas.toDataURL('image/png'),
+            'PNG',
+            offsetX,
+            offsetY,
+            renderWidth,
+            renderHeight,
+            undefined,
+            'FAST'
+          );
+
+          capturedCount += 1;
         }
-
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 8;
-        const headerHeight = 24;
-        const sectionGap = 4;
-        const contentY = margin + headerHeight + sectionGap;
-        const contentWidth = pageWidth - margin * 2;
-        const contentHeight = pageHeight - contentY - margin;
-        const imagePadding = 2;
-        const maxImageWidth = contentWidth - imagePadding * 2;
-        const maxImageHeight = contentHeight - imagePadding * 2;
-        const ratio = Math.min(maxImageWidth / canvas.width, maxImageHeight / canvas.height);
-        const renderWidth = canvas.width * ratio;
-        const renderHeight = canvas.height * ratio;
-        const offsetX = margin + (contentWidth - renderWidth) / 2;
-        const offsetY = contentY + imagePadding;
-
-        const weeks = projectDurationWeeksById.get(project.id) ?? project.numberOfWeeks;
-        const pmName = project.projectManagerId
-          ? (projectManagerNameById.get(project.id) || 'PM')
-          : (language === 'es' ? 'Sin PM' : 'No PM');
-        const viewLabel = departmentFilter === 'General'
-          ? (language === 'es' ? 'Vista General' : 'General View')
-          : `${language === 'es' ? 'Departamento' : 'Department'}: ${departmentFilter}`;
-        const generatedLabel = language === 'es'
-          ? `Generado: ${new Date().toLocaleString('es-ES')}`
-          : `Generated: ${new Date().toLocaleString('en-US')}`;
-
-        pdf.setFillColor(245, 247, 255);
-        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-        pdf.setFillColor(37, 99, 235);
-        pdf.roundedRect(margin, margin, contentWidth, headerHeight, 3, 3, 'F');
-
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(15);
-        pdf.text(truncateText(project.name || 'Project', 80), margin + 4, margin + 8.5);
-
-        const subtitle = `${project.client || '-'}  |  ${weeks} ${language === 'es' ? 'semanas' : 'weeks'}  |  PM: ${pmName}  |  ${viewLabel}`;
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(10);
-        pdf.text(truncateText(subtitle, 150), margin + 4, margin + 16.5);
-
-        pdf.setFontSize(9);
-        const generatedLabelWidth = pdf.getTextWidth(generatedLabel) + 6;
-        const generatedLabelX = pageWidth - margin - generatedLabelWidth;
-        pdf.setFillColor(219, 234, 254);
-        pdf.roundedRect(generatedLabelX, margin + 4.5, generatedLabelWidth, 6.2, 2, 2, 'F');
-        pdf.setTextColor(29, 78, 216);
-        pdf.text(generatedLabel, generatedLabelX + 3, margin + 8.9);
-
-        pdf.setDrawColor(191, 219, 254);
-        pdf.setLineWidth(0.4);
-        pdf.roundedRect(margin, contentY, contentWidth, contentHeight, 2, 2, 'S');
-
-        pdf.addImage(
-          canvas.toDataURL('image/png'),
-          'PNG',
-          offsetX,
-          offsetY,
-          renderWidth,
-          renderHeight,
-          undefined,
-          'FAST'
-        );
-
-        capturedCount += 1;
       }
 
       if (capturedCount === 0) {
