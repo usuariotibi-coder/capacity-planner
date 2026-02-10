@@ -1395,11 +1395,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       if (filteredSelectedIds.length !== selectedExportProjectIds.length) {
         setSelectedExportProjectIds(filteredSelectedIds);
-        return;
-      }
-
-      if (filteredSelectedIds.length === 0) {
-        setSelectedExportProjectIds([projectsVisibleInCurrentView[0].id]);
       }
     }
   }, [
@@ -1891,7 +1886,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
     setPdfExportScope('single');
     setSelectedExportProjectId(firstProjectId);
-    setSelectedExportProjectIds(firstProjectId ? [firstProjectId] : []);
+    setSelectedExportProjectIds([]);
     setShowExportPdfModal(true);
   };
 
@@ -4935,13 +4930,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       name="pdfExportScope"
                       value="selected"
                       checked={pdfExportScope === 'selected'}
-                      onChange={() => {
-                        const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
-                        setPdfExportScope('selected');
-                        if (!selectedExportProjectIds.length && firstProjectId) {
-                          setSelectedExportProjectIds([firstProjectId]);
-                        }
-                      }}
+                      onChange={() => setPdfExportScope('selected')}
                       disabled={isExportingPdf}
                     />
                     {language === 'es' ? 'Seleccionar varios proyectos' : 'Select multiple projects'}

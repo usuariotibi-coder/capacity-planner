@@ -16,6 +16,8 @@ export const useInactivityLogout = () => {
     let inactivityTimer: ReturnType<typeof setTimeout>;
     let sessionCheckTimer: ReturnType<typeof setInterval>;
     let sessionStatusEndpointAvailable = true;
+    let consecutiveAuthFailures = 0;
+    const MAX_CONSECUTIVE_AUTH_FAILURES = 2;
 
     const resetTimer = () => {
       // Clear existing timer
@@ -45,14 +47,8 @@ export const useInactivityLogout = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          cache: 'no-store',
         });
-
-        // Only force logout for explicit auth failures.
-        if (response.status === 401 || response.status === 403) {
-          console.log('[useInactivityLogout] Session inactive on backend, logging out...');
-          logout();
-          return;
-        }
 
         // Some deployments don't expose this endpoint. Don't treat that as an inactive session.
         if (response.status === 404) {
@@ -62,6 +58,27 @@ export const useInactivityLogout = () => {
           return;
         }
 
+        // Avoid false-positive logouts from a single transient 401/403.
+        if (response.status === 401 || response.status === 403) {
+          consecutiveAuthFailures += 1;
+          console.warn(
+            `[useInactivityLogout] Session status auth failure ${consecutiveAuthFailures}/${MAX_CONSECUTIVE_AUTH_FAILURES}`
+          );
+
+          if (consecutiveAuthFailures >= MAX_CONSECUTIVE_AUTH_FAILURES) {
+            console.log('[useInactivityLogout] Session inactive on backend (confirmed), logging out...');
+            logout();
+          }
+          return;
+        }
+
+        // Reset failure streak after a successful check.
+        if (response.ok) {
+          consecutiveAuthFailures = 0;
+          return;
+        }
+
+        consecutiveAuthFailures = 0;
         if (!response.ok) {
           console.warn('[useInactivityLogout] Session status check failed with status:', response.status);
         }
@@ -93,32 +110,6 @@ export const useInactivityLogout = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Handle tab/window close - logout when user closes the tab/browser
-    const handleBeforeUnload = () => {
-      console.log('[useInactivityLogout] Tab/window closing, logging out...');
-      const refreshToken = localStorage.getItem('refresh_token');
-      const accessToken = localStorage.getItem('access_token');
-
-      if (refreshToken && accessToken) {
-        try {
-          // keepalive allows the request to continue while the page is unloading.
-          fetch(`${API_URL}/logout/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({ refresh: refreshToken }),
-            keepalive: true,
-          }).catch(() => {});
-        } catch (error) {
-          console.error('[useInactivityLogout] Error sending keepalive logout:', error);
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
     // Initialize timer on mount
     resetTimer();
 
@@ -130,7 +121,6 @@ export const useInactivityLogout = () => {
         window.removeEventListener(event, resetTimer);
       });
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [isLoggedIn, logout]);
 };
