@@ -3946,7 +3946,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   {/* Expandable content - includes hours panel AND table */}
                   {expandedProjects[proj.id] && (
                     <>
-                      {/* Quoted/Used/Forecast/Utilization by Department - compact and readable */}
+                      {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
                       <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
                           {DEPARTMENTS.map((dept) => {
@@ -3963,32 +3963,35 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                             return (
                               <div
                                 key={dept}
-                                className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-1 border border-gray-100"
+                                className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
                                 title={`${deptLabel}
-Q: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
-U: ${formatHours(utilizedHoursValue)}h
-F: ${formatHours(forecastedHoursValue)}h
+${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
+${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
+${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
                               >
-                                <div className="flex items-center justify-center gap-1 mb-0.5">
-                                  <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                  <span className="text-[10px] font-bold text-gray-800">{dept}</span>
+                                <div className="flex items-center justify-center gap-1 mb-0">
+                                  <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                  <span className="text-[9px] font-bold text-gray-800">{dept}</span>
                                 </div>
-                                <div className="text-[9px] text-gray-600 text-center font-semibold truncate mb-0.5">
+                                <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
                                   {deptLabel}
                                 </div>
                                 <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
-                                  <div className="rounded bg-blue-100 border border-blue-200 text-[9px] font-bold text-blue-700 leading-tight">
-                                    Q {formatHours(totalQuotedHoursValue)}
+                                  <div className="rounded bg-blue-100 border border-blue-200 px-0.5 py-[1px] text-blue-700 leading-none">
+                                    <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
+                                    <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</div>
                                   </div>
-                                  <div className="rounded bg-purple-100 border border-purple-200 text-[9px] font-bold text-purple-700 leading-tight">
-                                    U {formatHours(utilizedHoursValue)}
+                                  <div className="rounded bg-purple-100 border border-purple-200 px-0.5 py-[1px] text-purple-700 leading-none">
+                                    <div className="text-[7px] font-semibold truncate">{t.usedLabel}</div>
+                                    <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</div>
                                   </div>
-                                  <div className="rounded bg-orange-100 border border-orange-200 text-[9px] font-bold text-orange-700 leading-tight">
-                                    F {formatHours(forecastedHoursValue)}
+                                  <div className="rounded bg-orange-100 border border-orange-200 px-0.5 py-[1px] text-orange-700 leading-none">
+                                    <div className="text-[7px] font-semibold truncate">{t.pronosticado}</div>
+                                    <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</div>
                                   </div>
                                 </div>
-                                <div className={`px-1 py-0.5 rounded text-[10px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+                                <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
                                   {utilizationPercent}%
                                 </div>
                               </div>
