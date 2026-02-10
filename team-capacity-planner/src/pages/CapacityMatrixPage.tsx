@@ -41,6 +41,7 @@ interface CapacityMatrixPageProps {
 }
 
 type FormValidationScope = 'quick' | 'import';
+type PdfExportScope = 'single' | 'all';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
@@ -247,6 +248,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     numberOfWeeks: '' as any,
     budgetHours: '' as any,
   });
+  const [showExportPdfModal, setShowExportPdfModal] = useState(false);
+  const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
+  const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [formValidationPopup, setFormValidationPopup] = useState<{
     scope: FormValidationScope;
     title: string;
@@ -946,6 +951,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const departmentsTableRef = useRef<HTMLDivElement>(null);
   const projectsTableRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const projectCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -1366,6 +1372,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const scopeKey = getProjectOrderScopeKey('General');
     return sortProjectsByStoredOrder(generalProjects, scopeKey);
   }, [generalProjects, projectOrderByScope]);
+
+  const projectsVisibleInCurrentView = useMemo(() => {
+    return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
+  }, [departmentFilter, orderedDepartmentProjects, orderedGeneralProjects]);
+
+  useEffect(() => {
+    if (!showExportPdfModal) return;
+    if (pdfExportScope !== 'single') return;
+    if (!projectsVisibleInCurrentView.length) return;
+    const selectedStillExists = projectsVisibleInCurrentView.some((proj) => proj.id === selectedExportProjectId);
+    if (!selectedStillExists) {
+      setSelectedExportProjectId(projectsVisibleInCurrentView[0].id);
+    }
+  }, [showExportPdfModal, pdfExportScope, projectsVisibleInCurrentView, selectedExportProjectId]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -1843,6 +1863,150 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     departmentFilter !== 'General' &&
     departmentFilter !== 'PM' &&
     canEditDepartment(departmentFilter as Department);
+
+  const openExportPdfModal = () => {
+    setPdfExportScope('single');
+    setSelectedExportProjectId(projectsVisibleInCurrentView[0]?.id || '');
+    setShowExportPdfModal(true);
+  };
+
+  const closeExportPdfModal = () => {
+    if (isExportingPdf) return;
+    setShowExportPdfModal(false);
+  };
+
+  const handleExportTimelinePdf = async () => {
+    if (isExportingPdf) return;
+
+    const targetProjects = pdfExportScope === 'all'
+      ? projectsVisibleInCurrentView
+      : projectsVisibleInCurrentView.filter((proj) => proj.id === selectedExportProjectId);
+
+    if (targetProjects.length === 0) {
+      alert(language === 'es'
+        ? 'No hay proyectos seleccionados para exportar.'
+        : 'No projects selected to export.');
+      return;
+    }
+
+    const previousExpandedState = new Map<string, boolean>();
+    targetProjects.forEach((proj) => {
+      previousExpandedState.set(proj.id, !!expandedProjects[proj.id]);
+    });
+
+    const projectsToExpand = targetProjects
+      .filter((proj) => !expandedProjects[proj.id])
+      .map((proj) => proj.id);
+
+    try {
+      setIsExportingPdf(true);
+
+      if (projectsToExpand.length > 0) {
+        setExpandedProjects((prev) => {
+          const next = { ...prev };
+          projectsToExpand.forEach((projectId) => {
+            next[projectId] = true;
+          });
+          return next;
+        });
+        await new Promise((resolve) => setTimeout(resolve, 280));
+      }
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      let capturedCount = 0;
+
+      for (const project of targetProjects) {
+        const cardElement = projectCardRefs.current.get(project.id);
+        if (!cardElement) continue;
+
+        const canvas = await html2canvas(cardElement, {
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          scale: 2,
+          logging: false,
+          windowWidth: Math.max(window.innerWidth, cardElement.scrollWidth),
+        });
+
+        if (capturedCount > 0) {
+          pdf.addPage();
+        }
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 6;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - margin * 2;
+        const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+        const renderWidth = canvas.width * ratio;
+        const renderHeight = canvas.height * ratio;
+        const offsetX = (pageWidth - renderWidth) / 2;
+        const offsetY = margin;
+
+        pdf.addImage(
+          canvas.toDataURL('image/png'),
+          'PNG',
+          offsetX,
+          offsetY,
+          renderWidth,
+          renderHeight,
+          undefined,
+          'FAST'
+        );
+
+        capturedCount += 1;
+      }
+
+      if (capturedCount === 0) {
+        alert(language === 'es'
+          ? 'No se pudo capturar el timeline para exportar.'
+          : 'Unable to capture timeline for export.');
+        return;
+      }
+
+      const sanitizeFilePart = (value: string) =>
+        value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+      const scopeLabel = pdfExportScope === 'all'
+        ? 'all-projects'
+        : sanitizeFilePart(targetProjects[0]?.name || 'project');
+      const departmentLabel = sanitizeFilePart(
+        departmentFilter === 'General' ? 'general' : departmentFilter
+      );
+      const dateStamp = new Date().toISOString().slice(0, 10);
+
+      pdf.save(`capacity-timeline-${departmentLabel}-${scopeLabel}-${dateStamp}.pdf`);
+      setShowExportPdfModal(false);
+    } catch (error) {
+      console.error('[CapacityMatrix] Error exporting timeline PDF:', error);
+      alert(language === 'es'
+        ? 'Ocurrió un error al exportar el PDF.'
+        : 'An error occurred while exporting the PDF.');
+    } finally {
+      if (previousExpandedState.size > 0) {
+        setExpandedProjects((prev) => {
+          const next = { ...prev };
+          previousExpandedState.forEach((isExpanded, projectId) => {
+            next[projectId] = isExpanded;
+          });
+          return next;
+        });
+      }
+      setIsExportingPdf(false);
+    }
+  };
 
   useEffect(() => {
     if (!editingCell) return;
@@ -2844,6 +3008,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               <span className="hidden sm:inline">{t.importProject || 'Import'}</span>
             </button>
           )}
+
+          {projectsVisibleInCurrentView.length > 0 && (
+            <button
+              onClick={openExportPdfModal}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-500 hover:bg-rose-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              title={language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF'}
+            >
+              <span>PDF</span>
+              <span className="hidden sm:inline">{language === 'es' ? 'Exportar' : 'Export'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -3342,6 +3517,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               return (
                 <div
                   key={proj.id}
+                  ref={(el) => {
+                    if (el) {
+                      projectCardRefs.current.set(proj.id, el);
+                    } else {
+                      projectCardRefs.current.delete(proj.id);
+                    }
+                  }}
                   className={`relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
@@ -3931,6 +4113,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 return (
                 <div
                   key={proj.id}
+                  ref={(el) => {
+                    if (el) {
+                      projectCardRefs.current.set(proj.id, el);
+                    } else {
+                      projectCardRefs.current.delete(proj.id);
+                    }
+                  }}
                   className={`relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
@@ -4599,6 +4788,104 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Export Timeline PDF Modal */}
+        {showExportPdfModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="bg-rose-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
+                <h2 className="text-lg font-bold">
+                  {language === 'es' ? '📄 Exportar Timeline PDF' : '📄 Export Timeline PDF'}
+                </h2>
+                <button
+                  onClick={closeExportPdfModal}
+                  disabled={isExportingPdf}
+                  className="hover:bg-rose-700 p-1 rounded transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      name="pdfExportScope"
+                      value="single"
+                      checked={pdfExportScope === 'single'}
+                      onChange={() => setPdfExportScope('single')}
+                      disabled={isExportingPdf}
+                    />
+                    {language === 'es' ? 'Solo 1 proyecto' : 'Single project'}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      name="pdfExportScope"
+                      value="all"
+                      checked={pdfExportScope === 'all'}
+                      onChange={() => setPdfExportScope('all')}
+                      disabled={isExportingPdf}
+                    />
+                    {language === 'es' ? 'Todos los proyectos visibles' : 'All visible projects'}
+                  </label>
+                </div>
+
+                {pdfExportScope === 'single' && (
+                  <div>
+                    <label className="block text-sm font-bold mb-1.5 text-gray-700">
+                      {language === 'es' ? 'Proyecto' : 'Project'}
+                    </label>
+                    <select
+                      value={selectedExportProjectId}
+                      onChange={(e) => setSelectedExportProjectId(e.target.value)}
+                      className="w-full border-2 border-rose-200 rounded-lg px-3 py-2 focus:border-rose-500 focus:outline-none transition bg-white text-sm"
+                      disabled={isExportingPdf}
+                    >
+                      {projectsVisibleInCurrentView.map((proj) => (
+                        <option key={proj.id} value={proj.id}>
+                          {proj.name} - {proj.client}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  {pdfExportScope === 'all'
+                    ? (language === 'es'
+                      ? `Se exportarán ${projectsVisibleInCurrentView.length} proyecto(s), una página por proyecto.`
+                      : `${projectsVisibleInCurrentView.length} project(s) will be exported, one page per project.`)
+                    : (language === 'es'
+                      ? 'Se exportará el timeline del proyecto seleccionado.'
+                      : 'The selected project timeline will be exported.')}
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={closeExportPdfModal}
+                    disabled={isExportingPdf}
+                    className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed text-gray-800 font-semibold rounded-lg transition"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportTimelinePdf}
+                    disabled={isExportingPdf || (pdfExportScope === 'single' && !selectedExportProjectId)}
+                    className="flex-1 px-4 py-2 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+                  >
+                    {isExportingPdf
+                      ? (language === 'es' ? 'Exportando...' : 'Exporting...')
+                      : (language === 'es' ? 'Exportar PDF' : 'Export PDF')}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
