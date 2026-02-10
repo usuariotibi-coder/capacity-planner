@@ -1738,6 +1738,94 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return rounded.toFixed(3).replace(/\.?0+$/, '');
   };
 
+  const renderProjectDepartmentSummaryCard = (projectId: string, dept: Department, isMobile = false) => {
+    const quotedHoursValue = getQuotedHours(dept, projectId);
+    const quotedChangeOrdersValue = getQuotedChangeOrders(dept, projectId);
+    const totalQuotedHoursValue = quotedHoursValue + quotedChangeOrdersValue;
+    const utilizedHoursValue = getUtilizedHours(dept, projectId);
+    const forecastedHoursValue = getForecastedHours(dept, projectId);
+    const utilizationPercent = getUtilizationPercent(dept, projectId);
+    const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+    const deptInfo = getDepartmentIcon(dept);
+    const deptLabel = getDepartmentLabel(dept, t);
+
+    if (isMobile) {
+      return (
+        <div
+          key={dept}
+          className="w-[122px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
+          title={`${deptLabel}
+${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
+${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
+${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
+${t.utilizationLabel}: ${utilizationPercent}%`}
+        >
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+            <span className="text-[9px] font-bold text-gray-800">{dept}</span>
+          </div>
+          <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
+            {deptLabel}
+          </div>
+          <div className="space-y-[2px] mb-0.5">
+            <div className="flex items-center justify-between rounded bg-blue-100 border border-blue-200 px-1 py-[1px] text-blue-700 leading-none">
+              <span className="text-[7px] font-semibold">{t.quotedLabel}</span>
+              <span className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded bg-purple-100 border border-purple-200 px-1 py-[1px] text-purple-700 leading-none">
+              <span className="text-[7px] font-semibold">{t.usedLabel}</span>
+              <span className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded bg-orange-100 border border-orange-200 px-1 py-[1px] text-orange-700 leading-none">
+              <span className="text-[7px] font-semibold">{t.pronosticado}</span>
+              <span className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</span>
+            </div>
+          </div>
+          <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+            {utilizationPercent}%
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={dept}
+        className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
+        title={`${deptLabel}
+${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
+${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
+${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
+${t.utilizationLabel}: ${utilizationPercent}%`}
+      >
+        <div className="flex items-center justify-center gap-1 mb-0">
+          <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+          <span className="text-[9px] font-bold text-gray-800">{dept}</span>
+        </div>
+        <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
+          {deptLabel}
+        </div>
+        <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
+          <div className="rounded bg-blue-100 border border-blue-200 px-0.5 py-[1px] text-blue-700 leading-none">
+            <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
+            <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</div>
+          </div>
+          <div className="rounded bg-purple-100 border border-purple-200 px-0.5 py-[1px] text-purple-700 leading-none">
+            <div className="text-[7px] font-semibold truncate">{t.usedLabel}</div>
+            <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</div>
+          </div>
+          <div className="rounded bg-orange-100 border border-orange-200 px-0.5 py-[1px] text-orange-700 leading-none">
+            <div className="text-[7px] font-semibold truncate">{t.pronosticado}</div>
+            <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</div>
+          </div>
+        </div>
+        <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+          {utilizationPercent}%
+        </div>
+      </div>
+    );
+  };
+
   const canEditDepartment = (department: Department): boolean => {
     if (hasFullAccess) return true;
     if (isReadOnly) return false;
@@ -3949,55 +4037,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
                       <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
                         <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}`, display: 'inline-block', minWidth: '100%' }}>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
-                          {DEPARTMENTS.map((dept) => {
-                            const quotedHoursValue = getQuotedHours(dept, proj.id);
-                            const quotedChangeOrdersValue = getQuotedChangeOrders(dept, proj.id);
-                            const totalQuotedHoursValue = quotedHoursValue + quotedChangeOrdersValue;
-                            const utilizedHoursValue = getUtilizedHours(dept, proj.id);
-                            const forecastedHoursValue = getForecastedHours(dept, proj.id);
-                            const utilizationPercent = getUtilizationPercent(dept, proj.id);
-                            const utilizationColorInfo = getUtilizationColor(utilizationPercent);
-                            const deptInfo = getDepartmentIcon(dept);
-                            const deptLabel = getDepartmentLabel(dept, t);
-
-                            return (
-                              <div
-                                key={dept}
-                                className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
-                                title={`${deptLabel}
-${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
-${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
-${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
-${t.utilizationLabel}: ${utilizationPercent}%`}
-                              >
-                                <div className="flex items-center justify-center gap-1 mb-0">
-                                  <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
-                                  <span className="text-[9px] font-bold text-gray-800">{dept}</span>
-                                </div>
-                                <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
-                                  {deptLabel}
-                                </div>
-                                <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
-                                  <div className="rounded bg-blue-100 border border-blue-200 px-0.5 py-[1px] text-blue-700 leading-none">
-                                    <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
-                                    <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</div>
-                                  </div>
-                                  <div className="rounded bg-purple-100 border border-purple-200 px-0.5 py-[1px] text-purple-700 leading-none">
-                                    <div className="text-[7px] font-semibold truncate">{t.usedLabel}</div>
-                                    <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</div>
-                                  </div>
-                                  <div className="rounded bg-orange-100 border border-orange-200 px-0.5 py-[1px] text-orange-700 leading-none">
-                                    <div className="text-[7px] font-semibold truncate">{t.pronosticado}</div>
-                                    <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</div>
-                                  </div>
-                                </div>
-                                <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
-                                  {utilizationPercent}%
-                                </div>
-                              </div>
-                            );
-                          })}
+                          <div className="flex md:hidden gap-1 min-w-max">
+                            {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
+                          </div>
+                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
+                            {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                           </div>
                         </div>
                       </div>
