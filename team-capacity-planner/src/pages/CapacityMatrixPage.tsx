@@ -7,7 +7,7 @@ import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
-import { getDepartmentIcon } from '../utils/departmentIcons';
+import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, AlertTriangle, GripVertical } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -3946,28 +3946,49 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   {/* Expandable content - includes hours panel AND table */}
                   {expandedProjects[proj.id] && (
                     <>
-                      {/* Quoted and Used Hours by Department - ALL departments (Read-only in General View) */}
-                      <div className="bg-white rounded p-0 border border-gray-200 m-0.5">
-                        {/* Show ALL 6 departments in 6 columns - NO edit buttons in General view */}
-                        <div className="grid grid-cols-6 gap-0">
+                      {/* Quoted/Used/Forecast/Utilization by Department - compact and readable */}
+                      <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
                           {DEPARTMENTS.map((dept) => {
+                            const quotedHoursValue = getQuotedHours(dept, proj.id);
+                            const quotedChangeOrdersValue = getQuotedChangeOrders(dept, proj.id);
+                            const totalQuotedHoursValue = quotedHoursValue + quotedChangeOrdersValue;
                             const utilizedHoursValue = getUtilizedHours(dept, proj.id);
-                            const cotizadasHoursValue = proj.departmentHoursAllocated?.[dept] || 0;
+                            const forecastedHoursValue = getForecastedHours(dept, proj.id);
                             const utilizationPercent = getUtilizationPercent(dept, proj.id);
                             const utilizationColorInfo = getUtilizationColor(utilizationPercent);
                             const deptInfo = getDepartmentIcon(dept);
+                            const deptLabel = getDepartmentLabel(dept, t);
 
                             return (
-                              <div key={dept} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100 text-center">
-                                <div className="flex items-center justify-center gap-0 mb-0">
+                              <div
+                                key={dept}
+                                className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-1 border border-gray-100"
+                                title={`${deptLabel}
+Q: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
+U: ${formatHours(utilizedHoursValue)}h
+F: ${formatHours(forecastedHoursValue)}h
+${t.utilizationLabel}: ${utilizationPercent}%`}
+                              >
+                                <div className="flex items-center justify-center gap-1 mb-0.5">
                                   <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+                                  <span className="text-[10px] font-bold text-gray-800">{dept}</span>
                                 </div>
-                                <div className="text-[10px] text-gray-700 mb-0 leading-tight">
-                                  <span className="font-semibold text-[10px]">{formatHours(cotizadasHoursValue)}</span>
-                                  <span className="text-gray-500 text-[10px]">/</span>
-                                  <span className="font-semibold text-[10px]">{formatHours(utilizedHoursValue)}</span>
+                                <div className="text-[9px] text-gray-600 text-center font-semibold truncate mb-0.5">
+                                  {deptLabel}
                                 </div>
-                                <div className={`px-0 py-0 rounded text-[10px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+                                <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
+                                  <div className="rounded bg-blue-100 border border-blue-200 text-[9px] font-bold text-blue-700 leading-tight">
+                                    Q {formatHours(totalQuotedHoursValue)}
+                                  </div>
+                                  <div className="rounded bg-purple-100 border border-purple-200 text-[9px] font-bold text-purple-700 leading-tight">
+                                    U {formatHours(utilizedHoursValue)}
+                                  </div>
+                                  <div className="rounded bg-orange-100 border border-orange-200 text-[9px] font-bold text-orange-700 leading-tight">
+                                    F {formatHours(forecastedHoursValue)}
+                                  </div>
+                                </div>
+                                <div className={`px-1 py-0.5 rounded text-[10px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
                                   {utilizationPercent}%
                                 </div>
                               </div>
