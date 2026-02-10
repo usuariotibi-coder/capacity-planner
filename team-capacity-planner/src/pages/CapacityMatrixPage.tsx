@@ -41,7 +41,7 @@ interface CapacityMatrixPageProps {
 }
 
 type FormValidationScope = 'quick' | 'import';
-type PdfExportScope = 'single' | 'all';
+type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
@@ -251,6 +251,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showExportPdfModal, setShowExportPdfModal] = useState(false);
   const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
+  const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [formValidationPopup, setFormValidationPopup] = useState<{
     scope: FormValidationScope;
@@ -1378,13 +1379,36 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   useEffect(() => {
     if (!showExportPdfModal) return;
-    if (pdfExportScope !== 'single') return;
     if (!projectsVisibleInCurrentView.length) return;
-    const selectedStillExists = projectsVisibleInCurrentView.some((proj) => proj.id === selectedExportProjectId);
-    if (!selectedStillExists) {
-      setSelectedExportProjectId(projectsVisibleInCurrentView[0].id);
+
+    if (pdfExportScope === 'single') {
+      const selectedStillExists = projectsVisibleInCurrentView.some((proj) => proj.id === selectedExportProjectId);
+      if (!selectedStillExists) {
+        setSelectedExportProjectId(projectsVisibleInCurrentView[0].id);
+      }
+      return;
     }
-  }, [showExportPdfModal, pdfExportScope, projectsVisibleInCurrentView, selectedExportProjectId]);
+
+    if (pdfExportScope === 'selected') {
+      const visibleProjectIds = new Set(projectsVisibleInCurrentView.map((proj) => proj.id));
+      const filteredSelectedIds = selectedExportProjectIds.filter((projectId) => visibleProjectIds.has(projectId));
+
+      if (filteredSelectedIds.length !== selectedExportProjectIds.length) {
+        setSelectedExportProjectIds(filteredSelectedIds);
+        return;
+      }
+
+      if (filteredSelectedIds.length === 0) {
+        setSelectedExportProjectIds([projectsVisibleInCurrentView[0].id]);
+      }
+    }
+  }, [
+    showExportPdfModal,
+    pdfExportScope,
+    projectsVisibleInCurrentView,
+    selectedExportProjectId,
+    selectedExportProjectIds,
+  ]);
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => ({
@@ -1864,8 +1888,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     canEditDepartment(departmentFilter as Department);
 
   const openExportPdfModal = () => {
+    const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
     setPdfExportScope('single');
-    setSelectedExportProjectId(projectsVisibleInCurrentView[0]?.id || '');
+    setSelectedExportProjectId(firstProjectId);
+    setSelectedExportProjectIds(firstProjectId ? [firstProjectId] : []);
     setShowExportPdfModal(true);
   };
 
@@ -1874,12 +1900,31 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setShowExportPdfModal(false);
   };
 
+  const toggleExportProjectSelection = (projectId: string) => {
+    setSelectedExportProjectIds((prev) => (
+      prev.includes(projectId)
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
+    ));
+  };
+
+  const selectAllExportProjects = () => {
+    setSelectedExportProjectIds(projectsVisibleInCurrentView.map((proj) => proj.id));
+  };
+
+  const clearExportProjectSelection = () => {
+    setSelectedExportProjectIds([]);
+  };
+
   const handleExportTimelinePdf = async () => {
     if (isExportingPdf) return;
 
+    const selectedProjectIdsSet = new Set(selectedExportProjectIds);
     const targetProjects = pdfExportScope === 'all'
       ? projectsVisibleInCurrentView
-      : projectsVisibleInCurrentView.filter((proj) => proj.id === selectedExportProjectId);
+      : pdfExportScope === 'selected'
+        ? projectsVisibleInCurrentView.filter((proj) => selectedProjectIdsSet.has(proj.id))
+        : projectsVisibleInCurrentView.filter((proj) => proj.id === selectedExportProjectId);
 
     if (targetProjects.length === 0) {
       alert(language === 'es'
@@ -2037,7 +2082,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const scopeLabel = pdfExportScope === 'all'
         ? 'all-projects'
-        : sanitizeFilePart(targetProjects[0]?.name || 'project');
+        : pdfExportScope === 'selected'
+          ? `selected-${targetProjects.length}-projects`
+          : sanitizeFilePart(targetProjects[0]?.name || 'project');
       const departmentLabel = sanitizeFilePart(
         departmentFilter === 'General' ? 'general' : departmentFilter
       );
@@ -4871,10 +4918,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       name="pdfExportScope"
                       value="single"
                       checked={pdfExportScope === 'single'}
-                      onChange={() => setPdfExportScope('single')}
+                      onChange={() => {
+                        const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
+                        setPdfExportScope('single');
+                        if (!selectedExportProjectId && firstProjectId) {
+                          setSelectedExportProjectId(firstProjectId);
+                        }
+                      }}
                       disabled={isExportingPdf}
                     />
                     {language === 'es' ? 'Solo 1 proyecto' : 'Single project'}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="radio"
+                      name="pdfExportScope"
+                      value="selected"
+                      checked={pdfExportScope === 'selected'}
+                      onChange={() => {
+                        const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
+                        setPdfExportScope('selected');
+                        if (!selectedExportProjectIds.length && firstProjectId) {
+                          setSelectedExportProjectIds([firstProjectId]);
+                        }
+                      }}
+                      disabled={isExportingPdf}
+                    />
+                    {language === 'es' ? 'Seleccionar varios proyectos' : 'Select multiple projects'}
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <input
@@ -4909,13 +4979,66 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </div>
                 )}
 
+                {pdfExportScope === 'selected' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="block text-sm font-bold text-gray-700">
+                        {language === 'es' ? 'Proyectos a exportar' : 'Projects to export'}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={selectAllExportProjects}
+                          disabled={isExportingPdf || projectsVisibleInCurrentView.length === 0}
+                          className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        >
+                          {language === 'es' ? 'Seleccionar todos' : 'Select all'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearExportProjectSelection}
+                          disabled={isExportingPdf || selectedExportProjectIds.length === 0}
+                          className="text-[11px] font-semibold text-gray-600 hover:text-gray-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        >
+                          {language === 'es' ? 'Limpiar' : 'Clear'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-44 overflow-y-auto border border-rose-200 rounded-lg p-2 bg-rose-50/30 space-y-1.5">
+                      {projectsVisibleInCurrentView.map((proj) => (
+                        <label
+                          key={proj.id}
+                          className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-white cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedExportProjectIds.includes(proj.id)}
+                            onChange={() => toggleExportProjectSelection(proj.id)}
+                            disabled={isExportingPdf}
+                            className="mt-0.5"
+                          />
+                          <span className="text-xs text-gray-700 leading-tight">
+                            <span className="font-semibold">{proj.name}</span>
+                            <span className="text-gray-500"> - {proj.client}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   {pdfExportScope === 'all'
                     ? (language === 'es'
-                      ? `Se exportarán ${projectsVisibleInCurrentView.length} timeline(s), una página por proyecto.`
+                      ? `Se exportaran ${projectsVisibleInCurrentView.length} timeline(s), una pagina por proyecto.`
                       : `${projectsVisibleInCurrentView.length} timeline(s) will be exported, one page per project.`)
+                    : pdfExportScope === 'selected'
+                      ? (language === 'es'
+                        ? `Se exportaran ${selectedExportProjectIds.length} proyecto(s) seleccionados.`
+                        : `${selectedExportProjectIds.length} selected project(s) will be exported.`)
                     : (language === 'es'
-                      ? 'Se exportará solo el timeline del proyecto seleccionado.'
+                      ? 'Se exportara solo el timeline del proyecto seleccionado.'
                       : 'Only the selected project timeline will be exported.')}
                 </div>
 
@@ -4931,7 +5054,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <button
                     type="button"
                     onClick={handleExportTimelinePdf}
-                    disabled={isExportingPdf || (pdfExportScope === 'single' && !selectedExportProjectId)}
+                    disabled={
+                      isExportingPdf ||
+                      (pdfExportScope === 'single' && !selectedExportProjectId) ||
+                      (pdfExportScope === 'selected' && selectedExportProjectIds.length === 0)
+                    }
                     className="flex-1 px-4 py-2 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
                   >
                     {isExportingPdf
@@ -5275,4 +5402,3 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     </div>
   );
 }
-
