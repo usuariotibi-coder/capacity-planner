@@ -951,7 +951,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const departmentsTableRef = useRef<HTMLDivElement>(null);
   const projectsTableRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const projectCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -1909,7 +1908,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           });
           return next;
         });
-        await new Promise((resolve) => setTimeout(resolve, 280));
+        await new Promise((resolve) => setTimeout(resolve, 420));
       }
 
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -1920,21 +1919,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
-        format: 'a4',
+        format: 'a3',
       });
 
       let capturedCount = 0;
 
-      for (const project of targetProjects) {
-        const cardElement = projectCardRefs.current.get(project.id);
-        if (!cardElement) continue;
+      const truncateText = (value: string, maxLength: number) =>
+        value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 
-        const canvas = await html2canvas(cardElement, {
+      for (const project of targetProjects) {
+        const timelineContainer = projectTableRefs.current.get(project.id);
+        if (!timelineContainer) continue;
+
+        const timelineTarget = (timelineContainer.querySelector('table') as HTMLElement | null) || timelineContainer;
+        const captureWidth = Math.max(timelineTarget.scrollWidth, timelineTarget.clientWidth);
+        const captureHeight = Math.max(timelineTarget.scrollHeight, timelineTarget.clientHeight);
+
+        const canvas = await html2canvas(timelineTarget, {
           backgroundColor: '#ffffff',
           useCORS: true,
           scale: 2,
           logging: false,
-          windowWidth: Math.max(window.innerWidth, cardElement.scrollWidth),
+          width: captureWidth,
+          height: captureHeight,
+          windowWidth: captureWidth,
+          windowHeight: captureHeight,
+          scrollX: 0,
+          scrollY: -window.scrollY,
         });
 
         if (capturedCount > 0) {
@@ -1943,14 +1954,59 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 6;
-        const maxWidth = pageWidth - margin * 2;
-        const maxHeight = pageHeight - margin * 2;
-        const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+        const margin = 8;
+        const headerHeight = 24;
+        const sectionGap = 4;
+        const contentY = margin + headerHeight + sectionGap;
+        const contentWidth = pageWidth - margin * 2;
+        const contentHeight = pageHeight - contentY - margin;
+        const imagePadding = 2;
+        const maxImageWidth = contentWidth - imagePadding * 2;
+        const maxImageHeight = contentHeight - imagePadding * 2;
+        const ratio = Math.min(maxImageWidth / canvas.width, maxImageHeight / canvas.height);
         const renderWidth = canvas.width * ratio;
         const renderHeight = canvas.height * ratio;
-        const offsetX = (pageWidth - renderWidth) / 2;
-        const offsetY = margin;
+        const offsetX = margin + (contentWidth - renderWidth) / 2;
+        const offsetY = contentY + imagePadding;
+
+        const weeks = projectDurationWeeksById.get(project.id) ?? project.numberOfWeeks;
+        const pmName = project.projectManagerId
+          ? (projectManagerNameById.get(project.id) || 'PM')
+          : (language === 'es' ? 'Sin PM' : 'No PM');
+        const viewLabel = departmentFilter === 'General'
+          ? (language === 'es' ? 'Vista General' : 'General View')
+          : `${language === 'es' ? 'Departamento' : 'Department'}: ${departmentFilter}`;
+        const generatedLabel = language === 'es'
+          ? `Generado: ${new Date().toLocaleString('es-ES')}`
+          : `Generated: ${new Date().toLocaleString('en-US')}`;
+
+        pdf.setFillColor(245, 247, 255);
+        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+        pdf.setFillColor(37, 99, 235);
+        pdf.roundedRect(margin, margin, contentWidth, headerHeight, 3, 3, 'F');
+
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(15);
+        pdf.text(truncateText(project.name || 'Project', 80), margin + 4, margin + 8.5);
+
+        const subtitle = `${project.client || '-'}  |  ${weeks} ${language === 'es' ? 'semanas' : 'weeks'}  |  PM: ${pmName}  |  ${viewLabel}`;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text(truncateText(subtitle, 150), margin + 4, margin + 16.5);
+
+        pdf.setFontSize(9);
+        const generatedLabelWidth = pdf.getTextWidth(generatedLabel) + 6;
+        const generatedLabelX = pageWidth - margin - generatedLabelWidth;
+        pdf.setFillColor(219, 234, 254);
+        pdf.roundedRect(generatedLabelX, margin + 4.5, generatedLabelWidth, 6.2, 2, 2, 'F');
+        pdf.setTextColor(29, 78, 216);
+        pdf.text(generatedLabel, generatedLabelX + 3, margin + 8.9);
+
+        pdf.setDrawColor(191, 219, 254);
+        pdf.setLineWidth(0.4);
+        pdf.roundedRect(margin, contentY, contentWidth, contentHeight, 2, 2, 'S');
 
         pdf.addImage(
           canvas.toDataURL('image/png'),
@@ -1968,8 +2024,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       if (capturedCount === 0) {
         alert(language === 'es'
-          ? 'No se pudo capturar el timeline para exportar.'
-          : 'Unable to capture timeline for export.');
+          ? 'No se detecto el timeline para exportar.'
+          : 'Timeline could not be detected for export.');
         return;
       }
 
@@ -3517,13 +3573,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               return (
                 <div
                   key={proj.id}
-                  ref={(el) => {
-                    if (el) {
-                      projectCardRefs.current.set(proj.id, el);
-                    } else {
-                      projectCardRefs.current.delete(proj.id);
-                    }
-                  }}
                   className={`relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
@@ -3833,7 +3882,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                   {expandedProjects[proj.id] && (
                     <div style={{ zoom: `${(isGeneralView ? getEffectiveProjectZoom(proj.id) : 100) / 100}` }}>
-                      <div className="overflow-x-auto border border-gray-300 bg-white" style={{ scrollBehavior: 'smooth' }}>
+                      <div
+                        className="overflow-x-auto border border-gray-300 bg-white"
+                        style={{ scrollBehavior: 'smooth' }}
+                        ref={(el) => {
+                          if (el) {
+                            projectTableRefs.current.set(proj.id, el);
+                          } else {
+                            projectTableRefs.current.delete(proj.id);
+                          }
+                        }}
+                      >
                       <table className="border-collapse text-xs w-full">
                         <thead>
                         {/* Month row */}
@@ -4113,13 +4172,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 return (
                 <div
                   key={proj.id}
-                  ref={(el) => {
-                    if (el) {
-                      projectCardRefs.current.set(proj.id, el);
-                    } else {
-                      projectCardRefs.current.delete(proj.id);
-                    }
-                  }}
                   className={`relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
@@ -4238,6 +4290,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div className="overflow-x-auto" style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }} ref={(el) => {
                         if (el) {
                           projectTableRefs.current.set(proj.id, el);
+                        } else {
+                          projectTableRefs.current.delete(proj.id);
                         }
                       }}>
                       <table className="border-collapse text-xs w-full">
@@ -4858,11 +4912,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   {pdfExportScope === 'all'
                     ? (language === 'es'
-                      ? `Se exportarán ${projectsVisibleInCurrentView.length} proyecto(s), una página por proyecto.`
-                      : `${projectsVisibleInCurrentView.length} project(s) will be exported, one page per project.`)
+                      ? `Se exportarán ${projectsVisibleInCurrentView.length} timeline(s), una página por proyecto.`
+                      : `${projectsVisibleInCurrentView.length} timeline(s) will be exported, one page per project.`)
                     : (language === 'es'
-                      ? 'Se exportará el timeline del proyecto seleccionado.'
-                      : 'The selected project timeline will be exported.')}
+                      ? 'Se exportará solo el timeline del proyecto seleccionado.'
+                      : 'Only the selected project timeline will be exported.')}
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
