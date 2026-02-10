@@ -1969,16 +1969,18 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 5;
-      const headerHeight = 20;
-      const sectionGap = 2.5;
+      const margin = 4;
+      const headerHeight = 18;
+      const sectionGap = 2;
       const contentY = margin + headerHeight + sectionGap;
       const contentWidth = pageWidth - margin * 2;
       const contentHeight = pageHeight - contentY - margin;
-      const imagePadding = 1.5;
+      const imagePadding = 1;
       const maxImageWidth = contentWidth - imagePadding * 2;
       const maxImageHeight = contentHeight - imagePadding * 2;
-      const pageAspectRatio = maxImageWidth / maxImageHeight;
+      const TARGET_MAX_PAGES_PER_PROJECT = 3;
+      const MAX_TIMELINE_SCALE_MM_PER_PX = 0.15;
+      const MIN_TIMELINE_SCALE_MM_PER_PX = 0.055;
       const generatedLabel = language === 'es'
         ? `Generado: ${new Date().toLocaleString('es-ES')}`
         : `Generated: ${new Date().toLocaleString('en-US')}`;
@@ -2052,7 +2054,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           scrollY: -window.scrollY,
         });
 
-        const chunkWidthPx = Math.max(1, Math.floor(canvas.height * pageAspectRatio));
+        const fitHeightScale = maxImageHeight / canvas.height;
+        const upperScale = Math.min(fitHeightScale, MAX_TIMELINE_SCALE_MM_PER_PX);
+        const lowerScale = Math.min(MIN_TIMELINE_SCALE_MM_PER_PX, upperScale);
+        const scaleForTargetPages = (TARGET_MAX_PAGES_PER_PROJECT * maxImageWidth) / canvas.width;
+        let timelineScale = Math.min(upperScale, scaleForTargetPages);
+        timelineScale = Math.max(timelineScale, lowerScale);
+
+        const chunkWidthPx = Math.max(1, Math.floor(maxImageWidth / timelineScale));
         const totalChunks = Math.max(1, Math.ceil(canvas.width / chunkWidthPx));
 
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
@@ -2093,9 +2102,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           renderProjectPageHeader(project, sectionLabel);
 
-          const ratio = Math.min(maxImageWidth / sourceWidth, maxImageHeight / sourceHeight);
-          const renderWidth = sourceWidth * ratio;
-          const renderHeight = sourceHeight * ratio;
+          const renderWidth = sourceWidth * timelineScale;
+          const renderHeight = sourceHeight * timelineScale;
           const offsetX = margin + (contentWidth - renderWidth) / 2;
           const offsetY = contentY + (contentHeight - renderHeight) / 2;
 
