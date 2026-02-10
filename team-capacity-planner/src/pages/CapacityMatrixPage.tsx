@@ -3947,8 +3947,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   {expandedProjects[proj.id] && (
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
-                      <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
+                      <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
+                        <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}`, display: 'inline-block', minWidth: '100%' }}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
                           {DEPARTMENTS.map((dept) => {
                             const quotedHoursValue = getQuotedHours(dept, proj.id);
                             const quotedChangeOrdersValue = getQuotedChangeOrders(dept, proj.id);
@@ -3997,6 +3998,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               </div>
                             );
                           })}
+                          </div>
                         </div>
                       </div>
 
