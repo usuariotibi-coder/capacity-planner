@@ -127,9 +127,9 @@ export function calculateTalent(hours: number): number {
  * Get color classes based on utilization percentage
  *
  * Color scale:
- * - Green (0-50%): Underutilized
- * - Yellow (50-75%): Moderate utilization
- * - Red (75-100%): High utilization - becoming critical
+ * - Green (<70%): Underutilized
+ * - Yellow (70-89%): Moderate utilization
+ * - Red (90-99%): High utilization - becoming critical
  * - Red Intense (100%+): Over-utilized - OVER BUDGET with animation
  *
  * @param utilizationPercent - Utilization percentage (0-100+)
@@ -137,8 +137,8 @@ export function calculateTalent(hours: number): number {
  *
  * @example
  * getUtilizationColor(35) // Returns: { bg: 'bg-green-100', text: 'text-green-900' }
- * getUtilizationColor(65) // Returns: { bg: 'bg-yellow-100', text: 'text-yellow-900' }
- * getUtilizationColor(85) // Returns: { bg: 'bg-red-500', text: 'text-white font-bold' }
+ * getUtilizationColor(75) // Returns: { bg: 'bg-yellow-100', text: 'text-yellow-900' }
+ * getUtilizationColor(95) // Returns: { bg: 'bg-red-500', text: 'text-white font-bold' }
  * getUtilizationColor(120) // Returns: { bg: 'bg-red-700 animate-pulse', text: 'text-white font-black' } - INTENSE RED
  */
 export function getUtilizationColor(utilizationPercent: number): { bg: string; text: string } {
@@ -146,11 +146,11 @@ export function getUtilizationColor(utilizationPercent: number): { bg: string; t
     // OVER-ALLOCATED: Intense red with pulse animation to show over budget
     return { bg: 'bg-red-700 animate-pulse shadow-lg', text: 'text-white font-black' };
   }
-  if (utilizationPercent >= 75) {
+  if (utilizationPercent >= 90) {
     // High utilization: Red but not pulsing yet
     return { bg: 'bg-red-500', text: 'text-white font-bold' };
   }
-  if (utilizationPercent >= 50) {
+  if (utilizationPercent >= 70) {
     return { bg: 'bg-yellow-100', text: 'text-yellow-900' };
   }
   return { bg: 'bg-green-100', text: 'text-green-900' };

@@ -3612,42 +3612,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           const availableCapacity = totalCapacity - occupiedValue;
                           const unit = isMFG ? 'h' : 'people';
 
-                          // Determine color based on available capacity
+                          // Determine color based on utilization percentage
                           let bgColor = 'bg-gray-200 border-gray-400';
                           let textColor = 'text-gray-700';
+                          const utilizationPercentForCapacity = totalCapacity > 0
+                            ? (occupiedValue / totalCapacity) * 100
+                            : 0;
 
                           // If no capacity set, show gray
                           if (totalCapacity === 0) {
                             bgColor = 'bg-gray-200 border-gray-400';
                             textColor = 'text-gray-700';
-                          } else if (availableCapacity <= 0) {
-                            // Red: Over-allocated or fully occupied
+                          } else if (utilizationPercentForCapacity >= 100) {
+                            // Critical: 100%+ utilization
+                            bgColor = 'bg-red-700 border-red-800 animate-pulse';
+                            textColor = 'text-white';
+                          } else if (utilizationPercentForCapacity >= 90) {
+                            // High: 90-99%
                             bgColor = 'bg-red-500 border-red-600';
                             textColor = 'text-white';
-                          } else if (isMFG) {
-                            // For MFG: use percentage-based thresholds on available hours
-                            if (availableCapacity < totalCapacity * 0.25) {
-                              bgColor = 'bg-orange-400 border-orange-500';
-                              textColor = 'text-white';
-                            } else if (availableCapacity < totalCapacity * 0.5) {
-                              bgColor = 'bg-yellow-300 border-yellow-400';
-                              textColor = 'text-yellow-900';
-                            } else {
-                              bgColor = 'bg-green-300 border-green-400';
-                              textColor = 'text-green-900';
-                            }
+                          } else if (utilizationPercentForCapacity >= 70) {
+                            // Moderate: 70-89%
+                            bgColor = 'bg-yellow-300 border-yellow-400';
+                            textColor = 'text-yellow-900';
                           } else {
-                            // For other departments: use percentage-based thresholds on available people
-                            if (availableCapacity < totalCapacity * 0.25) {
-                              bgColor = 'bg-orange-400 border-orange-500';
-                              textColor = 'text-white';
-                            } else if (availableCapacity < totalCapacity * 0.5) {
-                              bgColor = 'bg-yellow-300 border-yellow-400';
-                              textColor = 'text-yellow-900';
-                            } else {
-                              bgColor = 'bg-green-300 border-green-400';
-                              textColor = 'text-green-900';
-                            }
+                            // Healthy: <70%
+                            bgColor = 'bg-green-300 border-green-400';
+                            textColor = 'text-green-900';
                           }
 
                           return (
@@ -4200,42 +4191,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           const availableCapacity = totalCapacity - occupiedValue;
                           const unit = isMFG ? 'h' : 'people';
 
-                          // Determine color based on available capacity
+                          // Determine color based on utilization percentage
                           let bgColor = 'bg-gray-200 border-gray-400';
                           let textColor = 'text-gray-700';
+                          const utilizationPercentForCapacity = totalCapacity > 0
+                            ? (occupiedValue / totalCapacity) * 100
+                            : 0;
 
                           // If no capacity set, show gray
                           if (totalCapacity === 0) {
                             bgColor = 'bg-gray-200 border-gray-400';
                             textColor = 'text-gray-700';
-                          } else if (availableCapacity <= 0) {
-                            // Red: Over-allocated or fully occupied
+                          } else if (utilizationPercentForCapacity >= 100) {
+                            // Critical: 100%+ utilization
+                            bgColor = 'bg-red-700 border-red-800 animate-pulse';
+                            textColor = 'text-white';
+                          } else if (utilizationPercentForCapacity >= 90) {
+                            // High: 90-99%
                             bgColor = 'bg-red-500 border-red-600';
                             textColor = 'text-white';
-                          } else if (isMFG) {
-                            // For MFG: use percentage-based thresholds on available hours
-                            if (availableCapacity < totalCapacity * 0.25) {
-                              bgColor = 'bg-orange-400 border-orange-500';
-                              textColor = 'text-white';
-                            } else if (availableCapacity < totalCapacity * 0.5) {
-                              bgColor = 'bg-yellow-300 border-yellow-400';
-                              textColor = 'text-yellow-900';
-                            } else {
-                              bgColor = 'bg-green-300 border-green-400';
-                              textColor = 'text-green-900';
-                            }
+                          } else if (utilizationPercentForCapacity >= 70) {
+                            // Moderate: 70-89%
+                            bgColor = 'bg-yellow-300 border-yellow-400';
+                            textColor = 'text-yellow-900';
                           } else {
-                            // For other departments: use percentage-based thresholds on available people
-                            if (availableCapacity < totalCapacity * 0.25) {
-                              bgColor = 'bg-orange-400 border-orange-500';
-                              textColor = 'text-white';
-                            } else if (availableCapacity < totalCapacity * 0.5) {
-                              bgColor = 'bg-yellow-300 border-yellow-400';
-                              textColor = 'text-yellow-900';
-                            } else {
-                              bgColor = 'bg-green-300 border-green-400';
-                              textColor = 'text-green-900';
-                            }
+                            // Healthy: <70%
+                            bgColor = 'bg-green-300 border-green-400';
+                            textColor = 'text-green-900';
                           }
 
                           return (
