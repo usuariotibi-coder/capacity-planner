@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, Menu, X, LogOut, FileText, Lock, User, Building2 } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Building2 } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -192,65 +192,71 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 text-slate-800">
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
-          sidebarOpen ? 'w-12 md:w-48' : 'w-0'
-        } h-full bg-slate-800 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-lg flex-shrink-0 min-h-0`}
+          sidebarOpen ? 'w-14 md:w-44' : 'w-0'
+        } h-full bg-slate-900 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-md flex-shrink-0 min-h-0`}
       >
-        <div className="p-0.5 md:p-6 border-b border-slate-700 flex-shrink-0">
-          <h1 className="text-[8px] md:text-2xl font-bold text-center md:text-left whitespace-nowrap overflow-hidden">📊</h1>
-          <h1 className="hidden md:block text-2xl font-bold">{t.teamCapacity}</h1>
-          <p className="hidden md:block text-xs text-slate-400 mt-1">{t.plannerSubtitle}</p>
+        <div className="p-1.5 md:p-4 border-b border-slate-800 flex-shrink-0">
+          <div className="flex items-center justify-center md:justify-start gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
+              <Grid3x3 size={16} className="text-blue-200" />
+            </div>
+            <div className="hidden md:block min-w-0">
+              <h1 className="text-base font-semibold leading-tight tracking-tight truncate">{t.teamCapacity}</h1>
+              <p className="text-[11px] text-slate-400 mt-0.5 truncate">{t.plannerSubtitle}</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 
-        <nav className="p-0.5 md:p-4 space-y-0 md:space-y-2">
+        <nav className="p-1.5 md:p-3 space-y-1.5">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-3 px-0.5 md:px-4 py-1 md:py-3 rounded-lg transition text-[8px] md:text-sm ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-2.5 px-1 md:px-3 py-1.5 md:py-2.5 rounded-md transition text-[9px] md:text-[13px] ${
                 currentPage === item.id
-                  ? 'bg-blue-500 text-white'
-                  : 'text-slate-300 hover:bg-slate-700'
+                  ? 'bg-blue-500/95 text-white shadow-sm'
+                  : 'text-slate-300 hover:bg-slate-800'
               }`}
               title={item.label}
             >
-              <span className="flex-shrink-0 text-sm md:text-xl">{item.icon}</span>
+              <span className="flex-shrink-0 text-sm md:text-base">{item.icon}</span>
               <span className="font-medium text-center md:text-left leading-none">{item.label}</span>
             </button>
           ))}
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-0.5 md:p-4 border-t border-slate-700 space-y-0.5 md:space-y-2">
+          <div className="p-1.5 md:p-3 border-t border-slate-800 space-y-1.5">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
               }}
-              className={`w-full px-1 md:px-3 py-0.5 md:py-2 rounded text-[8px] md:text-sm font-semibold transition leading-tight ${
+              className={`w-full px-1.5 md:px-3 py-1 md:py-2 rounded-md text-[9px] md:text-[13px] font-semibold transition leading-tight ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
               title={t.general}
             >
-              <span className="md:hidden">📊</span>
-              <span className="hidden md:inline">📊 {t.general}</span>
+              <span className="md:hidden">{t.general}</span>
+              <span className="hidden md:inline">{t.general}</span>
             </button>
 
-            <label className="hidden md:block text-xs font-semibold text-slate-400">{t.viewDepartment}</label>
+            <label className="hidden md:block text-[11px] font-semibold text-slate-400 tracking-wide">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
               }}
-              className="w-full bg-slate-700 text-white text-[8px] md:text-sm rounded px-1 md:px-2 py-0.5 md:py-2 border border-slate-600 hover:border-blue-500 transition leading-tight"
+              className="w-full bg-slate-800 text-white text-[10px] md:text-[13px] rounded-md px-2 py-1.5 border border-slate-700 hover:border-blue-500 transition leading-tight"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
@@ -262,10 +268,10 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-0.5 md:p-4 border-t border-slate-700 space-y-0.5 md:space-y-2">
+        <div className="p-1.5 md:p-3 border-t border-slate-800 space-y-1">
           <button
             onClick={() => window.location.href = '/change-password'}
-            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-[13px] text-slate-300 hover:bg-slate-800 rounded-md transition"
             title={t.changePassword}
           >
             <Lock size={14} className="md:w-4 md:h-4" />
@@ -273,7 +279,7 @@ function MainApp() {
           </button>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-1 px-1 md:px-3 py-1 md:py-2 text-[9px] md:text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-[13px] text-slate-300 hover:bg-slate-800 rounded-md transition"
             title={t.logout}
           >
             <LogOut size={14} className="md:w-4 md:h-4" />
@@ -286,16 +292,19 @@ function MainApp() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1 hover:bg-gray-100 rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-1.5 px-2 py-1 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-md transition flex-shrink-0"
               title={sidebarOpen ? t.hideSidebar : t.showSidebar}
             >
-              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              <span className="hidden md:inline text-xs font-medium text-slate-600">
+                {sidebarOpen ? t.hideSidebar : t.showSidebar}
+              </span>
             </button>
-            <h2 className="text-sm font-semibold text-gray-800 truncate">
+            <h2 className="text-base font-semibold tracking-tight text-slate-800 truncate leading-none">
               {navItems.find((item) => item.id === currentPage)?.label}
             </h2>
           </div>
