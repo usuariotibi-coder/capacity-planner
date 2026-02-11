@@ -2248,6 +2248,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     return weekStart >= project.startDate && weekStart <= project.endDate;
   };
 
+  // Get project-relative week number (1..N) for a given week column.
+  // Returns null when the week is outside the project range.
+  const getProjectWeekNumber = (project: Project, weekStart: string): number | null => {
+    if (!isWeekInProjectRange(weekStart, project)) return null;
+
+    const projectStart = parseISODate(project.startDate);
+    const currentWeek = parseISODate(weekStart);
+    if (Number.isNaN(projectStart.getTime()) || Number.isNaN(currentWeek.getTime())) return null;
+
+    const weeksDiff = Math.floor((currentWeek.getTime() - projectStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return weeksDiff + 1;
+  };
+
   const handleEditCell = (department: Department, weekStart: string, projectId?: string) => {
     if (departmentFilter === 'General') return; // No edit in General view
     if (!canEditDepartment(department)) return;
@@ -4043,6 +4056,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </tr>
                     </thead>
                     <tbody>
+                      {/* Project-relative week row (thin): 1..N from project start to end */}
+                      <tr>
+                        <td className="border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide">
+                          {t.projectWeek || 'Project Week'}
+                        </td>
+                        {allWeeksData.map((weekData, weekIdx) => {
+                          const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
+                          const projectWeekNumber = getProjectWeekNumber(proj, weekData.date);
+                          return (
+                            <td
+                              key={`project-week-${proj.id}-${weekData.date}`}
+                              data-week-index={weekIdx}
+                              className={`border px-0.5 py-0 text-center text-[9px] font-semibold min-w-20 ${
+                                isCurrentWeekColumn
+                                  ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                  : 'bg-slate-50 text-slate-600 border-gray-300'
+                              }`}
+                            >
+                              {projectWeekNumber ?? '—'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+
                       {/* Department row for this project */}
                       <tr className="hover:bg-gray-50">
                         <td className="border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5">
@@ -4435,6 +4472,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           </tr>
                         </thead>
                         <tbody>
+                          {/* Project-relative week row (thin): 1..N from project start to end */}
+                          <tr>
+                            <td className="border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide">
+                              {t.projectWeek || 'Project Week'}
+                            </td>
+                            {allWeeksData.map((weekData, weekIdx) => {
+                              const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
+                              const projectWeekNumber = getProjectWeekNumber(proj, weekData.date);
+                              return (
+                                <td
+                                  key={`project-week-general-${proj.id}-${weekData.date}`}
+                                  data-week-index={weekIdx}
+                                  className={`border px-0.5 py-0 text-center text-[9px] font-semibold min-w-20 ${
+                                    isCurrentWeekColumn
+                                      ? 'bg-stone-100 border-stone-400 text-stone-900'
+                                      : 'bg-slate-50 text-slate-600 border-gray-300'
+                                  }`}
+                                >
+                                  {projectWeekNumber ?? '—'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+
                           {/* Show ALL 6 departments in the calendar */}
                           {DEPARTMENTS.map((dept) => {
                             return (
