@@ -1817,15 +1817,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           )}
           <div className="space-y-[2px] mb-0.5">
-            <div className="flex items-center justify-between rounded bg-blue-100 border border-blue-200 px-1 py-[1px] text-blue-700 leading-none">
+            <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.quotedLabel}</span>
               <span className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</span>
             </div>
-            <div className="flex items-center justify-between rounded bg-purple-100 border border-purple-200 px-1 py-[1px] text-purple-700 leading-none">
+            <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.usedLabel}</span>
               <span className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</span>
             </div>
-            <div className="flex items-center justify-between rounded bg-orange-100 border border-orange-200 px-1 py-[1px] text-orange-700 leading-none">
+            <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.pronosticado}</span>
               <span className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</span>
             </div>
@@ -1857,15 +1857,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           </div>
         )}
         <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
-          <div className="rounded bg-blue-100 border border-blue-200 px-0.5 py-[1px] text-blue-700 leading-none">
+          <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
             <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</div>
           </div>
-          <div className="rounded bg-purple-100 border border-purple-200 px-0.5 py-[1px] text-purple-700 leading-none">
+          <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.usedLabel}</div>
             <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</div>
           </div>
-          <div className="rounded bg-orange-100 border border-orange-200 px-0.5 py-[1px] text-orange-700 leading-none">
+          <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.pronosticado}</div>
             <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</div>
           </div>
@@ -3785,21 +3785,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                           return (
                             <>
-                              <div className="bg-blue-100 rounded px-1.5 py-1 border border-blue-300 text-center w-[72px] flex flex-col justify-center">
-                                <div className="text-[10px] text-blue-700 font-bold">{t.quotedLabel}</div>
-                                <div className="text-[11px] font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
+                              <div className="bg-slate-100 rounded px-1.5 py-1 border border-slate-300 text-center w-[72px] flex flex-col justify-center">
+                                <div className="text-[10px] text-slate-700 font-bold">{t.quotedLabel}</div>
+                                <div className="text-[11px] font-black text-slate-700">{formatHours(quotedHoursValue)}h</div>
                               </div>
                               <div className="bg-emerald-100 rounded px-1 py-0.5 border border-emerald-300 text-center w-[72px] flex flex-col justify-center" title={t.quotedChangeOrders}>
                                 <div className="text-[8px] text-emerald-700 font-bold leading-tight">{t.quotedChangeOrdersShort}</div>
                                 <div className="text-[10px] font-black text-emerald-700">{formatHours(quotedChangeOrdersValue)}h</div>
                               </div>
-                              <div className="bg-purple-100 rounded px-1.5 py-1 border border-purple-300 text-center w-[72px] flex flex-col justify-center">
-                                <div className="text-[10px] text-purple-700 font-bold">{t.usedLabel}</div>
-                                <div className="text-[11px] font-black text-purple-700">{formatHours(utilizedHoursValue)}h</div>
+                              <div className="bg-slate-100 rounded px-1.5 py-1 border border-slate-300 text-center w-[72px] flex flex-col justify-center">
+                                <div className="text-[10px] text-slate-700 font-bold">{t.usedLabel}</div>
+                                <div className="text-[11px] font-black text-slate-700">{formatHours(utilizedHoursValue)}h</div>
                               </div>
-                              <div className="bg-orange-100 rounded px-1.5 py-1 border border-orange-300 text-center w-[72px] flex flex-col justify-center">
-                                <div className="text-[10px] text-orange-700 font-bold">{t.pronosticado}</div>
-                                <div className="text-[11px] font-black text-orange-700">{formatHours(forecastedHoursValue)}h</div>
+                              <div className="bg-slate-100 rounded px-1.5 py-1 border border-slate-300 text-center w-[72px] flex flex-col justify-center">
+                                <div className="text-[10px] text-slate-700 font-bold">{t.pronosticado}</div>
+                                <div className="text-[11px] font-black text-slate-700">{formatHours(forecastedHoursValue)}h</div>
                               </div>
                               <div className={`rounded px-1.5 py-1 border text-center w-[72px] flex flex-col justify-center ${utilizationColorInfo.bg}`}>
                                 <div className={`text-[9px] font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
@@ -3853,21 +3853,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                           return (
                             <>
-                              <div className="bg-blue-100 rounded px-1 py-0.5 border border-blue-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
-                                <span className="text-[7px] text-blue-600 font-semibold leading-none">{t.quotedLabel}</span>
-                                <span className="text-[9px] text-blue-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
+                              <div className="bg-slate-100 rounded px-1 py-0.5 border border-slate-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
+                                <span className="text-[7px] text-slate-600 font-semibold leading-none">{t.quotedLabel}</span>
+                                <span className="text-[9px] text-slate-700 font-bold leading-none">{formatHours(quotedHoursValue)}h</span>
                               </div>
                               <div className="bg-emerald-100 rounded px-1 py-0.5 border border-emerald-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center" title={t.quotedChangeOrders}>
                                 <span className="text-[6px] text-emerald-600 font-semibold leading-none">{t.quotedChangeOrdersShort}</span>
                                 <span className="text-[8px] text-emerald-700 font-bold leading-none">{formatHours(quotedChangeOrdersValue)}h</span>
                               </div>
-                              <div className="bg-purple-100 rounded px-1 py-0.5 border border-purple-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
-                                <span className="text-[7px] text-purple-600 font-semibold leading-none">{t.usedLabel}</span>
-                                <span className="text-[9px] text-purple-700 font-bold leading-none">{formatHours(utilizedHoursValue)}h</span>
+                              <div className="bg-slate-100 rounded px-1 py-0.5 border border-slate-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
+                                <span className="text-[7px] text-slate-600 font-semibold leading-none">{t.usedLabel}</span>
+                                <span className="text-[9px] text-slate-700 font-bold leading-none">{formatHours(utilizedHoursValue)}h</span>
                               </div>
-                              <div className="bg-orange-100 rounded px-1 py-0.5 border border-orange-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
-                                <span className="text-[7px] text-orange-600 font-semibold leading-none">{t.pronosticado}</span>
-                                <span className="text-[9px] text-orange-700 font-bold leading-none">{formatHours(forecastedHoursValue)}h</span>
+                              <div className="bg-slate-100 rounded px-1 py-0.5 border border-slate-300 text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center">
+                                <span className="text-[7px] text-slate-600 font-semibold leading-none">{t.pronosticado}</span>
+                                <span className="text-[9px] text-slate-700 font-bold leading-none">{formatHours(forecastedHoursValue)}h</span>
                               </div>
                               <div className={`rounded px-1 py-0.5 border text-center w-[56px] min-h-[30px] flex flex-col items-center justify-center ${utilizationColorInfo.bg}`}>
                                 <span className={`text-[6px] font-semibold leading-none ${utilizationColorInfo.text}`}>{t.utilizationLabel}</span>
@@ -3922,24 +3922,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       return (
                         <div className="flex items-center gap-1 px-2 border-r border-indigo-300">
                           {/* Quoted Hours (budget) */}
-                          <div className="bg-blue-100 rounded px-1.5 py-0.5 border border-blue-300 text-center min-w-fit">
-                            <div className="text-xs text-blue-700 font-bold">{t.quotedLabel}</div>
-                            <div className="text-xs font-black text-blue-700">{formatHours(quotedHoursValue)}h</div>
+                          <div className="bg-slate-100 rounded px-1.5 py-0.5 border border-slate-300 text-center min-w-fit">
+                            <div className="text-xs text-slate-700 font-bold">{t.quotedLabel}</div>
+                            <div className="text-xs font-black text-slate-700">{formatHours(quotedHoursValue)}h</div>
                           </div>
 
                           {/* Used Hours (calculated) */}
-                          <div className="bg-purple-100 rounded px-2 py-0.5 border border-purple-300 min-w-fit">
+                          <div className="bg-slate-100 rounded px-2 py-0.5 border border-slate-300 min-w-fit">
                             <div className="text-center">
-                              <div className="text-xs text-purple-700 font-bold">{t.usedLabel}</div>
-                              <div className="text-xs font-black text-purple-700">{formatHours(utilizedHoursValue)}h</div>
+                              <div className="text-xs text-slate-700 font-bold">{t.usedLabel}</div>
+                              <div className="text-xs font-black text-slate-700">{formatHours(utilizedHoursValue)}h</div>
                             </div>
                           </div>
 
                           {/* Forecasted Hours (calculated) */}
-                          <div className="bg-orange-100 rounded px-2 py-0.5 border border-orange-300 min-w-fit">
+                          <div className="bg-slate-100 rounded px-2 py-0.5 border border-slate-300 min-w-fit">
                             <div className="text-center">
-                              <div className="text-xs text-orange-700 font-bold">{t.pronosticado}</div>
-                              <div className="text-xs font-black text-orange-700">{formatHours(forecastedHoursValue)}h</div>
+                              <div className="text-xs text-slate-700 font-bold">{t.pronosticado}</div>
+                              <div className="text-xs font-black text-slate-700">{formatHours(forecastedHoursValue)}h</div>
                             </div>
                           </div>
 
