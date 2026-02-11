@@ -50,6 +50,7 @@ const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-st
 const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-gradient-to-b from-stone-100 to-zinc-100';
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
+const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -4041,7 +4042,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               <th
                                 key={weekData.date}
                                 data-week-index={idx}
-                                className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
+                                className={`border px-0.5 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} relative transition-all text-xs ${
                                   isCurrentWeek
                                     ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                     : weekData.isNextYear
@@ -4068,7 +4069,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             <td
                               key={`project-week-${proj.id}-${weekData.date}`}
                               data-week-index={weekIdx}
-                              className={`border px-0.5 py-0 text-center text-[9px] font-semibold min-w-20 ${
+                              className={`border px-0.5 py-0 text-center text-[9px] font-semibold ${WEEK_COLUMN_WIDTH_CLASS} ${
                                 isCurrentWeekColumn
                                   ? 'bg-stone-100 border-stone-400 text-stone-900'
                                   : 'bg-slate-50 text-slate-600 border-gray-300'
@@ -4161,7 +4162,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       return (
                         <div
                           key={`header-${weekData.date}`}
-                          className={`w-16 flex-shrink-0 text-center text-[8px] font-bold p-0.5 rounded border ${
+                          className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 text-center text-[8px] font-bold p-0.5 rounded border ${
                             isCurrentWeek
                               ? CURRENT_WEEK_HEADER_CLASS
                               : 'bg-blue-100 text-blue-900 border-blue-300'
@@ -4260,7 +4261,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           return (
                             <div
                               key={`${dept}-${weekData.date}`}
-                              className={`w-16 flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
+                              className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
                                 isCurrentWeek ? 'ring-1 ring-slate-500 shadow-sm' : ''
                               }`}
                               title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
@@ -4457,7 +4458,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 <th
                                   key={weekData.date}
                                   data-week-index={idx}
-                                  className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
+                                  className={`border px-0.5 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} relative transition-all text-xs ${
                                     isCurrentWeek
                                       ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                       : weekData.isNextYear
@@ -4484,7 +4485,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 <td
                                   key={`project-week-general-${proj.id}-${weekData.date}`}
                                   data-week-index={weekIdx}
-                                  className={`border px-0.5 py-0 text-center text-[9px] font-semibold min-w-20 ${
+                                  className={`border px-0.5 py-0 text-center text-[9px] font-semibold ${WEEK_COLUMN_WIDTH_CLASS} ${
                                     isCurrentWeekColumn
                                       ? 'bg-stone-100 border-stone-400 text-stone-900'
                                       : 'bg-slate-50 text-slate-600 border-gray-300'
