@@ -49,7 +49,7 @@ const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-stone-600 shadow-md border-ston
 const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-stone-600 to-zinc-700 text-white border-2 border-zinc-800 shadow-lg ring-2 ring-stone-300';
 const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-gradient-to-b from-stone-100 to-zinc-100';
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
-const MONTH_HEADER_SECONDARY_CLASS = 'bg-gradient-to-b from-[#f0b64b] to-[#d79a2b] text-[#2e1a47] border-[#b67f16] shadow-md';
+const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
