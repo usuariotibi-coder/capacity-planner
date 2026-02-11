@@ -166,7 +166,7 @@ export function RegisteredUsersPage() {
 
   if (!canManageRegisteredUsers) {
     return (
-      <div className="p-6">
+      <div className="brand-page-shell p-6">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
           {t.onlyBusinessIntelligenceAccess || 'Only Business Intelligence can access this view.'}
         </div>
@@ -175,15 +175,15 @@ export function RegisteredUsersPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
+    <div className="brand-page-shell flex flex-col h-full">
+      <div className="brand-page-header px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <User size={22} className="text-blue-600" />
+            <h1 className="brand-title text-2xl font-bold flex items-center gap-2">
+              <User size={22} className="text-[#4f3a70]" />
               {t.registeredUsersTitle || t.registeredUsers || 'Registered Users'}
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="brand-subtitle text-sm mt-1">
               {t.registeredUsersSubtitle || 'Manage users created from register screen.'}
             </p>
           </div>
@@ -193,7 +193,7 @@ export function RegisteredUsersPage() {
               setIsRefreshing(true);
               loadUsers(false);
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition"
+            className="brand-btn-primary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-semibold transition"
             disabled={isRefreshing}
           >
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
@@ -211,25 +211,25 @@ export function RegisteredUsersPage() {
 
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#827691]"></div>
           </div>
         ) : sortedUsers.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600">
+          <div className="brand-panel rounded-lg p-6 text-sm text-[#6c6480]">
             {t.registeredUsersEmpty || 'No registered users found.'}
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+          <div className="brand-panel overflow-x-auto rounded-lg border border-[#d5d1da] bg-white">
+            <table className="brand-table min-w-full text-sm">
+              <thead className="border-b border-[#d5d1da]">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.name}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.email}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.department}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.otherDepartmentLabel || 'Sub-department'}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.status || 'Status'}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.registeredOn || 'Registered on'}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.lastLogin || 'Last login'}</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">{t.actions}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.name}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.email}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.department}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.otherDepartmentLabel || 'Sub-department'}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.status || 'Status'}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.registeredOn || 'Registered on'}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.lastLogin || 'Last login'}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t.actions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,13 +243,13 @@ export function RegisteredUsersPage() {
                             <input
                               value={editState.firstName}
                               onChange={(e) => setEditState((prev) => prev ? { ...prev, firstName: e.target.value } : null)}
-                              className="border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="brand-input px-2 py-1 text-sm"
                               placeholder={t.firstName}
                             />
                             <input
                               value={editState.lastName}
                               onChange={(e) => setEditState((prev) => prev ? { ...prev, lastName: e.target.value } : null)}
-                              className="border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="brand-input px-2 py-1 text-sm"
                               placeholder={t.lastName}
                             />
                           </div>
@@ -262,7 +262,7 @@ export function RegisteredUsersPage() {
                           <input
                             value={editState.email}
                             onChange={(e) => setEditState((prev) => prev ? { ...prev, email: e.target.value } : null)}
-                            className="border border-gray-300 rounded px-2 py-1 text-sm w-full min-w-[220px]"
+                            className="brand-input px-2 py-1 text-sm w-full min-w-[220px]"
                             placeholder={t.email}
                           />
                         ) : (
@@ -284,7 +284,7 @@ export function RegisteredUsersPage() {
                                   : null
                               )
                             }
-                            className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                            className="brand-select px-2 py-1 text-sm w-full"
                           >
                             <option value="">{t.selectDepartment}</option>
                             {USER_DEPARTMENTS.map((dept) => (
@@ -302,7 +302,7 @@ export function RegisteredUsersPage() {
                           <select
                             value={editState.otherDepartment}
                             onChange={(e) => setEditState((prev) => prev ? { ...prev, otherDepartment: e.target.value as OtherDepartment } : null)}
-                            className="border border-gray-300 rounded px-2 py-1 text-sm w-full min-w-[180px]"
+                            className="brand-select px-2 py-1 text-sm w-full min-w-[180px]"
                           >
                             <option value="">{t.selectOtherDepartment}</option>
                             {OTHER_DEPARTMENTS.map((dept) => (
@@ -320,7 +320,7 @@ export function RegisteredUsersPage() {
                           <select
                             value={editState.isActive ? 'true' : 'false'}
                             onChange={(e) => setEditState((prev) => prev ? { ...prev, isActive: e.target.value === 'true' } : null)}
-                            className="border border-gray-300 rounded px-2 py-1 text-sm"
+                            className="brand-select px-2 py-1 text-sm"
                           >
                             <option value="true">{t.active}</option>
                             <option value="false">{t.inactive}</option>
@@ -356,7 +356,7 @@ export function RegisteredUsersPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => startEdit(user)}
-                              className="inline-flex items-center gap-1 rounded px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 brand-btn-primary text-white text-xs font-semibold"
                             >
                               <Pencil size={14} />
                               {t.edit}

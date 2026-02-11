@@ -83,11 +83,11 @@ const LoginPage: React.FC = () => {
         }
       `}</style>
 
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 relative overflow-hidden px-4 py-8">
+      <div className="brand-auth-bg min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-8">
         {/* Decorative background elements */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.1),rgba(0,0,0,0))]" />
-        <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 bg-blue-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-amber-500/5 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_120%,rgba(206,0,55,0.18),rgba(46,26,71,0)_52%)]" />
+        <div className="absolute top-0 right-0 w-48 h-48 md:w-96 md:h-96 bg-[#827691]/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-[#ce0037]/10 rounded-full blur-3xl" />
 
         {/* Language selector */}
         <div className="absolute top-4 right-4 md:top-6 md:right-6 flex gap-2 z-20">
@@ -95,7 +95,7 @@ const LoginPage: React.FC = () => {
             onClick={() => setLanguage('es' as Language)}
             className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 text-xl ${
               language === 'es'
-                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/50 scale-105'
+                ? 'bg-gradient-to-r from-[#2e1a47] to-[#827691] text-white shadow-lg shadow-[#2e1a47]/40 scale-105'
                 : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white hover:scale-105'
             }`}
             title="Español"
@@ -106,7 +106,7 @@ const LoginPage: React.FC = () => {
             onClick={() => setLanguage('en' as Language)}
             className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 text-xl ${
               language === 'en'
-                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/50 scale-105'
+                ? 'bg-gradient-to-r from-[#2e1a47] to-[#827691] text-white shadow-lg shadow-[#2e1a47]/40 scale-105'
                 : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white hover:scale-105'
             }`}
             title="English"
@@ -116,13 +116,13 @@ const LoginPage: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="relative z-10 bg-zinc-800/90 backdrop-blur-xl p-6 md:p-8 rounded-2xl shadow-2xl shadow-black/50 w-full max-w-md border border-zinc-700/50 animate-fade-in">
+        <div className="brand-auth-card relative z-10 p-6 md:p-8 rounded-2xl w-full max-w-md animate-fade-in">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-amber-400 bg-clip-text text-transparent mb-2">
+            <h1 className="brand-auth-title text-4xl mb-2">
               {t.loginTitle}
             </h1>
-            <p className="text-zinc-400 text-sm">{t.loginSubtitle}</p>
+            <p className="text-[#d5d1da] text-sm">{t.loginSubtitle}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -141,13 +141,13 @@ const LoginPage: React.FC = () => {
                       type="button"
                       onClick={handleResendVerificationCode}
                       disabled={isResendingCode}
-                      className="text-left text-sm text-blue-300 hover:text-blue-200 disabled:text-zinc-500 disabled:cursor-not-allowed"
+                      className="text-left text-sm text-[#c7b9df] hover:text-[#ddd1ef] disabled:text-zinc-500 disabled:cursor-not-allowed"
                     >
                       {isResendingCode ? 'Reenviando codigo...' : 'Reenviar codigo de verificacion'}
                     </button>
                     <Link
                       to={`/register?step=verify&email=${encodeURIComponent(email)}`}
-                      className="text-left text-sm text-blue-300 hover:text-blue-200"
+                      className="text-left text-sm text-[#c7b9df] hover:text-[#ddd1ef]"
                     >
                       Ir a verificar codigo
                     </Link>
@@ -168,7 +168,7 @@ const LoginPage: React.FC = () => {
                 {t.email}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-[#c7b9df] transition-colors duration-300">
                   <Mail size={20} />
                 </div>
                 <input
@@ -177,7 +177,7 @@ const LoginPage: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                           focus:outline-none focus:ring-2 focus:ring-[#827691]/50 focus:border-[#827691]
                              transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
                   placeholder={t.enterEmail}
                   required
@@ -192,7 +192,7 @@ const LoginPage: React.FC = () => {
                 {t.password}
               </label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors duration-300">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-[#c7b9df] transition-colors duration-300">
                   <Lock size={20} />
                 </div>
                 <input
@@ -201,7 +201,7 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                           focus:outline-none focus:ring-2 focus:ring-[#827691]/50 focus:border-[#827691]
                              transition-all duration-300 hover:border-zinc-600 hover:bg-zinc-900"
                   placeholder={t.enterPassword}
                   required
@@ -222,11 +222,11 @@ const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-amber-500
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#2e1a47] to-[#827691] hover:from-[#3b2658] hover:to-[#978bab]
                          disabled:from-zinc-700 disabled:to-zinc-600 disabled:cursor-not-allowed
                          text-white font-semibold rounded-lg
                          transition-all duration-300
-                         transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg hover:shadow-blue-500/50
+                         transform hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg hover:shadow-[#2e1a47]/35
                          flex items-center justify-center"
             >
               {isSubmitting ? (

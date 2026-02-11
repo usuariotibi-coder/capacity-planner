@@ -345,9 +345,9 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">{t.projects}</h1>
+    <div className="brand-page-shell p-6">
+      <div className="brand-page-header rounded-xl px-4 py-3 flex justify-between items-center mb-6">
+        <h1 className="brand-title text-3xl font-bold">{t.projects}</h1>
         <button
           onClick={() => {
             if (!hasFullAccess) return;
@@ -356,7 +356,7 @@ export function ProjectsPage() {
           }}
           disabled={!hasFullAccess}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
-            hasFullAccess ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            hasFullAccess ? 'brand-btn-primary text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
           <Plus size={20} />
@@ -442,7 +442,7 @@ export function ProjectsPage() {
             <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-6 shadow-lg w-full max-w-[95vw] sm:max-w-lg md:max-w-2xl">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-2 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded"></div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                <h2 className="brand-title text-2xl font-bold">
                   {editingId ? t.editProject : t.createNewProject}
                 </h2>
               </div>
@@ -675,10 +675,10 @@ export function ProjectsPage() {
       )}
 
       {/* Projects table */}
-      <div className="overflow-x-auto border-2 border-gray-300 rounded-lg shadow-lg bg-white">
-        <table className="w-full border-collapse">
+      <div className="brand-panel overflow-x-auto border-2 border-[#d5d1da] rounded-lg bg-white">
+        <table className="brand-table w-full border-collapse">
           <thead>
-            <tr className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <tr>
               <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">📋 {t.job}</th>
               <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">👥 {t.customer}</th>
               <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">🏭 {t.facility}</th>
@@ -690,39 +690,39 @@ export function ProjectsPage() {
           </thead>
           <tbody>
             {projects.map((proj, idx) => (
-              <tr key={proj.id} className={`transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}`}>
-                <td className="border border-gray-200 px-4 py-3 font-semibold text-gray-900">{proj.name}</td>
-                <td className="border border-gray-200 px-4 py-3 text-gray-700">{proj.client}</td>
-                <td className="border border-gray-200 px-4 py-3 text-center">
-                  <span className="inline-block bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+              <tr key={proj.id} className={`transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f4f1f8]'}`}>
+                <td className="border px-4 py-3 font-semibold text-[#2e1a47]">{proj.name}</td>
+                <td className="border px-4 py-3 text-[#4f3a70]">{proj.client}</td>
+                <td className="border px-4 py-3 text-center">
+                  <span className="inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
                     {proj.facility}
                   </span>
                 </td>
-                <td className="border border-gray-200 px-4 py-3 text-left">
+                <td className="border px-4 py-3 text-left">
                   {proj.projectManagerId ? (
-                    <span className="inline-block bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold shadow-sm">
+                    <span className="inline-block bg-[#f1edf6] text-[#4f3a70] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-semibold shadow-sm">
                       {employees.find((e) => e.id === proj.projectManagerId)?.name || t.noProjectManager}
                     </span>
                   ) : (
-                    <span className="text-gray-400 text-sm italic">{t.noProjectManager}</span>
+                    <span className="text-[#8a8298] text-sm italic">{t.noProjectManager}</span>
                   )}
                 </td>
-                <td className="border border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700">
+                <td className="border px-4 py-3 text-center text-sm font-medium text-[#4f3a70]">
                   {formatDate(proj.startDate)}
                 </td>
-                <td className="border border-gray-200 px-4 py-3 text-center">
-                  <span className="inline-block bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                <td className="border px-4 py-3 text-center">
+                  <span className="inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
                     {proj.numberOfWeeks} {t.weeks}
                   </span>
                 </td>
-                <td className="border border-gray-200 px-4 py-3 text-center">
+                <td className="border px-4 py-3 text-center">
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => hasFullAccess && handleEditProject(proj)}
                         disabled={!hasFullAccess}
                         className={`p-2 rounded-lg transition transform shadow-sm ${
                           hasFullAccess
-                            ? 'text-blue-600 bg-blue-100 hover:bg-blue-200 hover:scale-110'
+                            ? 'text-[#2e1a47] bg-[#ece6f5] hover:bg-[#ddd5ea] border border-[#d5d1da] hover:scale-110'
                             : 'text-gray-400 bg-gray-100 cursor-not-allowed'
                         }`}
                         title={t.edit}
@@ -743,7 +743,7 @@ export function ProjectsPage() {
                         disabled={!hasFullAccess}
                         className={`p-2 rounded-lg transition transform shadow-sm ${
                           hasFullAccess
-                            ? 'text-red-600 bg-red-100 hover:bg-red-200 hover:scale-110'
+                            ? 'text-[#ce0037] bg-[#fce7ee] hover:bg-[#f7d6e2] border border-[#f1c3d2] hover:scale-110'
                             : 'text-gray-400 bg-gray-100 cursor-not-allowed'
                         }`}
                         title={t.delete}
@@ -759,7 +759,7 @@ export function ProjectsPage() {
       </div>
 
       {projects.length === 0 && !isFormOpen && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-[#6c6480]">
           <p>{t.noProjects}</p>
         </div>
       )}

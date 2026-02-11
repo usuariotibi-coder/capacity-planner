@@ -120,9 +120,9 @@ export function ActivityLogPage() {
     }
     if (isUpdateAction(action)) {
       return {
-        badge: 'bg-blue-50 text-blue-700 border-blue-200',
-        iconBg: 'bg-blue-100 text-blue-700 border-blue-200',
-        accent: 'border-l-blue-400',
+        badge: 'bg-[#ece7f3] text-[#2e1a47] border-[#c9c0d8]',
+        iconBg: 'bg-[#e0d9ea] text-[#2e1a47] border-[#c9c0d8]',
+        accent: 'border-l-[#827691]',
       };
     }
     if (isDeleteAction(action)) {
@@ -342,11 +342,11 @@ export function ActivityLogPage() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="brand-page-shell flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <FileText size={22} className="text-blue-600" />
+      <div className="brand-page-header px-6 py-4 flex-shrink-0">
+        <h1 className="brand-title text-2xl font-bold mb-4 flex items-center gap-2">
+          <FileText size={22} className="text-[#4f3a70]" />
           {t.activityLog || 'Activity Log'}
         </h1>
 
@@ -354,13 +354,13 @@ export function ActivityLogPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+            <Search size={16} className="absolute left-3 top-3 text-[#8a8298]" />
             <input
               type="text"
               placeholder={t.search || 'Search...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="brand-input w-full pl-9 pr-3 py-2 text-sm"
             />
           </div>
 
@@ -368,7 +368,7 @@ export function ActivityLogPage() {
           <select
             value={filterAction}
             onChange={(e) => setFilterAction(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="brand-select px-3 py-2 text-sm"
           >
             <option value="all">{t.allActions || 'All Actions'}</option>
             {uniqueActions.map(action => (
@@ -382,7 +382,7 @@ export function ActivityLogPage() {
           <select
             value={filterModel}
             onChange={(e) => setFilterModel(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="brand-select px-3 py-2 text-sm"
           >
             <option value="all">{t.allModels || 'All Models'}</option>
             {uniqueModels.map(model => (
@@ -394,7 +394,7 @@ export function ActivityLogPage() {
 
           {/* Results count */}
           <div className="flex items-center justify-end">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-[#6c6480]">
               {filteredLogs.length} {t.results || 'results'}
             </span>
           </div>
@@ -405,7 +405,7 @@ export function ActivityLogPage() {
       <div className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#827691]"></div>
           </div>
         ) : error ? (
           <div className="p-6 bg-red-50 border border-red-200 rounded-lg m-6">
@@ -442,7 +442,7 @@ export function ActivityLogPage() {
                   hasValue(summary?.project) && {
                     label: language === 'es' ? 'Proyecto' : 'Project',
                     value: summary?.project,
-                    className: 'bg-blue-50 text-blue-700 border-blue-200',
+                    className: 'bg-[#ece7f3] text-[#2e1a47] border-[#c9c0d8]',
                   },
                   hasValue(summary?.hours) && {
                     label: language === 'es' ? 'Horas' : 'Hours',
@@ -464,11 +464,11 @@ export function ActivityLogPage() {
                 return (
                   <div
                     key={log.id}
-                    className={`border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 ${tone.accent} ${isExpanded ? 'lg:col-span-2' : ''}`}
+                    className={`brand-panel border rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 ${tone.accent} ${isExpanded ? 'lg:col-span-2' : ''}`}
                   >
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                      className="w-full px-4 py-3 bg-white hover:bg-gray-50 flex items-start justify-between gap-3 transition-colors"
+                      className="w-full px-4 py-3 bg-white hover:bg-[#f7f4fb] flex items-start justify-between gap-3 transition-colors"
                       aria-expanded={isExpanded}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -481,16 +481,16 @@ export function ActivityLogPage() {
                             <span className={`text-[11px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full border ${tone.badge}`}>
                               {actionLabel}
                             </span>
-                            <span className="text-sm font-semibold text-gray-900 truncate">{modelLabel}</span>
+                            <span className="text-sm font-semibold text-[#2e1a47] truncate">{modelLabel}</span>
                           </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6c6480]">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
-                              <User size={12} className="text-gray-400" />
-                              <span className="font-medium text-gray-700 truncate">{userLabel}</span>
+                              <User size={12} className="text-[#8a8298]" />
+                              <span className="font-medium text-[#4f3a70] truncate">{userLabel}</span>
                             </span>
                             <span className="inline-flex items-center gap-1.5">
-                              <Clock size={12} className="text-gray-400" />
+                              <Clock size={12} className="text-[#8a8298]" />
                               {formatDate(createdAtValue)}{timeLabel ? ` - ${timeLabel}` : ''}
                             </span>
                           </div>
@@ -514,22 +514,22 @@ export function ActivityLogPage() {
 
                       <div className="mt-1 flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronUp size={18} className="text-gray-400" />
+                          <ChevronUp size={18} className="text-[#8a8298]" />
                         ) : (
-                          <ChevronDown size={18} className="text-gray-400" />
+                          <ChevronDown size={18} className="text-[#8a8298]" />
                         )}
                       </div>
                     </button>
 
                     {isExpanded && (
-                      <div className="border-t border-gray-200 bg-white p-4 space-y-3">
+                      <div className="border-t border-[#e7e1ef] bg-white p-4 space-y-3">
                         {log.user && (
-                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                            <p className="text-xs font-semibold text-blue-900 mb-1 flex items-center gap-2">
-                              <User size={12} className="text-blue-700" />
+                          <div className="bg-[#ece7f3] p-3 rounded border border-[#c9c0d8]">
+                            <p className="text-xs font-semibold text-[#2e1a47] mb-1 flex items-center gap-2">
+                              <User size={12} className="text-[#4f3a70]" />
                               {language === 'es' ? 'Usuario' : 'User'}
                             </p>
-                            <p className="text-sm text-blue-800">{userLabel}</p>
+                            <p className="text-sm text-[#2e1a47]">{userLabel}</p>
                           </div>
                         )}
 
@@ -597,13 +597,13 @@ export function ActivityLogPage() {
                                           key={key}
                                           className={`p-3 rounded border ${
                                             isImportant
-                                              ? 'bg-blue-50 border-blue-200'
+                                              ? 'bg-[#ece7f3] border-[#c9c0d8]'
                                               : 'bg-white border-slate-200'
                                           }`}
                                         >
                                           <div className="flex justify-between items-start gap-3">
                                             <span className={`text-sm font-semibold whitespace-nowrap ${
-                                              isImportant ? 'text-blue-700' : 'text-slate-700'
+                                              isImportant ? 'text-[#2e1a47]' : 'text-slate-700'
                                             }`}>
                                               {formatKeyName(key)}
                                             </span>
@@ -657,13 +657,13 @@ export function ActivityLogPage() {
                                           key={key}
                                           className={`p-3 rounded border ${
                                             isImportant
-                                              ? 'bg-blue-50 border-blue-200'
+                                              ? 'bg-[#ece7f3] border-[#c9c0d8]'
                                               : 'bg-white border-slate-200'
                                           }`}
                                         >
                                           <div className="flex justify-between items-start gap-3">
                                             <span className={`text-sm font-semibold whitespace-nowrap ${
-                                              isImportant ? 'text-blue-700' : 'text-slate-700'
+                                              isImportant ? 'text-[#2e1a47]' : 'text-slate-700'
                                             }`}>
                                               {formatKeyName(key)}
                                             </span>

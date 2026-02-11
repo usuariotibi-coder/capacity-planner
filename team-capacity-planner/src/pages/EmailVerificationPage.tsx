@@ -44,15 +44,15 @@ const EmailVerificationPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+    <div className="brand-auth-bg min-h-screen flex items-center justify-center px-4">
+      <div className="brand-auth-card p-8 rounded-2xl w-full max-w-md">
         <div className="flex justify-end mb-4">
           <div className="flex gap-2">
             <button
               onClick={() => setLanguage('es' as Language)}
               className={`px-3 py-2 rounded-lg font-medium transition-colors ${
                 language === 'es'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#2e1a47] text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
               title="Español"
@@ -63,7 +63,7 @@ const EmailVerificationPage: React.FC = () => {
               onClick={() => setLanguage('en' as Language)}
               className={`px-3 py-2 rounded-lg font-medium transition-colors ${
                 language === 'en'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#2e1a47] text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
               title="English"
@@ -75,7 +75,7 @@ const EmailVerificationPage: React.FC = () => {
         {status === 'verifying' && (
           <div className="text-center">
             <div className="mb-6">
-              <svg className="animate-spin mx-auto h-16 w-16 text-blue-500" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin mx-auto h-16 w-16 text-[#d5d1da]" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -99,7 +99,7 @@ const EmailVerificationPage: React.FC = () => {
             </p>
             <button
               onClick={() => navigate('/login')}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#2e1a47] to-[#827691] hover:from-[#3b2658] hover:to-[#978bab] text-white font-medium rounded-lg transition-colors"
             >
               {t.loginNow}
             </button>
@@ -118,7 +118,7 @@ const EmailVerificationPage: React.FC = () => {
             <div className="space-y-3">
               <button
                 onClick={() => navigate('/login')}
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                className="w-full py-3 px-4 bg-gradient-to-r from-[#2e1a47] to-[#827691] hover:from-[#3b2658] hover:to-[#978bab] text-white font-medium rounded-lg transition-colors"
               >
                 {t.backToLogin}
               </button>

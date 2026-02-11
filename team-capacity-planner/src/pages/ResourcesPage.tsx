@@ -197,29 +197,29 @@ export function ResourcesPage() {
 
   const getDepartmentColor = (dept: Department) => {
     const colors: Record<Department, string> = {
-      'PM': 'bg-blue-50 border-blue-200',
-      'MED': 'bg-cyan-50 border-cyan-200',
-      'HD': 'bg-purple-50 border-purple-200',
-      'MFG': 'bg-orange-50 border-orange-200',
-      'BUILD': 'bg-green-50 border-green-200',
-      'PRG': 'bg-lime-50 border-lime-200',
+      'PM': 'bg-[#f4f1f8] border-[#d5d1da]',
+      'MED': 'bg-[#f1f7f7] border-[#c9dedf]',
+      'HD': 'bg-[#f2eef8] border-[#d5d1da]',
+      'MFG': 'bg-[#fbf2ec] border-[#e9d8ca]',
+      'BUILD': 'bg-[#eef6f1] border-[#d4e4da]',
+      'PRG': 'bg-[#f3f7ed] border-[#d9e3c8]',
     };
     return colors[dept];
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-md px-4 py-4 sm:px-8 sm:py-6">
+    <div className="brand-page-shell flex flex-col h-screen">
+      <div className="brand-page-header sticky top-0 z-30 px-4 py-4 sm:px-8 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{t.teamResources}</h1>
+          <h1 className="brand-title text-xl sm:text-2xl md:text-3xl">{t.teamResources}</h1>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
-              <Calendar size={20} className="text-blue-600 flex-shrink-0" />
-              <label className="text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">{t.year}:</label>
+              <Calendar size={20} className="text-[#4f3a70] flex-shrink-0" />
+              <label className="text-xs sm:text-sm font-semibold text-[#4f3a70] whitespace-nowrap">{t.year}:</label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="border-2 border-blue-300 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
+                className="brand-select px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-[#2e1a47] bg-[#f4f1f8] hover:bg-[#ece7f3] transition"
               >
                 {yearOptions.map((year) => (
                   <option key={year} value={year}>{year}</option>
@@ -236,7 +236,7 @@ export function ResourcesPage() {
               disabled={!canCreateEmployee}
               className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-lg transition text-sm sm:text-base ${
                 canCreateEmployee
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  ? 'brand-btn-primary text-white'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
@@ -258,15 +258,15 @@ export function ResourcesPage() {
           />
           {/* Modal */}
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 p-4 sm:p-0">
-            <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-full max-w-[95vw] sm:max-w-md max-h-screen overflow-auto">
+            <div className="brand-panel w-full max-w-[95vw] sm:max-w-md max-h-screen overflow-auto">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-                <h2 className="text-xl font-semibold text-gray-800">
+              <div className="brand-page-header flex items-center justify-between p-6">
+                <h2 className="brand-title text-xl font-semibold">
                   {editingId ? t.editEmployee : t.newEmployee}
                 </h2>
                 <button
                   onClick={handleCancel}
-                  className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
+                  className="p-1 text-[#6c6480] hover:bg-[#e8e2f1] rounded transition"
                   title={t.cancel}
                 >
                   <X size={24} />
@@ -277,12 +277,12 @@ export function ResourcesPage() {
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {/* Name Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.name}</label>
+                  <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.name}</label>
                   <input
                     type="text"
                     value={formData.name || ''}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="brand-input w-full px-3 py-2 text-[#2e1a47]"
                     placeholder={t.egJohnDoe}
                     autoFocus
                   />
@@ -290,11 +290,11 @@ export function ResourcesPage() {
 
                 {/* Department Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.department}</label>
+                  <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.department}</label>
                   <select
                     value={(lockedDepartment as Department) || formData.department || 'PM'}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value as Department })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="brand-select w-full px-3 py-2 text-[#2e1a47]"
                     disabled={Boolean(lockedDepartment)}
                   >
                     {DEPARTMENTS.map((dept) => (
@@ -309,7 +309,7 @@ export function ResourcesPage() {
                 {formData.department === 'BUILD' && (
                   <>
                     {/* Subcontracted Material Checkbox */}
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-3 p-3 bg-[#f0ebf7] rounded-lg border border-[#d5d1da]">
                       <input
                         type="checkbox"
                         id="isSubcontracted"
@@ -319,9 +319,9 @@ export function ResourcesPage() {
                           isSubcontractedMaterial: e.target.checked,
                           subcontractCompany: e.target.checked ? formData.subcontractCompany : ''
                         })}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        className="w-4 h-4 text-[#2e1a47] rounded focus:ring-2 focus:ring-[#827691]"
                       />
-                      <label htmlFor="isSubcontracted" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      <label htmlFor="isSubcontracted" className="text-sm font-medium text-[#4f3a70] cursor-pointer">
                         {t.isSubcontractedMaterial}
                       </label>
                     </div>
@@ -329,11 +329,11 @@ export function ResourcesPage() {
                     {/* Company Selection - Show only if subcontracted and in BUILD department */}
                     {formData.isSubcontractedMaterial && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{t.selectCompany}</label>
+                        <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.selectCompany}</label>
                         <select
                           value={formData.subcontractCompany || ''}
                           onChange={(e) => setFormData({ ...formData, subcontractCompany: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="brand-select w-full px-3 py-2 text-[#2e1a47]"
                         >
                           <option value="">-- {t.selectCompany} --</option>
                           {Array.from(activeTeams).map((team) => (
@@ -349,7 +349,7 @@ export function ResourcesPage() {
                 {formData.department === 'PRG' && (
                   <>
                     {/* External Team Checkbox */}
-                    <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                    <div className="flex items-center gap-3 p-3 bg-[#f0ebf7] rounded-lg border border-[#d5d1da]">
                       <input
                         type="checkbox"
                         id="isExternalTeam"
@@ -359,9 +359,9 @@ export function ResourcesPage() {
                           isSubcontractedMaterial: e.target.checked,
                           subcontractCompany: e.target.checked ? formData.subcontractCompany : ''
                         })}
-                        className="w-4 h-4 text-teal-600 rounded focus:ring-2 focus:ring-teal-500"
+                        className="w-4 h-4 text-[#2e1a47] rounded focus:ring-2 focus:ring-[#827691]"
                       />
-                      <label htmlFor="isExternalTeam" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      <label htmlFor="isExternalTeam" className="text-sm font-medium text-[#4f3a70] cursor-pointer">
                         {t.isSubcontractedMaterial}
                       </label>
                     </div>
@@ -369,11 +369,11 @@ export function ResourcesPage() {
                     {/* Team Selection - Show only if external team and in PRG department */}
                     {formData.isSubcontractedMaterial && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">{t.selectTeam}</label>
+                        <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.selectTeam}</label>
                         <select
                           value={formData.subcontractCompany || ''}
                           onChange={(e) => setFormData({ ...formData, subcontractCompany: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          className="brand-select w-full px-3 py-2 text-[#2e1a47]"
                         >
                           <option value="">{t.selectTeamPlaceholder}</option>
                           {Array.from(prgActiveTeams).map((team) => (
@@ -387,41 +387,41 @@ export function ResourcesPage() {
 
                 {/* Role Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.role}</label>
+                  <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.role}</label>
                   <input
                     type="text"
                     value={formData.role || ''}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="brand-input w-full px-3 py-2 text-[#2e1a47]"
                     placeholder={t.egDesignEngineer}
                   />
                 </div>
 
                 {/* Capacity Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.capacity}</label>
+                  <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.capacity}</label>
                   <input
                     type="number"
                     value={formData.capacity || 40}
                     onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="brand-input w-full px-3 py-2 text-[#2e1a47]"
                     min="1"
                     max="168"
                   />
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex gap-3 pt-4 border-t border-[#e8e2f1]">
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                    className="brand-btn-soft flex-1 px-4 py-2 font-semibold rounded-lg transition"
                   >
                     {t.cancel}
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition"
+                    className="brand-btn-primary flex-1 px-4 py-2 text-white font-semibold rounded-lg transition"
                   >
                     {editingId ? t.update : t.create}
                   </button>
@@ -432,7 +432,7 @@ export function ResourcesPage() {
         </>
       )}
 
-      <div className="overflow-y-auto flex-1 p-8">
+      <div className="overflow-y-auto flex-1 p-6">
         {/* Employees grouped by department */}
         {DEPARTMENTS.map((dept) => {
           // Filter out system placeholder employees (names like "MFG Employee 1", "PM Employee 1", etc.)

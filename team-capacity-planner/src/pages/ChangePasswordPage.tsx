@@ -99,9 +99,9 @@ export const ChangePasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 px-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(59,130,246,0.1),rgba(0,0,0,0))]" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+    <div className="brand-auth-bg min-h-screen flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(130,118,145,0.16),rgba(0,0,0,0))]" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#827691]/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl" />
 
       <div className="absolute top-4 right-4 md:top-6 md:right-6 z-20 flex items-center gap-2 bg-zinc-900/70 border border-zinc-700 rounded-xl px-2 py-1.5">
@@ -109,7 +109,7 @@ export const ChangePasswordPage = () => {
         <button
           onClick={() => setLanguage('es' as Language)}
           className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-            language === 'es' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+            language === 'es' ? 'bg-[#2e1a47] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
           }`}
           title="Espanol"
           type="button"
@@ -119,7 +119,7 @@ export const ChangePasswordPage = () => {
         <button
           onClick={() => setLanguage('en' as Language)}
           className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
-            language === 'en' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+            language === 'en' ? 'bg-[#2e1a47] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
           }`}
           title="English"
           type="button"
@@ -137,8 +137,8 @@ export const ChangePasswordPage = () => {
           <span>{t.back || 'Back'}</span>
         </button>
 
-        <div className="bg-zinc-800/90 backdrop-blur-xl p-8 rounded-2xl shadow-2xl shadow-black/50 border border-zinc-700/50">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-blue-500 to-amber-400 bg-clip-text text-transparent mb-2">
+        <div className="brand-auth-card p-8 rounded-2xl">
+          <h1 className="brand-auth-title text-3xl mb-2">
             {t.changePassword}
           </h1>
           <p className="text-zinc-400 text-sm mb-6">
@@ -167,7 +167,7 @@ export const ChangePasswordPage = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-zinc-300">{t.currentPasswordLabel || 'Current Password'}</label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-[#c7b9df] transition-colors">
                   <Lock size={20} />
                 </div>
                 <input
@@ -176,7 +176,7 @@ export const ChangePasswordPage = () => {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   disabled={isLoading}
                   className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             focus:outline-none focus:ring-2 focus:ring-[#827691]/50 focus:border-[#827691]
                              transition-all duration-300 hover:border-zinc-600 disabled:opacity-50"
                   placeholder={t.currentPasswordPlaceholder || 'Enter your current password'}
                   required
@@ -194,7 +194,7 @@ export const ChangePasswordPage = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-zinc-300">{t.newPasswordLabel || 'New Password'}</label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-[#c7b9df] transition-colors">
                   <Lock size={20} />
                 </div>
                 <input
@@ -203,7 +203,7 @@ export const ChangePasswordPage = () => {
                   onChange={(e) => handleNewPasswordChange(e.target.value)}
                   disabled={isLoading}
                   className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             focus:outline-none focus:ring-2 focus:ring-[#827691]/50 focus:border-[#827691]
                              transition-all duration-300 hover:border-zinc-600 disabled:opacity-50"
                   placeholder={t.newPasswordPlaceholder || 'Enter a new password (min. 8 characters)'}
                   required
@@ -254,7 +254,7 @@ export const ChangePasswordPage = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-zinc-300">{t.confirmNewPasswordLabel || 'Confirm New Password'}</label>
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-blue-400 transition-colors">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-[#c7b9df] transition-colors">
                   <Lock size={20} />
                 </div>
                 <input
@@ -263,7 +263,7 @@ export const ChangePasswordPage = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
                   className="w-full pl-11 pr-12 py-3 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500
-                             focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                             focus:outline-none focus:ring-2 focus:ring-[#827691]/50 focus:border-[#827691]
                              transition-all duration-300 hover:border-zinc-600 disabled:opacity-50"
                   placeholder={t.confirmNewPasswordPlaceholder || 'Confirm your new password'}
                   required
@@ -286,11 +286,11 @@ export const ChangePasswordPage = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-amber-500
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#2e1a47] to-[#827691] hover:from-[#3b2658] hover:to-[#978bab]
                          disabled:from-zinc-700 disabled:to-zinc-600 disabled:cursor-not-allowed
                          text-white font-semibold rounded-lg
                          transition-all duration-300
-                         transform hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/50
+                         transform hover:scale-[1.02] hover:shadow-lg hover:shadow-[#2e1a47]/35
                          active:scale-[0.98]
                          flex items-center justify-center"
             >

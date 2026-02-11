@@ -104,8 +104,8 @@ function MainApp() {
   if (isLoading) {
     console.log('[MainApp] Still loading...');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="brand-auth-bg min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#d5d1da]"></div>
       </div>
     );
   }
@@ -146,21 +146,21 @@ function MainApp() {
   const departmentChipTone = (() => {
     switch (currentUserDepartment) {
       case 'PM':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'bg-[#8fb2ff]/25 text-[#eaf1ff] border-[#9fb8ff]/45';
       case 'MED':
-        return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+        return 'bg-[#7fd6d1]/20 text-[#ddfffb] border-[#8ee3de]/40';
       case 'HD':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
+        return 'bg-[#c39bff]/20 text-[#f5ecff] border-[#caa8ff]/42';
       case 'MFG':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
+        return 'bg-[#ffd2a1]/25 text-[#fff1df] border-[#ffd6ab]/40';
       case 'BUILD':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-[#8fd4a8]/20 text-[#e7fff0] border-[#9be0b4]/40';
       case 'PRG':
-        return 'bg-lime-50 text-lime-700 border-lime-200';
+        return 'bg-[#d3f09a]/22 text-[#f5ffe4] border-[#daefad]/40';
       case 'OTHER':
-        return 'bg-teal-50 text-teal-700 border-teal-200';
+        return 'bg-[#82c8bc]/22 text-[#e3fff9] border-[#95d1c7]/40';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-white/15 text-white border-white/30';
     }
   })();
 
@@ -192,21 +192,21 @@ function MainApp() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 text-slate-800">
+    <div className="brand-app-shell flex h-screen text-slate-800">
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
           sidebarOpen ? 'w-12 md:w-40' : 'w-0'
-        } h-full bg-slate-900 text-white transition-all duration-300 overflow-hidden flex flex-col shadow-md flex-shrink-0 min-h-0`}
+        } brand-sidebar h-full text-white transition-all duration-300 overflow-hidden flex flex-col shadow-xl flex-shrink-0 min-h-0`}
       >
-        <div className="p-1.5 md:p-4 border-b border-slate-800 flex-shrink-0">
+        <div className="p-1.5 md:p-4 border-b border-white/15 flex-shrink-0">
           <div className="flex items-center justify-center md:justify-start gap-2">
-            <div className="w-7 h-7 rounded-md bg-blue-500/20 border border-blue-400/40 flex items-center justify-center">
-              <Grid3x3 size={14} className="text-blue-200" />
+            <div className="w-7 h-7 rounded-md bg-white/12 border border-white/30 flex items-center justify-center">
+              <Grid3x3 size={14} className="text-white" />
             </div>
             <div className="hidden md:block min-w-0">
-              <h1 className="text-[13px] font-semibold leading-tight tracking-tight truncate">{t.teamCapacity}</h1>
-              <p className="text-[9px] text-slate-400 mt-0.5 truncate">{t.plannerSubtitle}</p>
+              <h1 className="text-[13px] font-semibold leading-tight tracking-tight truncate text-white">{t.teamCapacity}</h1>
+              <p className="text-[9px] text-[#d5d1da] mt-0.5 truncate">{t.plannerSubtitle}</p>
             </div>
           </div>
         </div>
@@ -220,10 +220,10 @@ function MainApp() {
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-1.5 px-1 md:px-2.5 py-1.5 md:py-1.5 rounded-md transition text-[8px] md:text-[11px] ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-1.5 px-1 md:px-2.5 py-1.5 md:py-1.5 rounded-md border transition text-[8px] md:text-[11px] ${
                 currentPage === item.id
-                  ? 'bg-blue-500/95 text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-slate-800'
+                  ? 'bg-gradient-to-r from-[#827691] to-[#2E1A47] text-white border-[#9c92ab] shadow-[0_8px_16px_rgba(46,26,71,0.35)]'
+                  : 'text-[#d8d2e5] border-transparent hover:bg-white/10 hover:border-white/20'
               }`}
               title={item.label}
             >
@@ -234,15 +234,15 @@ function MainApp() {
         </nav>
 
         {currentPage === 'capacity' && (
-          <div className="p-1.5 md:p-3 border-t border-slate-800 space-y-1.5">
+          <div className="p-1.5 md:p-3 border-t border-white/15 space-y-1.5">
             <button
               onClick={() => {
                 setDepartmentFilter('General');
               }}
               className={`w-full px-1.5 md:px-2.5 py-1 md:py-1.5 rounded-md text-[8px] md:text-[11px] font-semibold transition leading-tight ${
                 departmentFilter === 'General'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  ? 'bg-gradient-to-r from-[#827691] to-[#2E1A47] text-white border border-[#9c92ab]'
+                  : 'bg-white/10 text-[#d8d2e5] hover:bg-white/15 border border-white/20'
               }`}
               title={t.general}
             >
@@ -250,13 +250,13 @@ function MainApp() {
               <span className="hidden md:inline">{t.general}</span>
             </button>
 
-            <label className="hidden md:block text-[9px] font-semibold text-slate-400 tracking-wide">{t.viewDepartment}</label>
+            <label className="hidden md:block text-[9px] font-semibold text-[#d5d1da] tracking-wide">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
               }}
-              className="w-full bg-slate-800 text-white text-[9px] md:text-[11px] rounded-md px-2 py-1 border border-slate-700 hover:border-blue-500 transition leading-tight"
+              className="w-full bg-white/10 text-white text-[9px] md:text-[11px] rounded-md px-2 py-1 border border-white/20 hover:border-[#d5d1da] transition leading-tight"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
@@ -268,10 +268,10 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-1.5 md:p-3 border-t border-slate-800 space-y-1">
+        <div className="p-1.5 md:p-3 border-t border-white/15 space-y-1">
           <button
             onClick={() => window.location.href = '/change-password'}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-slate-300 hover:bg-slate-800 rounded-md transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-[#d8d2e5] hover:bg-white/12 rounded-md transition border border-transparent hover:border-white/20"
             title={t.changePassword}
           >
             <Lock size={12} className="md:w-3 md:h-3" />
@@ -279,32 +279,32 @@ function MainApp() {
           </button>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-slate-300 hover:bg-slate-800 rounded-md transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-[#d8d2e5] hover:bg-white/12 rounded-md transition border border-transparent hover:border-white/20"
             title={t.logout}
           >
             <LogOut size={12} className="md:w-3 md:h-3" />
             <span className="hidden md:inline">{t.logout}</span>
           </button>
-          <p className="hidden md:block text-[9px] text-slate-400 text-center">{t.teamCapacityPlanner}</p>
+          <p className="hidden md:block text-[9px] text-[#d5d1da] text-center">{t.teamCapacityPlanner}</p>
         </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 px-2.5 md:px-3 py-1 flex items-center justify-between shadow-sm">
+        <div className="brand-header px-2.5 md:px-3 py-1 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-md transition flex-shrink-0"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#d5d1da] hover:border-[#827691] hover:bg-[#f3eff8] rounded-md transition flex-shrink-0 text-[#2e1a47]"
               title={sidebarOpen ? t.hideSidebar : t.showSidebar}
             >
               {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeftOpen size={13} />}
-              <span className="hidden md:inline text-[10px] font-medium text-slate-600">
+              <span className="hidden md:inline text-[10px] font-medium text-[#6c6480]">
                 {sidebarOpen ? t.hideSidebar : t.showSidebar}
               </span>
             </button>
-            <h2 className="text-[12px] font-semibold tracking-tight text-slate-800 truncate leading-none">
+            <h2 className="text-[12px] font-semibold tracking-tight text-[#2e1a47] truncate leading-none">
               {navItems.find((item) => item.id === currentPage)?.label}
             </h2>
           </div>
@@ -312,19 +312,19 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div className="relative w-7 h-7 rounded-full bg-blue-600 border border-blue-500 flex items-center justify-center flex-shrink-0">
+              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[#766689] bg-gradient-to-r from-[#2E1A47] to-[#4A3967] shadow-[0_8px_18px_rgba(46,26,71,0.3)] text-white">
+                <div className="relative w-7 h-7 rounded-full bg-white/15 border border-white/40 flex items-center justify-center flex-shrink-0">
                   <span className="text-[10px] font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
                   <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white"></span>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-semibold text-slate-800 truncate leading-none">
+                  <span className="text-[11px] font-semibold text-white truncate leading-none">
                     {currentUser}
                   </span>
                   <div className="flex items-center gap-1 mt-0.5 min-w-0">
-                    <span className="inline-flex items-center gap-1 text-[9px] text-slate-500 font-medium whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 text-[9px] text-[#ded7ea] font-medium whitespace-nowrap">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       {t.loggedIn || 'Logged in'}
                     </span>
@@ -343,7 +343,7 @@ function MainApp() {
             {currentUser && (
               <div className="sm:hidden flex items-center gap-1 flex-shrink-0">
                 <div
-                  className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center border border-blue-500"
+                  className="w-7 h-7 rounded-full bg-[#2E1A47] flex items-center justify-center border border-[#827691]"
                   title={departmentDisplayLabel ? `${currentUser} - ${departmentDisplayLabel}` : currentUser}
                 >
                   <span className="text-[10px] font-bold text-white">
@@ -351,7 +351,7 @@ function MainApp() {
                   </span>
                 </div>
                 {mobileDepartmentCode && (
-                  <span className="px-1 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 text-[9px] font-bold">
+                  <span className="px-1 py-0.5 rounded border border-[#c9c0d8] bg-[#ece7f3] text-[#2e1a47] text-[9px] font-bold">
                     {mobileDepartmentCode}
                   </span>
                 )}
@@ -359,13 +359,13 @@ function MainApp() {
             )}
 
             {/* Language Selector - Responsive */}
-            <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md flex-shrink-0">
+            <div className="flex items-center gap-0.5 bg-[#ece6f5] p-0.5 rounded-md flex-shrink-0 border border-[#d5d1da]">
               <button
                 onClick={() => setLanguage('es')}
                 className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'es'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-[#2e1a47] text-white'
+                    : 'text-[#6c6480] hover:text-[#2e1a47]'
                 }`}
                 title="Espanol"
               >
@@ -375,8 +375,8 @@ function MainApp() {
                 onClick={() => setLanguage('en')}
                 className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'en'
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-[#2e1a47] text-white'
+                    : 'text-[#6c6480] hover:text-[#2e1a47]'
                 }`}
                 title="English"
               >
@@ -385,8 +385,8 @@ function MainApp() {
             </div>
 
             {currentPage === 'capacity' && departmentFilter !== 'General' && (
-              <div className="text-[10px] font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-1.5 py-0.5 rounded-md flex items-center gap-1 flex-shrink-0">
-                <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+              <div className="text-[10px] font-semibold text-[#2e1a47] bg-gradient-to-r from-[#ede8f5] to-[#f6f3fb] border border-[#d5d1da] px-1.5 py-0.5 rounded-md flex items-center gap-1 flex-shrink-0">
+                <span className="w-1 h-1 rounded-full bg-[#ce0037]"></span>
                 {t.viewing} {departmentFilter}
               </div>
             )}

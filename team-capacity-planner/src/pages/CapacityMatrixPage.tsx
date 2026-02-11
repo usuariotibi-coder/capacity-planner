@@ -2992,7 +2992,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50">
+    <div className="brand-page-shell h-full flex flex-col">
       {/* Edit Cell Modal */}
       {renderEditModal()}
       {/* Change Order Modal */}
@@ -3090,21 +3090,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         </div>
       )}
       {/* Sticky Header - Responsive */}
-      <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      <div className="sticky top-0 z-50 brand-page-header">
         <div className="px-1 py-1 flex flex-wrap items-center gap-1">
           {/* Zoom controls - ultra compact */}
-          <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5 flex-shrink-0">
+          <div className="flex items-center gap-0.5 bg-[#ede8f5] rounded-md p-0.5 flex-shrink-0 border border-[#d5d1da]">
             <button
               onClick={() => setZoom(Math.max(50, zoom - 10))}
-              className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
+              className="p-0.5 hover:bg-[#e2dced] rounded transition text-[#2e1a47]"
               title={t.zoomOut}
             >
               <ZoomOut size={12} />
             </button>
-            <span className="text-[9px] font-semibold text-gray-700 w-6 text-center">{zoom}%</span>
+            <span className="text-[9px] font-semibold text-[#2e1a47] w-6 text-center">{zoom}%</span>
             <button
               onClick={() => setZoom(Math.min(200, zoom + 10))}
-              className="p-0.5 hover:bg-gray-200 rounded transition text-gray-700"
+              className="p-0.5 hover:bg-[#e2dced] rounded transition text-[#2e1a47]"
               title={t.zoomIn}
             >
               <ZoomIn size={12} />
@@ -3115,7 +3115,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="border border-blue-300 rounded px-1 py-0.5 text-[9px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex-shrink-0"
+            className="border border-[#d5d1da] rounded px-1 py-0.5 text-[9px] font-semibold text-[#2e1a47] bg-[#f4f1f8] hover:bg-[#ebe6f2] transition flex-shrink-0"
           >
             {yearOptions.map((year) => (
               <option key={year} value={year}>{year}</option>
@@ -3133,7 +3133,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {/* Legend Toggle Button - ultra compact */}
           <button
             onClick={() => setShowLegend(!showLegend)}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-500 hover:bg-blue-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#2e1a47] hover:bg-[#3a2556] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
             title={t.toggleLegend}
           >
             <span>{showLegend ? '▼' : '▶'}</span>
@@ -3144,7 +3144,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {canManageProjectsInCurrentDepartment && (
             <button
               onClick={() => setShowQuickProjectModal(true)}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 hover:bg-green-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#4f3a70] hover:bg-[#3f2d5d] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
               title={t.createProject || 'Create Project'}
             >
               <Plus size={10} />
@@ -3156,7 +3156,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {canManageProjectsInCurrentDepartment && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#827691] hover:bg-[#716381] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
               title={t.importProject || 'Import Existing Project'}
             >
               <FolderPlus size={10} />
@@ -3167,7 +3167,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {projectsVisibleInCurrentView.length > 0 && (
             <button
               onClick={openExportPdfModal}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-500 hover:bg-rose-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#ce0037] hover:bg-[#ba0032] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
               title={language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF'}
             >
               <span>PDF</span>
@@ -3189,15 +3189,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               const deptIcon = getDepartmentIcon(dept);
 
               return (
-                <div className="sticky top-0 z-40 mb-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-2 shadow-sm">
+                <div className="sticky top-0 z-40 mb-2 bg-gradient-to-r from-[#f2eef8] to-[#ece7f3] border border-[#d5d1da] rounded-lg p-2 shadow-sm">
                   <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-xs font-bold text-indigo-800 flex items-center gap-1">
+                    <h2 className="text-xs font-bold text-[#2e1a47] flex items-center gap-1">
                       <span className={deptIcon.color}>{deptIcon.icon}</span>
                       <span>{dept} - {t.weeklyOccupancyTotal}</span>
                     </h2>
                     <button
                       onClick={() => setShowDepartmentPanel(!showDepartmentPanel)}
-                      className="text-indigo-600 hover:text-indigo-800 font-bold text-xs cursor-pointer transition"
+                      className="text-[#4f3a70] hover:text-[#2e1a47] font-bold text-xs cursor-pointer transition"
                       title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
                     >
                       {showDepartmentPanel ? '▼' : '▶'}
