@@ -8,6 +8,17 @@ body {
   font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Compact global scale so tables/panels render smaller by default */
+html {
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 13px;
+  }
+}
+
 /* Make interactive elements feel clickable, avoid text-caret selection */
 button,
 [role="button"],
