@@ -74,18 +74,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Railway provides DATABASE_URL automatically, otherwise use individual variables
 import dj_database_url
 
-DATABASE_URL = config('DATABASE_URL', default='').strip()
-# Optional override when internal networking is unavailable.
-DATABASE_PUBLIC_URL = config('DATABASE_PUBLIC_URL', default='').strip()
-DB_CONNECT_TIMEOUT = config('DB_CONNECT_TIMEOUT', default=10, cast=int)
-RESOLVED_DATABASE_URL = DATABASE_PUBLIC_URL or DATABASE_URL
-
-if RESOLVED_DATABASE_URL:
+if 'DATABASE_URL' in os.environ:
     # Railway and other platforms provide DATABASE_URL
     DATABASES = {
-        'default': dj_database_url.parse(
-            RESOLVED_DATABASE_URL,
-            conn_max_age=600,
+        'default': dj_database_url.config(
+            default='sqlite:///db.sqlite3',
+            conn_max_age=600
         )
     }
 else:
@@ -100,12 +94,6 @@ else:
             'PORT': config('DB_PORT', default='5432'),
         }
     }
-
-if 'default' in DATABASES:
-    engine = DATABASES['default'].get('ENGINE', '')
-    if 'postgresql' in engine:
-        DATABASES['default'].setdefault('OPTIONS', {})
-        DATABASES['default']['OPTIONS'].setdefault('connect_timeout', DB_CONNECT_TIMEOUT)
 
 # Connection pooling for Railway
 if not DEBUG:
