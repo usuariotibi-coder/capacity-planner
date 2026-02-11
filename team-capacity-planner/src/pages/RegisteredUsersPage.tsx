@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Pencil, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
+import { Pencil, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
 import { registeredUsersApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -393,9 +393,6 @@ export function RegisteredUsersPage() {
           <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-red-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-rose-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 border border-red-200 flex items-center justify-center">
-                  <AlertTriangle size={20} className="text-red-600" />
-                </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
                     {t.delete || 'Delete'} {t.registeredUsers || 'User'}

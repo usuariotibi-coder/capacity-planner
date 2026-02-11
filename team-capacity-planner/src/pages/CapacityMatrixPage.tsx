@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, AlertTriangle, GripVertical } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -2604,9 +2604,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           </div>
         )}
         {stage && <div className="text-[10px] opacity-60 font-normal leading-tight">{stage}</div>}
-        {outOfEstimatedRange && (
-          <div className="absolute top-0.5 -right-0.5 text-red-600 font-bold text-[10px]">⚠</div>
-        )}
         {/* Comment indicator - shows when cell has a comment */}
         {cellComment && (
           <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
@@ -2897,7 +2894,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center rounded-lg">
               <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
-                <h3 className="text-lg font-bold text-red-700 mb-2">⚠️ {t.deleteConfirm || 'Confirmar Eliminación'}</h3>
+                <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar Eliminación'}</h3>
                 <p className="text-sm text-gray-700 mb-4">
                   {t.deleteAllDataConfirm || '¿Estás seguro de que deseas eliminar estos datos?'}
                 </p>
@@ -4562,9 +4559,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               💬
                                             </button>
                                           )}
-                                          {!isDeptWeekInRange && (
-                                            <div className="absolute top-0.5 -right-0.5 text-red-600 font-bold text-[10px]">⚠</div>
-                                          )}
                                           <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
                                           {stageColor && assignmentStage && (
@@ -4637,7 +4631,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <span className="text-gray-700 font-medium">Current week</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-red-50 rounded border border-dashed border-red-500 flex items-center justify-center text-red-600 text-sm font-bold flex-shrink-0">⚠</div>
+                <div className="w-6 h-6 bg-red-50 rounded border border-dashed border-red-500 flex-shrink-0"></div>
                 <span className="text-gray-700 font-medium">Out of range</span>
               </div>
             </div>
@@ -4673,9 +4667,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 {formValidationPopup?.scope === 'quick' && (
                   <div className="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-3 py-2 shadow-sm">
                     <div className="flex items-start gap-2">
-                      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                        <AlertTriangle size={14} />
-                      </div>
                       <div className="flex-1">
                         <p className="text-sm font-bold text-amber-900">{formValidationPopup.title}</p>
                         <p className="text-xs text-amber-800">{formValidationPopup.message}</p>
@@ -4827,9 +4818,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 {formValidationPopup?.scope === 'import' && (
                   <div className="rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-3 py-2 shadow-sm">
                     <div className="flex items-start gap-2">
-                      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                        <AlertTriangle size={14} />
-                      </div>
                       <div className="flex-1">
                         <p className="text-sm font-bold text-amber-900">{formValidationPopup.title}</p>
                         <p className="text-xs text-amber-800">{formValidationPopup.message}</p>

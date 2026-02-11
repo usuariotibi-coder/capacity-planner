@@ -6,7 +6,7 @@ import type { Project, Department, DepartmentStageConfig } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
-import { AlertTriangle, CheckCircle2, Plus, Trash2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, X, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
@@ -386,7 +386,6 @@ export function ProjectsPage() {
                 }`}
               >
                 {formNotice.type === 'success' && <CheckCircle2 size={16} />}
-                {formNotice.type === 'warning' && <AlertTriangle size={16} />}
                 {formNotice.type === 'error' && <XCircle size={16} />}
               </div>
               <div className="flex-1">

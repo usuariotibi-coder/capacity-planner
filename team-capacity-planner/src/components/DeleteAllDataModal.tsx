@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { Language } from '../utils/translations';
 import { useTranslation } from '../utils/translations';
 import { clearOnlyLocalStorage } from '../utils/storageCleanup';
@@ -45,8 +44,7 @@ export function DeleteAllDataModal({
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
           {/* Header */}
-          <div className="bg-red-50 border-b border-red-200 px-6 py-4 flex items-start gap-3">
-            <AlertTriangle size={24} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-red-50 border-b border-red-200 px-6 py-4">
             <div>
               <h3 className="text-lg font-bold text-red-900">
                 {t.deleteAllData}
