@@ -43,11 +43,11 @@ interface CapacityMatrixPageProps {
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
-const CURRENT_WEEK_HEADER_CLASS = 'bg-slate-300 text-slate-900 border-slate-500';
-const CURRENT_WEEK_RING_CLASS = 'ring-2 ring-slate-500 shadow-sm';
-const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-slate-500 shadow-sm border-slate-400 bg-gradient-to-b from-slate-50 to-slate-100';
-const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-slate-500 via-slate-600 to-slate-700 text-white border-2 border-slate-800 shadow-md ring-1 ring-slate-300';
-const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-slate-500 border-2 shadow-sm bg-gradient-to-b from-slate-50 to-slate-100';
+const CURRENT_WEEK_HEADER_CLASS = 'bg-stone-300 text-stone-900 border-stone-600';
+const CURRENT_WEEK_RING_CLASS = 'ring-2 ring-stone-600 shadow-md';
+const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-stone-600 shadow-md border-stone-500 bg-gradient-to-b from-stone-100 to-zinc-100';
+const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-stone-600 to-zinc-700 text-white border-2 border-zinc-800 shadow-lg ring-2 ring-stone-300';
+const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-gradient-to-b from-stone-100 to-zinc-100';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -3129,8 +3129,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Current Week Info - ultra compact */}
           {currentDateWeekIndex >= 0 && (
-            <div className="bg-gradient-to-r from-slate-600 to-slate-700 text-white px-1 py-0.5 rounded-md shadow-sm flex items-center gap-0.5 text-[9px] flex-shrink-0">
-              <span className="font-bold">🎯</span>
+            <div className="bg-gradient-to-r from-stone-600 to-zinc-700 text-white px-1.5 py-0.5 rounded-md shadow-md text-[9px] flex-shrink-0">
               <span className="font-bold">W{currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.weekNum : '-'}</span>
             </div>
           )}
@@ -4439,13 +4438,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
                                   }`}
                                 >
-                                  {isCurrentWeek && (
-                                    <>
-                                      <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-slate-700 text-white px-0.5 py-0 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
-                                        🎯
-                                      </div>
-                                    </>
-                                  )}
                                   <div className={`font-bold text-xs leading-none`}>CW{weekData.weekNum}</div>
                                 </th>
                               );
