@@ -88,13 +88,8 @@ const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: str
     '/api/resend-verification-email/',
     '/api/session-status/',
   ];
-  const isAuthOrSessionEndpoint = authOrSessionEndpoints.some(prefix => endpoint.startsWith(prefix));
 
-  if (response.status === 404 && isAuthOrSessionEndpoint) {
-    return true;
-  }
-
-  if ([502, 503, 504].includes(response.status) && isAuthOrSessionEndpoint) {
+  if (response.status === 404 && authOrSessionEndpoints.some(prefix => endpoint.startsWith(prefix))) {
     return true;
   }
 
