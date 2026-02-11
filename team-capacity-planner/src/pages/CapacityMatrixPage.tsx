@@ -6,7 +6,7 @@ import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate } from '../utils/dateUtils';
-import { calculateTalent, getStageColor, getUtilizationColor } from '../utils/stageColors';
+import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
 import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical } from 'lucide-react';
@@ -2629,7 +2629,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             {utilizationPercent}%
           </div>
         )}
-        {stage && <div className="text-[10px] opacity-60 font-normal leading-tight">{stage}</div>}
+        {stage && <div className="text-[10px] opacity-60 font-normal leading-tight">{getStageLabel(stage, t as Record<string, string>)}</div>}
         {/* Comment indicator - shows when cell has a comment */}
         {cellComment && (
           <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
@@ -2832,7 +2832,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <option value="">{t.noStage}</option>
                 {stageOptions.map((stage) => (
                   <option key={stage} value={stage}>
-                    {(t as Record<string, string>)[`stage${stage.split('_').map(word => word.charAt(0) + word.slice(1).toLowerCase()).join('')}`] || stage.replace(/_/g, ' ')}
+                    {getStageLabel(stage, t as Record<string, string>)}
                   </option>
                 ))}
               </select>
@@ -4579,7 +4579,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             </button>
                                           )}
                                           {stageColor && assignmentStage ? (
-                                            <span className="font-semibold text-[7px]">{assignmentStage}</span>
+                                            <span className="font-semibold text-[7px]">{getStageLabel(assignmentStage, t as Record<string, string>)}</span>
                                           ) : isDeptWeekInRange ? (
                                             <>
                                               {isDeptFirstWeek ? (
@@ -4610,7 +4610,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
                                           <div className="text-[10px] opacity-75 leading-tight">{talent}</div>
                                           {stageColor && assignmentStage && (
-                                            <div className="text-[7px] font-semibold leading-tight">{assignmentStage}</div>
+                                            <div className="text-[7px] font-semibold leading-tight">{getStageLabel(assignmentStage, t as Record<string, string>)}</div>
                                           )}
                                         </div>
                                       )}
