@@ -146,21 +146,21 @@ function MainApp() {
   const departmentChipTone = (() => {
     switch (currentUserDepartment) {
       case 'PM':
-        return 'bg-blue-500/25 text-blue-50 border-blue-200/40';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'MED':
-        return 'bg-cyan-500/25 text-cyan-50 border-cyan-200/40';
+        return 'bg-cyan-50 text-cyan-700 border-cyan-200';
       case 'HD':
-        return 'bg-purple-500/25 text-purple-50 border-purple-200/40';
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'MFG':
-        return 'bg-orange-500/25 text-orange-50 border-orange-200/40';
+        return 'bg-orange-50 text-orange-700 border-orange-200';
       case 'BUILD':
-        return 'bg-emerald-500/25 text-emerald-50 border-emerald-200/40';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'PRG':
-        return 'bg-lime-500/25 text-lime-50 border-lime-200/40';
+        return 'bg-lime-50 text-lime-700 border-lime-200';
       case 'OTHER':
-        return 'bg-teal-500/25 text-teal-50 border-teal-200/40';
+        return 'bg-teal-50 text-teal-700 border-teal-200';
       default:
-        return 'bg-white/20 text-white border-white/30';
+        return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   })();
 
@@ -292,45 +292,46 @@ function MainApp() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-gray-200 px-3 py-1.5 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="bg-white border-b border-gray-200 px-2.5 md:px-3 py-1 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-md transition flex-shrink-0"
               title={sidebarOpen ? t.hideSidebar : t.showSidebar}
             >
               {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeftOpen size={13} />}
-              <span className="hidden md:inline text-[11px] font-medium text-slate-600">
+              <span className="hidden md:inline text-[10px] font-medium text-slate-600">
                 {sidebarOpen ? t.hideSidebar : t.showSidebar}
               </span>
             </button>
-            <h2 className="text-[13px] font-semibold tracking-tight text-slate-800 truncate leading-none">
+            <h2 className="text-[12px] font-semibold tracking-tight text-slate-800 truncate leading-none">
               {navItems.find((item) => item.id === currentPage)?.label}
             </h2>
           </div>
 
-          <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2.5 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 rounded-xl border border-blue-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all">
-                <div className="relative w-8 md:w-10 h-8 md:h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs md:text-sm font-bold text-white">
+              <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="relative w-7 h-7 rounded-full bg-blue-600 border border-blue-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-blue-600"></span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white"></span>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs md:text-sm font-bold text-white truncate">
+                  <span className="text-[11px] font-semibold text-slate-800 truncate leading-none">
                     {currentUser}
                   </span>
-                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                    <span className="text-[10px] md:text-xs text-blue-100 font-medium whitespace-nowrap">
+                  <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                    <span className="inline-flex items-center gap-1 text-[9px] text-slate-500 font-medium whitespace-nowrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       {t.loggedIn || 'Logged in'}
                     </span>
                     {departmentDisplayLabel && (
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${departmentChipTone}`}>
-                        <Building2 size={10} />
-                        <span className="truncate max-w-[140px]">{departmentDisplayLabel}</span>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-semibold whitespace-nowrap ${departmentChipTone}`}>
+                        <Building2 size={8} />
+                        <span className="truncate max-w-[120px]">{departmentDisplayLabel}</span>
                       </span>
                     )}
                   </div>
@@ -342,15 +343,15 @@ function MainApp() {
             {currentUser && (
               <div className="sm:hidden flex items-center gap-1 flex-shrink-0">
                 <div
-                  className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 flex items-center justify-center border border-blue-400 shadow-lg shadow-blue-500/30"
+                  className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center border border-blue-500"
                   title={departmentDisplayLabel ? `${currentUser} - ${departmentDisplayLabel}` : currentUser}
                 >
-                  <span className="text-xs font-bold text-white">
+                  <span className="text-[10px] font-bold text-white">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 {mobileDepartmentCode && (
-                  <span className="px-1.5 py-0.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700 text-[10px] font-bold">
+                  <span className="px-1 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 text-[9px] font-bold">
                     {mobileDepartmentCode}
                   </span>
                 )}
@@ -361,31 +362,31 @@ function MainApp() {
             <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-md flex-shrink-0">
               <button
                 onClick={() => setLanguage('es')}
-                className={`px-1.5 md:px-2 py-0.5 rounded text-sm md:text-base transition ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'es'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
-                title="Español"
+                title="Espanol"
               >
-                🇲🇽
+                ES
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-1.5 md:px-2 py-0.5 rounded text-sm md:text-base transition ${
+                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'en'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="English"
               >
-                🇺🇸
+                EN
               </button>
             </div>
 
             {currentPage === 'capacity' && departmentFilter !== 'General' && (
-              <div className="text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-2 py-1 rounded-md flex items-center gap-1 flex-shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              <div className="text-[10px] font-semibold text-blue-700 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-1.5 py-0.5 rounded-md flex items-center gap-1 flex-shrink-0">
+                <span className="w-1 h-1 rounded-full bg-blue-500"></span>
                 {t.viewing} {departmentFilter}
               </div>
             )}
