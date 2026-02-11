@@ -48,6 +48,8 @@ const CURRENT_WEEK_RING_CLASS = 'ring-2 ring-stone-600 shadow-md';
 const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-stone-600 shadow-md border-stone-500 bg-gradient-to-b from-stone-100 to-zinc-100';
 const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-stone-600 to-zinc-700 text-white border-2 border-zinc-800 shadow-lg ring-2 ring-stone-300';
 const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-gradient-to-b from-stone-100 to-zinc-100';
+const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
+const MONTH_HEADER_SECONDARY_CLASS = 'bg-gradient-to-b from-[#f0b64b] to-[#d79a2b] text-[#2e1a47] border-[#b67f16] shadow-md';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -4009,8 +4011,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
                                 className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
                                   isEven
-                                    ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
-                                    : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                    ? MONTH_HEADER_PRIMARY_CLASS
+                                    : MONTH_HEADER_SECONDARY_CLASS
                                 }`}
                               >
                                 {monthInfo.month}
@@ -4410,8 +4412,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
                                   className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
                                     isEven
-                                      ? 'bg-gradient-to-b from-blue-400 to-blue-500 text-white border-blue-600 shadow-md'
-                                      : 'bg-gradient-to-b from-amber-300 to-amber-400 text-gray-800 border-amber-600 shadow-md'
+                                      ? MONTH_HEADER_PRIMARY_CLASS
+                                      : MONTH_HEADER_SECONDARY_CLASS
                                   }`}
                                 >
                                   {monthInfo.month}
