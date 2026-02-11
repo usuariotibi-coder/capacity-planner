@@ -6,6 +6,7 @@ This should be run periodically (e.g., via cron job or Celery beat).
 """
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db.utils import OperationalError
 from django.utils import timezone
 from datetime import timedelta
 from capacity.models import UserSession
@@ -30,11 +31,19 @@ class Command(BaseCommand):
         minutes = options['minutes']
         inactivity_threshold = timezone.now() - timedelta(minutes=minutes)
 
-        # Mark inactive sessions
-        inactive_sessions = UserSession.objects.filter(
-            is_active=True,
-            last_activity__lt=inactivity_threshold
-        ).update(is_active=False)
+        try:
+            # Mark inactive sessions
+            inactive_sessions = UserSession.objects.filter(
+                is_active=True,
+                last_activity__lt=inactivity_threshold
+            ).update(is_active=False)
+        except OperationalError as exc:
+            self.stderr.write(
+                self.style.WARNING(
+                    f'Database unavailable while running cleanup_inactive_sessions: {exc}'
+                )
+            )
+            return
 
         self.stdout.write(
             self.style.SUCCESS(
