@@ -197,7 +197,7 @@ function MainApp() {
       <div
         className={`${
           sidebarOpen ? 'w-12 md:w-40' : 'w-0'
-        } brand-sidebar h-full text-white transition-all duration-300 overflow-hidden flex flex-col shadow-sm border-r border-white/15 flex-shrink-0 min-h-0`}
+        } brand-sidebar -mt-px h-[calc(100%+1px)] text-white transition-all duration-300 overflow-hidden flex flex-col shadow-sm border-r border-white/15 flex-shrink-0 min-h-0`}
       >
         <div className="p-1.5 md:p-3 border-b border-white/15 flex-shrink-0">
           <div className="flex items-center justify-center md:justify-start gap-2">
