@@ -291,7 +291,7 @@ function MainApp() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className={`flex-1 flex flex-col overflow-hidden min-h-0 ${sidebarOpen ? '-ml-px' : ''}`}>
         <div className="brand-header px-2.5 md:px-3 py-1 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
