@@ -7,6 +7,7 @@ Uses environment variables for sensitive configuration.
 
 from pathlib import Path
 import os
+from urllib.parse import urlparse
 from decouple import config
 
 # Build paths inside the project
@@ -18,8 +19,20 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-chang
 # DEBUG: Control from environment variable
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+def _strip_wrapping_quotes(value: str) -> str:
+    text = (value or '').strip()
+    if len(text) >= 2 and ((text[0] == '"' and text[-1] == '"') or (text[0] == "'" and text[-1] == "'")):
+        return text[1:-1].strip()
+    return text
+
+
+def _csv_env(name: str, default: str) -> list[str]:
+    raw = _strip_wrapping_quotes(config(name, default=default))
+    return [item.strip().strip('"').strip("'") for item in raw.split(',') if item and item.strip()]
+
+
 # ALLOWED_HOSTS: Accept from environment or use defaults
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.railway.app', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = _csv_env('ALLOWED_HOSTS', 'localhost,127.0.0.1,.railway.app')
 
 # Application definition
 INSTALLED_APPS = [
@@ -74,14 +87,38 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Railway provides DATABASE_URL automatically, otherwise use individual variables
 import dj_database_url
 
-if 'DATABASE_URL' in os.environ:
+database_url = _strip_wrapping_quotes(os.environ.get('DATABASE_URL', ''))
+
+if database_url:
     # Railway and other platforms provide DATABASE_URL
-    DATABASES = {
-        'default': dj_database_url.config(
-            default='sqlite:///db.sqlite3',
-            conn_max_age=600
-        )
-    }
+    try:
+        parsed_db_config = dj_database_url.parse(database_url, conn_max_age=600)
+    except ValueError:
+        parsed_db_config = {}
+
+    if parsed_db_config:
+        if 'postgresql' in parsed_db_config.get('ENGINE', '') and not parsed_db_config.get('NAME'):
+            parsed_path_name = urlparse(database_url).path.lstrip('/')
+            parsed_db_config['NAME'] = (
+                parsed_path_name
+                or _strip_wrapping_quotes(os.environ.get('PGDATABASE', ''))
+                or _strip_wrapping_quotes(config('DB_NAME', default=''))
+                or 'railway'
+            )
+
+        DATABASES = {'default': parsed_db_config}
+    else:
+        # Invalid DATABASE_URL should not break startup; fallback to explicit DB_* vars.
+        DATABASES = {
+            'default': {
+                'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
+                'NAME': config('DB_NAME', default='db.sqlite3'),
+                'USER': config('DB_USER', default='postgres'),
+                'PASSWORD': config('DB_PASSWORD', default=''),
+                'HOST': config('DB_HOST', default='localhost'),
+                'PORT': config('DB_PORT', default='5432'),
+            }
+        }
 else:
     # Local development
     DATABASES = {
@@ -179,7 +216,7 @@ MAX_ACTIVE_SESSIONS_PER_USER = config(
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:5173,http://localhost:3000',
-    cast=lambda v: [s.strip() for s in v.split(',')]
+    cast=lambda v: [item.strip().strip('"').strip("'") for item in _strip_wrapping_quotes(v).split(',') if item and item.strip()]
 )
 
 # Allow all origins (useful for Railway preview/frontends)
