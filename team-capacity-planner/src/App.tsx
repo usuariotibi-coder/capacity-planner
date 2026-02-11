@@ -119,16 +119,16 @@ function MainApp() {
   console.log('[MainApp] Authenticated! Rendering main content');
 
   const navItems: Array<{ id: Page; label: string; icon: React.ReactNode }> = [
-    { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={20} /> },
-    { id: 'resources', label: t.resources, icon: <Users size={20} /> },
-    { id: 'projects', label: t.projects, icon: <Briefcase size={20} /> },
-    { id: 'activity-log', label: t.activityLog || 'Activity Log', icon: <FileText size={20} /> },
+    { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={16} /> },
+    { id: 'resources', label: t.resources, icon: <Users size={16} /> },
+    { id: 'projects', label: t.projects, icon: <Briefcase size={16} /> },
+    { id: 'activity-log', label: t.activityLog || 'Activity Log', icon: <FileText size={16} /> },
   ];
   if (canManageRegisteredUsers) {
     navItems.push({
       id: 'registered-users',
       label: t.registeredUsers || 'Registered Users',
-      icon: <User size={20} />,
+      icon: <User size={16} />,
     });
   }
 
@@ -205,8 +205,8 @@ function MainApp() {
               <Grid3x3 size={16} className="text-blue-200" />
             </div>
             <div className="hidden md:block min-w-0">
-              <h1 className="text-base font-semibold leading-tight tracking-tight truncate">{t.teamCapacity}</h1>
-              <p className="text-[11px] text-slate-400 mt-0.5 truncate">{t.plannerSubtitle}</p>
+              <h1 className="text-sm font-semibold leading-tight tracking-tight truncate">{t.teamCapacity}</h1>
+              <p className="text-[10px] text-slate-400 mt-0.5 truncate">{t.plannerSubtitle}</p>
             </div>
           </div>
         </div>
@@ -220,14 +220,14 @@ function MainApp() {
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-2.5 px-1 md:px-3 py-1.5 md:py-2.5 rounded-md transition text-[9px] md:text-[13px] ${
+              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-2 px-1 md:px-3 py-1.5 md:py-2 rounded-md transition text-[8px] md:text-xs ${
                 currentPage === item.id
                   ? 'bg-blue-500/95 text-white shadow-sm'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
               title={item.label}
             >
-              <span className="flex-shrink-0 text-sm md:text-base">{item.icon}</span>
+              <span className="flex-shrink-0">{item.icon}</span>
               <span className="font-medium text-center md:text-left leading-none">{item.label}</span>
             </button>
           ))}
@@ -239,7 +239,7 @@ function MainApp() {
               onClick={() => {
                 setDepartmentFilter('General');
               }}
-              className={`w-full px-1.5 md:px-3 py-1 md:py-2 rounded-md text-[9px] md:text-[13px] font-semibold transition leading-tight ${
+              className={`w-full px-1.5 md:px-3 py-1 md:py-2 rounded-md text-[8px] md:text-xs font-semibold transition leading-tight ${
                 departmentFilter === 'General'
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -250,13 +250,13 @@ function MainApp() {
               <span className="hidden md:inline">{t.general}</span>
             </button>
 
-            <label className="hidden md:block text-[11px] font-semibold text-slate-400 tracking-wide">{t.viewDepartment}</label>
+            <label className="hidden md:block text-[10px] font-semibold text-slate-400 tracking-wide">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
               }}
-              className="w-full bg-slate-800 text-white text-[10px] md:text-[13px] rounded-md px-2 py-1.5 border border-slate-700 hover:border-blue-500 transition leading-tight"
+              className="w-full bg-slate-800 text-white text-[9px] md:text-xs rounded-md px-2 py-1.5 border border-slate-700 hover:border-blue-500 transition leading-tight"
             >
               <option value="">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
@@ -271,21 +271,21 @@ function MainApp() {
         <div className="p-1.5 md:p-3 border-t border-slate-800 space-y-1">
           <button
             onClick={() => window.location.href = '/change-password'}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-[13px] text-slate-300 hover:bg-slate-800 rounded-md transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[9px] md:text-xs text-slate-300 hover:bg-slate-800 rounded-md transition"
             title={t.changePassword}
           >
-            <Lock size={14} className="md:w-4 md:h-4" />
+            <Lock size={13} className="md:w-3.5 md:h-3.5" />
             <span className="hidden md:inline">{t.changePassword}</span>
           </button>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-[13px] text-slate-300 hover:bg-slate-800 rounded-md transition"
+            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-3 py-1.5 md:py-2 text-[9px] md:text-xs text-slate-300 hover:bg-slate-800 rounded-md transition"
             title={t.logout}
           >
-            <LogOut size={14} className="md:w-4 md:h-4" />
+            <LogOut size={13} className="md:w-3.5 md:h-3.5" />
             <span className="hidden md:inline">{t.logout}</span>
           </button>
-          <p className="hidden md:block text-xs text-slate-400 text-center">{t.teamCapacityPlanner}</p>
+          <p className="hidden md:block text-[10px] text-slate-400 text-center">{t.teamCapacityPlanner}</p>
         </div>
         </div>
       </div>
@@ -299,12 +299,12 @@ function MainApp() {
               className="inline-flex items-center gap-1.5 px-2 py-1 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-md transition flex-shrink-0"
               title={sidebarOpen ? t.hideSidebar : t.showSidebar}
             >
-              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
               <span className="hidden md:inline text-xs font-medium text-slate-600">
                 {sidebarOpen ? t.hideSidebar : t.showSidebar}
               </span>
             </button>
-            <h2 className="text-base font-semibold tracking-tight text-slate-800 truncate leading-none">
+            <h2 className="text-sm font-semibold tracking-tight text-slate-800 truncate leading-none">
               {navItems.find((item) => item.id === currentPage)?.label}
             </h2>
           </div>
