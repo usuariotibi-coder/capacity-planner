@@ -4589,7 +4589,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               )}
                                             </>
                                           ) : isInRange ? (
-                                            <span className="text-[10px]">○</span>
+                                            <span className="text-[10px]">&nbsp;</span>
                                           ) : (
                                             '—'
                                           )}
