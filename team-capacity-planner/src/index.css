@@ -31,8 +31,16 @@ body {
   background: linear-gradient(180deg, #f8f6fb 0%, #eeebf4 100%);
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 #root {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
 }
 
 /* Compact global scale so tables/panels render smaller by default */

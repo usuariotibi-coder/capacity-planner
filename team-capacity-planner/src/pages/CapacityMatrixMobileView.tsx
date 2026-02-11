@@ -4,7 +4,7 @@ import type { Project, Assignment, Employee, Department } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { getDepartmentIcon } from '../utils/departmentIcons';
-import { getAllWeeksWithNextYear } from '../utils/dateUtils';
+import { formatToISO, getAllWeeksWithNextYear, getWeekStart } from '../utils/dateUtils';
 
 interface CapacityMatrixMobileViewProps {
   departmentFilter: 'General' | Department;
@@ -47,6 +47,8 @@ export function CapacityMatrixMobileView({
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const allWeeksData = getAllWeeksWithNextYear(selectedYear);
+  const currentWeekStart = formatToISO(getWeekStart(new Date()));
+  const currentDateWeekIndex = allWeeksData.findIndex((week) => week.date === currentWeekStart);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -125,7 +127,8 @@ export function CapacityMatrixMobileView({
                     </div>
                     <div className="overflow-x-auto">
                       <div className="flex gap-0.5 px-1 py-0.5 min-w-min">
-                        {weeksToShow.map((weekData) => {
+                        {weeksToShow.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
                           const deptAssignments = assignments.filter((a) => {
                             const emp = employees.find((e) => e.id === a.employeeId);
                             return a.weekStartDate === weekData.date && emp?.department === d;
@@ -134,7 +137,7 @@ export function CapacityMatrixMobileView({
                           const displayValue = d === 'MFG' ? totalHours : totalHours / 45;
                           return (
                             <div key={`total-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                              <div className="text-[8px] font-bold text-gray-700">CW{weekData.weekNum}</div>
+                              <div className={`text-[8px] font-bold ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                               <div className="bg-orange-300 text-orange-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
                                 {displayValue.toFixed(1)}
                               </div>
@@ -154,11 +157,12 @@ export function CapacityMatrixMobileView({
                     </div>
                     <div className="overflow-x-auto">
                       <div className="flex gap-0.5 px-1 py-0.5 min-w-min">
-                        {weeksToShow.map((weekData) => {
+                        {weeksToShow.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
                           const capacity = scioTeamMembers?.[d]?.[weekData.date] || 0;
                           return (
                             <div key={`scio-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                              <div className="text-[8px] font-bold text-gray-700">CW{weekData.weekNum}</div>
+                              <div className={`text-[8px] font-bold ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                               <div className="bg-purple-100 text-purple-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
                                 {capacity.toFixed(1)}
                               </div>
@@ -182,7 +186,8 @@ export function CapacityMatrixMobileView({
               </div>
               <div className="overflow-x-auto">
                 <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
-                  {weeksToShow.map((weekData) => {
+                  {weeksToShow.map((weekData, idx) => {
+                    const isCurrentWeek = idx === currentDateWeekIndex;
                     const deptAssignments = assignments.filter((a) => {
                       const emp = employees.find((e) => e.id === a.employeeId);
                       return a.weekStartDate === weekData.date && emp?.department === dept;
@@ -191,7 +196,7 @@ export function CapacityMatrixMobileView({
                     const displayValue = dept === 'MFG' ? totalHours : totalHours / 45;
                     return (
                       <div key={`total-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                        <div className="text-[9px] font-bold text-gray-700 mb-0.5">CW{weekData.weekNum}</div>
+                        <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                         <div className="bg-orange-300 text-orange-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                           {displayValue.toFixed(1)}
                         </div>
@@ -211,11 +216,12 @@ export function CapacityMatrixMobileView({
               </div>
               <div className="overflow-x-auto">
                 <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
-                  {weeksToShow.map((weekData) => {
+                  {weeksToShow.map((weekData, idx) => {
+                    const isCurrentWeek = idx === currentDateWeekIndex;
                     const capacity = scioTeamMembers?.[dept]?.[weekData.date] || 0;
                     return (
                       <div key={`scio-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                        <div className="text-[9px] font-bold text-gray-700 mb-0.5">CW{weekData.weekNum}</div>
+                        <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                         <div className="bg-purple-100 text-purple-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                           {capacity.toFixed(1)}
                         </div>
@@ -238,11 +244,12 @@ export function CapacityMatrixMobileView({
                   </div>
                   <div className="overflow-x-auto">
                     <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
-                      {weeksToShow.map((weekData) => {
+                      {weeksToShow.map((weekData, idx) => {
+                        const isCurrentWeek = idx === currentDateWeekIndex;
                         const count = subcontractedPersonnel?.[company]?.[weekData.date] || 0;
                         return (
                           <div key={`${company}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                            <div className="text-[9px] font-bold text-gray-700 mb-0.5">CW{weekData.weekNum}</div>
+                            <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                             <div className="bg-violet-100 text-violet-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                               {count.toFixed(0)}
                             </div>
@@ -266,11 +273,12 @@ export function CapacityMatrixMobileView({
                   </div>
                   <div className="overflow-x-auto">
                     <div className="flex gap-0.5 px-1.5 py-1 min-w-min">
-                      {weeksToShow.map((weekData) => {
+                      {weeksToShow.map((weekData, idx) => {
+                        const isCurrentWeek = idx === currentDateWeekIndex;
                         const count = prgExternalPersonnel?.[team]?.[weekData.date] || 0;
                         return (
                           <div key={`${team}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
-                            <div className="text-[9px] font-bold text-gray-700 mb-0.5">CW{weekData.weekNum}</div>
+                            <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
                             <div className="bg-cyan-100 text-cyan-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
                               {count.toFixed(0)}
                             </div>

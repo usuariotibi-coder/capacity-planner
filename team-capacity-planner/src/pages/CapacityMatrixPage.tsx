@@ -43,6 +43,11 @@ interface CapacityMatrixPageProps {
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
+const CURRENT_WEEK_HEADER_CLASS = 'bg-slate-300 text-slate-900 border-slate-500';
+const CURRENT_WEEK_RING_CLASS = 'ring-2 ring-slate-500 shadow-sm';
+const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-slate-500 shadow-sm border-slate-400 bg-gradient-to-b from-slate-50 to-slate-100';
+const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-slate-500 via-slate-600 to-slate-700 text-white border-2 border-slate-800 shadow-md ring-1 ring-slate-300';
+const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-slate-500 border-2 shadow-sm bg-gradient-to-b from-slate-50 to-slate-100';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -3124,7 +3129,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Current Week Info - ultra compact */}
           {currentDateWeekIndex >= 0 && (
-            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-1 py-0.5 rounded-md shadow-sm flex items-center gap-0.5 text-[9px] flex-shrink-0">
+            <div className="bg-gradient-to-r from-slate-600 to-slate-700 text-white px-1 py-0.5 rounded-md shadow-sm flex items-center gap-0.5 text-[9px] flex-shrink-0">
               <span className="font-bold">🎯</span>
               <span className="font-bold">W{currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.weekNum : '-'}</span>
             </div>
@@ -3223,7 +3228,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               key={`dept-header-${weekData.date}`}
                               className={`w-10 flex-shrink-0 text-center text-[8px] font-bold px-1 py-0.5 rounded-md border-1.5 ${
                                 isCurrentWeek
-                                  ? 'bg-red-300 text-red-900 border-red-500'
+                                  ? CURRENT_WEEK_HEADER_CLASS
                                   : 'bg-blue-100 text-blue-900 border-blue-300'
                               }`}
                             >
@@ -3287,7 +3292,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             <div
                               key={`total-${dept}-${weekData.date}`}
                               className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
-                                isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
+                                isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
                               }`}
                               title={`${t.totalLabel} - CW${weekData.weekNum}: ${displayValue.toFixed(2)} ${unit}`}
                             >
@@ -3322,7 +3327,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   handleScioTeamChange(dept, weekData.date, newCapacity);
                                 }}
                                 className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-60 ${
-                                  isCurrentWeek ? 'ring-2 ring-red-600 shadow-md border-red-500 bg-gradient-to-b from-red-50 to-orange-50' : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
+                                  isCurrentWeek ? CURRENT_WEEK_EDITABLE_CLASS : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
                                 }`}
                                 placeholder="0"
                                 title={`Capacidad para la semana ${weekData.weekNum}`}
@@ -3368,7 +3373,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       key={`subcontract-${company}-${weekData.date}`}
                                       className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
                                         isCurrentWeek
-                                          ? 'ring-2 ring-red-500 shadow-md border-red-400 bg-gradient-to-b from-red-50 to-orange-50'
+                                          ? CURRENT_WEEK_EDITABLE_CLASS
                                           : 'border-violet-300 bg-gradient-to-b from-violet-50 to-violet-25 hover:border-violet-400'
                                       }`}
                                     >
@@ -3457,7 +3462,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       key={`prg-external-${team}-${weekData.date}`}
                                       className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
                                         isCurrentWeek
-                                          ? 'ring-2 ring-red-500 shadow-md border-red-400 bg-gradient-to-b from-red-50 to-orange-50'
+                                          ? CURRENT_WEEK_EDITABLE_CLASS
                                           : 'border-cyan-300 bg-gradient-to-b from-cyan-50 to-cyan-25 hover:border-cyan-400'
                                       }`}
                                     >
@@ -3534,7 +3539,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   totalExternalHours > 0
                                     ? 'bg-purple-200 border-purple-400 shadow-sm'
                                     : 'bg-purple-50 border-purple-300'
-                                } ${isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''}`}
+                                } ${isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''}`}
                                 title={`Horas externas - ${totalExternalHours}h`}
                               >
                                 <div className="font-black text-[9px]">
@@ -3642,7 +3647,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             <div
                               key={`capacity-${dept}-${weekData.date}`}
                               className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
-                                isCurrentWeek ? 'ring-2 ring-red-600 shadow-md' : ''
+                                isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
                               }`}
                               title={`${t.capacityLabel} - CW${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
@@ -4027,7 +4032,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 data-week-index={idx}
                                 className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
                                   isCurrentWeek
-                                    ? 'bg-gradient-to-b from-red-500 via-orange-500 to-red-600 text-white border-2 border-red-700 shadow-lg ring-2 ring-red-300'
+                                    ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                     : weekData.isNextYear
                                       ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
                                       : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
@@ -4066,7 +4071,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 canEditThisDepartment ? 'cursor-pointer hover:shadow-md' : ''
                               } ${
                                 isCurrentWeekColumn
-                                  ? 'border-red-500 border-2 shadow-md bg-gradient-to-b from-red-50 to-orange-50'
+                                  ? CURRENT_WEEK_SOFT_CELL_CLASS
                                   : 'border-gray-300'
                               }`}
                             >
@@ -4123,7 +4128,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           key={`header-${weekData.date}`}
                           className={`w-16 flex-shrink-0 text-center text-[8px] font-bold p-0.5 rounded border ${
                             isCurrentWeek
-                              ? 'bg-red-300 text-red-900 border-red-500'
+                              ? CURRENT_WEEK_HEADER_CLASS
                               : 'bg-blue-100 text-blue-900 border-blue-300'
                           }`}
                         >
@@ -4230,7 +4235,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             <div
                               key={`${dept}-${weekData.date}`}
                               className={`w-16 flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded border text-[7px] font-semibold ${bgColor} ${
-                                isCurrentWeek ? 'ring-1 ring-red-600 shadow-md' : ''
+                                isCurrentWeek ? 'ring-1 ring-slate-500 shadow-sm' : ''
                               }`}
                               title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
@@ -4428,7 +4433,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   data-week-index={idx}
                                   className={`border px-0.5 py-0.5 text-center font-bold min-w-20 relative transition-all text-xs ${
                                     isCurrentWeek
-                                      ? 'bg-gradient-to-b from-red-500 via-orange-500 to-red-600 text-white border-2 border-red-700 shadow-lg ring-2 ring-red-300'
+                                      ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                       : weekData.isNextYear
                                         ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
                                         : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
@@ -4436,7 +4441,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 >
                                   {isCurrentWeek && (
                                     <>
-                                      <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-red-700 text-white px-0.5 py-0 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
+                                      <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-slate-700 text-white px-0.5 py-0 rounded-full text-xs font-bold whitespace-nowrap shadow-md">
                                         🎯
                                       </div>
                                     </>
@@ -4503,7 +4508,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       data-week-index={weekIdx}
                                       className={`border p-0 relative text-xs ${
                                         isCurrentWeekColumn
-                                          ? 'border-red-500 border-2 shadow-md bg-gradient-to-b from-red-50 to-orange-50'
+                                          ? CURRENT_WEEK_SOFT_CELL_CLASS
                                           : 'border-gray-300'
                                       } ${
                                         stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50'
@@ -4627,7 +4632,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <span className="text-gray-700 font-medium">Within range</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-yellow-400 rounded border border-yellow-500 flex items-center justify-center text-xs font-bold flex-shrink-0">S</div>
+                <div className="w-6 h-6 bg-slate-300 rounded border border-slate-500 text-slate-900 flex items-center justify-center text-xs font-bold flex-shrink-0">S</div>
                 <span className="text-gray-700 font-medium">Current week</span>
               </div>
               <div className="flex items-center gap-2">

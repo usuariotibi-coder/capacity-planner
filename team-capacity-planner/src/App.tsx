@@ -192,7 +192,7 @@ function MainApp() {
   };
 
   return (
-    <div className="brand-app-shell flex h-screen text-slate-800">
+    <div className="brand-app-shell flex h-[100dvh] overflow-hidden text-slate-800">
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
@@ -258,9 +258,9 @@ function MainApp() {
               }}
               className="w-full bg-white/10 text-white text-[9px] md:text-[11px] rounded-md px-2 py-1 border border-white/20 hover:border-[#d5d1da] transition leading-tight"
             >
-              <option value="">{t.selectDepartment}</option>
+              <option value="" className="text-[#2e1a47] bg-white">{t.selectDepartment}</option>
               {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept}>
+                <option key={dept} value={dept} className="text-[#2e1a47] bg-white">
                   {dept}
                 </option>
               ))}
@@ -291,7 +291,7 @@ function MainApp() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <div className="brand-header px-2.5 md:px-3 py-1 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <button
@@ -393,7 +393,7 @@ function MainApp() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden min-h-0">
           {renderPage()}
         </div>
       </div>

@@ -345,8 +345,8 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="brand-page-shell p-6">
-      <div className="brand-page-header rounded-xl px-4 py-3 flex justify-between items-center mb-6">
+    <div className="brand-page-shell h-full min-h-0 flex flex-col overflow-hidden">
+      <div className="brand-page-header rounded-xl px-4 py-3 flex justify-between items-center mx-6 mt-6 mb-4">
         <h1 className="brand-title text-3xl font-bold">{t.projects}</h1>
         <button
           onClick={() => {
@@ -674,6 +674,7 @@ export function ProjectsPage() {
         </div>
       )}
 
+      <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
       {/* Projects table */}
       <div className="brand-panel overflow-x-auto border-2 border-[#d5d1da] rounded-lg bg-white">
         <table className="brand-table w-full border-collapse">
@@ -763,6 +764,7 @@ export function ProjectsPage() {
           <p>{t.noProjects}</p>
         </div>
       )}
+    </div>
     </div>
   );
 }
