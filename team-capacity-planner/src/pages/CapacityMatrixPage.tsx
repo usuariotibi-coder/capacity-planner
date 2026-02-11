@@ -1793,13 +1793,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const utilizationColorInfo = getUtilizationColor(utilizationPercent);
     const deptInfo = getDepartmentIcon(dept);
     const deptLabel = getDepartmentLabel(dept, t);
+    const showDepartmentLongLabel = departmentFilter !== 'General';
+    const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
 
     if (isMobile) {
       return (
         <div
           key={dept}
           className="w-[122px] bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
-          title={`${deptLabel}
+          title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
@@ -1809,9 +1811,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
             <span className="text-[9px] font-bold text-gray-800">{dept}</span>
           </div>
-          <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
-            {deptLabel}
-          </div>
+          {showDepartmentLongLabel && (
+            <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
+              {deptLabel}
+            </div>
+          )}
           <div className="space-y-[2px] mb-0.5">
             <div className="flex items-center justify-between rounded bg-blue-100 border border-blue-200 px-1 py-[1px] text-blue-700 leading-none">
               <span className="text-[7px] font-semibold">{t.quotedLabel}</span>
@@ -1837,7 +1841,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       <div
         key={dept}
         className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100"
-        title={`${deptLabel}
+        title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
@@ -1847,9 +1851,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
           <span className="text-[9px] font-bold text-gray-800">{dept}</span>
         </div>
-        <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
-          {deptLabel}
-        </div>
+        {showDepartmentLongLabel && (
+          <div className="text-[8px] text-gray-600 text-center font-semibold truncate mb-0.5">
+            {deptLabel}
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
           <div className="rounded bg-blue-100 border border-blue-200 px-0.5 py-[1px] text-blue-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
