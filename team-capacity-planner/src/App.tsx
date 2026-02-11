@@ -197,9 +197,9 @@ function MainApp() {
       <div
         className={`${
           sidebarOpen ? 'w-12 md:w-40' : 'w-0'
-        } brand-sidebar h-full text-white transition-all duration-300 overflow-hidden flex flex-col shadow-xl flex-shrink-0 min-h-0`}
+        } brand-sidebar h-full text-white transition-all duration-300 overflow-hidden flex flex-col shadow-sm border-r border-white/15 flex-shrink-0 min-h-0`}
       >
-        <div className="p-1.5 md:p-4 border-b border-white/15 flex-shrink-0">
+        <div className="p-1.5 md:p-3 border-b border-white/15 flex-shrink-0">
           <div className="flex items-center justify-center md:justify-start gap-2">
             <div className="w-7 h-7 rounded-md bg-white/12 border border-white/30 flex items-center justify-center">
               <Grid3x3 size={14} className="text-white" />
@@ -213,7 +213,7 @@ function MainApp() {
 
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 
-        <nav className="p-1.5 md:p-2.5 space-y-1">
+        <nav className="px-1.5 md:px-2.5 pt-0.5 md:pt-1 pb-1.5 md:pb-2.5 space-y-1">
           {navItems.map((item) => (
             <button
               key={item.id}
