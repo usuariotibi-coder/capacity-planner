@@ -3298,10 +3298,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {/* Legend Toggle Button - ultra compact */}
           <button
             onClick={() => setShowLegend(!showLegend)}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#2e1a47] hover:bg-[#3a2556] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
+              showLegend
+                ? 'bg-[#4f3a70] text-white border-[#2e1a47]'
+                : 'bg-[#2e1a47] hover:bg-[#3a2556] text-white border-[#2e1a47]'
+            }`}
             title={t.toggleLegend}
           >
-            <span>{showLegend ? '▼' : '▶'}</span>
+            <span className="font-bold">{showLegend ? '-' : '+'}</span>
             <span className="hidden sm:inline">{t.legend}</span>
           </button>
 
@@ -4858,68 +4862,81 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         )}
       </div>
 
-      {/* Leyenda - Expandable in place */}
+      {/* Visual Guide - Expandable in place */}
       {showLegend && (
-        <div className="mx-2 my-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mx-2 my-2 overflow-hidden rounded-xl border border-[#d9d4e2] bg-gradient-to-b from-white to-[#f6f3fb] shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#e8e4ef] px-3 py-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-[#2e1a47]">{t.legend}</h3>
+            <span className="text-[10px] font-medium text-[#6d6082]">
+              {departmentFilter === 'General' ? t.globalPanelTitle : t.projectsMatrix}
+            </span>
+          </div>
+
+          <div className="space-y-3 p-3">
             {departmentFilter === 'General' && (
-              <>
-                <h3 className="text-xs font-bold text-indigo-900 mb-2">Global Panel - Colors by Utilization</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-green-300 rounded border border-green-400 flex-shrink-0"></div>
-                    <span className="text-gray-700 font-medium">0-50% (Low)</span>
+              <div>
+                <p className="mb-2 text-[11px] font-semibold text-[#2e1a47]">
+                  {language === 'es' ? 'Uso de capacidad' : 'Capacity usage'}
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                    <div className="h-4 w-4 rounded border border-green-300 bg-green-100" />
+                    <span className="text-[11px] font-medium text-[#3f3354]">{t.percentLow}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-yellow-300 rounded border border-yellow-400 flex-shrink-0"></div>
-                    <span className="text-gray-700 font-medium">50-75% (Moderate)</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                    <div className="h-4 w-4 rounded border border-yellow-300 bg-yellow-100" />
+                    <span className="text-[11px] font-medium text-[#3f3354]">{t.percentModerate}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-orange-400 rounded border border-orange-500 flex-shrink-0"></div>
-                    <span className="text-gray-700 font-medium">75-100% (High)</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                    <div className="h-4 w-4 rounded border border-red-600 bg-red-500" />
+                    <span className="text-[11px] font-medium text-[#3f3354]">{t.percentHigh}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-red-500 rounded border border-red-600 flex-shrink-0"></div>
-                    <span className="text-gray-700 font-medium">100%+ (Critical)</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                    <div className="h-4 w-4 rounded border border-red-800 bg-red-700 shadow-inner" />
+                    <span className="text-[11px] font-medium text-[#3f3354]">{t.percentCritical}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-gray-100 rounded border border-gray-300 flex-shrink-0"></div>
-                    <span className="text-gray-700 font-medium">No data</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                    <div className="h-4 w-4 rounded border border-gray-300 bg-gray-100" />
+                    <span className="text-[11px] font-medium text-[#3f3354]">{t.noDataLegend}</span>
                   </div>
                 </div>
-              </>
+              </div>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-blue-100 rounded border border-blue-300 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">h</div>
-                <span className="text-gray-700 font-medium">Hours</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-gray-400 flex-shrink-0">—</div>
-                <span className="text-gray-700 font-medium">No assignments</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-green-100 rounded border border-green-300 flex items-center justify-center text-green-600 text-sm flex-shrink-0">○</div>
-                <span className="text-gray-700 font-medium">Within range</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-slate-300 rounded border border-slate-500 text-slate-900 flex items-center justify-center text-xs font-bold flex-shrink-0">S</div>
-                <span className="text-gray-700 font-medium">Current week</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-red-50 rounded border border-dashed border-red-500 flex-shrink-0"></div>
-                <span className="text-gray-700 font-medium">Out of range</span>
+
+            <div>
+              <p className="mb-2 text-[11px] font-semibold text-[#2e1a47]">
+                {language === 'es' ? 'Como leer las celdas' : 'How to read cells'}
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded border border-blue-300 bg-blue-100 text-[10px] font-bold text-blue-700">h</div>
+                  <span className="text-[11px] font-medium text-[#3f3354]">{t.hoursLegend}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 bg-white text-[11px] font-bold text-gray-400">-</div>
+                  <span className="text-[11px] font-medium text-[#3f3354]">{t.noAssignmentsLegend}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="h-5 w-5 rounded border border-emerald-300 bg-emerald-50" />
+                  <span className="text-[11px] font-medium text-[#3f3354]">{t.withinRangeLegend}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="flex h-5 w-5 items-center justify-center rounded border border-stone-500 bg-stone-300 text-[10px] font-bold text-stone-900">S</div>
+                  <span className="text-[11px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="h-5 w-5 rounded border border-dashed border-red-500 bg-white" />
+                  <span className="text-[11px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
+                </div>
               </div>
             </div>
-            <div className="text-xs text-blue-900">
-              {departmentFilter === 'General' && (
-                <span>📌 Read-only view. Select a department to edit. Colors in the Global panel represent weekly capacity utilization per department.</span>
-              )}
-              {departmentFilter !== 'General' && (
-                <span>💡 Background colors indicate project stages.</span>
-              )}
+
+            <div className="rounded-lg border border-[#ddd5ea] bg-white/80 px-3 py-2 text-[11px] text-[#4b3d61]">
+              {departmentFilter === 'General' ? t.readOnlyView : t.backgroundColors}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* Quick Project Creation Modal */}
         {showQuickProjectModal && canManageProjectsInCurrentDepartment && (

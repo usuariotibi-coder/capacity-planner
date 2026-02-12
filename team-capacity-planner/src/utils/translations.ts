@@ -36,7 +36,7 @@ export const translations = {
     backgroundColors: 'Los colores de fondo indican las etapas del proyecto.',
 
     // Legend
-    legend: 'Leyenda',
+    legend: 'Guia visual',
     globalPanelColors: 'Panel Global - Colores por utilización',
     low: 'Bajo',
     moderate: 'Moderado',
@@ -139,7 +139,7 @@ export const translations = {
     showSidebar: 'Mostrar barra lateral',
     zoomOut: 'Alejar',
     zoomIn: 'Acercar',
-    toggleLegend: 'Alternar Leyenda',
+    toggleLegend: 'Mostrar u ocultar guia visual',
     egJohnDoe: 'Ej: Juan Pérez',
     egDesignEngineer: 'Ej: Ingeniero de Diseño',
     egRefreshDashboard: 'Ej: 3018',
@@ -444,7 +444,7 @@ export const translations = {
     backgroundColors: 'Background colors indicate project stages.',
 
     // Legend
-    legend: 'Legend',
+    legend: 'Visual guide',
     globalPanelColors: 'Global Panel - Colors by utilization',
     low: 'Low',
     moderate: 'Moderate',
@@ -547,7 +547,7 @@ export const translations = {
     showSidebar: 'Show sidebar',
     zoomOut: 'Zoom out',
     zoomIn: 'Zoom in',
-    toggleLegend: 'Toggle Legend',
+    toggleLegend: 'Show or hide visual guide',
     egJohnDoe: 'E.g.: John Doe',
     egDesignEngineer: 'E.g.: Design Engineer',
     egRefreshDashboard: 'E.g.: 3018',
