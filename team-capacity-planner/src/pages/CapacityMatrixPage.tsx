@@ -2645,6 +2645,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
     const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+    const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
     // Get project info for tooltip
     const projectStartDate = projectId ? (projectStartDisplayById.get(projectId) || 'N/A') : 'N/A';
@@ -2673,7 +2674,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               💬
             </div>
           )}
-          <div className="text-[10px] font-bold leading-tight">{talent}</div>
+          <div className="text-[10px] font-bold leading-tight">{compactTalentDisplay}</div>
           {canEdit && (
             <Pencil size={11} className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600" />
           )}
@@ -4734,6 +4735,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                                   const outOfEstimatedRange = !isDeptWeekInRange;
                                   const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+                                  const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
                                     return (
@@ -4764,7 +4766,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               💬
                                             </button>
                                           )}
-                                          <div className="text-[10px] font-bold leading-tight">{talent}</div>
+                                          <div className="text-[10px] font-bold leading-tight">{compactTalentDisplay}</div>
                                         </div>
                                       </td>
                                     );
