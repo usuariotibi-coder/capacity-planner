@@ -3267,25 +3267,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       {/* Sticky Header - Responsive */}
       <div className="sticky top-0 z-50 brand-page-header">
         <div className="px-1 py-1 flex flex-wrap items-center gap-1">
-          {/* Zoom controls - ultra compact */}
-          <div className="flex items-center gap-0.5 bg-[#ede8f5] rounded-md p-0.5 flex-shrink-0 border border-[#d5d1da]">
-            <button
-              onClick={() => setZoom(Math.max(50, zoom - 10))}
-              className="p-0.5 hover:bg-[#e2dced] rounded transition text-[#2e1a47]"
-              title={t.zoomOut}
-            >
-              <ZoomOut size={12} />
-            </button>
-            <span className="text-[9px] font-semibold text-[#2e1a47] w-6 text-center">{zoom}%</span>
-            <button
-              onClick={() => setZoom(Math.min(200, zoom + 10))}
-              className="p-0.5 hover:bg-[#e2dced] rounded transition text-[#2e1a47]"
-              title={t.zoomIn}
-            >
-              <ZoomIn size={12} />
-            </button>
-          </div>
-
           {/* Year selector - ultra compact */}
           <select
             value={selectedYear}
