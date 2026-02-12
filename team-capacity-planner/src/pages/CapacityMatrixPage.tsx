@@ -51,7 +51,7 @@ const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-grad
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
-const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-12 min-w-12 max-w-12';
+const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
@@ -3842,7 +3842,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               );
             })()}
 
-            <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">{t.projectsSection}</h2>
+            <div className="mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
+              <h2 className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                <ClipboardList size={12} className="text-indigo-700" />
+                <span>{t.projectsSection}</span>
+              </h2>
+            </div>
 
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
@@ -4474,7 +4479,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </button>
             )}
 
-            <h2 className="text-sm font-bold mt-2 mb-1 text-gray-800 border-l-4 border-blue-600 pl-2">Projects Matrix</h2>
+            <div className="mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
+              <h2 className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                <ClipboardList size={12} className="text-indigo-700" />
+                <span>{t.projectsSection}</span>
+              </h2>
+            </div>
 
               {orderedGeneralProjects.map((proj) => {
                 const scopeKey = getProjectOrderScopeKey('General');
