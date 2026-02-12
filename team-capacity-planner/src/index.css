@@ -567,9 +567,35 @@ input[type="number"] {
 }
 
 [data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-gray-"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-slate-"],
 [data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-indigo-900"] {
   color: #e7dbf9 !important;
+}
+
+/* Keep metric cards readable: light card backgrounds must use dark text */
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-slate-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-slate-100 {
+  background-color: rgb(226 232 240) !important;
+  border-color: rgb(148 163 184) !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-slate-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-slate-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-slate-100 [class*="text-"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-slate-100 [class*="text-"] {
+  color: rgb(30 41 59) !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-emerald-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-emerald-100 {
+  background-color: rgb(167 243 208) !important;
+  border-color: rgb(16 185 129) !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-emerald-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-emerald-100,
+[data-theme="night"] .capacity-matrix-page .capacity-project-header .bg-emerald-100 [class*="text-"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell .bg-emerald-100 [class*="text-"] {
+  color: rgb(6 95 70) !important;
 }
 
 [data-theme="night"] .capacity-matrix-page .capacity-project-table-shell table,
