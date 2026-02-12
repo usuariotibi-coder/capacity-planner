@@ -963,7 +963,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const isSyncingHorizontalScrollRef = useRef(false);
-  const syncedBaseScrollLeftRef = useRef(0);
+  const syncedBaseScrollProgressRef = useRef(0);
   const activeSyncedProjectIdRef = useRef<string | null>(null);
   const [activeSyncedProjectId, setActiveSyncedProjectId] = useState<string | null>(null);
 
@@ -1698,8 +1698,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setActiveSyncedProjectId(projectId);
   };
 
-  const setScrollLeftIfNeeded = (container: HTMLDivElement | null, targetScrollLeft: number) => {
+  const getScrollProgress = (container: HTMLDivElement | null): number => {
+    if (!container) return 0;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    if (maxScrollLeft <= 0) return 0;
+    return Math.max(0, Math.min(1, container.scrollLeft / maxScrollLeft));
+  };
+
+  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, progress: number) => {
     if (!container) return;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    const targetScrollLeft = maxScrollLeft > 0 ? maxScrollLeft * progress : 0;
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
       container.scrollLeft = targetScrollLeft;
     }
@@ -1725,63 +1734,65 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const syncHorizontalScrollToCanonical = (
-    canonicalScrollLeft: number,
+    canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
-    const safeCanonicalScrollLeft = Math.max(0, canonicalScrollLeft);
-    syncedBaseScrollLeftRef.current = safeCanonicalScrollLeft;
+    const safeCanonicalProgress = Math.max(0, Math.min(1, canonicalScrollProgress));
+    syncedBaseScrollProgressRef.current = safeCanonicalProgress;
 
     if (isGeneralView) {
-      setScrollLeftIfNeeded(generalCapacityScrollRef.current, safeCanonicalScrollLeft);
+      setScrollProgressIfNeeded(generalCapacityScrollRef.current, safeCanonicalProgress);
     } else {
-      setScrollLeftIfNeeded(departmentCapacityScrollRef.current, safeCanonicalScrollLeft);
+      setScrollProgressIfNeeded(departmentCapacityScrollRef.current, safeCanonicalProgress);
     }
 
     const syncProjectId = resolveSyncProjectId(targetProjectId);
     if (!syncProjectId) return;
     const container = projectTableRefs.current.get(syncProjectId);
     if (container) {
-      setScrollLeftIfNeeded(container, safeCanonicalScrollLeft);
+      setScrollProgressIfNeeded(container, safeCanonicalProgress);
     }
   };
 
   const runSyncedHorizontalScroll = (
-    canonicalScrollLeft: number,
+    canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
     if (isSyncingHorizontalScrollRef.current) return;
 
     isSyncingHorizontalScrollRef.current = true;
-    syncHorizontalScrollToCanonical(canonicalScrollLeft, targetProjectId);
+    syncHorizontalScrollToCanonical(canonicalScrollProgress, targetProjectId);
 
     requestAnimationFrame(() => {
       isSyncingHorizontalScrollRef.current = false;
     });
   };
 
-  const handleCapacityHorizontalScroll = (scrollLeft: number) => {
+  const handleCapacityHorizontalScroll = (container: HTMLDivElement) => {
     if (isSyncingHorizontalScrollRef.current) return;
-    runSyncedHorizontalScroll(scrollLeft, resolveSyncProjectId());
+    const scrollProgress = getScrollProgress(container);
+    runSyncedHorizontalScroll(scrollProgress, resolveSyncProjectId());
   };
 
-  const handleProjectHorizontalScroll = (projectId: string, scrollLeft: number) => {
+  const handleProjectHorizontalScroll = (projectId: string, container: HTMLDivElement) => {
     if (isSyncingHorizontalScrollRef.current) return;
     if (activeSyncedProjectIdRef.current !== projectId) {
       markProjectAsActiveSyncTarget(projectId);
     }
-    runSyncedHorizontalScroll(scrollLeft, projectId);
+    const scrollProgress = getScrollProgress(container);
+    runSyncedHorizontalScroll(scrollProgress, projectId);
   };
 
   // Effect to reset scroll to first week when departmentFilter changes
   useEffect(() => {
-    syncedBaseScrollLeftRef.current = 0;
+    syncedBaseScrollProgressRef.current = 0;
     markProjectAsActiveSyncTarget(null);
     syncHorizontalScrollToCanonical(0, resolveSyncProjectId());
   }, [departmentFilter]);
 
   // Keep alignment after zoom changes/re-renders.
   useEffect(() => {
-    syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current, resolveSyncProjectId());
+    syncHorizontalScrollToCanonical(syncedBaseScrollProgressRef.current, resolveSyncProjectId());
   }, [projectZooms, isGeneralView]);
 
   const activeProjectIdForCapacityZoom = useMemo(() => {
@@ -3337,7 +3348,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <div
                       className="overflow-x-auto"
                       ref={departmentCapacityScrollRef}
-                      onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget.scrollLeft)}
+                      onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}
                     >
                     <div className="inline-block min-w-full">
                       {/* Week headers row */}
@@ -4107,15 +4118,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto border border-gray-300 bg-white"
                         style={{ scrollBehavior: 'smooth' }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
                             if (!activeSyncedProjectIdRef.current) {
                               markProjectAsActiveSyncTarget(proj.id);
                             }
-                            const targetScrollLeft = syncedBaseScrollLeftRef.current;
-                            setScrollLeftIfNeeded(el, targetScrollLeft);
+                            const targetScrollProgress = syncedBaseScrollProgressRef.current;
+                            setScrollProgressIfNeeded(el, targetScrollProgress);
                           } else {
                             projectTableRefs.current.delete(proj.id);
                             if (activeSyncedProjectIdRef.current === proj.id) {
@@ -4267,7 +4278,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               <div
                 className="overflow-x-auto"
                 ref={generalCapacityScrollRef}
-                onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget.scrollLeft)}
+                onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}
               >
                 <div className="inline-block min-w-full" style={{ zoom: `${generalCapacityZoom / 100}` }}>
                   {/* Week headers row */}
@@ -4540,15 +4551,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto"
                         style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
                             if (!activeSyncedProjectIdRef.current) {
                               markProjectAsActiveSyncTarget(proj.id);
                             }
-                            const targetScrollLeft = syncedBaseScrollLeftRef.current;
-                            setScrollLeftIfNeeded(el, targetScrollLeft);
+                            const targetScrollProgress = syncedBaseScrollProgressRef.current;
+                            setScrollProgressIfNeeded(el, targetScrollProgress);
                           } else {
                             projectTableRefs.current.delete(proj.id);
                             if (activeSyncedProjectIdRef.current === proj.id) {
