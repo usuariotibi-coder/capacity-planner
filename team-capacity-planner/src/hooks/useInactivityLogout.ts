@@ -17,7 +17,7 @@ export const useInactivityLogout = () => {
     let sessionCheckTimer: ReturnType<typeof setInterval>;
     let sessionStatusEndpointAvailable = true;
     let consecutiveAuthFailures = 0;
-    const MAX_CONSECUTIVE_AUTH_FAILURES = 2;
+    const MAX_CONSECUTIVE_AUTH_FAILURES = 3;
 
     const resetTimer = () => {
       // Clear existing timer
@@ -58,8 +58,31 @@ export const useInactivityLogout = () => {
           return;
         }
 
-        // Avoid false-positive logouts from a single transient 401/403.
+        // Avoid false-positive logouts from transient 401/403 responses.
+        // Only treat auth failures as inactive session when backend explicitly
+        // confirms inactivity (`status: inactive`).
         if (response.status === 401 || response.status === 403) {
+          let backendConfirmedInactive = false;
+          try {
+            const errorData = await response.clone().json();
+            const statusValue = String(errorData?.status || '').toLowerCase();
+            const detailValue = String(errorData?.detail || '').toLowerCase();
+            backendConfirmedInactive =
+              statusValue === 'inactive' ||
+              detailValue.includes('sesion inactiva') ||
+              detailValue.includes('session inactive');
+          } catch {
+            backendConfirmedInactive = false;
+          }
+
+          if (!backendConfirmedInactive) {
+            consecutiveAuthFailures = 0;
+            console.warn(
+              '[useInactivityLogout] Session status returned auth failure without explicit inactivity confirmation. Ignoring check.'
+            );
+            return;
+          }
+
           consecutiveAuthFailures += 1;
           console.warn(
             `[useInactivityLogout] Session status auth failure ${consecutiveAuthFailures}/${MAX_CONSECUTIVE_AUTH_FAILURES}`
