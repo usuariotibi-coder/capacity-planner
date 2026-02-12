@@ -3167,7 +3167,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   };
 
   return (
-    <div className="brand-page-shell h-full flex flex-col">
+    <div className="brand-page-shell capacity-matrix-page h-full flex flex-col">
       {/* Edit Cell Modal */}
       {renderEditModal()}
       {/* Change Order Modal */}
@@ -3271,7 +3271,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="border border-[#d5d1da] rounded px-1 py-0.5 text-[9px] font-semibold text-[#2e1a47] bg-[#f4f1f8] hover:bg-[#ebe6f2] transition flex-shrink-0"
+            className="cm-toolbar-select border border-[#d5d1da] rounded px-1 py-0.5 text-[9px] font-semibold text-[#2e1a47] bg-[#f4f1f8] hover:bg-[#ebe6f2] transition flex-shrink-0"
           >
             {yearOptions.map((year) => (
               <option key={year} value={year}>{year}</option>
@@ -3302,7 +3302,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {projectsVisibleInCurrentView.length > 0 && (
             <button
               onClick={() => setProjectCellViewMode((prev) => (prev === 'detailed' ? 'compact' : 'detailed'))}
-              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
+              className={`cm-project-view-toggle inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
                 projectCellViewMode === 'compact'
                   ? 'bg-[#4f3a70] hover:bg-[#3f2d5d] text-white border-[#2e1a47]'
                   : 'bg-[#f4f1f8] hover:bg-[#ebe6f2] text-[#2e1a47] border-[#d5d1da]'
@@ -3832,7 +3832,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               );
             })()}
 
-            <div className="mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
+            <div className="capacity-projects-section-banner mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
               <h2 className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
                 <ClipboardList size={12} className="text-indigo-700" />
                 <span>{t.projectsSection}</span>
@@ -3849,7 +3849,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               return (
                 <div
                   key={proj.id}
-                  className={`relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                  className={`capacity-project-card relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
                       : 'border-gray-300'
@@ -3874,7 +3874,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       />
                     )}
                   {/* Project header - Includes metrics for department view */}
-                  <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                  <div className="capacity-project-header bg-gray-100 hover:bg-gray-200 cursor-pointer border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     {/* Row 1: Project info */}
                     <div className="p-1 flex items-center gap-1">
                       <button
@@ -4159,7 +4159,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {expandedProjects[proj.id] && (
                     <div style={{ zoom: `${(isGeneralView ? getEffectiveProjectZoom(proj.id) : 100) / 100}` }}>
                       <div
-                        className="overflow-x-auto border border-gray-300 bg-white"
+                        className="capacity-project-table-shell overflow-x-auto border border-gray-300 bg-white"
                         style={{ scrollBehavior: 'smooth' }}
                         onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
                         ref={(el) => {
@@ -4469,7 +4469,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </button>
             )}
 
-            <div className="mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
+            <div className="capacity-projects-section-banner mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
               <h2 className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
                 <ClipboardList size={12} className="text-indigo-700" />
                 <span>{t.projectsSection}</span>
@@ -4481,7 +4481,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 return (
                 <div
                   key={proj.id}
-                  className={`relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
+                  className={`capacity-project-card relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
                       : 'border-gray-300'
@@ -4506,7 +4506,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       />
                     )}
                   {/* Project header */}
-                  <div className="bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                  <div className="capacity-project-header bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
                     <div className="flex items-center justify-between gap-1">
                       <button
                         type="button"
@@ -4585,7 +4585,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {expandedProjects[proj.id] && (
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
-                      <div className="bg-white rounded p-0.5 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
+                      <div className="capacity-project-summary-shell bg-white rounded p-0.5 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
                         <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}`, display: 'inline-block', minWidth: '100%' }}>
                           <div className="flex md:hidden gap-1 min-w-max">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}

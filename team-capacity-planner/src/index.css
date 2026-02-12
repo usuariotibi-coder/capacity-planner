@@ -519,6 +519,123 @@ input[type="number"] {
   box-shadow: 0 0 0 2px rgba(130, 118, 145, 0.35) !important;
 }
 
+/* Capacity Matrix night-mode contrast fixes */
+[data-theme="night"] .capacity-matrix-page .cm-toolbar-select {
+  background: #34214a !important;
+  color: #f0eaf8 !important;
+  border-color: #66527f !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .cm-toolbar-select:hover {
+  background: #3b2752 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .cm-project-view-toggle {
+  color: #f0eaf8 !important;
+  border-color: #66527f !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .cm-project-view-toggle:not(.bg-\[\#4f3a70\]) {
+  background: #34214a !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-projects-section-banner {
+  background: linear-gradient(90deg, #2b1a3f 0%, #3a2651 100%) !important;
+  border-color: #66527f !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-card {
+  background: #241537 !important;
+  border-color: #5f4a78 !important;
+  color: #efe9fb !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header {
+  background: #302047 !important;
+  border-bottom-color: #5f4a78 !important;
+  color: #efe9fb !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header:hover {
+  background: #3a2752 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-table-shell,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell {
+  background: #241537 !important;
+  border-color: #5f4a78 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="bg-white"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="bg-white/"],
+[data-theme="night"] .capacity-matrix-page .capacity-projects-section-banner [class*="bg-white"],
+[data-theme="night"] .capacity-matrix-page .capacity-projects-section-banner [class*="bg-white/"] {
+  background: #2a1b3f !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="text-white"] {
+  color: #f5f0ff !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-gray-"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-slate-"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-indigo-900"] {
+  color: #e7dbf9 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-blue-100"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-purple-100"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-emerald-50"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-gray-100"] {
+  background: #3a2854 !important;
+  border-color: #705890 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-blue-700"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-purple-700"],
+[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-emerald-700"] {
+  color: #e9deff !important;
+}
+
+[data-theme="night"] .capacity-matrix-page [class*="bg-gray-"],
+[data-theme="night"] .capacity-matrix-page [class*="bg-slate-"],
+[data-theme="night"] .capacity-matrix-page [class*="bg-zinc-"],
+[data-theme="night"] .capacity-matrix-page [class*="bg-stone-"] {
+  background-color: #302047 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page [class*="border-gray-"],
+[data-theme="night"] .capacity-matrix-page [class*="border-slate-"],
+[data-theme="night"] .capacity-matrix-page [class*="border-zinc-"],
+[data-theme="night"] .capacity-matrix-page [class*="border-stone-"] {
+  border-color: #5f4a78 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page [class*="text-gray-"],
+[data-theme="night"] .capacity-matrix-page [class*="text-slate-"],
+[data-theme="night"] .capacity-matrix-page [class*="text-zinc-"],
+[data-theme="night"] .capacity-matrix-page [class*="text-[#3f3354]"],
+[data-theme="night"] .capacity-matrix-page [class*="text-[#4b3d61]"],
+[data-theme="night"] .capacity-matrix-page [class*="text-[#6d6082]"] {
+  color: #dfd3ef !important;
+}
+
+[data-theme="night"] .capacity-matrix-page [class*="bg-[#f4f1f8]"],
+[data-theme="night"] .capacity-matrix-page [class*="bg-[#ebe6f2]"] {
+  background: #34214a !important;
+}
+
+[data-theme="night"] .capacity-matrix-page [class*="bg-white"],
+[data-theme="night"] .capacity-matrix-page [class*="bg-white/"] {
+  background: #241537 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page select,
+[data-theme="night"] .capacity-matrix-page select option {
+  background-color: #2f2046 !important;
+  color: #f0e8ff !important;
+}
+
 /* Requested: hide warning icons globally */
 .lucide-alert-triangle,
 .lucide-triangle-alert,
