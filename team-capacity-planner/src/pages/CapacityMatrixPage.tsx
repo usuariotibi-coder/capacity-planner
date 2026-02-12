@@ -3407,7 +3407,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     >
                     <div className="inline-block min-w-full">
                       {/* Week headers row */}
-                      <div className="flex gap-0.5 mb-0.5">
+                      <div className="flex gap-0 mb-0.5">
                         {/* Empty cell for label column */}
                         <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 text-[8px] font-bold text-indigo-700 flex items-center justify-center`}>
                           {t.people}
@@ -3419,7 +3419,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           return (
                             <div
                               key={`dept-header-${weekData.date}`}
-                              className={`w-10 flex-shrink-0 text-center text-[8px] font-bold px-1 py-0.5 rounded-md border-1.5 ${
+                              className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 text-center text-[8px] font-bold px-1 py-0.5 rounded-md border-1.5 ${
                                 isCurrentWeek
                                   ? CURRENT_WEEK_HEADER_CLASS
                                   : 'bg-blue-100 text-blue-900 border-blue-300'
@@ -3432,7 +3432,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       </div>
 
                       {/* Total row - sum of occupied people in that week (or hours for MFG) */}
-                      <div className="flex gap-0.5 mb-0.5">
+                      <div className="flex gap-0 mb-0.5">
                         {/* Label */}
                         <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-orange-100 to-orange-50 text-orange-800 border-orange-300`}>
                           {t.totalLabel}
@@ -3484,7 +3484,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           return (
                             <div
                               key={`total-${dept}-${weekData.date}`}
-                              className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
+                              className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
                                 isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
                               }`}
                               title={`${t.totalLabel} - CW${weekData.weekNum}: ${displayValue.toFixed(2)} ${unit}`}
@@ -3498,14 +3498,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       </div>
 
                       {/* SCIO Team Members / Hours per Week row - edit capacity per week */}
-                      <div className="flex gap-0.5 mb-0.5">
+                      <div className="flex gap-0 mb-0.5">
                         {/* Label */}
                         <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
                           {dept === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
                         </div>
 
                         {/* Week inputs for SCIO capacity */}
-                        <div className="flex gap-0.5">
+                        <div className="flex gap-0">
                           {allWeeksData.map((weekData, idx) => {
                             const isCurrentWeek = idx === currentDateWeekIndex;
                             return (
@@ -3519,7 +3519,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const newCapacity = parseFloat(e.target.value) || 0;
                                   handleScioTeamChange(dept, weekData.date, newCapacity);
                                 }}
-                                className={`w-10 flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+                                className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-60 ${
                                   isCurrentWeek ? CURRENT_WEEK_EDITABLE_CLASS : 'bg-gradient-to-b from-purple-50 to-purple-25 border-purple-300'
                                 }`}
                                 placeholder="0"
@@ -3536,7 +3536,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <>
                           {/* Company rows - Only show active teams */}
                           {Array.from(activeTeams).map((company) => (
-                            <div key={`subcontract-${company}`} className="flex gap-0.5 mb-0.5 group">
+                            <div key={`subcontract-${company}`} className="flex gap-0 mb-0.5 group">
                               {/* Company Label with delete button */}
                               <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border-violet-400 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
@@ -3558,13 +3558,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               </div>
 
                               {/* Week inputs for subcontracted personnel - Smaller size */}
-                              <div className="flex gap-0.5">
+                              <div className="flex gap-0">
                                 {allWeeksData.map((weekData, idx) => {
                                   const isCurrentWeek = idx === currentDateWeekIndex;
                                   return (
                                     <div
                                       key={`subcontract-${company}-${weekData.date}`}
-                                      className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
+                                      className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
                                         isCurrentWeek
                                           ? CURRENT_WEEK_EDITABLE_CLASS
                                           : 'border-violet-300 bg-gradient-to-b from-violet-50 to-violet-25 hover:border-violet-400'
@@ -3606,7 +3606,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                           {/* Add Team button - clicking label opens popup */}
                           {hasFullAccess && (
-                            <div className="flex gap-0.5 mb-0.5">
+                            <div className="flex gap-0 mb-0.5">
                               {/* Label column - clickable to open popup */}
                               <button
                                 onClick={() => setIsBuildModalOpen(true)}
@@ -3625,7 +3625,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <>
                           {/* Team rows - Only show active teams */}
                           {prgActiveTeams.map((team) => (
-                            <div key={`prg-external-${team}`} className="flex gap-0.5 mb-0.5 group">
+                            <div key={`prg-external-${team}`} className="flex gap-0 mb-0.5 group">
                               {/* Team Label with delete button */}
                               <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
@@ -3647,13 +3647,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               </div>
 
                               {/* Week inputs for external personnel */}
-                              <div className="flex gap-0.5">
+                              <div className="flex gap-0">
                                 {allWeeksData.map((weekData, idx) => {
                                   const isCurrentWeek = idx === currentDateWeekIndex;
                                   return (
                                     <div
                                       key={`prg-external-${team}-${weekData.date}`}
-                                      className={`w-10 flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
+                                      className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 rounded-md py-0.5 flex items-center justify-center transition-all ${
                                         isCurrentWeek
                                           ? CURRENT_WEEK_EDITABLE_CLASS
                                           : 'border-cyan-300 bg-gradient-to-b from-cyan-50 to-cyan-25 hover:border-cyan-400'
@@ -3695,7 +3695,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                           {/* Add External Team button - clicking label opens popup */}
                           {hasFullAccess && (
-                            <div className="flex gap-0.5 mb-0.5">
+                            <div className="flex gap-0 mb-0.5">
                               {/* Label column - clickable to open popup */}
                               <button
                                 onClick={() => setIsPRGModalOpen(true)}
@@ -3711,7 +3711,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                       {/* External Hours row - For BUILD and PRG departments only */}
                       {(dept === 'BUILD' || dept === 'PRG') && (
-                        <div className="flex gap-0.5 mb-0.5">
+                        <div className="flex gap-0 mb-0.5">
                           {/* Label */}
                           <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
                             {dept === 'BUILD' ? '🏢 Ext' : '👥 Ext'}
@@ -3728,7 +3728,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             return (
                               <div
                                 key={`external-${dept}-${weekData.date}`}
-                                className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold text-purple-700 transition-all ${
+                                className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold text-purple-700 transition-all ${
                                   totalExternalHours > 0
                                     ? 'bg-purple-200 border-purple-400 shadow-sm'
                                     : 'bg-purple-50 border-purple-300'
@@ -3745,7 +3745,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       )}
 
                       {/* Capacity row - department capacity minus occupied (hours for MFG, people for others) */}
-                      <div className="flex gap-0.5 mb-0.5">
+                      <div className="flex gap-0 mb-0.5">
                         {/* Label */}
                         <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-green-100 to-green-50 text-green-800 border-green-300`}>
                           {t.capacityLabel}
@@ -3830,7 +3830,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           return (
                             <div
                               key={`capacity-${dept}-${weekData.date}`}
-                              className={`w-10 flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
+                              className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-md border-1.5 text-[8px] font-bold ${bgColor} ${
                                 isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
                               }`}
                               title={`${t.capacityLabel} - CW${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
