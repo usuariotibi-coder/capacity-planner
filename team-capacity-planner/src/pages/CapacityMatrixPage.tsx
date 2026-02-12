@@ -51,7 +51,8 @@ const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-grad
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
-const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-12 min-w-12';
+const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-12 min-w-12 max-w-12';
+const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -3294,7 +3295,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {/* Week headers row */}
                       <div className="flex gap-0.5 mb-0.5">
                         {/* Empty cell for label column */}
-                        <div className="w-14 flex-shrink-0 text-[8px] font-bold text-indigo-700 flex items-center justify-center">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 text-[8px] font-bold text-indigo-700 flex items-center justify-center`}>
                           {t.people}
                         </div>
 
@@ -3319,7 +3320,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {/* Total row - sum of occupied people in that week (or hours for MFG) */}
                       <div className="flex gap-0.5 mb-0.5">
                         {/* Label */}
-                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-orange-100 to-orange-50 text-orange-800 border-orange-300">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-orange-100 to-orange-50 text-orange-800 border-orange-300`}>
                           {t.totalLabel}
                         </div>
 
@@ -3385,7 +3386,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {/* SCIO Team Members / Hours per Week row - edit capacity per week */}
                       <div className="flex gap-0.5 mb-0.5">
                         {/* Label */}
-                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
                           {dept === 'MFG' ? t.hoursPerWeek : t.scioTeamMembers}
                         </div>
 
@@ -3423,7 +3424,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           {Array.from(activeTeams).map((company) => (
                             <div key={`subcontract-${company}`} className="flex gap-0.5 mb-0.5 group">
                               {/* Company Label with delete button */}
-                              <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border-violet-400 shadow-sm hover:shadow-md transition-all">
+                              <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 border-violet-400 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
                                 {hasFullAccess && (
                                   <button
@@ -3495,7 +3496,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               {/* Label column - clickable to open popup */}
                               <button
                                 onClick={() => setIsBuildModalOpen(true)}
-                                className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all"
+                                className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 border-indigo-300 hover:from-indigo-200 hover:to-indigo-100 hover:border-indigo-400 cursor-pointer transition-all`}
                                 title={t.clickToAddSubcontractedTeam}
                               >
                                 {t.addButton}
@@ -3512,7 +3513,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           {prgActiveTeams.map((team) => (
                             <div key={`prg-external-${team}`} className="flex gap-0.5 mb-0.5 group">
                               {/* Team Label with delete button */}
-                              <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all">
+                              <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 border-cyan-400 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
                                 {hasFullAccess && (
                                   <button
@@ -3584,7 +3585,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               {/* Label column - clickable to open popup */}
                               <button
                                 onClick={() => setIsPRGModalOpen(true)}
-                                className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all"
+                                className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 border-teal-300 hover:from-teal-200 hover:to-teal-100 hover:border-teal-400 cursor-pointer transition-all`}
                                 title={t.clickToAddExternalTeam}
                               >
                                 {t.addButton}
@@ -3598,7 +3599,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {(dept === 'BUILD' || dept === 'PRG') && (
                         <div className="flex gap-0.5 mb-0.5">
                           {/* Label */}
-                          <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300">
+                          <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
                             {dept === 'BUILD' ? '🏢 Ext' : '👥 Ext'}
                           </div>
 
@@ -3632,7 +3633,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {/* Capacity row - department capacity minus occupied (hours for MFG, people for others) */}
                       <div className="flex gap-0.5 mb-0.5">
                         {/* Label */}
-                        <div className="w-14 flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-green-100 to-green-50 text-green-800 border-green-300">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-green-100 to-green-50 text-green-800 border-green-300`}>
                           {t.capacityLabel}
                         </div>
 
@@ -4073,7 +4074,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <thead>
                         {/* Month row */}
                         <tr className="bg-gray-200 text-gray-700">
-                          <th className="border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs"></th>
+                          <th className={`border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}></th>
                           {monthSpans.map((monthInfo, idx) => {
                             const isEven = idx % 2 === 0;
                             return (
@@ -4093,7 +4094,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </tr>
                         {/* Week row */}
                         <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                          <th className="border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs">
+                          <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                             {proj.name}
                           </th>
                           {allWeeksData.map((weekData, idx) => {
@@ -4119,7 +4120,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <tbody>
                       {/* Project-relative week row (thin): 1..N from project start to end */}
                       <tr>
-                        <td className="border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide">
+                        <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           {t.projectWeek || 'Project Week'}
                         </td>
                         {allWeeksData.map((weekData, weekIdx) => {
@@ -4143,7 +4144,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                       {/* Department row for this project */}
                       <tr className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5">
+                        <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           <div className="flex items-center justify-between gap-0.5">
                             <div className="flex items-center gap-0.5">
                               <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
