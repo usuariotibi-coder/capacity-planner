@@ -1805,6 +1805,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     syncHorizontalScrollToCanonical(syncedBaseScrollProgressRef.current, resolveSyncProjectId());
   }, [projectZooms, isGeneralView]);
 
+  // Keep alignment when language/locale changes (text reflow can shift layout widths).
+  useEffect(() => {
+    const syncProjectId = resolveSyncProjectId();
+    const scrollProgress = syncedBaseScrollProgressRef.current;
+    const rafA = requestAnimationFrame(() => {
+      syncHorizontalScrollToCanonical(scrollProgress, syncProjectId);
+    });
+    const rafB = requestAnimationFrame(() => {
+      syncHorizontalScrollToCanonical(scrollProgress, syncProjectId);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafA);
+      cancelAnimationFrame(rafB);
+    };
+  }, [language, locale, isGeneralView]);
+
   const activeProjectIdForCapacityZoom = useMemo(() => {
     if (!isGeneralView) return null;
     if (activeSyncedProjectId && projectsVisibleInCurrentView.some((proj) => proj.id === activeSyncedProjectId)) {
@@ -4178,7 +4195,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           }
                         }}
                       >
-                      <table className="border-collapse text-xs w-full">
+                      <table className="border-collapse text-xs table-fixed w-max min-w-full">
                         <thead>
                         {/* Month row */}
                         <tr className="bg-gray-200 text-gray-700">
@@ -4202,7 +4219,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </tr>
                         {/* Week row */}
                         <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                          <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
+                          <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                             {proj.name}
                           </th>
                           {allWeeksData.map((weekData, idx) => {
@@ -4228,7 +4245,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <tbody>
                       {/* Project-relative week row (thin): 1..N from project start to end */}
                       <tr>
-                        <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
+                        <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           {t.projectWeek || 'Project Week'}
                         </td>
                         {allWeeksData.map((weekData, weekIdx) => {
@@ -4252,7 +4269,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                       {/* Department row for this project */}
                       <tr className="hover:bg-gray-50">
-                        <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
+                        <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           <div className="flex items-center justify-between gap-0.5">
                             <div className="flex items-center gap-0.5">
                               <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
@@ -4616,7 +4633,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           }
                         }}
                       >
-                      <table className="border-collapse text-xs w-full">
+                      <table className="border-collapse text-xs table-fixed w-max min-w-full">
                         <thead>
                           {/* Month row */}
                           <tr className="bg-gray-200 text-gray-700 sticky top-0 z-20">
@@ -4640,7 +4657,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           </tr>
                           {/* Week row */}
                           <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-5 z-20">
-                            <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-xs ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
+                            <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-xs whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
                               Dpto
                             </th>
                             {allWeeksData.map((weekData, idx) => {
@@ -4666,7 +4683,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <tbody>
                           {/* Project-relative week row (thin): 1..N from project start to end */}
                           <tr>
-                            <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
+                            <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
                               {t.projectWeek || 'Project Week'}
                             </td>
                             {allWeeksData.map((weekData, weekIdx) => {
@@ -4692,7 +4709,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           {DEPARTMENTS.map((dept) => {
                             return (
                               <tr key={`${proj.id}-${dept}`} className="hover:bg-gray-50">
-                                <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
+                                <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
                                   <div className="flex items-center gap-0.5">
                                     <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
                                       {getDepartmentIcon(dept).icon}
