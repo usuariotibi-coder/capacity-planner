@@ -1821,15 +1821,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="space-y-[2px] mb-0.5">
             <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.quotedLabel}</span>
-              <span className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</span>
+              <span className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}h</span>
             </div>
             <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.usedLabel}</span>
-              <span className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</span>
+              <span className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}h</span>
             </div>
             <div className="flex items-center justify-between rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none">
               <span className="text-[7px] font-semibold">{t.pronosticado}</span>
-              <span className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</span>
+              <span className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}h</span>
             </div>
           </div>
           <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
@@ -1861,15 +1861,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         <div className="grid grid-cols-3 gap-0.5 text-center mb-0.5">
           <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.quotedLabel}</div>
-            <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}</div>
+            <div className="text-[8px] font-bold">{formatHours(totalQuotedHoursValue)}h</div>
           </div>
           <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.usedLabel}</div>
-            <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}</div>
+            <div className="text-[8px] font-bold">{formatHours(utilizedHoursValue)}h</div>
           </div>
           <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-[1px] text-slate-700 leading-none">
             <div className="text-[7px] font-semibold truncate">{t.pronosticado}</div>
-            <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}</div>
+            <div className="text-[8px] font-bold">{formatHours(forecastedHoursValue)}h</div>
           </div>
         </div>
         <div className={`px-0.5 py-[1px] rounded text-[9px] font-bold text-center leading-none ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
