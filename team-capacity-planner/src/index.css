@@ -519,6 +519,77 @@ input[type="number"] {
   box-shadow: 0 0 0 2px rgba(130, 118, 145, 0.35) !important;
 }
 
+/* Projects page night-mode contrast fixes */
+[data-theme="night"] .projects-page .projects-table-shell {
+  background: #231338 !important;
+  border-color: #5f4a78 !important;
+}
+
+[data-theme="night"] .projects-page .projects-row-even {
+  background: #2a193d !important;
+}
+
+[data-theme="night"] .projects-page .projects-row-odd {
+  background: #35214b !important;
+}
+
+[data-theme="night"] .projects-page .projects-row:hover {
+  background: #3f2958 !important;
+}
+
+[data-theme="night"] .projects-page .projects-row td {
+  border-color: #65507e !important;
+  color: #e9ddf7 !important;
+}
+
+[data-theme="night"] .projects-page .projects-cell-main {
+  color: #f6f0ff !important;
+}
+
+[data-theme="night"] .projects-page .projects-cell-muted {
+  color: #ddd0f0 !important;
+}
+
+[data-theme="night"] .projects-page .projects-chip {
+  background: #4a3663 !important;
+  color: #f4ecff !important;
+  border-color: #806d99 !important;
+}
+
+[data-theme="night"] .projects-page .projects-chip-muted {
+  background: #412d5a !important;
+  color: #eadcf9 !important;
+  border-color: #76628f !important;
+}
+
+[data-theme="night"] .projects-page .projects-empty-pm {
+  color: #c8b9dc !important;
+}
+
+[data-theme="night"] .projects-page .project-action-edit:not(:disabled) {
+  background: #4b3765 !important;
+  color: #f2e8ff !important;
+  border-color: #806d99 !important;
+}
+
+[data-theme="night"] .projects-page .project-action-edit:not(:disabled):hover {
+  background: #5a4577 !important;
+}
+
+[data-theme="night"] .projects-page .project-action-delete:not(:disabled) {
+  background: #5f243f !important;
+  color: #ffe1ec !important;
+  border-color: #ab5077 !important;
+}
+
+[data-theme="night"] .projects-page .project-action-delete:not(:disabled):hover {
+  background: #7a2d53 !important;
+}
+
+[data-theme="night"] .projects-page .projects-empty-state {
+  color: #c6b8db !important;
+}
+
 /* Capacity Matrix night-mode contrast fixes */
 [data-theme="night"] .capacity-matrix-page .cm-toolbar-select {
   background: #34214a !important;

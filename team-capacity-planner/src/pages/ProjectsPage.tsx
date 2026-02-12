@@ -345,7 +345,7 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="brand-page-shell h-full min-h-0 flex flex-col overflow-hidden">
+    <div className="brand-page-shell projects-page h-full min-h-0 flex flex-col overflow-hidden">
       <div className="brand-page-header rounded-xl px-4 py-3 flex justify-between items-center mx-6 mt-6 mb-4">
         <h1 className="brand-title text-3xl font-bold">{t.projects}</h1>
         <button
@@ -676,7 +676,7 @@ export function ProjectsPage() {
 
       <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
       {/* Projects table */}
-      <div className="brand-panel overflow-x-auto border-2 border-[#d5d1da] rounded-lg bg-white">
+      <div className="brand-panel projects-table-shell overflow-x-auto border-2 border-[#d5d1da] rounded-lg bg-white">
         <table className="brand-table w-full border-collapse">
           <thead>
             <tr>
@@ -691,28 +691,28 @@ export function ProjectsPage() {
           </thead>
           <tbody>
             {projects.map((proj, idx) => (
-              <tr key={proj.id} className={`transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white' : 'bg-[#f4f1f8]'}`}>
-                <td className="border px-4 py-3 font-semibold text-[#2e1a47]">{proj.name}</td>
-                <td className="border px-4 py-3 text-[#4f3a70]">{proj.client}</td>
+              <tr key={proj.id} className={`projects-row transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white projects-row-even' : 'bg-[#f4f1f8] projects-row-odd'}`}>
+                <td className="projects-cell-main border px-4 py-3 font-semibold text-[#2e1a47]">{proj.name}</td>
+                <td className="projects-cell-muted border px-4 py-3 text-[#4f3a70]">{proj.client}</td>
                 <td className="border px-4 py-3 text-center">
-                  <span className="inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                  <span className="projects-chip inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
                     {proj.facility}
                   </span>
                 </td>
                 <td className="border px-4 py-3 text-left">
                   {proj.projectManagerId ? (
-                    <span className="inline-block bg-[#f1edf6] text-[#4f3a70] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-semibold shadow-sm">
+                    <span className="projects-chip projects-chip-muted inline-block bg-[#f1edf6] text-[#4f3a70] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-semibold shadow-sm">
                       {employees.find((e) => e.id === proj.projectManagerId)?.name || t.noProjectManager}
                     </span>
                   ) : (
-                    <span className="text-[#8a8298] text-sm italic">{t.noProjectManager}</span>
+                    <span className="projects-empty-pm text-[#8a8298] text-sm italic">{t.noProjectManager}</span>
                   )}
                 </td>
-                <td className="border px-4 py-3 text-center text-sm font-medium text-[#4f3a70]">
+                <td className="projects-cell-muted border px-4 py-3 text-center text-sm font-medium text-[#4f3a70]">
                   {formatDate(proj.startDate)}
                 </td>
                 <td className="border px-4 py-3 text-center">
-                  <span className="inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                  <span className="projects-chip inline-block bg-[#ece6f5] text-[#2e1a47] border border-[#d5d1da] px-3 py-1 rounded-full text-sm font-bold shadow-sm">
                     {proj.numberOfWeeks} {t.weeks}
                   </span>
                 </td>
@@ -721,7 +721,7 @@ export function ProjectsPage() {
                       <button
                         onClick={() => hasFullAccess && handleEditProject(proj)}
                         disabled={!hasFullAccess}
-                        className={`p-2 rounded-lg transition transform shadow-sm ${
+                        className={`project-action-btn project-action-edit p-2 rounded-lg transition transform shadow-sm ${
                           hasFullAccess
                             ? 'text-[#2e1a47] bg-[#ece6f5] hover:bg-[#ddd5ea] border border-[#d5d1da] hover:scale-110'
                             : 'text-gray-400 bg-gray-100 cursor-not-allowed'
@@ -742,7 +742,7 @@ export function ProjectsPage() {
                           }
                         }}
                         disabled={!hasFullAccess}
-                        className={`p-2 rounded-lg transition transform shadow-sm ${
+                        className={`project-action-btn project-action-delete p-2 rounded-lg transition transform shadow-sm ${
                           hasFullAccess
                             ? 'text-[#ce0037] bg-[#fce7ee] hover:bg-[#f7d6e2] border border-[#f1c3d2] hover:scale-110'
                             : 'text-gray-400 bg-gray-100 cursor-not-allowed'
@@ -760,7 +760,7 @@ export function ProjectsPage() {
       </div>
 
       {projects.length === 0 && !isFormOpen && (
-        <div className="text-center py-12 text-[#6c6480]">
+        <div className="projects-empty-state text-center py-12 text-[#6c6480]">
           <p>{t.noProjects}</p>
         </div>
       )}
