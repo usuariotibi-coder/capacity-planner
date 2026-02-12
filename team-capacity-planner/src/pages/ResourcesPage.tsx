@@ -208,7 +208,7 @@ export function ResourcesPage() {
   };
 
   return (
-    <div className="brand-page-shell flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="brand-page-shell resources-page flex flex-col h-full min-h-0 overflow-hidden">
       <div className="brand-page-header sticky top-0 z-30 px-4 py-4 sm:px-8 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
           <h1 className="brand-title text-xl sm:text-2xl md:text-3xl">{t.teamResources}</h1>

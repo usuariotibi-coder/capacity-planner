@@ -342,7 +342,7 @@ export function ActivityLogPage() {
   };
 
   return (
-    <div className="brand-page-shell flex flex-col h-full overflow-hidden">
+    <div className="brand-page-shell activity-log-page flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="brand-page-header px-6 py-4 flex-shrink-0">
         <h1 className="brand-title text-2xl font-bold mb-4 flex items-center gap-2">

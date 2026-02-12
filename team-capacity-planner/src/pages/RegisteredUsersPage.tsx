@@ -166,7 +166,7 @@ export function RegisteredUsersPage() {
 
   if (!canManageRegisteredUsers) {
     return (
-      <div className="brand-page-shell p-6">
+      <div className="brand-page-shell registered-users-page p-6">
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
           {t.onlyBusinessIntelligenceAccess || 'Only Business Intelligence can access this view.'}
         </div>
@@ -175,7 +175,7 @@ export function RegisteredUsersPage() {
   }
 
   return (
-    <div className="brand-page-shell flex flex-col h-full">
+    <div className="brand-page-shell registered-users-page flex flex-col h-full">
       <div className="brand-page-header px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
