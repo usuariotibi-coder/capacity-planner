@@ -8,6 +8,8 @@ export const translations = {
     projects: 'Proyectos',
     activityLog: 'Registro de Actividad',
     registeredUsers: 'Usuarios Registrados',
+    dayMode: 'Dia',
+    nightMode: 'Noche',
 
     // Department Filter
     viewDepartment: 'VER DEPARTAMENTO',
@@ -416,6 +418,8 @@ export const translations = {
     projects: 'Projects',
     activityLog: 'Activity Log',
     registeredUsers: 'Registered Users',
+    dayMode: 'Day',
+    nightMode: 'Night',
 
     // Department Filter
     viewDepartment: 'VIEW DEPARTMENT',

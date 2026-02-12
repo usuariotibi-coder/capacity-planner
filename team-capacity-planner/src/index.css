@@ -18,6 +18,20 @@
   --brand-shadow: 0 10px 28px rgba(46, 26, 71, 0.12);
 }
 
+:root[data-theme="night"] {
+  --brand-primary: #2e1a47;
+  --brand-primary-strong: #140b22;
+  --brand-secondary: #827691;
+  --brand-secondary-soft: #b4a4bc;
+  --brand-highlight: #ce0037;
+  --brand-muted: #c5b8d8;
+  --brand-text: #ede7f6;
+  --brand-surface: #251536;
+  --brand-surface-soft: #2d1b41;
+  --brand-border: #5d4b73;
+  --brand-shadow: 0 12px 32px rgba(8, 4, 14, 0.45);
+}
+
 *,
 *::before,
 *::after {
@@ -94,6 +108,28 @@ input[type="number"] {
 .brand-header {
   background: linear-gradient(90deg, #ffffff 0%, #f4f1f8 100%);
   border-bottom: 1px solid var(--brand-border);
+}
+
+.theme-toggle,
+.lang-toggle {
+  background: #ece6f5;
+  border-color: #d5d1da;
+}
+
+.theme-toggle-btn,
+.lang-toggle-btn {
+  color: #6c6480;
+}
+
+.theme-toggle-btn:hover,
+.lang-toggle-btn:hover {
+  color: #2e1a47;
+}
+
+.theme-toggle-btn.is-active,
+.lang-toggle-btn.is-active {
+  background: #2e1a47;
+  color: #ffffff;
 }
 
 .brand-page-shell {
@@ -324,6 +360,163 @@ input[type="number"] {
 
 .brand-auth-bg [class*="focus:border-blue-"] {
   border-color: #827691 !important;
+}
+
+/* Night theme */
+[data-theme="night"] body {
+  color: var(--brand-text);
+  background: radial-gradient(circle at 50% -10%, rgba(130, 118, 145, 0.28), rgba(20, 11, 34, 0) 38%),
+    linear-gradient(180deg, #140b22 0%, #1c112e 55%, #140b22 100%);
+}
+
+[data-theme="night"] .brand-app-shell {
+  background: linear-gradient(180deg, #140b22 0%, #1c112e 55%, #140b22 100%);
+}
+
+[data-theme="night"] .brand-sidebar {
+  background: linear-gradient(180deg, #12081f 0%, #2e1a47 58%, #140b22 100%);
+  border-right-color: rgba(213, 209, 218, 0.18) !important;
+}
+
+[data-theme="night"] .brand-header {
+  background: linear-gradient(90deg, #1d102e 0%, #2e1a47 52%, #3d2a56 100%);
+  border-bottom-color: #5d4b73;
+}
+
+[data-theme="night"] .brand-page-shell {
+  background: linear-gradient(180deg, #1a0f29 0%, #211333 48%, #1a0f29 100%);
+  color: var(--brand-text);
+}
+
+[data-theme="night"] .brand-page-header {
+  background: linear-gradient(90deg, #221235 0%, #301c47 100%);
+  border-bottom-color: #5d4b73;
+  box-shadow: 0 6px 18px rgba(8, 4, 14, 0.42);
+}
+
+[data-theme="night"] .brand-title {
+  color: #f2ecfa;
+}
+
+[data-theme="night"] .brand-subtitle {
+  color: #c5b8d8;
+}
+
+[data-theme="night"] .brand-panel {
+  background: var(--brand-surface);
+  border-color: #5d4b73;
+  box-shadow: var(--brand-shadow);
+}
+
+[data-theme="night"] .brand-input,
+[data-theme="night"] .brand-select {
+  background: #301d46;
+  border-color: #66527f;
+  color: #f0eaf8;
+}
+
+[data-theme="night"] .brand-input:focus,
+[data-theme="night"] .brand-select:focus {
+  border-color: #9d8cb8;
+  box-shadow: 0 0 0 2px rgba(130, 118, 145, 0.35);
+}
+
+[data-theme="night"] .brand-btn-soft {
+  background: #34214a;
+  color: #ede7f6;
+  border-color: #66527f;
+}
+
+[data-theme="night"] .theme-toggle,
+[data-theme="night"] .lang-toggle {
+  background: #2a1a3d;
+  border-color: #64507c;
+}
+
+[data-theme="night"] .theme-toggle-btn,
+[data-theme="night"] .lang-toggle-btn {
+  color: #d8cfe7;
+}
+
+[data-theme="night"] .theme-toggle-btn:hover,
+[data-theme="night"] .lang-toggle-btn:hover {
+  color: #fff6ff;
+}
+
+[data-theme="night"] .theme-toggle-btn.is-active,
+[data-theme="night"] .lang-toggle-btn.is-active {
+  background: linear-gradient(90deg, #ce0037 0%, #2e1a47 100%);
+  color: #ffffff;
+}
+
+[data-theme="night"] .brand-page-shell [class*="bg-white"],
+[data-theme="night"] .brand-header [class*="bg-white"] {
+  background-color: #2d1b42 !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="text-[#2e1a47]"],
+[data-theme="night"] .brand-header [class*="text-[#2e1a47]"] {
+  color: #f0eaf8 !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="text-[#6c6480]"],
+[data-theme="night"] .brand-header [class*="text-[#6c6480]"] {
+  color: #c6b9d9 !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="text-gray-"],
+[data-theme="night"] .brand-header [class*="text-gray-"],
+[data-theme="night"] .brand-page-shell [class*="text-slate-"] {
+  color: #d7cde7 !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="border-[#d5d1da]"],
+[data-theme="night"] .brand-header [class*="border-[#d5d1da]"],
+[data-theme="night"] .brand-page-shell [class*="border-gray-"],
+[data-theme="night"] .brand-page-shell [class*="border-slate-"] {
+  border-color: #66527f !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="bg-blue-50"],
+[data-theme="night"] .brand-page-shell [class*="bg-indigo-50"],
+[data-theme="night"] .brand-page-shell [class*="bg-violet-50"],
+[data-theme="night"] .brand-page-shell [class*="bg-cyan-50"],
+[data-theme="night"] .brand-page-shell [class*="bg-purple-50"] {
+  background: #2a193d !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="bg-blue-100"],
+[data-theme="night"] .brand-page-shell [class*="bg-indigo-100"],
+[data-theme="night"] .brand-page-shell [class*="bg-violet-100"],
+[data-theme="night"] .brand-page-shell [class*="bg-cyan-100"],
+[data-theme="night"] .brand-page-shell [class*="bg-purple-100"],
+[data-theme="night"] .brand-page-shell [class*="bg-blue-200"],
+[data-theme="night"] .brand-page-shell [class*="bg-indigo-200"],
+[data-theme="night"] .brand-page-shell [class*="bg-violet-200"],
+[data-theme="night"] .brand-page-shell [class*="bg-cyan-200"],
+[data-theme="night"] .brand-page-shell [class*="bg-purple-200"] {
+  background: #332047 !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="text-blue-"],
+[data-theme="night"] .brand-page-shell [class*="text-indigo-"],
+[data-theme="night"] .brand-page-shell [class*="text-violet-"],
+[data-theme="night"] .brand-page-shell [class*="text-cyan-"],
+[data-theme="night"] .brand-page-shell [class*="text-purple-"] {
+  color: #dfd3ef !important;
+}
+
+[data-theme="night"] .brand-page-shell [class*="hover:bg-blue-"]:hover,
+[data-theme="night"] .brand-page-shell [class*="hover:bg-indigo-"]:hover,
+[data-theme="night"] .brand-page-shell [class*="hover:bg-violet-"]:hover,
+[data-theme="night"] .brand-page-shell [class*="hover:bg-cyan-"]:hover,
+[data-theme="night"] .brand-page-shell [class*="hover:bg-purple-"]:hover {
+  background: #3b2752 !important;
+}
+
+[data-theme="night"] .brand-page-shell :is(input, select, textarea):focus {
+  border-color: #9d8cb8 !important;
+  box-shadow: 0 0 0 2px rgba(130, 118, 145, 0.35) !important;
 }
 
 /* Requested: hide warning icons globally */

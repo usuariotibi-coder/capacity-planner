@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Building2 } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Building2, Moon, Sun } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -48,6 +48,13 @@ function MainApp() {
       return (saved as DepartmentFilter) || 'General';
     }
     return 'General';
+  });
+  const [theme, setTheme] = useState<'day' | 'night'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('uiTheme');
+      return savedTheme === 'night' ? 'night' : 'day';
+    }
+    return 'day';
   });
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
@@ -87,6 +94,12 @@ function MainApp() {
     // Save department filter to localStorage
     localStorage.setItem('departmentFilter', departmentFilter);
   }, [departmentFilter]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('uiTheme', theme);
+  }, [theme]);
 
   useEffect(() => {
     // Handle resize event
@@ -192,7 +205,7 @@ function MainApp() {
   };
 
   return (
-    <div className="brand-app-shell flex h-[100dvh] overflow-hidden text-slate-800">
+    <div className="brand-app-shell flex h-[100dvh] overflow-hidden">
       {/* Sidebar - inline flex, not overlay */}
       <div
         className={`${
@@ -358,14 +371,40 @@ function MainApp() {
               </div>
             )}
 
+            {/* Theme Selector */}
+            <div className="theme-toggle flex items-center gap-0.5 p-0.5 rounded-md flex-shrink-0 border">
+              <button
+                onClick={() => setTheme('day')}
+                className={`theme-toggle-btn px-1.5 py-0.5 rounded text-[10px] font-semibold transition inline-flex items-center gap-1 ${
+                  theme === 'day' ? 'is-active' : ''
+                }`}
+                title={t.dayMode}
+                aria-label={t.dayMode}
+              >
+                <Sun size={11} />
+                <span className="hidden md:inline">{t.dayMode}</span>
+              </button>
+              <button
+                onClick={() => setTheme('night')}
+                className={`theme-toggle-btn px-1.5 py-0.5 rounded text-[10px] font-semibold transition inline-flex items-center gap-1 ${
+                  theme === 'night' ? 'is-active' : ''
+                }`}
+                title={t.nightMode}
+                aria-label={t.nightMode}
+              >
+                <Moon size={11} />
+                <span className="hidden md:inline">{t.nightMode}</span>
+              </button>
+            </div>
+
             {/* Language Selector - Responsive */}
-            <div className="flex items-center gap-0.5 bg-[#ece6f5] p-0.5 rounded-md flex-shrink-0 border border-[#d5d1da]">
+            <div className="lang-toggle flex items-center gap-0.5 p-0.5 rounded-md flex-shrink-0 border">
               <button
                 onClick={() => setLanguage('es')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
+                className={`lang-toggle-btn px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'es'
-                    ? 'bg-[#2e1a47] text-white'
-                    : 'text-[#6c6480] hover:text-[#2e1a47]'
+                    ? 'is-active'
+                    : ''
                 }`}
                 title="Espanol"
               >
@@ -373,10 +412,10 @@ function MainApp() {
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
+                className={`lang-toggle-btn px-1.5 py-0.5 rounded text-[10px] font-semibold transition ${
                   language === 'en'
-                    ? 'bg-[#2e1a47] text-white'
-                    : 'text-[#6c6480] hover:text-[#2e1a47]'
+                    ? 'is-active'
+                    : ''
                 }`}
                 title="English"
               >
@@ -402,6 +441,12 @@ function MainApp() {
 }
 
 function App() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedTheme = localStorage.getItem('uiTheme');
+    document.documentElement.setAttribute('data-theme', savedTheme === 'night' ? 'night' : 'day');
+  }, []);
+
   return (
     <Router>
       <Routes>
