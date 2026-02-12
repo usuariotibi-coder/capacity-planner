@@ -449,68 +449,68 @@ input[type="number"] {
   color: #ffffff;
 }
 
-[data-theme="night"] .brand-page-shell [class*="bg-white"],
-[data-theme="night"] .brand-header [class*="bg-white"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-white"],
+[data-theme="night"] .brand-header:not(.capacity-matrix-page) [class*="bg-white"] {
   background-color: #2d1b42 !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="text-[#2e1a47]"],
-[data-theme="night"] .brand-header [class*="text-[#2e1a47]"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-[#2e1a47]"],
+[data-theme="night"] .brand-header:not(.capacity-matrix-page) [class*="text-[#2e1a47]"] {
   color: #f0eaf8 !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="text-[#6c6480]"],
-[data-theme="night"] .brand-header [class*="text-[#6c6480]"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-[#6c6480]"],
+[data-theme="night"] .brand-header:not(.capacity-matrix-page) [class*="text-[#6c6480]"] {
   color: #c6b9d9 !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="text-gray-"],
-[data-theme="night"] .brand-header [class*="text-gray-"],
-[data-theme="night"] .brand-page-shell [class*="text-slate-"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-gray-"],
+[data-theme="night"] .brand-header:not(.capacity-matrix-page) [class*="text-gray-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-slate-"] {
   color: #d7cde7 !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="border-[#d5d1da]"],
-[data-theme="night"] .brand-header [class*="border-[#d5d1da]"],
-[data-theme="night"] .brand-page-shell [class*="border-gray-"],
-[data-theme="night"] .brand-page-shell [class*="border-slate-"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="border-[#d5d1da]"],
+[data-theme="night"] .brand-header:not(.capacity-matrix-page) [class*="border-[#d5d1da]"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="border-gray-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="border-slate-"] {
   border-color: #66527f !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="bg-blue-50"],
-[data-theme="night"] .brand-page-shell [class*="bg-indigo-50"],
-[data-theme="night"] .brand-page-shell [class*="bg-violet-50"],
-[data-theme="night"] .brand-page-shell [class*="bg-cyan-50"],
-[data-theme="night"] .brand-page-shell [class*="bg-purple-50"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-blue-50"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-indigo-50"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-violet-50"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-cyan-50"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-purple-50"] {
   background: #2a193d !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="bg-blue-100"],
-[data-theme="night"] .brand-page-shell [class*="bg-indigo-100"],
-[data-theme="night"] .brand-page-shell [class*="bg-violet-100"],
-[data-theme="night"] .brand-page-shell [class*="bg-cyan-100"],
-[data-theme="night"] .brand-page-shell [class*="bg-purple-100"],
-[data-theme="night"] .brand-page-shell [class*="bg-blue-200"],
-[data-theme="night"] .brand-page-shell [class*="bg-indigo-200"],
-[data-theme="night"] .brand-page-shell [class*="bg-violet-200"],
-[data-theme="night"] .brand-page-shell [class*="bg-cyan-200"],
-[data-theme="night"] .brand-page-shell [class*="bg-purple-200"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-blue-100"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-indigo-100"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-violet-100"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-cyan-100"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-purple-100"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-blue-200"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-indigo-200"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-violet-200"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-cyan-200"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-purple-200"] {
   background: #332047 !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="text-blue-"],
-[data-theme="night"] .brand-page-shell [class*="text-indigo-"],
-[data-theme="night"] .brand-page-shell [class*="text-violet-"],
-[data-theme="night"] .brand-page-shell [class*="text-cyan-"],
-[data-theme="night"] .brand-page-shell [class*="text-purple-"] {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-blue-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-indigo-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-violet-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-cyan-"],
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="text-purple-"] {
   color: #dfd3ef !important;
 }
 
-[data-theme="night"] .brand-page-shell [class*="hover:bg-blue-"]:hover,
-[data-theme="night"] .brand-page-shell [class*="hover:bg-indigo-"]:hover,
-[data-theme="night"] .brand-page-shell [class*="hover:bg-violet-"]:hover,
-[data-theme="night"] .brand-page-shell [class*="hover:bg-cyan-"]:hover,
-[data-theme="night"] .brand-page-shell [class*="hover:bg-purple-"]:hover {
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="hover:bg-blue-"]:hover,
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="hover:bg-indigo-"]:hover,
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="hover:bg-violet-"]:hover,
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="hover:bg-cyan-"]:hover,
+[data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="hover:bg-purple-"]:hover {
   background: #3b2752 !important;
 }
 
@@ -566,68 +566,59 @@ input[type="number"] {
   border-color: #5f4a78 !important;
 }
 
-[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="bg-white"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="bg-white/"],
-[data-theme="night"] .capacity-matrix-page .capacity-projects-section-banner [class*="bg-white"],
-[data-theme="night"] .capacity-matrix-page .capacity-projects-section-banner [class*="bg-white/"] {
-  background: #2a1b3f !important;
-}
-
-[data-theme="night"] .capacity-matrix-page .capacity-project-card [class*="text-white"] {
-  color: #f5f0ff !important;
-}
-
 [data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-gray-"],
 [data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-slate-"],
 [data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-indigo-900"] {
   color: #e7dbf9 !important;
 }
 
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-blue-100"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-purple-100"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-emerald-50"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="bg-gray-100"] {
-  background: #3a2854 !important;
-  border-color: #705890 !important;
+[data-theme="night"] .capacity-matrix-page .capacity-project-table-shell table,
+[data-theme="night"] .capacity-matrix-page .capacity-project-summary-shell {
+  color: #eadff8;
 }
 
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-blue-700"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-purple-700"],
-[data-theme="night"] .capacity-matrix-page .capacity-project-header [class*="text-emerald-700"] {
-  color: #e9deff !important;
-}
-
-[data-theme="night"] .capacity-matrix-page [class*="bg-gray-"],
-[data-theme="night"] .capacity-matrix-page [class*="bg-slate-"],
-[data-theme="night"] .capacity-matrix-page [class*="bg-zinc-"],
-[data-theme="night"] .capacity-matrix-page [class*="bg-stone-"] {
-  background-color: #302047 !important;
-}
-
-[data-theme="night"] .capacity-matrix-page [class*="border-gray-"],
-[data-theme="night"] .capacity-matrix-page [class*="border-slate-"],
-[data-theme="night"] .capacity-matrix-page [class*="border-zinc-"],
-[data-theme="night"] .capacity-matrix-page [class*="border-stone-"] {
-  border-color: #5f4a78 !important;
-}
-
-[data-theme="night"] .capacity-matrix-page [class*="text-gray-"],
-[data-theme="night"] .capacity-matrix-page [class*="text-slate-"],
-[data-theme="night"] .capacity-matrix-page [class*="text-zinc-"],
+/* Keep stage/semantic palette intact in night mode */
+[data-theme="night"] .capacity-matrix-page .bg-green-50 { background-color: rgb(240 253 244) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-gray-50 { background-color: rgb(249 250 251) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-blue-100 { background-color: rgb(219 234 254) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-purple-100 { background-color: rgb(243 232 255) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-purple-200 { background-color: rgb(233 213 255) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-cyan-100 { background-color: rgb(207 250 254) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-sky-100 { background-color: rgb(224 242 254) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-lime-100 { background-color: rgb(236 252 203) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-green-100 { background-color: rgb(220 252 231) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-amber-100 { background-color: rgb(254 243 199) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-orange-100 { background-color: rgb(255 237 213) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-emerald-100 { background-color: rgb(209 250 229) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-red-100 { background-color: rgb(254 226 226) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-slate-100 { background-color: rgb(241 245 249) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-stone-100 { background-color: rgb(245 245 244) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-zinc-100 { background-color: rgb(244 244 245) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-rose-100 { background-color: rgb(255 228 230) !important; }
+[data-theme="night"] .capacity-matrix-page .bg-stone-300 { background-color: rgb(214 211 209) !important; }
+[data-theme="night"] .capacity-matrix-page .from-stone-100 { --tw-gradient-from: rgb(245 245 244) var(--tw-gradient-from-position) !important; }
+[data-theme="night"] .capacity-matrix-page .to-zinc-100 { --tw-gradient-to: rgb(244 244 245) var(--tw-gradient-to-position) !important; }
+[data-theme="night"] .capacity-matrix-page .from-stone-500 { --tw-gradient-from: rgb(120 113 108) var(--tw-gradient-from-position) !important; }
+[data-theme="night"] .capacity-matrix-page .via-stone-600 { --tw-gradient-stops: var(--tw-gradient-from), rgb(87 83 78) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+[data-theme="night"] .capacity-matrix-page .to-zinc-700 { --tw-gradient-to: rgb(63 63 70) var(--tw-gradient-to-position) !important; }
+[data-theme="night"] .capacity-matrix-page .text-blue-900 { color: rgb(30 58 138) !important; }
+[data-theme="night"] .capacity-matrix-page .text-purple-900 { color: rgb(88 28 135) !important; }
+[data-theme="night"] .capacity-matrix-page .text-cyan-900 { color: rgb(22 78 99) !important; }
+[data-theme="night"] .capacity-matrix-page .text-sky-900 { color: rgb(12 74 110) !important; }
+[data-theme="night"] .capacity-matrix-page .text-lime-900 { color: rgb(54 83 20) !important; }
+[data-theme="night"] .capacity-matrix-page .text-green-900 { color: rgb(20 83 45) !important; }
+[data-theme="night"] .capacity-matrix-page .text-amber-900 { color: rgb(120 53 15) !important; }
+[data-theme="night"] .capacity-matrix-page .text-orange-900 { color: rgb(124 45 18) !important; }
+[data-theme="night"] .capacity-matrix-page .text-emerald-900 { color: rgb(6 78 59) !important; }
+[data-theme="night"] .capacity-matrix-page .text-red-900 { color: rgb(127 29 29) !important; }
+[data-theme="night"] .capacity-matrix-page .text-slate-900 { color: rgb(15 23 42) !important; }
+[data-theme="night"] .capacity-matrix-page .text-stone-900 { color: rgb(28 25 23) !important; }
+[data-theme="night"] .capacity-matrix-page .text-zinc-900 { color: rgb(24 24 27) !important; }
+[data-theme="night"] .capacity-matrix-page .text-rose-900 { color: rgb(136 19 55) !important; }
 [data-theme="night"] .capacity-matrix-page [class*="text-[#3f3354]"],
 [data-theme="night"] .capacity-matrix-page [class*="text-[#4b3d61]"],
 [data-theme="night"] .capacity-matrix-page [class*="text-[#6d6082]"] {
-  color: #dfd3ef !important;
-}
-
-[data-theme="night"] .capacity-matrix-page [class*="bg-[#f4f1f8]"],
-[data-theme="night"] .capacity-matrix-page [class*="bg-[#ebe6f2]"] {
-  background: #34214a !important;
-}
-
-[data-theme="night"] .capacity-matrix-page [class*="bg-white"],
-[data-theme="night"] .capacity-matrix-page [class*="bg-white/"] {
-  background: #241537 !important;
+  color: #e6daf9 !important;
 }
 
 [data-theme="night"] .capacity-matrix-page select,

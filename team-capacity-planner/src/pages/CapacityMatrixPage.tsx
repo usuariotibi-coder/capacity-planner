@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -3901,17 +3901,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
                           <span className="font-bold">{proj.name}</span>
-                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-400">|</span>
                           <span className="text-gray-600">{proj.client}</span>
-                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-400">|</span>
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
                             {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
                           {proj.projectManagerId && (
                             <>
-                              <span className="text-gray-400">•</span>
+                              <span className="text-gray-400">|</span>
                               <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                👨‍💼 {projectManagerNameById.get(proj.id) || 'PM'}
+                                PM: {projectManagerNameById.get(proj.id) || 'PM'}
                               </span>
                             </>
                           )}
@@ -4532,17 +4532,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
                           <span className="font-bold">{proj.name}</span>
-                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-400">|</span>
                           <span className="text-gray-600">{proj.client}</span>
-                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-400">|</span>
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
                             {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
                           {proj.projectManagerId && (
                             <>
-                              <span className="text-gray-400">•</span>
+                              <span className="text-gray-400">|</span>
                               <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                👨‍💼 {projectManagerNameById.get(proj.id) || 'PM'}
+                                PM: {projectManagerNameById.get(proj.id) || 'PM'}
                               </span>
                             </>
                           )}
@@ -4767,7 +4767,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
                                               title={cellComment}
                                             >
-                                              💬
+                                              <MessageCircle size={9} />
                                             </button>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{compactTalentDisplay}</div>
@@ -4806,7 +4806,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               className="absolute top-0.5 right-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
                                               title={cellComment}
                                             >
-                                              💬
+                                              <MessageCircle size={9} />
                                             </button>
                                           )}
                                           {stageColor && assignmentStage ? (
@@ -4822,7 +4822,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           ) : isInRange ? (
                                             <span className="text-[10px]">&nbsp;</span>
                                           ) : (
-                                            '—'
+                                            '-'
                                           )}
                                         </div>
                                       ) : (
