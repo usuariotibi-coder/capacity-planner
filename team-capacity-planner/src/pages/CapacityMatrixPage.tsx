@@ -30,6 +30,15 @@ const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
   'MFG': [],
 };
 
+const DEPARTMENT_LEGEND_STYLES: Record<Department, { badge: string; dot: string }> = {
+  PM: { badge: 'border-purple-200 bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
+  MED: { badge: 'border-blue-200 bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
+  HD: { badge: 'border-amber-200 bg-amber-50 text-amber-700', dot: 'bg-amber-500' },
+  MFG: { badge: 'border-orange-200 bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
+  BUILD: { badge: 'border-red-200 bg-red-50 text-red-700', dot: 'bg-red-500' },
+  PRG: { badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+};
+
 interface CellEditState {
   department: Department;
   weekStart: string;
@@ -4938,6 +4947,60 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <div className="h-5 w-5 rounded border border-dashed border-red-500 bg-white" />
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold text-[#2e1a47]">
+                  {language === 'es' ? 'Color por departamento y actividad' : 'Color by department and activity'}
+                </p>
+                <span className="text-[10px] text-[#6d6082]">
+                  {language === 'es' ? 'Cada celda sigue esta combinacion' : 'Each cell follows this combination'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-3">
+                {DEPARTMENTS.map((dept) => {
+                  const deptInfo = getDepartmentIcon(dept);
+                  const deptLabel = getDepartmentLabel(dept, t as Record<string, string>);
+                  const deptStyle = DEPARTMENT_LEGEND_STYLES[dept];
+                  const deptStages = STAGE_OPTIONS[dept];
+
+                  return (
+                    <div key={`legend-dept-${dept}`} className="rounded-lg border border-[#e4dfec] bg-white px-2.5 py-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded border ${deptStyle.badge}`}>
+                            <span className={`h-2 w-2 rounded-full ${deptStyle.dot}`} />
+                          </span>
+                          <span className="text-[11px] font-semibold text-[#2e1a47]">{deptLabel}</span>
+                          <span className="text-[10px] font-semibold text-[#6d6082]">({dept})</span>
+                        </div>
+                        <span className={`text-[11px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+                      </div>
+
+                      {deptStages.length > 0 ? (
+                        <div className="space-y-1">
+                          {deptStages.map((stage) => {
+                            const stageColor = getStageColor(stage);
+                            return (
+                              <div key={`legend-stage-${dept}-${stage}`} className="flex items-center gap-2 text-[10px] text-[#4b3d61]">
+                                <span className={`h-3.5 w-3.5 rounded border border-[#d9d4e2] ${stageColor.bg}`} />
+                                <span className="truncate">{getStageLabel(stage, t as Record<string, string>)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-[#6d6082]">
+                          {language === 'es'
+                            ? 'Sin actividades por etapa para este departamento.'
+                            : 'No stage activities for this department.'}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
