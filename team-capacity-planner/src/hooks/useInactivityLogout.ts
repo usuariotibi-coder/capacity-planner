@@ -16,9 +16,6 @@ export const useInactivityLogout = () => {
     let inactivityTimer: ReturnType<typeof setTimeout>;
     let sessionCheckTimer: ReturnType<typeof setInterval>;
     let sessionStatusEndpointAvailable = true;
-    let consecutiveAuthFailures = 0;
-    const MAX_CONSECUTIVE_AUTH_FAILURES = 3;
-
     const resetTimer = () => {
       // Clear existing timer
       clearTimeout(inactivityTimer);
@@ -59,8 +56,7 @@ export const useInactivityLogout = () => {
         }
 
         // Avoid false-positive logouts from transient 401/403 responses.
-        // Only treat auth failures as inactive session when backend explicitly
-        // confirms inactivity (`status: inactive`).
+        // Only log out when backend explicitly confirms inactivity.
         if (response.status === 401 || response.status === 403) {
           let backendConfirmedInactive = false;
           try {
@@ -75,33 +71,19 @@ export const useInactivityLogout = () => {
             backendConfirmedInactive = false;
           }
 
-          if (!backendConfirmedInactive) {
-            consecutiveAuthFailures = 0;
-            console.warn(
-              '[useInactivityLogout] Session status returned auth failure without explicit inactivity confirmation. Ignoring check.'
-            );
+          if (backendConfirmedInactive) {
+            console.log('[useInactivityLogout] Session inactive on backend (confirmed), logging out...');
+            logout();
             return;
           }
 
-          consecutiveAuthFailures += 1;
           console.warn(
-            `[useInactivityLogout] Session status auth failure ${consecutiveAuthFailures}/${MAX_CONSECUTIVE_AUTH_FAILURES}`
+            '[useInactivityLogout] Session status returned auth failure without explicit inactivity confirmation. Ignoring check.'
           );
-
-          if (consecutiveAuthFailures >= MAX_CONSECUTIVE_AUTH_FAILURES) {
-            console.log('[useInactivityLogout] Session inactive on backend (confirmed), logging out...');
-            logout();
-          }
           return;
         }
 
-        // Reset failure streak after a successful check.
-        if (response.ok) {
-          consecutiveAuthFailures = 0;
-          return;
-        }
-
-        consecutiveAuthFailures = 0;
+        if (response.ok) return;
         if (!response.ok) {
           console.warn('[useInactivityLogout] Session status check failed with status:', response.status);
         }
