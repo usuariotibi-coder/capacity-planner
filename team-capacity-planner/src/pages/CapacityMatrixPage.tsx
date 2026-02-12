@@ -4100,7 +4100,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   isCurrentWeek
                                     ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                     : weekData.isNextYear
-                                      ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
+                                      ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
                                       : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
                                 }`}
                               >
@@ -4527,7 +4527,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     isCurrentWeek
                                       ? CURRENT_WEEK_STRONG_HEADER_CLASS
                                       : weekData.isNextYear
-                                        ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-400 text-white'
+                                        ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
                                         : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
                                   }`}
                                 >
