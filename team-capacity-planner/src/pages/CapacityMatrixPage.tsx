@@ -93,6 +93,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [zoom, setZoom] = useState<number>(100);
+  const [projectCellViewMode, setProjectCellViewMode] = useState<'detailed' | 'compact'>('detailed');
   const [showLegend, setShowLegend] = useState<boolean>(false);
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
@@ -2641,6 +2642,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     // Get stage color for styling
     const stageColor = stage ? getStageColor(stage) : null;
     const isGeneralView = departmentFilter === 'General';
+    const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
+    const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
 
     // Get project info for tooltip
     const projectStartDate = projectId ? (projectStartDisplayById.get(projectId) || 'N/A') : 'N/A';
@@ -2650,6 +2653,41 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     let tooltipText = `📅 ${t.projectTooltip}: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
     if (cellComment) {
       tooltipText += `\n\n💬 ${cellComment}`;
+    }
+
+    if (projectId && projectCellViewMode === 'compact') {
+      const statusLabel = isDeptWeekInRange
+        ? (language === 'es' ? 'En tiempo' : 'On time')
+        : (language === 'es' ? 'Fuera de tiempo' : 'Out of range');
+      const statusClass = isDeptWeekInRange
+        ? 'bg-emerald-100 text-emerald-700'
+        : 'bg-rose-100 text-rose-700';
+
+      return (
+        <div
+          className={`p-0.5 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
+            stageColor
+              ? `${stageColor.bg} ${stageColor.text}`
+              : isDeptWeekInRange
+                ? 'bg-emerald-50 text-emerald-900'
+                : 'bg-gray-100 text-gray-500'
+          } ${outOfEstimatedRange ? 'border border-dashed border-red-500' : ''} ${canEdit ? 'cursor-pointer' : ''}`}
+          title={tooltipText}
+        >
+          {cellComment && (
+            <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
+              💬
+            </div>
+          )}
+          <div className="text-[10px] font-bold leading-tight">{talent}</div>
+          <div className={`mt-0.5 text-[7px] font-bold px-1 py-0 rounded leading-tight uppercase tracking-wide ${statusClass}`}>
+            {statusLabel}
+          </div>
+          {canEdit && (
+            <Pencil size={11} className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600" />
+          )}
+        </div>
+      );
     }
 
     // Calculate consecutive week number within the department using dates
@@ -2663,8 +2701,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     // Read-only display
     if (totalHours === 0 && cellAssignments.length === 0) {
-      const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
-
       // Apply visual indicators for department start/duration (like General view does)
       let cellBgClass = 'bg-gray-50';
       let cellTextClass = 'text-gray-400';
@@ -2717,8 +2753,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       utilizationPercent = getUtilizationPercent(department, projectId);
       utilizationColor = getUtilizationColor(utilizationPercent);
     }
-
-    const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
 
     return (
       <div
@@ -3279,6 +3313,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             <span className="hidden sm:inline">{t.legend}</span>
           </button>
 
+          {projectsVisibleInCurrentView.length > 0 && (
+            <button
+              onClick={() => setProjectCellViewMode((prev) => (prev === 'detailed' ? 'compact' : 'detailed'))}
+              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
+                projectCellViewMode === 'compact'
+                  ? 'bg-[#4f3a70] hover:bg-[#3f2d5d] text-white border-[#2e1a47]'
+                  : 'bg-[#f4f1f8] hover:bg-[#ebe6f2] text-[#2e1a47] border-[#d5d1da]'
+              }`}
+              title={language === 'es' ? 'Cambiar vista de celdas de proyectos' : 'Toggle project cells view'}
+            >
+              <span>{language === 'es' ? 'Vista' : 'View'}:</span>
+              <span className="font-bold">
+                {projectCellViewMode === 'compact'
+                  ? (language === 'es' ? 'Compacta' : 'Compact')
+                  : (language === 'es' ? 'Detalle' : 'Detailed')}
+              </span>
+            </button>
+          )}
           {/* Create Project Button - Only in department view (except PM) */}
           {canManageProjectsInCurrentDepartment && (
             <button
@@ -4687,6 +4739,52 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     const currentMs = new Date(week).getTime();
                                     const weeksDiff = Math.floor((currentMs - startMs) / (7 * 24 * 60 * 60 * 1000));
                                     deptConsecutiveWeek = weeksDiff + 1;
+                                  }
+
+                                  const outOfEstimatedRange = !isDeptWeekInRange;
+                                  const compactStatusLabel = isDeptWeekInRange
+                                    ? (language === 'es' ? 'En tiempo' : 'On time')
+                                    : (language === 'es' ? 'Fuera de tiempo' : 'Out of range');
+                                  const compactStatusClass = isDeptWeekInRange
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-rose-100 text-rose-700';
+
+                                  if (projectCellViewMode === 'compact') {
+                                    return (
+                                      <td
+                                        key={`${proj.id}-${dept}-${week}`}
+                                        data-week-index={weekIdx}
+                                        className={`border p-0 relative text-xs ${
+                                          isCurrentWeekColumn
+                                            ? CURRENT_WEEK_SOFT_CELL_CLASS
+                                            : 'border-gray-300'
+                                        } ${
+                                          stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50'
+                                        }`}
+                                      >
+                                        <div className={`p-0.5 rounded text-center text-[10px] font-semibold leading-tight relative ${
+                                          stageColor
+                                            ? `${stageColor.bg} ${stageColor.text}`
+                                            : isDeptWeekInRange
+                                              ? 'bg-emerald-50 text-emerald-900'
+                                              : 'bg-gray-100 text-gray-500'
+                                        } ${outOfEstimatedRange ? 'border border-dashed border-red-500' : ''}`}>
+                                          {cellComment && (
+                                            <button
+                                              onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
+                                              className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
+                                              title={cellComment}
+                                            >
+                                              💬
+                                            </button>
+                                          )}
+                                          <div className="text-[10px] font-bold leading-tight">{talent}</div>
+                                          <div className={`mt-0.5 text-[7px] font-bold px-1 py-0 rounded leading-tight uppercase tracking-wide ${compactStatusClass}`}>
+                                            {compactStatusLabel}
+                                          </div>
+                                        </div>
+                                      </td>
+                                    );
                                   }
 
                                   return (
