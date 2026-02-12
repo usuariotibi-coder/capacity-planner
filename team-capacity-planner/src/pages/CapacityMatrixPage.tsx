@@ -957,10 +957,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
   };
 
-  // Refs for table containers
-  const departmentsTableRef = useRef<HTMLDivElement>(null);
-  const projectsTableRef = useRef<HTMLDivElement>(null);
+  // Refs for synchronized horizontal scrolling between Capacity and Projects
+  const departmentCapacityScrollRef = useRef<HTMLDivElement>(null);
+  const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const isSyncingHorizontalScrollRef = useRef(false);
+  const syncedBaseScrollLeftRef = useRef(0);
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -1686,16 +1688,66 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setZoom(boundedZoom);
   };
 
+  const getProjectHorizontalScale = (projectId: string): number => {
+    if (!isGeneralView) return 1;
+    return Math.max(0.1, getEffectiveProjectZoom(projectId) / 100);
+  };
+
+  const setScrollLeftIfNeeded = (container: HTMLDivElement | null, targetScrollLeft: number) => {
+    if (!container) return;
+    if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
+      container.scrollLeft = targetScrollLeft;
+    }
+  };
+
+  const syncHorizontalScrollToCanonical = (canonicalScrollLeft: number) => {
+    const safeCanonicalScrollLeft = Math.max(0, canonicalScrollLeft);
+    syncedBaseScrollLeftRef.current = safeCanonicalScrollLeft;
+
+    if (isGeneralView) {
+      setScrollLeftIfNeeded(generalCapacityScrollRef.current, safeCanonicalScrollLeft);
+    } else {
+      setScrollLeftIfNeeded(departmentCapacityScrollRef.current, safeCanonicalScrollLeft);
+    }
+
+    projectTableRefs.current.forEach((container, projectId) => {
+      const scale = getProjectHorizontalScale(projectId);
+      setScrollLeftIfNeeded(container, safeCanonicalScrollLeft * scale);
+    });
+  };
+
+  const runSyncedHorizontalScroll = (canonicalScrollLeft: number) => {
+    if (isSyncingHorizontalScrollRef.current) return;
+
+    isSyncingHorizontalScrollRef.current = true;
+    syncHorizontalScrollToCanonical(canonicalScrollLeft);
+
+    requestAnimationFrame(() => {
+      isSyncingHorizontalScrollRef.current = false;
+    });
+  };
+
+  const handleCapacityHorizontalScroll = (scrollLeft: number) => {
+    if (isSyncingHorizontalScrollRef.current) return;
+    runSyncedHorizontalScroll(scrollLeft);
+  };
+
+  const handleProjectHorizontalScroll = (projectId: string, scrollLeft: number) => {
+    if (isSyncingHorizontalScrollRef.current) return;
+    const scale = getProjectHorizontalScale(projectId);
+    runSyncedHorizontalScroll(scrollLeft / scale);
+  };
+
   // Effect to reset scroll to first week when departmentFilter changes
   useEffect(() => {
-    // Reset scroll position to start of year (first week)
-    if (departmentsTableRef.current) {
-      departmentsTableRef.current.scrollLeft = 0;
-    }
-    if (projectsTableRef.current) {
-      projectsTableRef.current.scrollLeft = 0;
-    }
+    syncedBaseScrollLeftRef.current = 0;
+    syncHorizontalScrollToCanonical(0);
   }, [departmentFilter]);
+
+  // Keep alignment when project zoom changes in general view.
+  useEffect(() => {
+    syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current);
+  }, [projectZooms, isGeneralView]);
 
   // Get total hours and stage for a department in a week (optionally filtered by project)
   const getDepartmentWeekData = (department: Department, weekStart: string, projectId?: string) => {
@@ -3233,7 +3285,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                   {/* Weekly occupancy calendar */}
                   {showDepartmentPanel && (
-                    <div className="overflow-x-auto">
+                    <div
+                      className="overflow-x-auto"
+                      ref={departmentCapacityScrollRef}
+                      onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget.scrollLeft)}
+                    >
                     <div className="inline-block min-w-full">
                       {/* Week headers row */}
                       <div className="flex gap-0.5 mb-0.5">
@@ -4002,9 +4058,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto border border-gray-300 bg-white"
                         style={{ scrollBehavior: 'smooth' }}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
+                            const targetScrollLeft = syncedBaseScrollLeftRef.current * getProjectHorizontalScale(proj.id);
+                            setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
                           }
@@ -4150,7 +4209,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 </h2>
 
               {/* Vertical calendar layout - weeks as columns, departments as rows */}
-              <div className="overflow-x-auto">
+              <div
+                className="overflow-x-auto"
+                ref={generalCapacityScrollRef}
+                onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget.scrollLeft)}
+              >
                 <div className="inline-block min-w-full">
                   {/* Week headers row */}
                   <div className="flex gap-0.5 mb-0.5">
@@ -4419,13 +4482,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto" style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }} ref={(el) => {
-                        if (el) {
-                          projectTableRefs.current.set(proj.id, el);
-                        } else {
-                          projectTableRefs.current.delete(proj.id);
-                        }
-                      }}>
+                      <div
+                        className="overflow-x-auto"
+                        style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
+                        ref={(el) => {
+                          if (el) {
+                            projectTableRefs.current.set(proj.id, el);
+                            const targetScrollLeft = syncedBaseScrollLeftRef.current * getProjectHorizontalScale(proj.id);
+                            setScrollLeftIfNeeded(el, targetScrollLeft);
+                          } else {
+                            projectTableRefs.current.delete(proj.id);
+                          }
+                        }}
+                      >
                       <table className="border-collapse text-xs w-full">
                         <thead>
                           {/* Month row */}
