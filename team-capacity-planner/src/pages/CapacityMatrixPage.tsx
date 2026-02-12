@@ -965,6 +965,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const isSyncingHorizontalScrollRef = useRef(false);
   const syncedBaseScrollLeftRef = useRef(0);
   const activeSyncedProjectIdRef = useRef<string | null>(null);
+  const [activeSyncedProjectId, setActiveSyncedProjectId] = useState<string | null>(null);
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -1684,10 +1685,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const updateProjectZoom = (projectId: string, zoomLevel: number) => {
     const boundedZoom = Math.max(50, Math.min(200, zoomLevel));
     if (isGeneralView) {
+      markProjectAsActiveSyncTarget(projectId);
       setProjectZoom(projectId, boundedZoom);
       return;
     }
     setZoom(boundedZoom);
+  };
+
+  const markProjectAsActiveSyncTarget = (projectId: string | null) => {
+    if (activeSyncedProjectIdRef.current === projectId) return;
+    activeSyncedProjectIdRef.current = projectId;
+    setActiveSyncedProjectId(projectId);
   };
 
   const setScrollLeftIfNeeded = (container: HTMLDivElement | null, targetScrollLeft: number) => {
@@ -1758,14 +1766,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const handleProjectHorizontalScroll = (projectId: string, scrollLeft: number) => {
     if (isSyncingHorizontalScrollRef.current) return;
-    activeSyncedProjectIdRef.current = projectId;
+    if (activeSyncedProjectIdRef.current !== projectId) {
+      markProjectAsActiveSyncTarget(projectId);
+    }
     runSyncedHorizontalScroll(scrollLeft, projectId);
   };
 
   // Effect to reset scroll to first week when departmentFilter changes
   useEffect(() => {
     syncedBaseScrollLeftRef.current = 0;
-    activeSyncedProjectIdRef.current = null;
+    markProjectAsActiveSyncTarget(null);
     syncHorizontalScrollToCanonical(0, resolveSyncProjectId());
   }, [departmentFilter]);
 
@@ -1773,6 +1783,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   useEffect(() => {
     syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current, resolveSyncProjectId());
   }, [projectZooms, isGeneralView]);
+
+  const activeProjectIdForCapacityZoom = useMemo(() => {
+    if (!isGeneralView) return null;
+    if (activeSyncedProjectId && projectsVisibleInCurrentView.some((proj) => proj.id === activeSyncedProjectId)) {
+      return activeSyncedProjectId;
+    }
+    return projectsVisibleInCurrentView[0]?.id || null;
+  }, [activeSyncedProjectId, isGeneralView, projectsVisibleInCurrentView]);
+
+  const generalCapacityZoom = useMemo(() => {
+    if (!isGeneralView) return 100;
+    if (!activeProjectIdForCapacityZoom) return 100;
+    return getEffectiveProjectZoom(activeProjectIdForCapacityZoom);
+  }, [activeProjectIdForCapacityZoom, isGeneralView, projectZooms]);
 
   // Get total hours and stage for a department in a week (optionally filtered by project)
   const getDepartmentWeekData = (department: Department, weekStart: string, projectId?: string) => {
@@ -4088,14 +4112,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
                             if (!activeSyncedProjectIdRef.current) {
-                              activeSyncedProjectIdRef.current = proj.id;
+                              markProjectAsActiveSyncTarget(proj.id);
                             }
                             const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
                             if (activeSyncedProjectIdRef.current === proj.id) {
-                              activeSyncedProjectIdRef.current = null;
+                              markProjectAsActiveSyncTarget(null);
                             }
                           }
                         }}
@@ -4245,7 +4269,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 ref={generalCapacityScrollRef}
                 onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget.scrollLeft)}
               >
-                <div className="inline-block min-w-full">
+                <div className="inline-block min-w-full" style={{ zoom: `${generalCapacityZoom / 100}` }}>
                   {/* Week headers row */}
                   <div className="flex gap-0 mb-0">
                     {/* Empty cell for department names column */}
@@ -4521,14 +4545,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
                             if (!activeSyncedProjectIdRef.current) {
-                              activeSyncedProjectIdRef.current = proj.id;
+                              markProjectAsActiveSyncTarget(proj.id);
                             }
                             const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
                             if (activeSyncedProjectIdRef.current === proj.id) {
-                              activeSyncedProjectIdRef.current = null;
+                              markProjectAsActiveSyncTarget(null);
                             }
                           }
                         }}
