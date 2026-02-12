@@ -2644,6 +2644,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
+    const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
 
     // Get project info for tooltip
     const projectStartDate = projectId ? (projectStartDisplayById.get(projectId) || 'N/A') : 'N/A';
@@ -2656,13 +2657,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     }
 
     if (projectId && projectCellViewMode === 'compact') {
-      const statusLabel = isDeptWeekInRange
-        ? (language === 'es' ? 'En tiempo' : 'On time')
-        : (language === 'es' ? 'Fuera de tiempo' : 'Out of range');
-      const statusClass = isDeptWeekInRange
-        ? 'bg-emerald-100 text-emerald-700'
-        : 'bg-rose-100 text-rose-700';
-
       return (
         <div
           className={`p-0.5 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
@@ -2671,7 +2665,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               : isDeptWeekInRange
                 ? 'bg-emerald-50 text-emerald-900'
                 : 'bg-gray-100 text-gray-500'
-          } ${outOfEstimatedRange ? 'border border-dashed border-red-500' : ''} ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
           {cellComment && (
@@ -2680,9 +2674,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           )}
           <div className="text-[10px] font-bold leading-tight">{talent}</div>
-          <div className={`mt-0.5 text-[7px] font-bold px-1 py-0 rounded leading-tight uppercase tracking-wide ${statusClass}`}>
-            {statusLabel}
-          </div>
           {canEdit && (
             <Pencil size={11} className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600" />
           )}
@@ -2759,7 +2750,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
         } ${stageColor ? stageColor.text : 'text-blue-900'} ${
-          outOfEstimatedRange ? 'border border-dashed border-red-500' : ''
+          showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''
         }`}
         title={tooltipText}
       >
@@ -4742,12 +4733,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   }
 
                                   const outOfEstimatedRange = !isDeptWeekInRange;
-                                  const compactStatusLabel = isDeptWeekInRange
-                                    ? (language === 'es' ? 'En tiempo' : 'On time')
-                                    : (language === 'es' ? 'Fuera de tiempo' : 'Out of range');
-                                  const compactStatusClass = isDeptWeekInRange
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-rose-100 text-rose-700';
+                                  const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
 
                                   if (projectCellViewMode === 'compact') {
                                     return (
@@ -4768,7 +4754,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? 'bg-emerald-50 text-emerald-900'
                                               : 'bg-gray-100 text-gray-500'
-                                        } ${outOfEstimatedRange ? 'border border-dashed border-red-500' : ''}`}>
+                                        } ${showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -4779,9 +4765,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             </button>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{talent}</div>
-                                          <div className={`mt-0.5 text-[7px] font-bold px-1 py-0 rounded leading-tight uppercase tracking-wide ${compactStatusClass}`}>
-                                            {compactStatusLabel}
-                                          </div>
                                         </div>
                                       </td>
                                     );
