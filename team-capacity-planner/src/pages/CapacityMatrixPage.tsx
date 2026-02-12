@@ -964,6 +964,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const isSyncingHorizontalScrollRef = useRef(false);
   const syncedBaseScrollLeftRef = useRef(0);
+  const activeSyncedProjectIdRef = useRef<string | null>(null);
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -1696,7 +1697,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
   };
 
-  const syncHorizontalScrollToCanonical = (canonicalScrollLeft: number) => {
+  const resolveSyncProjectId = (preferredProjectId?: string | null): string | null => {
+    if (preferredProjectId && projectTableRefs.current.has(preferredProjectId)) {
+      return preferredProjectId;
+    }
+
+    const activeProjectId = activeSyncedProjectIdRef.current;
+    if (activeProjectId && projectTableRefs.current.has(activeProjectId)) {
+      return activeProjectId;
+    }
+
+    const visibleProjectId = projectsVisibleInCurrentView.find((proj) => projectTableRefs.current.has(proj.id))?.id;
+    if (visibleProjectId) {
+      return visibleProjectId;
+    }
+
+    const firstEntry = projectTableRefs.current.keys().next();
+    return firstEntry.done ? null : firstEntry.value;
+  };
+
+  const syncHorizontalScrollToCanonical = (
+    canonicalScrollLeft: number,
+    targetProjectId?: string | null
+  ) => {
     const safeCanonicalScrollLeft = Math.max(0, canonicalScrollLeft);
     syncedBaseScrollLeftRef.current = safeCanonicalScrollLeft;
 
@@ -1706,16 +1729,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setScrollLeftIfNeeded(departmentCapacityScrollRef.current, safeCanonicalScrollLeft);
     }
 
-    projectTableRefs.current.forEach((container) => {
+    const syncProjectId = resolveSyncProjectId(targetProjectId);
+    if (!syncProjectId) return;
+    const container = projectTableRefs.current.get(syncProjectId);
+    if (container) {
       setScrollLeftIfNeeded(container, safeCanonicalScrollLeft);
-    });
+    }
   };
 
-  const runSyncedHorizontalScroll = (canonicalScrollLeft: number) => {
+  const runSyncedHorizontalScroll = (
+    canonicalScrollLeft: number,
+    targetProjectId?: string | null
+  ) => {
     if (isSyncingHorizontalScrollRef.current) return;
 
     isSyncingHorizontalScrollRef.current = true;
-    syncHorizontalScrollToCanonical(canonicalScrollLeft);
+    syncHorizontalScrollToCanonical(canonicalScrollLeft, targetProjectId);
 
     requestAnimationFrame(() => {
       isSyncingHorizontalScrollRef.current = false;
@@ -1724,23 +1753,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const handleCapacityHorizontalScroll = (scrollLeft: number) => {
     if (isSyncingHorizontalScrollRef.current) return;
-    runSyncedHorizontalScroll(scrollLeft);
+    runSyncedHorizontalScroll(scrollLeft, resolveSyncProjectId());
   };
 
-  const handleProjectHorizontalScroll = (scrollLeft: number) => {
+  const handleProjectHorizontalScroll = (projectId: string, scrollLeft: number) => {
     if (isSyncingHorizontalScrollRef.current) return;
-    runSyncedHorizontalScroll(scrollLeft);
+    activeSyncedProjectIdRef.current = projectId;
+    runSyncedHorizontalScroll(scrollLeft, projectId);
   };
 
   // Effect to reset scroll to first week when departmentFilter changes
   useEffect(() => {
     syncedBaseScrollLeftRef.current = 0;
-    syncHorizontalScrollToCanonical(0);
+    activeSyncedProjectIdRef.current = null;
+    syncHorizontalScrollToCanonical(0, resolveSyncProjectId());
   }, [departmentFilter]);
 
   // Keep alignment after zoom changes/re-renders.
   useEffect(() => {
-    syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current);
+    syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current, resolveSyncProjectId());
   }, [projectZooms, isGeneralView]);
 
   // Get total hours and stage for a department in a week (optionally filtered by project)
@@ -4052,14 +4083,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto border border-gray-300 bg-white"
                         style={{ scrollBehavior: 'smooth' }}
-                        onScroll={(e) => handleProjectHorizontalScroll(e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
+                            if (!activeSyncedProjectIdRef.current) {
+                              activeSyncedProjectIdRef.current = proj.id;
+                            }
                             const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
+                            if (activeSyncedProjectIdRef.current === proj.id) {
+                              activeSyncedProjectIdRef.current = null;
+                            }
                           }
                         }}
                       >
@@ -4479,14 +4516,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto"
                         style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
-                        onScroll={(e) => handleProjectHorizontalScroll(e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
+                            if (!activeSyncedProjectIdRef.current) {
+                              activeSyncedProjectIdRef.current = proj.id;
+                            }
                             const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
+                            if (activeSyncedProjectIdRef.current === proj.id) {
+                              activeSyncedProjectIdRef.current = null;
+                            }
                           }
                         }}
                       >
