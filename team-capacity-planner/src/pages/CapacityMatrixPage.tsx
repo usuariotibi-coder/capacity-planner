@@ -1689,11 +1689,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setZoom(boundedZoom);
   };
 
-  const getProjectHorizontalScale = (projectId: string): number => {
-    if (!isGeneralView) return 1;
-    return Math.max(0.1, getEffectiveProjectZoom(projectId) / 100);
-  };
-
   const setScrollLeftIfNeeded = (container: HTMLDivElement | null, targetScrollLeft: number) => {
     if (!container) return;
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
@@ -1711,9 +1706,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setScrollLeftIfNeeded(departmentCapacityScrollRef.current, safeCanonicalScrollLeft);
     }
 
-    projectTableRefs.current.forEach((container, projectId) => {
-      const scale = getProjectHorizontalScale(projectId);
-      setScrollLeftIfNeeded(container, safeCanonicalScrollLeft * scale);
+    projectTableRefs.current.forEach((container) => {
+      setScrollLeftIfNeeded(container, safeCanonicalScrollLeft);
     });
   };
 
@@ -1733,10 +1727,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     runSyncedHorizontalScroll(scrollLeft);
   };
 
-  const handleProjectHorizontalScroll = (projectId: string, scrollLeft: number) => {
+  const handleProjectHorizontalScroll = (scrollLeft: number) => {
     if (isSyncingHorizontalScrollRef.current) return;
-    const scale = getProjectHorizontalScale(projectId);
-    runSyncedHorizontalScroll(scrollLeft / scale);
+    runSyncedHorizontalScroll(scrollLeft);
   };
 
   // Effect to reset scroll to first week when departmentFilter changes
@@ -1745,7 +1738,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     syncHorizontalScrollToCanonical(0);
   }, [departmentFilter]);
 
-  // Keep alignment when project zoom changes in general view.
+  // Keep alignment after zoom changes/re-renders.
   useEffect(() => {
     syncHorizontalScrollToCanonical(syncedBaseScrollLeftRef.current);
   }, [projectZooms, isGeneralView]);
@@ -4059,11 +4052,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto border border-gray-300 bg-white"
                         style={{ scrollBehavior: 'smooth' }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(e.currentTarget.scrollLeft)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
-                            const targetScrollLeft = syncedBaseScrollLeftRef.current * getProjectHorizontalScale(proj.id);
+                            const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
@@ -4486,11 +4479,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div
                         className="overflow-x-auto"
                         style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget.scrollLeft)}
+                        onScroll={(e) => handleProjectHorizontalScroll(e.currentTarget.scrollLeft)}
                         ref={(el) => {
                           if (el) {
                             projectTableRefs.current.set(proj.id, el);
-                            const targetScrollLeft = syncedBaseScrollLeftRef.current * getProjectHorizontalScale(proj.id);
+                            const targetScrollLeft = syncedBaseScrollLeftRef.current;
                             setScrollLeftIfNeeded(el, targetScrollLeft);
                           } else {
                             projectTableRefs.current.delete(proj.id);
