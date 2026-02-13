@@ -5045,8 +5045,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           {deptStages.map((stage) => {
                             const stageColor = getStageColor(stage);
                             return (
-                              <div key={`legend-stage-${dept}-${stage}`} className="flex items-center gap-1 text-[9px] text-[#4b3d61]">
-                                <span className={`h-3 w-3 rounded border border-[#d9d4e2] ${stageColor.bg}`} />
+                              <div
+                                key={`legend-stage-${dept}-${stage}`}
+                                className="flex items-center gap-1.5 rounded px-1 py-0.5 text-[9px] font-medium text-[#4b3d61]"
+                              >
+                                <span
+                                  className={`h-3.5 w-3.5 shrink-0 rounded-[4px] border border-[#b8adca] ${stageColor.bg}`}
+                                  style={{
+                                    filter: 'saturate(1.45) contrast(1.15)',
+                                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), 0 1px 2px rgba(34,17,57,0.25)',
+                                  }}
+                                />
                                 <span className="truncate">{getStageLabel(stage, t as Record<string, string>)}</span>
                               </div>
                             );
