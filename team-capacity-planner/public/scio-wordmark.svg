@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 190" width="620" height="190">
+  <defs>
+    <linearGradient id="scioWhite" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f5f2fa"/>
+      <stop offset="100%" stop-color="#ded7ea"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="url(#scioWhite)">
+    <text
+      x="35"
+      y="105"
+      font-family="'Arial Black', 'Arial', sans-serif"
+      font-size="118"
+      font-weight="900"
+      letter-spacing="2"
+    >
+      SCIO
+    </text>
+  </g>
+
+  <rect x="314" y="18" width="24" height="24" rx="4" fill="#ce0037"/>
+
+  <text
+    x="318"
+    y="150"
+    text-anchor="middle"
+    font-family="'Arial Narrow', 'Arial', sans-serif"
+    font-size="52"
+    font-style="italic"
+    letter-spacing="1.5"
+    fill="#ce0037"
+  >
+    AUTOMATION
+  </text>
+</svg>
