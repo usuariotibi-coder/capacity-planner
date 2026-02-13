@@ -325,30 +325,33 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="user-session-card hidden sm:flex items-center gap-2.5 px-2.5 py-1.5">
-                <div className="user-session-avatar relative w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="user-session-card hidden sm:flex items-center gap-2 px-2 py-1.5">
+                <div className="user-session-avatar relative h-8 w-8 shrink-0 rounded-full flex items-center justify-center">
                   <span className="user-session-initial text-[10px] font-bold">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
-                  <span className="user-session-dot absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"></span>
+                  <span className="user-session-dot absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full"></span>
                 </div>
-                <div className="flex min-w-0 flex-col">
-                  <span className="user-session-name truncate text-[11px] font-semibold leading-none">
-                    {currentUser}
-                  </span>
-                  <div className="mt-0.5 flex min-w-0 items-center gap-1">
-                    <span className="user-session-status inline-flex items-center gap-1 whitespace-nowrap text-[9px] font-medium">
-                      <span className="user-session-status-dot w-1.5 h-1.5 rounded-full"></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="user-session-name truncate text-[11px] font-semibold leading-none">
+                      {currentUser}
+                    </span>
+                    <span className="user-session-status inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-[2px] text-[8px] font-semibold">
+                      <span className="user-session-status-dot h-1.5 w-1.5 rounded-full"></span>
                       {t.loggedIn || 'Logged in'}
                     </span>
+                  </div>
+                  <div className="mt-1 flex min-w-0 items-center gap-1">
                     {departmentDisplayLabel && (
-                      <span className={`user-session-dept inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${departmentChipTone}`}>
+                      <span className={`user-session-dept inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-[2px] text-[9px] font-semibold ${departmentChipTone}`}>
                         <Building2 size={8} />
-                        <span className="truncate max-w-[120px]">{departmentDisplayLabel}</span>
+                        <span className="truncate max-w-[122px]">{departmentDisplayLabel}</span>
                       </span>
                     )}
                   </div>
                 </div>
+                <div className="user-session-accent h-7 w-[3px] shrink-0 rounded-full"></div>
               </div>
             )}
 
