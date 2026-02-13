@@ -4,6 +4,8 @@ import { registeredUsersApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
+import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
+import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
 import type { OtherDepartment, RegisteredUser, UserDepartment } from '../types';
 
 const USER_DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
@@ -95,6 +97,18 @@ export function RegisteredUsersPage() {
     () => [...users].sort((a, b) => (a.dateJoined < b.dateJoined ? 1 : -1)),
     [users]
   );
+
+  const hasCreatePassword = createState.password.length > 0;
+  const createPasswordStrength = useMemo(
+    () => (hasCreatePassword ? getPasswordStrength(createState.password) : null),
+    [createState.password, hasCreatePassword]
+  );
+  const createPasswordCriteria = useMemo(
+    () => getPasswordCriteria(createState.password),
+    [createState.password]
+  );
+  const hasCreateConfirmPassword = createState.confirmPassword.length > 0;
+  const createPasswordsMatch = hasCreateConfirmPassword && createState.password === createState.confirmPassword;
 
   const loadUsers = async (withSpinner = true) => {
     if (!canManageRegisteredUsers) return;
@@ -539,8 +553,59 @@ export function RegisteredUsersPage() {
                     className="brand-input px-3 py-2 text-sm w-full"
                     placeholder={t.confirmPassword}
                   />
+                  {hasCreateConfirmPassword && (
+                    <p className={`text-[11px] mt-1 ${createPasswordsMatch ? 'text-green-700' : 'text-red-600'}`}>
+                      {createPasswordsMatch
+                        ? (t.passwordsMatch || 'Passwords match')
+                        : t.passwordsDoNotMatch}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {hasCreatePassword && (
+                <div className="rounded-xl border border-[#ddd9e5] bg-[#f8f7fb] p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-[#6f6782]">
+                      {t.passwordStrength || 'Password strength'}
+                    </span>
+                    <span
+                      className={`text-xs font-semibold ${
+                        createPasswordStrength === 'weak'
+                          ? 'text-red-600'
+                          : createPasswordStrength === 'medium'
+                            ? 'text-amber-600'
+                            : 'text-emerald-700'
+                      }`}
+                    >
+                      {createPasswordStrength === 'weak' && (t.weak || 'Weak')}
+                      {createPasswordStrength === 'medium' && (t.medium || 'Medium')}
+                      {createPasswordStrength === 'strong' && (t.strong || 'Strong')}
+                    </span>
+                  </div>
+
+                  <div className="h-1.5 w-full rounded-full bg-[#ded8e8] overflow-hidden">
+                    <div
+                      className={`h-full w-full rounded-full transition-all duration-500 ${
+                        createPasswordStrength === 'weak'
+                          ? 'bg-red-500'
+                          : createPasswordStrength === 'medium'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                      }`}
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-[#6f6782] mt-2">
+                    {t.passwordRequirements || 'Password requirements'}
+                  </p>
+                  <PasswordRequirementsChecklist
+                    criteria={createPasswordCriteria}
+                    t={t}
+                    variant="light"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
