@@ -132,6 +132,100 @@ input[type="number"] {
   color: #ffffff;
 }
 
+.user-session-card {
+  border: 1px solid #c9bdd9;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #f2eef8 52%, #ece6f4 100%);
+  box-shadow: 0 8px 20px rgba(46, 26, 71, 0.16);
+}
+
+.user-session-avatar {
+  background: linear-gradient(145deg, #2e1a47 0%, #5a4479 100%);
+  border: 1px solid #d8cee6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.user-session-initial {
+  color: #ffffff;
+}
+
+.user-session-dot,
+.user-session-status-dot {
+  background: #18c584;
+  border: 1px solid #ffffff;
+}
+
+.user-session-name {
+  color: #2e1a47;
+}
+
+.user-session-status {
+  color: #5e4d77;
+}
+
+.user-session-dept {
+  background: #f6f2fb;
+  border-color: #d9d0e7;
+  color: #2e1a47;
+}
+
+.user-session-dept--pm {
+  background: #eaf1ff;
+  border-color: #c6d8ff;
+  color: #24457c;
+}
+
+.user-session-dept--med {
+  background: #e3f8f6;
+  border-color: #bde9e3;
+  color: #1d5f58;
+}
+
+.user-session-dept--hd {
+  background: #f0e9ff;
+  border-color: #d8c9ff;
+  color: #5a4293;
+}
+
+.user-session-dept--mfg {
+  background: #fff2e3;
+  border-color: #ffdcbc;
+  color: #8c4f17;
+}
+
+.user-session-dept--build {
+  background: #e8f8ec;
+  border-color: #c9e8d2;
+  color: #25633a;
+}
+
+.user-session-dept--prg {
+  background: #eef8df;
+  border-color: #d8e9bb;
+  color: #4b6d20;
+}
+
+.user-session-dept--other {
+  background: #e4f5f1;
+  border-color: #c7e6de;
+  color: #295f55;
+}
+
+.user-session-mobile-avatar {
+  background: linear-gradient(145deg, #2e1a47 0%, #5a4479 100%);
+  border: 1px solid #b9accf;
+}
+
+.user-session-mobile-initial {
+  color: #ffffff;
+}
+
+.user-session-mobile-dept {
+  background: #ede7f5;
+  border-color: #c9c0d8;
+  color: #2e1a47;
+}
+
 .brand-page-shell {
   background: linear-gradient(180deg, #f8f6fb 0%, #f1edf6 100%);
   color: var(--brand-text);
@@ -447,6 +541,84 @@ input[type="number"] {
 [data-theme="night"] .lang-toggle-btn.is-active {
   background: linear-gradient(90deg, #ce0037 0%, #2e1a47 100%);
   color: #ffffff;
+}
+
+[data-theme="night"] .user-session-card {
+  border-color: #6a547f;
+  background: linear-gradient(135deg, #2c1a3f 0%, #3a2553 55%, #4a3264 100%);
+  box-shadow: 0 12px 26px rgba(8, 4, 14, 0.48);
+}
+
+[data-theme="night"] .user-session-avatar {
+  background: linear-gradient(145deg, #4f3a70 0%, #75628f 100%);
+  border-color: #9f8cb8;
+}
+
+[data-theme="night"] .user-session-name {
+  color: #f5f0fb;
+}
+
+[data-theme="night"] .user-session-status {
+  color: #d9cde9;
+}
+
+[data-theme="night"] .user-session-dept {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #f3ecfb;
+}
+
+[data-theme="night"] .user-session-dept--pm {
+  background: rgba(143, 178, 255, 0.18);
+  border-color: rgba(185, 207, 255, 0.38);
+  color: #e7f0ff;
+}
+
+[data-theme="night"] .user-session-dept--med {
+  background: rgba(127, 214, 209, 0.2);
+  border-color: rgba(160, 233, 227, 0.36);
+  color: #dcfffa;
+}
+
+[data-theme="night"] .user-session-dept--hd {
+  background: rgba(195, 155, 255, 0.2);
+  border-color: rgba(215, 187, 255, 0.36);
+  color: #f3e9ff;
+}
+
+[data-theme="night"] .user-session-dept--mfg {
+  background: rgba(255, 210, 161, 0.18);
+  border-color: rgba(255, 224, 188, 0.34);
+  color: #fff1df;
+}
+
+[data-theme="night"] .user-session-dept--build {
+  background: rgba(143, 212, 168, 0.2);
+  border-color: rgba(183, 232, 200, 0.36);
+  color: #e8fff1;
+}
+
+[data-theme="night"] .user-session-dept--prg {
+  background: rgba(211, 240, 154, 0.2);
+  border-color: rgba(226, 242, 188, 0.36);
+  color: #f4ffe2;
+}
+
+[data-theme="night"] .user-session-dept--other {
+  background: rgba(130, 200, 188, 0.2);
+  border-color: rgba(171, 225, 216, 0.34);
+  color: #e5fff9;
+}
+
+[data-theme="night"] .user-session-mobile-avatar {
+  background: linear-gradient(145deg, #4f3a70 0%, #75628f 100%);
+  border-color: #8f7aaa;
+}
+
+[data-theme="night"] .user-session-mobile-dept {
+  background: #3a2551;
+  border-color: #6d5886;
+  color: #efe7f8;
 }
 
 [data-theme="night"] .brand-page-shell:not(.capacity-matrix-page) [class*="bg-white"],

@@ -159,21 +159,21 @@ function MainApp() {
   const departmentChipTone = (() => {
     switch (currentUserDepartment) {
       case 'PM':
-        return 'bg-[#8fb2ff]/25 text-[#eaf1ff] border-[#9fb8ff]/45';
+        return 'user-session-dept--pm';
       case 'MED':
-        return 'bg-[#7fd6d1]/20 text-[#ddfffb] border-[#8ee3de]/40';
+        return 'user-session-dept--med';
       case 'HD':
-        return 'bg-[#c39bff]/20 text-[#f5ecff] border-[#caa8ff]/42';
+        return 'user-session-dept--hd';
       case 'MFG':
-        return 'bg-[#ffd2a1]/25 text-[#fff1df] border-[#ffd6ab]/40';
+        return 'user-session-dept--mfg';
       case 'BUILD':
-        return 'bg-[#8fd4a8]/20 text-[#e7fff0] border-[#9be0b4]/40';
+        return 'user-session-dept--build';
       case 'PRG':
-        return 'bg-[#d3f09a]/22 text-[#f5ffe4] border-[#daefad]/40';
+        return 'user-session-dept--prg';
       case 'OTHER':
-        return 'bg-[#82c8bc]/22 text-[#e3fff9] border-[#95d1c7]/40';
+        return 'user-session-dept--other';
       default:
-        return 'bg-white/15 text-white border-white/30';
+        return 'user-session-dept--default';
     }
   })();
 
@@ -325,24 +325,24 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[#766689] bg-gradient-to-r from-[#2E1A47] to-[#4A3967] shadow-[0_8px_18px_rgba(46,26,71,0.3)] text-white">
-                <div className="relative w-7 h-7 rounded-full bg-white/15 border border-white/40 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] font-bold text-white">
+              <div className="user-session-card hidden sm:flex items-center gap-2.5 px-2.5 py-1.5">
+                <div className="user-session-avatar relative w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="user-session-initial text-[10px] font-bold">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-white"></span>
+                  <span className="user-session-dot absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"></span>
                 </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] font-semibold text-white truncate leading-none">
+                <div className="flex min-w-0 flex-col">
+                  <span className="user-session-name truncate text-[11px] font-semibold leading-none">
                     {currentUser}
                   </span>
-                  <div className="flex items-center gap-1 mt-0.5 min-w-0">
-                    <span className="inline-flex items-center gap-1 text-[9px] text-[#ded7ea] font-medium whitespace-nowrap">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1">
+                    <span className="user-session-status inline-flex items-center gap-1 whitespace-nowrap text-[9px] font-medium">
+                      <span className="user-session-status-dot w-1.5 h-1.5 rounded-full"></span>
                       {t.loggedIn || 'Logged in'}
                     </span>
                     {departmentDisplayLabel && (
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-semibold whitespace-nowrap ${departmentChipTone}`}>
+                      <span className={`user-session-dept inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${departmentChipTone}`}>
                         <Building2 size={8} />
                         <span className="truncate max-w-[120px]">{departmentDisplayLabel}</span>
                       </span>
@@ -354,17 +354,17 @@ function MainApp() {
 
             {/* Mobile User Widget */}
             {currentUser && (
-              <div className="sm:hidden flex items-center gap-1 flex-shrink-0">
+              <div className="user-session-mobile sm:hidden flex items-center gap-1 flex-shrink-0">
                 <div
-                  className="w-7 h-7 rounded-full bg-[#2E1A47] flex items-center justify-center border border-[#827691]"
+                  className="user-session-mobile-avatar w-7 h-7 rounded-full flex items-center justify-center"
                   title={departmentDisplayLabel ? `${currentUser} - ${departmentDisplayLabel}` : currentUser}
                 >
-                  <span className="text-[10px] font-bold text-white">
+                  <span className="user-session-mobile-initial text-[10px] font-bold">
                     {currentUser.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 {mobileDepartmentCode && (
-                  <span className="px-1 py-0.5 rounded border border-[#c9c0d8] bg-[#ece7f3] text-[#2e1a47] text-[9px] font-bold">
+                  <span className="user-session-mobile-dept rounded border px-1 py-0.5 text-[9px] font-bold">
                     {mobileDepartmentCode}
                   </span>
                 )}
