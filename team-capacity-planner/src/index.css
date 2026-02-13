@@ -873,6 +873,36 @@ input[type="number"] {
   color: #f0e8ff !important;
 }
 
+/* Capacity Matrix visual guide: readable night mode */
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide {
+  background: linear-gradient(180deg, #251638 0%, #2e1b43 100%) !important;
+  border-color: #5f4a78 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide .capacity-visual-guide-card {
+  background: #2d1b42 !important;
+  border-color: #5f4a78 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide .capacity-visual-guide-footnote {
+  background: #322047 !important;
+  border-color: #66527f !important;
+  color: #e6dbf5 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide [class*="text-[#2e1a47]"] {
+  color: #f6efff !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide [class*="text-[#3f3354]"],
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide [class*="text-[#4b3d61]"] {
+  color: #e6dbf5 !important;
+}
+
+[data-theme="night"] .capacity-matrix-page .capacity-visual-guide [class*="text-[#6d6082]"] {
+  color: #cfc1e6 !important;
+}
+
 /* Requested: hide warning icons globally */
 .lucide-alert-triangle,
 .lucide-triangle-alert,

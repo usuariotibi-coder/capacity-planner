@@ -4881,7 +4881,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       {/* Visual Guide - Expandable in place */}
       {showLegend && (
-        <div className="mx-2 my-2 overflow-hidden rounded-xl border border-[#d9d4e2] bg-gradient-to-b from-white to-[#f6f3fb] shadow-sm">
+        <div className="capacity-visual-guide mx-2 my-2 overflow-hidden rounded-xl border border-[#d9d4e2] bg-gradient-to-b from-white to-[#f6f3fb] shadow-sm">
           <div className="flex items-center justify-between border-b border-[#e8e4ef] px-3 py-2">
             <h3 className="text-xs font-bold uppercase tracking-wide text-[#2e1a47]">{t.legend}</h3>
             <span className="text-[10px] font-medium text-[#6d6082]">
@@ -4896,23 +4896,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {language === 'es' ? 'Uso de capacidad' : 'Capacity usage'}
                 </p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                     <div className="h-4 w-4 rounded border border-green-300 bg-green-100" />
                     <span className="text-[11px] font-medium text-[#3f3354]">{t.percentLow}</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                     <div className="h-4 w-4 rounded border border-yellow-300 bg-yellow-100" />
                     <span className="text-[11px] font-medium text-[#3f3354]">{t.percentModerate}</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                     <div className="h-4 w-4 rounded border border-red-600 bg-red-500" />
                     <span className="text-[11px] font-medium text-[#3f3354]">{t.percentHigh}</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                     <div className="h-4 w-4 rounded border border-red-800 bg-red-700 shadow-inner" />
                     <span className="text-[11px] font-medium text-[#3f3354]">{t.percentCritical}</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                  <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                     <div className="h-4 w-4 rounded border border-gray-300 bg-gray-100" />
                     <span className="text-[11px] font-medium text-[#3f3354]">{t.noDataLegend}</span>
                   </div>
@@ -4925,23 +4925,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 {language === 'es' ? 'Como leer las celdas' : 'How to read cells'}
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                   <div className="flex h-5 w-5 items-center justify-center rounded border border-blue-300 bg-blue-100 text-[10px] font-bold text-blue-700">h</div>
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.hoursLegend}</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                   <div className="flex h-5 w-5 items-center justify-center rounded border border-gray-300 bg-white text-[11px] font-bold text-gray-400">-</div>
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.noAssignmentsLegend}</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                   <div className="h-5 w-5 rounded border border-emerald-300 bg-emerald-50" />
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.withinRangeLegend}</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                   <div className="flex h-5 w-5 items-center justify-center rounded border border-stone-500 bg-stone-300 text-[10px] font-bold text-stone-900">S</div>
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
+                <div className="capacity-visual-guide-card flex items-center gap-2 rounded-lg border border-[#e4dfec] bg-white px-2 py-1.5">
                   <div className="h-5 w-5 rounded border border-dashed border-red-500 bg-white" />
                   <span className="text-[11px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
@@ -4965,7 +4965,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   const deptStages = STAGE_OPTIONS[dept];
 
                   return (
-                    <div key={`legend-dept-${dept}`} className="rounded-lg border border-[#e4dfec] bg-white px-2.5 py-2">
+                    <div key={`legend-dept-${dept}`} className="capacity-visual-guide-card rounded-lg border border-[#e4dfec] bg-white px-2.5 py-2">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
                           <span className={`inline-flex h-5 w-5 items-center justify-center rounded border ${deptStyle.badge}`}>
@@ -5002,7 +5002,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
 
-            <div className="rounded-lg border border-[#ddd5ea] bg-white/80 px-3 py-2 text-[11px] text-[#4b3d61]">
+            <div className="capacity-visual-guide-footnote rounded-lg border border-[#ddd5ea] bg-white/80 px-3 py-2 text-[11px] text-[#4b3d61]">
               {departmentFilter === 'General' ? t.readOnlyView : t.backgroundColors}
             </div>
           </div>
