@@ -61,6 +61,13 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
     """Serializer for BI-only user management view."""
     department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     other_department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        min_length=8,
+        style={'input_type': 'password'},
+        help_text="Password must be at least 8 characters",
+    )
 
     class Meta:
         model = User
@@ -75,6 +82,7 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
             'last_login',
             'department',
             'other_department',
+            'password',
         )
         read_only_fields = ('id', 'username', 'date_joined', 'last_login')
 
@@ -88,6 +96,8 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         department = attrs.get('department')
         other_department = attrs.get('other_department')
+        email = attrs.get('email')
+        password = attrs.get('password')
 
         if self.instance is not None:
             profile = getattr(self.instance, 'profile', None)
@@ -95,6 +105,34 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
                 department = getattr(profile, 'department', None)
             if other_department is None:
                 other_department = getattr(profile, 'other_department', None)
+        else:
+            if not department:
+                raise serializers.ValidationError({
+                    'department': 'Department is required.'
+                })
+            if not attrs.get('first_name'):
+                raise serializers.ValidationError({
+                    'first_name': 'First name is required.'
+                })
+            if not attrs.get('last_name'):
+                raise serializers.ValidationError({
+                    'last_name': 'Last name is required.'
+                })
+            if not password:
+                raise serializers.ValidationError({
+                    'password': 'Password is required.'
+                })
+
+        if email:
+            normalized_email = email.strip().lower()
+            email_query = Q(email__iexact=normalized_email) | Q(username__iexact=normalized_email)
+            if self.instance is not None:
+                email_query &= ~Q(id=self.instance.id)
+            if User.objects.filter(email_query).exists():
+                raise serializers.ValidationError({
+                    'email': 'A user with this email already exists.'
+                })
+            attrs['email'] = normalized_email
 
         valid_departments = {choice[0] for choice in UserDepartment.choices}
         valid_other_departments = {choice[0] for choice in OtherDepartment.choices}
@@ -120,14 +158,63 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
                 'department': 'Department is required when setting sub-department.'
             })
 
+        if self.instance is None:
+            attrs.setdefault('is_active', True)
+
         return attrs
+
+    def create(self, validated_data):
+        from django.contrib.auth.models import Permission
+
+        department = validated_data.pop('department')
+        other_department = validated_data.pop('other_department', None)
+        password = validated_data.pop('password')
+        email = validated_data.get('email', '').strip().lower()
+        validated_data['email'] = email
+        validated_data['username'] = email
+
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=validated_data['username'],
+                    email=validated_data['email'],
+                    first_name=validated_data.get('first_name', '').strip(),
+                    last_name=validated_data.get('last_name', '').strip(),
+                    password=password,
+                    is_active=validated_data.get('is_active', True),
+                )
+
+                permissions = Permission.objects.filter(
+                    codename__in=[
+                        'view_employee', 'change_employee', 'add_employee',
+                        'view_project', 'change_project', 'add_project',
+                        'view_assignment', 'change_assignment', 'add_assignment',
+                        'view_projectbudget', 'change_projectbudget', 'add_projectbudget',
+                    ]
+                )
+                user.user_permissions.set(permissions)
+
+                UserProfile.objects.create(
+                    user=user,
+                    department=department,
+                    other_department=other_department if department == UserDepartment.OTHER else None
+                )
+        except IntegrityError:
+            raise serializers.ValidationError({
+                'email': 'A user with this email already exists.'
+            })
+
+        return user
 
     def update(self, instance, validated_data):
         department = validated_data.pop('department', None)
         other_department = validated_data.pop('other_department', None)
+        password = validated_data.pop('password', None)
 
         for field, value in validated_data.items():
             setattr(instance, field, value)
+        if password:
+            instance.set_password(password)
         instance.save()
 
         if department is not None or other_department is not None:

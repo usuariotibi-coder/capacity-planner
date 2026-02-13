@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
 import { registeredUsersApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -24,6 +24,28 @@ interface EditState {
   isActive: boolean;
 }
 
+interface CreateState {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  department: UserDepartment | '';
+  otherDepartment: OtherDepartment | '';
+  isActive: boolean;
+}
+
+const INITIAL_CREATE_STATE: CreateState = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  department: '',
+  otherDepartment: '',
+  isActive: true,
+};
+
 export function RegisteredUsersPage() {
   const [users, setUsers] = useState<RegisteredUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +55,9 @@ export function RegisteredUsersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RegisteredUser | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createState, setCreateState] = useState<CreateState>(INITIAL_CREATE_STATE);
+  const [isCreating, setIsCreating] = useState(false);
 
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -111,6 +136,59 @@ export function RegisteredUsersPage() {
     setIsSaving(false);
   };
 
+  const openCreateModal = () => {
+    setError(null);
+    setCreateState(INITIAL_CREATE_STATE);
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    if (isCreating) return;
+    setIsCreateOpen(false);
+    setCreateState(INITIAL_CREATE_STATE);
+  };
+
+  const handleCreate = async () => {
+    if (!createState.firstName.trim() || !createState.lastName.trim() || !createState.email.trim() || !createState.password) {
+      setError(t.completeAllFields);
+      return;
+    }
+    if (!createState.department) {
+      setError(t.selectDepartment);
+      return;
+    }
+    if (createState.department === 'OTHER' && !createState.otherDepartment) {
+      setError(t.selectOtherDepartment);
+      return;
+    }
+    if (createState.password !== createState.confirmPassword) {
+      setError(t.passwordsDoNotMatch);
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+    try {
+      const payload = {
+        first_name: createState.firstName.trim(),
+        last_name: createState.lastName.trim(),
+        email: createState.email.trim().toLowerCase(),
+        password: createState.password,
+        is_active: createState.isActive,
+        department: createState.department,
+        other_department: createState.department === 'OTHER' ? createState.otherDepartment : null,
+      };
+      const created = await registeredUsersApi.create(payload);
+      setUsers((prev) => [created, ...prev]);
+      setIsCreateOpen(false);
+      setCreateState(INITIAL_CREATE_STATE);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (t.registeredUsersSaveError || 'Error creating user'));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editState) return;
     if (!editState.email.trim()) {
@@ -187,18 +265,27 @@ export function RegisteredUsersPage() {
               {t.registeredUsersSubtitle || 'Manage users created from register screen.'}
             </p>
           </div>
-          <button
-            onClick={() => {
-              if (isRefreshing) return;
-              setIsRefreshing(true);
-              loadUsers(false);
-            }}
-            className="brand-btn-primary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-semibold transition"
-            disabled={isRefreshing}
-          >
-            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            {t.refresh || 'Refresh'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openCreateModal}
+              className="brand-btn-primary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-semibold transition"
+            >
+              <Plus size={16} />
+              {language === 'es' ? 'Nuevo usuario' : 'New user'}
+            </button>
+            <button
+              onClick={() => {
+                if (isRefreshing) return;
+                setIsRefreshing(true);
+                loadUsers(false);
+              }}
+              className="brand-btn-primary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white text-sm font-semibold transition"
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              {t.refresh || 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -380,6 +467,157 @@ export function RegisteredUsersPage() {
           </div>
         )}
       </div>
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4">
+          <div
+            className="absolute inset-0"
+            onClick={closeCreateModal}
+          />
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#d5d1da] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e4e1e8] bg-gradient-to-r from-[#f8f7fb] to-white">
+              <h3 className="text-lg font-bold text-[#2e1a47]">
+                {language === 'es' ? 'Registrar nuevo usuario' : 'Register new user'}
+              </h3>
+              <p className="text-sm text-[#6c6480]">
+                {language === 'es'
+                  ? 'Crea y administra usuarios desde esta pantalla.'
+                  : 'Create and manage users from this screen.'}
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.firstName}</label>
+                  <input
+                    value={createState.firstName}
+                    onChange={(e) => setCreateState((prev) => ({ ...prev, firstName: e.target.value }))}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.firstName}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.lastName}</label>
+                  <input
+                    value={createState.lastName}
+                    onChange={(e) => setCreateState((prev) => ({ ...prev, lastName: e.target.value }))}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.lastName}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.email}</label>
+                <input
+                  type="email"
+                  value={createState.email}
+                  onChange={(e) => setCreateState((prev) => ({ ...prev, email: e.target.value }))}
+                  className="brand-input px-3 py-2 text-sm w-full"
+                  placeholder={t.email}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.password}</label>
+                  <input
+                    type="password"
+                    value={createState.password}
+                    onChange={(e) => setCreateState((prev) => ({ ...prev, password: e.target.value }))}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.password}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.confirmPassword}</label>
+                  <input
+                    type="password"
+                    value={createState.confirmPassword}
+                    onChange={(e) => setCreateState((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.confirmPassword}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.department}</label>
+                  <select
+                    value={createState.department}
+                    onChange={(e) =>
+                      setCreateState((prev) => ({
+                        ...prev,
+                        department: e.target.value as UserDepartment,
+                        otherDepartment: e.target.value === 'OTHER' ? prev.otherDepartment : '',
+                      }))
+                    }
+                    className="brand-select px-3 py-2 text-sm w-full"
+                  >
+                    <option value="">{t.selectDepartment}</option>
+                    {USER_DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept === 'OTHER' ? t.departmentOther : dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">
+                    {t.otherDepartmentLabel || 'Sub-department'}
+                  </label>
+                  <select
+                    value={createState.otherDepartment}
+                    onChange={(e) => setCreateState((prev) => ({ ...prev, otherDepartment: e.target.value as OtherDepartment }))}
+                    className="brand-select px-3 py-2 text-sm w-full"
+                    disabled={createState.department !== 'OTHER'}
+                  >
+                    <option value="">{t.selectOtherDepartment}</option>
+                    {OTHER_DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {otherDepartmentLabel(dept)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.status || 'Status'}</label>
+                <select
+                  value={createState.isActive ? 'true' : 'false'}
+                  onChange={(e) => setCreateState((prev) => ({ ...prev, isActive: e.target.value === 'true' }))}
+                  className="brand-select px-3 py-2 text-sm w-full max-w-xs"
+                >
+                  <option value="true">{t.active}</option>
+                  <option value="false">{t.inactive}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-[#e4e1e8] flex items-center justify-end gap-2 bg-white">
+              <button
+                onClick={closeCreateModal}
+                disabled={isCreating}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold disabled:opacity-60"
+              >
+                <X size={14} />
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={isCreating}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-[#4f3a70] hover:bg-[#3f2d5a] text-white text-sm font-semibold disabled:opacity-70"
+              >
+                {isCreating ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
+                {language === 'es' ? 'Registrar usuario' : 'Register user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4">

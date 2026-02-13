@@ -501,6 +501,13 @@ export const registeredUsersApi = {
     return apiFetch(`/api/registered-users/${id}/`);
   },
 
+  create: async (userData: any) => {
+    return apiFetch('/api/registered-users/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(userData)),
+    });
+  },
+
   update: async (id: string, userData: any) => {
     return apiFetch(`/api/registered-users/${id}/`, {
       method: 'PATCH',
