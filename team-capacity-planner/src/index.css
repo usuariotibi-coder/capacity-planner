@@ -606,6 +606,35 @@ input[type="number"] {
   color: #f1e8ff !important;
 }
 
+[data-theme="night"] .activity-log-page [class*="text-[#2e1a47]"] {
+  color: #f6efff !important;
+}
+
+[data-theme="night"] .activity-log-page [class*="text-[#4f3a70]"],
+[data-theme="night"] .activity-log-page [class*="text-[#6c6480]"],
+[data-theme="night"] .activity-log-page [class*="text-[#8a8298]"] {
+  color: #d8ccec !important;
+}
+
+[data-theme="night"] .activity-log-page [class*="text-gray-500"],
+[data-theme="night"] .activity-log-page [class*="text-gray-400"],
+[data-theme="night"] .activity-log-page [class*="text-slate-500"],
+[data-theme="night"] .activity-log-page [class*="text-slate-400"] {
+  color: #cbbfe0 !important;
+}
+
+[data-theme="night"] .activity-log-page [class*="text-gray-600"],
+[data-theme="night"] .activity-log-page [class*="text-slate-600"],
+[data-theme="night"] .activity-log-page [class*="text-gray-700"],
+[data-theme="night"] .activity-log-page [class*="text-slate-700"] {
+  color: #e3daf2 !important;
+}
+
+[data-theme="night"] .activity-log-page input::placeholder {
+  color: #bfaed8 !important;
+  opacity: 1;
+}
+
 /* Registered users page night-mode contrast */
 [data-theme="night"] .registered-users-page .brand-panel {
   background: #251638 !important;
