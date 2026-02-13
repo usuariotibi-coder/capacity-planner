@@ -1,34 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 190" width="620" height="190">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 240" width="760" height="240">
   <defs>
-    <linearGradient id="scioWhite" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#f5f2fa"/>
-      <stop offset="100%" stop-color="#ded7ea"/>
+    <linearGradient id="logoWhite" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f3eff8"/>
+      <stop offset="100%" stop-color="#ddd6ea"/>
     </linearGradient>
   </defs>
 
-  <g fill="url(#scioWhite)">
-    <text
-      x="35"
-      y="105"
-      font-family="'Arial Black', 'Arial', sans-serif"
-      font-size="118"
-      font-weight="900"
-      letter-spacing="2"
-    >
-      SCIO
-    </text>
+  <!-- S -->
+  <g fill="url(#logoWhite)">
+    <rect x="24" y="34" width="152" height="34" rx="8"/>
+    <rect x="24" y="98" width="152" height="34" rx="8"/>
+    <rect x="24" y="162" width="152" height="34" rx="8"/>
+    <rect x="24" y="34" width="34" height="64" rx="8"/>
+    <rect x="142" y="98" width="34" height="64" rx="8"/>
   </g>
 
-  <rect x="314" y="18" width="24" height="24" rx="4" fill="#ce0037"/>
+  <!-- C -->
+  <g fill="url(#logoWhite)">
+    <rect x="198" y="34" width="152" height="34" rx="8"/>
+    <rect x="198" y="34" width="34" height="162" rx="8"/>
+    <rect x="198" y="162" width="152" height="34" rx="8"/>
+  </g>
 
+  <!-- I -->
+  <rect x="372" y="34" width="34" height="162" rx="8" fill="url(#logoWhite)"/>
+
+  <!-- O -->
+  <rect x="432" y="34" width="152" height="162" rx="14" fill="none" stroke="url(#logoWhite)" stroke-width="34"/>
+
+  <!-- Red accent -->
+  <rect x="404" y="22" width="24" height="24" rx="4" fill="#ce0037"/>
+
+  <!-- AUTOMATION -->
   <text
-    x="318"
-    y="150"
+    x="466"
+    y="224"
     text-anchor="middle"
     font-family="'Arial Narrow', 'Arial', sans-serif"
-    font-size="52"
+    font-size="58"
     font-style="italic"
-    letter-spacing="1.5"
+    letter-spacing="1.8"
     fill="#ce0037"
   >
     AUTOMATION

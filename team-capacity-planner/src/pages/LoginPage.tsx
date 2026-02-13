@@ -120,7 +120,7 @@ const LoginPage: React.FC = () => {
             <img
               src="/scio-wordmark.svg"
               alt="SCIO Automation"
-              className="h-auto w-[260px] max-w-full drop-shadow-[0_10px_24px_rgba(8,4,14,0.55)] md:w-[300px]"
+              className="h-auto w-[300px] max-w-full drop-shadow-[0_10px_24px_rgba(8,4,14,0.55)] md:w-[340px]"
             />
           </div>
 
@@ -128,9 +128,6 @@ const LoginPage: React.FC = () => {
           <div className="brand-auth-card p-6 md:p-8 rounded-2xl">
           {/* Header */}
           <div className="text-center mb-8">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7b9df]">
-              SCIO Automation
-            </p>
             <h1 className="brand-auth-title text-4xl mb-1">
               {t.teamCapacity}
             </h1>
