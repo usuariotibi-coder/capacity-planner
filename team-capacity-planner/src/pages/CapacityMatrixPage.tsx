@@ -3406,6 +3406,32 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}
                     >
                     <div className="inline-block min-w-full">
+                      {/* Month headers row */}
+                      <div className="flex gap-0 mb-0.5">
+                        {/* Empty cell for label column */}
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0`}></div>
+
+                        {monthSpans.map((monthInfo, idx) => {
+                          const span = monthInfo.endIdx - monthInfo.startIdx + 1;
+                          return (
+                            <div
+                              key={`dept-month-${monthInfo.month}-${monthInfo.startIdx}`}
+                              className={`flex-shrink-0 text-center text-[8px] font-bold px-1 py-0.5 rounded-md border ${
+                                idx % 2 === 0
+                                  ? MONTH_HEADER_PRIMARY_CLASS
+                                  : MONTH_HEADER_SECONDARY_CLASS
+                              }`}
+                              style={{
+                                width: `${span * 5}rem`,
+                                minWidth: `${span * 5}rem`,
+                              }}
+                            >
+                              {monthInfo.month}
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       {/* Week headers row */}
                       <div className="flex gap-0 mb-0.5">
                         {/* Empty cell for label column */}
@@ -4341,6 +4367,32 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}
               >
                 <div className="inline-block min-w-full" style={{ zoom: `${generalCapacityZoom / 100}` }}>
+                  {/* Month headers row */}
+                  <div className="flex gap-0 mb-0">
+                    {/* Empty cell for department names column */}
+                    <div className={`${GENERAL_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0`}></div>
+
+                    {monthSpans.map((monthInfo, idx) => {
+                      const span = monthInfo.endIdx - monthInfo.startIdx + 1;
+                      return (
+                        <div
+                          key={`general-month-${monthInfo.month}-${monthInfo.startIdx}`}
+                          className={`flex-shrink-0 text-center text-[8px] font-bold p-0.5 rounded border ${
+                            idx % 2 === 0
+                              ? MONTH_HEADER_PRIMARY_CLASS
+                              : MONTH_HEADER_SECONDARY_CLASS
+                          }`}
+                          style={{
+                            width: `${span * 5}rem`,
+                            minWidth: `${span * 5}rem`,
+                          }}
+                        >
+                          {monthInfo.month}
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {/* Week headers row */}
                   <div className="flex gap-0 mb-0">
                     {/* Empty cell for department names column */}
