@@ -119,6 +119,26 @@ const LoginPage: React.FC = () => {
         <div className="brand-auth-card relative z-10 p-6 md:p-8 rounded-2xl w-full max-w-md animate-fade-in">
           {/* Header */}
           <div className="text-center mb-8">
+            <div className="mx-auto mb-4 flex w-full max-w-[320px] items-center gap-3 rounded-xl border border-[#d5d1da]/35 bg-[#2a193f]/75 px-3 py-2 shadow-[0_10px_24px_rgba(16,8,28,0.35)] backdrop-blur-sm">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-white/20 bg-[#1f1132]/70 p-1">
+                <img
+                  src="/scio-favicon.svg"
+                  alt="SCIO Automation logo"
+                  className="h-full w-full rounded-md object-contain"
+                />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#c7b9df]">
+                  SCIO Automation
+                </p>
+                <p className="truncate text-lg font-bold leading-tight text-white">
+                  {t.teamCapacity}
+                </p>
+                <p className="text-[11px] font-medium text-[#d5d1da]">
+                  {t.teamCapacityPlanner}
+                </p>
+              </div>
+            </div>
             <h1 className="brand-auth-title text-4xl mb-2">
               {t.loginTitle}
             </h1>
