@@ -4933,83 +4933,83 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       {/* Visual Guide - Expandable in place */}
       {showLegend && (
-        <div className="capacity-visual-guide mx-2 my-1 overflow-hidden rounded-lg border border-[#d9d4e2] bg-gradient-to-b from-white to-[#f6f3fb] shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#e8e4ef] px-2 py-1.5">
-            <h3 className="text-[10px] font-bold uppercase tracking-wide text-[#2e1a47]">{t.legend}</h3>
-            <span className="text-[9px] font-medium text-[#6d6082]">
+        <div className="capacity-visual-guide mx-1 my-0.5 overflow-hidden rounded-md border border-[#d9d4e2] bg-gradient-to-b from-white to-[#f6f3fb] shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#e8e4ef] px-1.5 py-1">
+            <h3 className="text-[9px] font-bold uppercase tracking-wide text-[#2e1a47]">{t.legend}</h3>
+            <span className="text-[8px] font-medium text-[#6d6082]">
               {departmentFilter === 'General' ? t.globalPanelTitle : t.projectsMatrix}
             </span>
           </div>
 
-          <div className="space-y-2 p-2">
+          <div className="space-y-1.5 p-1.5">
             {departmentFilter === 'General' && (
               <div>
-                <p className="mb-1 text-[10px] font-semibold text-[#2e1a47]">
+                <p className="mb-0.5 text-[9px] font-semibold text-[#2e1a47]">
                   {language === 'es' ? 'Uso de capacidad' : 'Capacity usage'}
                 </p>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
-                  <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                    <div className="h-3.5 w-3.5 rounded border border-green-300 bg-green-100" />
-                    <span className="text-[10px] font-medium text-[#3f3354]">{t.percentLow}</span>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                    <div className="h-3 w-3 rounded border border-green-300 bg-green-100" />
+                    <span className="text-[9px] font-medium text-[#3f3354]">{t.percentLow}</span>
                   </div>
-                  <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                    <div className="h-3.5 w-3.5 rounded border border-yellow-300 bg-yellow-100" />
-                    <span className="text-[10px] font-medium text-[#3f3354]">{t.percentModerate}</span>
+                  <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                    <div className="h-3 w-3 rounded border border-yellow-300 bg-yellow-100" />
+                    <span className="text-[9px] font-medium text-[#3f3354]">{t.percentModerate}</span>
                   </div>
-                  <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                    <div className="h-3.5 w-3.5 rounded border border-red-600 bg-red-500" />
-                    <span className="text-[10px] font-medium text-[#3f3354]">{t.percentHigh}</span>
+                  <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                    <div className="h-3 w-3 rounded border border-red-600 bg-red-500" />
+                    <span className="text-[9px] font-medium text-[#3f3354]">{t.percentHigh}</span>
                   </div>
-                  <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                    <div className="h-3.5 w-3.5 rounded border border-red-800 bg-red-700 shadow-inner" />
-                    <span className="text-[10px] font-medium text-[#3f3354]">{t.percentCritical}</span>
+                  <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                    <div className="h-3 w-3 rounded border border-red-800 bg-red-700 shadow-inner" />
+                    <span className="text-[9px] font-medium text-[#3f3354]">{t.percentCritical}</span>
                   </div>
-                  <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                    <div className="h-3.5 w-3.5 rounded border border-gray-300 bg-gray-100" />
-                    <span className="text-[10px] font-medium text-[#3f3354]">{t.noDataLegend}</span>
+                  <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                    <div className="h-3 w-3 rounded border border-gray-300 bg-gray-100" />
+                    <span className="text-[9px] font-medium text-[#3f3354]">{t.noDataLegend}</span>
                   </div>
                 </div>
               </div>
             )}
 
             <div>
-              <p className="mb-1 text-[10px] font-semibold text-[#2e1a47]">
+              <p className="mb-0.5 text-[9px] font-semibold text-[#2e1a47]">
                 {language === 'es' ? 'Como leer las celdas' : 'How to read cells'}
               </p>
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
-                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="flex h-4 w-4 items-center justify-center rounded border border-blue-300 bg-blue-100 text-[9px] font-bold text-blue-700">h</div>
-                  <span className="text-[10px] font-medium text-[#3f3354]">{t.hoursLegend}</span>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                  <div className="flex h-3.5 w-3.5 items-center justify-center rounded border border-blue-300 bg-blue-100 text-[8px] font-bold text-blue-700">h</div>
+                  <span className="text-[9px] font-medium text-[#3f3354]">{t.hoursLegend}</span>
                 </div>
-                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="flex h-4 w-4 items-center justify-center rounded border border-gray-300 bg-white text-[9px] font-bold text-gray-400">-</div>
-                  <span className="text-[10px] font-medium text-[#3f3354]">{t.noAssignmentsLegend}</span>
+                <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                  <div className="flex h-3.5 w-3.5 items-center justify-center rounded border border-gray-300 bg-white text-[8px] font-bold text-gray-400">-</div>
+                  <span className="text-[9px] font-medium text-[#3f3354]">{t.noAssignmentsLegend}</span>
                 </div>
-                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-emerald-300 bg-emerald-50" />
-                  <span className="text-[10px] font-medium text-[#3f3354]">{t.withinRangeLegend}</span>
+                <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                  <div className="h-3.5 w-3.5 rounded border border-emerald-300 bg-emerald-50" />
+                  <span className="text-[9px] font-medium text-[#3f3354]">{t.withinRangeLegend}</span>
                 </div>
-                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="flex h-4 w-4 items-center justify-center rounded border border-stone-500 bg-stone-300 text-[9px] font-bold text-stone-900">S</div>
-                  <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
+                <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                  <div className="flex h-3.5 w-3.5 items-center justify-center rounded border border-stone-500 bg-stone-300 text-[8px] font-bold text-stone-900">S</div>
+                  <span className="text-[9px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
-                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-red-500 bg-white" />
-                  <span className="text-[10px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
+                <div className="capacity-visual-guide-card flex items-center gap-1 rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                  <div className="h-3.5 w-3.5 rounded border border-dashed border-red-500 bg-white" />
+                  <span className="text-[9px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
               </div>
             </div>
 
             <div>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="text-[10px] font-semibold text-[#2e1a47]">
+              <div className="mb-0.5 flex items-center justify-between gap-2">
+                <p className="text-[9px] font-semibold text-[#2e1a47]">
                   {language === 'es' ? 'Color por departamento y actividad' : 'Color by department and activity'}
                 </p>
-                <span className="text-[9px] text-[#6d6082]">
+                <span className="text-[8px] text-[#6d6082]">
                   {language === 'es' ? 'Cada celda sigue esta combinacion' : 'Each cell follows this combination'}
                 </span>
               </div>
-              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                 {DEPARTMENTS.map((dept) => {
                   const deptInfo = getDepartmentIcon(dept);
                   const deptLabel = getDepartmentLabel(dept, t as Record<string, string>);
@@ -5017,32 +5017,32 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   const deptStages = STAGE_OPTIONS[dept];
 
                   return (
-                    <div key={`legend-dept-${dept}`} className="capacity-visual-guide-card rounded-lg border border-[#e4dfec] bg-white px-1.5 py-1">
-                      <div className="mb-1 flex items-center justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex h-4 w-4 items-center justify-center rounded border ${deptStyle.badge}`}>
+                    <div key={`legend-dept-${dept}`} className="capacity-visual-guide-card rounded-md border border-[#e4dfec] bg-white px-1 py-0.5">
+                      <div className="mb-0.5 flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${deptStyle.badge}`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${deptStyle.dot}`} />
                           </span>
-                          <span className="text-[10px] font-semibold text-[#2e1a47]">{deptLabel}</span>
-                          <span className="text-[9px] font-semibold text-[#6d6082]">({dept})</span>
+                          <span className="text-[9px] font-semibold text-[#2e1a47]">{deptLabel}</span>
+                          <span className="text-[8px] font-semibold text-[#6d6082]">({dept})</span>
                         </div>
-                        <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+                        <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
                       </div>
 
                       {deptStages.length > 0 ? (
-                        <div className="space-y-0.5">
+                        <div className="grid grid-cols-2 gap-x-1 gap-y-0.5">
                           {deptStages.map((stage) => {
                             const stageColor = getStageColor(stage);
                             return (
-                              <div key={`legend-stage-${dept}-${stage}`} className="flex items-center gap-1.5 text-[9px] text-[#4b3d61]">
-                                <span className={`h-3 w-3 rounded border border-[#d9d4e2] ${stageColor.bg}`} />
+                              <div key={`legend-stage-${dept}-${stage}`} className="flex items-center gap-1 text-[8px] text-[#4b3d61]">
+                                <span className={`h-2.5 w-2.5 rounded border border-[#d9d4e2] ${stageColor.bg}`} />
                                 <span className="truncate">{getStageLabel(stage, t as Record<string, string>)}</span>
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <p className="text-[9px] text-[#6d6082]">
+                        <p className="text-[8px] text-[#6d6082]">
                           {language === 'es'
                             ? 'Sin actividades por etapa para este departamento.'
                             : 'No stage activities for this department.'}
@@ -5054,7 +5054,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
 
-            <div className="capacity-visual-guide-footnote rounded-lg border border-[#ddd5ea] bg-white/80 px-2 py-1 text-[10px] text-[#4b3d61]">
+            <div className="capacity-visual-guide-footnote rounded-md border border-[#ddd5ea] bg-white/80 px-1.5 py-0.5 text-[9px] text-[#4b3d61]">
               {departmentFilter === 'General' ? t.readOnlyView : t.backgroundColors}
             </div>
           </div>
