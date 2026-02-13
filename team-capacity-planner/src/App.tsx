@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Building2, Moon, Sun } from 'lucide-react';
+import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -156,26 +156,8 @@ function MainApp() {
     return currentUserOtherDepartment;
   })();
 
-  const departmentChipTone = (() => {
-    switch (currentUserDepartment) {
-      case 'PM':
-        return 'user-session-dept--pm';
-      case 'MED':
-        return 'user-session-dept--med';
-      case 'HD':
-        return 'user-session-dept--hd';
-      case 'MFG':
-        return 'user-session-dept--mfg';
-      case 'BUILD':
-        return 'user-session-dept--build';
-      case 'PRG':
-        return 'user-session-dept--prg';
-      case 'OTHER':
-        return 'user-session-dept--other';
-      default:
-        return 'user-session-dept--default';
-    }
-  })();
+  const userRoleLabel =
+    departmentDisplayLabel || (language === 'es' ? 'Administrador' : 'Administrator');
 
   const mobileDepartmentCode = (() => {
     if (!currentUserDepartment) return '';
@@ -325,33 +307,21 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="user-session-card hidden sm:flex items-center gap-2 px-2 py-1.5">
-                <div className="user-session-avatar relative h-8 w-8 shrink-0 rounded-full flex items-center justify-center">
-                  <span className="user-session-initial text-[10px] font-bold">
+              <div className="user-profile-pill hidden sm:flex items-center gap-2.5 pl-3 pr-2 py-1.5">
+                <div className="min-w-0">
+                  <p className="user-profile-name truncate text-[11px] font-semibold leading-none">
+                    {currentUser}
+                  </p>
+                  <p className="user-profile-role mt-0.5 truncate text-[10px] leading-none">
+                    {userRoleLabel}
+                  </p>
+                </div>
+                <div className="user-profile-avatar h-9 w-9 shrink-0 rounded-full flex items-center justify-center">
+                  <span className="user-profile-avatar-text text-[12px] font-bold">
                     {currentUser.charAt(0).toUpperCase()}
+                    {currentUser.split(' ').length > 1 ? currentUser.split(' ')[1].charAt(0).toUpperCase() : ''}
                   </span>
-                  <span className="user-session-dot absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full"></span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="user-session-name truncate text-[11px] font-semibold leading-none">
-                      {currentUser}
-                    </span>
-                    <span className="user-session-status inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-[2px] text-[8px] font-semibold">
-                      <span className="user-session-status-dot h-1.5 w-1.5 rounded-full"></span>
-                      {t.loggedIn || 'Logged in'}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex min-w-0 items-center gap-1">
-                    {departmentDisplayLabel && (
-                      <span className={`user-session-dept inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-[2px] text-[9px] font-semibold ${departmentChipTone}`}>
-                        <Building2 size={8} />
-                        <span className="truncate max-w-[122px]">{departmentDisplayLabel}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="user-session-accent h-7 w-[3px] shrink-0 rounded-full"></div>
               </div>
             )}
 
