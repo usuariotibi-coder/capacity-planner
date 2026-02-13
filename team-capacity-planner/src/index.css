@@ -133,15 +133,13 @@ input[type="number"] {
 }
 
 .user-profile-pill {
-  min-width: 206px;
-  max-width: 290px;
-  border: 1px solid #ddd5e8;
+  min-width: 185px;
+  max-width: 250px;
+  border: 1px solid #ddd6e7;
   border-top: 3px solid #ce0037;
-  border-radius: 0 0 14px 14px;
+  border-radius: 0 0 10px 10px;
   background: #ffffff;
-  box-shadow:
-    0 8px 18px rgba(46, 26, 71, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  box-shadow: none;
 }
 
 .user-profile-info {
@@ -150,30 +148,26 @@ input[type="number"] {
 }
 
 .user-profile-name {
-  color: #221637;
-  letter-spacing: 0.015em;
+  color: #1f162e;
+  letter-spacing: 0.01em;
   font-weight: 700;
 }
 
 .user-profile-role {
-  color: #8d809f;
+  color: #9094a1;
   font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-.user-profile-divider {
-  background: linear-gradient(180deg, rgba(176, 162, 199, 0.2) 0%, rgba(176, 162, 199, 0.9) 50%, rgba(176, 162, 199, 0.2) 100%);
+  letter-spacing: 0;
 }
 
 .user-profile-avatar {
-  background: linear-gradient(145deg, #2f1b48 0%, #4d366f 100%);
-  border: 1px solid rgba(46, 26, 71, 0.32);
-  box-shadow: 0 3px 10px rgba(46, 26, 71, 0.25);
+  background: #2e1a47;
+  border: 1px solid rgba(46, 26, 71, 0.35);
+  box-shadow: none;
 }
 
 .user-profile-avatar-text {
   color: #ffffff;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .user-session-card {
@@ -608,10 +602,8 @@ input[type="number"] {
 [data-theme="night"] .user-profile-pill {
   border-color: #70588b;
   border-top-color: #ff557d;
-  background: linear-gradient(145deg, #2b1b3f 0%, #332149 100%);
-  box-shadow:
-    0 10px 22px rgba(8, 4, 14, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: #2b1b3f;
+  box-shadow: none;
 }
 
 [data-theme="night"] .user-profile-name {
@@ -619,17 +611,13 @@ input[type="number"] {
 }
 
 [data-theme="night"] .user-profile-role {
-  color: #c6b9d9;
-}
-
-[data-theme="night"] .user-profile-divider {
-  background: linear-gradient(180deg, rgba(170, 144, 204, 0.15) 0%, rgba(170, 144, 204, 0.75) 50%, rgba(170, 144, 204, 0.15) 100%);
+  color: #beb3ce;
 }
 
 [data-theme="night"] .user-profile-avatar {
-  background: linear-gradient(145deg, #5f4683 0%, #7b61a0 100%);
+  background: #5f4683;
   border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: 0 3px 10px rgba(8, 4, 14, 0.44);
+  box-shadow: none;
 }
 
 [data-theme="night"] .user-session-card {
