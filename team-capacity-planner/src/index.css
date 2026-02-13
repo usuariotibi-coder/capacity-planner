@@ -133,33 +133,47 @@ input[type="number"] {
 }
 
 .user-profile-pill {
-  min-width: 190px;
-  max-width: 250px;
-  border: 1px solid #d8d2e2;
+  min-width: 206px;
+  max-width: 290px;
+  border: 1px solid #ddd5e8;
   border-top: 3px solid #ce0037;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 14px 14px;
   background: #ffffff;
-  box-shadow: 0 6px 16px rgba(46, 26, 71, 0.14);
+  box-shadow:
+    0 8px 18px rgba(46, 26, 71, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.user-profile-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .user-profile-name {
-  color: #23163a;
-  letter-spacing: 0.01em;
+  color: #221637;
+  letter-spacing: 0.015em;
+  font-weight: 700;
 }
 
 .user-profile-role {
-  color: #8c809f;
+  color: #8d809f;
   font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.user-profile-divider {
+  background: linear-gradient(180deg, rgba(176, 162, 199, 0.2) 0%, rgba(176, 162, 199, 0.9) 50%, rgba(176, 162, 199, 0.2) 100%);
 }
 
 .user-profile-avatar {
-  background: linear-gradient(145deg, #2e1a47 0%, #4f3770 100%);
-  border: 1px solid rgba(46, 26, 71, 0.2);
+  background: linear-gradient(145deg, #2f1b48 0%, #4d366f 100%);
+  border: 1px solid rgba(46, 26, 71, 0.32);
+  box-shadow: 0 3px 10px rgba(46, 26, 71, 0.25);
 }
 
 .user-profile-avatar-text {
   color: #ffffff;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .user-session-card {
@@ -592,10 +606,12 @@ input[type="number"] {
 }
 
 [data-theme="night"] .user-profile-pill {
-  border-color: #6a567f;
-  border-top-color: #ff4f79;
-  background: #2f1f43;
-  box-shadow: 0 10px 20px rgba(8, 4, 14, 0.45);
+  border-color: #70588b;
+  border-top-color: #ff557d;
+  background: linear-gradient(145deg, #2b1b3f 0%, #332149 100%);
+  box-shadow:
+    0 10px 22px rgba(8, 4, 14, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="night"] .user-profile-name {
@@ -606,9 +622,14 @@ input[type="number"] {
   color: #c6b9d9;
 }
 
+[data-theme="night"] .user-profile-divider {
+  background: linear-gradient(180deg, rgba(170, 144, 204, 0.15) 0%, rgba(170, 144, 204, 0.75) 50%, rgba(170, 144, 204, 0.15) 100%);
+}
+
 [data-theme="night"] .user-profile-avatar {
-  background: linear-gradient(145deg, #5d457f 0%, #7f68a1 100%);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(145deg, #5f4683 0%, #7b61a0 100%);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 3px 10px rgba(8, 4, 14, 0.44);
 }
 
 [data-theme="night"] .user-session-card {

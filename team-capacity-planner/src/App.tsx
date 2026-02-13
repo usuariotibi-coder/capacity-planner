@@ -307,8 +307,11 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div className="user-profile-pill hidden sm:flex items-center gap-2.5 pl-3 pr-2 py-1.5">
-                <div className="min-w-0">
+              <div
+                className="user-profile-pill hidden sm:flex items-center gap-2 pl-3 pr-2 py-1.5"
+                title={userRoleLabel ? `${currentUser} - ${userRoleLabel}` : currentUser}
+              >
+                <div className="user-profile-info min-w-0">
                   <p className="user-profile-name truncate text-[11px] font-semibold leading-none">
                     {currentUser}
                   </p>
@@ -316,6 +319,7 @@ function MainApp() {
                     {userRoleLabel}
                   </p>
                 </div>
+                <div className="user-profile-divider h-7 w-px shrink-0"></div>
                 <div className="user-profile-avatar h-9 w-9 shrink-0 rounded-full flex items-center justify-center">
                   <span className="user-profile-avatar-text text-[12px] font-bold">
                     {currentUser.charAt(0).toUpperCase()}
