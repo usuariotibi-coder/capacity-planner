@@ -17,6 +17,7 @@ import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrd
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 
 type DepartmentFilter = 'General' | Department;
+type LegendStage = Exclude<Stage, null>;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
@@ -37,6 +38,26 @@ const DEPARTMENT_LEGEND_STYLES: Record<Department, { badge: string; dot: string 
   MFG: { badge: 'border-orange-200 bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
   BUILD: { badge: 'border-red-200 bg-red-50 text-red-700', dot: 'bg-red-500' },
   PRG: { badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+};
+
+const LEGEND_STAGE_SWATCH_BG: Record<LegendStage, string> = {
+  SWITCH_LAYOUT_REVISION: 'bg-violet-400',
+  CONTROLS_DESIGN: 'bg-indigo-500',
+  CONCEPT: 'bg-sky-400',
+  DETAIL_DESIGN: 'bg-cyan-400',
+  CABINETS_FRAMES: 'bg-blue-500',
+  OVERALL_ASSEMBLY: 'bg-purple-500',
+  FINE_TUNING: 'bg-pink-400',
+  OFFLINE: 'bg-lime-400',
+  ONLINE: 'bg-green-500',
+  DEBUG: 'bg-amber-400',
+  COMMISSIONING: 'bg-orange-500',
+  RELEASE: 'bg-emerald-400',
+  RED_LINES: 'bg-red-400',
+  SUPPORT: 'bg-slate-400',
+  SUPPORT_MANUALS_FLOW_CHARTS: 'bg-stone-400',
+  ROBOT_SIMULATION: 'bg-zinc-400',
+  STANDARDS_REV_PROGRAMING_CONCEPT: 'bg-rose-400',
 };
 
 interface CellEditState {
@@ -5044,16 +5065,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <div className="grid grid-cols-2 gap-x-1.5 gap-y-0.5">
                           {deptStages.map((stage) => {
                             const stageColor = getStageColor(stage);
+                            const swatchBg = LEGEND_STAGE_SWATCH_BG[stage] || stageColor.bg;
                             return (
                               <div
                                 key={`legend-stage-${dept}-${stage}`}
                                 className="flex items-center gap-1.5 rounded px-1 py-0.5 text-[9px] font-medium text-[#4b3d61]"
                               >
                                 <span
-                                  className={`h-3.5 w-3.5 shrink-0 rounded-[4px] border border-[#b8adca] ${stageColor.bg}`}
+                                  className={`h-3.5 w-3.5 shrink-0 rounded-[4px] border border-[#8d80a7] ${swatchBg}`}
                                   style={{
-                                    filter: 'saturate(1.45) contrast(1.15)',
-                                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), 0 1px 2px rgba(34,17,57,0.25)',
+                                    filter: 'saturate(1.8) contrast(1.25)',
+                                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25), 0 1px 3px rgba(34,17,57,0.28)',
                                   }}
                                 />
                                 <span className="truncate">{getStageLabel(stage, t as Record<string, string>)}</span>
