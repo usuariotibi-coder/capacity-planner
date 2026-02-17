@@ -83,7 +83,8 @@
       "Bash(sqlite3:*)",
       "Bash(git revert:*)",
       "Bash(npx tsc:*)",
-      "Bash(powershell -Command \"Get-ChildItem -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name=''TotalSize'';Expression={[math]::Round\\($_Sum/1MB,2\\)}}\")"
+      "Bash(powershell -Command \"Get-ChildItem -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name=''TotalSize'';Expression={[math]::Round\\($_Sum/1MB,2\\)}}\")",
+      "Bash(conectados\"\\) instead of generic \"Credenciales inválidas\"\n- Logout now calls /api/logout/ to deactivate session on backend, preventing\n  session accumulation when users log out\n- AuthContext updated to handle async logout properly\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
