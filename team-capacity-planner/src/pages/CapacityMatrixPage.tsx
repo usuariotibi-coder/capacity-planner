@@ -294,6 +294,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [formValidationPopup, setFormValidationPopup] = useState<{
     scope: FormValidationScope;
     title: string;
@@ -2057,6 +2058,292 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     departmentFilter !== 'PM' &&
     canEditDepartment(departmentFilter as Department);
 
+  const getDepartmentTotalCapacityForWeek = (department: Department, weekDate: string): number => {
+    const baseCapacity = scioTeamMembers[department]?.[weekDate] || 0;
+
+    if (department === 'BUILD') {
+      const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
+      const activeTeamSet = new Set(activeTeams);
+      const activeTeamCapacity = activeTeams.reduce((sum, company) => {
+        return sum + (subcontractedPersonnel[company]?.[weekDate] || 0);
+      }, 0);
+      const predefinedInactiveCapacity = predefinedTeams.reduce((sum, company) => {
+        if (activeTeamSet.has(company)) return sum;
+        return sum + (subcontractedPersonnel[company]?.[weekDate] || 0);
+      }, 0);
+
+      return baseCapacity + activeTeamCapacity + predefinedInactiveCapacity;
+    }
+
+    if (department === 'PRG') {
+      const externalTeamCapacity = prgActiveTeams.reduce((sum, team) => {
+        return sum + (prgExternalPersonnel[team]?.[weekDate] || 0);
+      }, 0);
+      return baseCapacity + externalTeamCapacity;
+    }
+
+    return baseCapacity;
+  };
+
+  const handleExportTimelineExcel = async () => {
+    if (isExportingExcel) return;
+
+    const hasProjects = projectsVisibleInCurrentView.length > 0;
+    if (!hasProjects) {
+      alert(language === 'es'
+        ? 'No hay proyectos visibles para exportar en Excel.'
+        : 'There are no visible projects to export to Excel.');
+      return;
+    }
+
+    try {
+      setIsExportingExcel(true);
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.utils.book_new();
+
+      const roundValue = (value: number): number => {
+        if (!Number.isFinite(value)) return 0;
+        return Math.round(value * 1000) / 1000;
+      };
+
+      const weekColumns = allWeeksData.map((week) => `CW${week.weekNum} (${week.date})`);
+      const generatedAt = new Date().toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
+      const viewLabel = departmentFilter === 'General'
+        ? (language === 'es' ? 'General' : 'General')
+        : `${language === 'es' ? 'Departamento' : 'Department'} ${departmentFilter}`;
+
+      const capacityRows: Array<Array<string | number>> = [
+        [language === 'es' ? 'Capacity - Resumen semanal' : 'Capacity - Weekly summary'],
+        [language === 'es' ? 'Vista' : 'View', viewLabel, language === 'es' ? 'Generado' : 'Generated', generatedAt],
+        [],
+        [language === 'es' ? 'Departamento' : 'Department', language === 'es' ? 'Metrica' : 'Metric', ...weekColumns],
+      ];
+
+      DEPARTMENTS.forEach((dept) => {
+        const availableRow: Array<string | number> = [dept, language === 'es' ? 'Disponible' : 'Available'];
+        const occupiedRow: Array<string | number> = [dept, language === 'es' ? 'Ocupado' : 'Occupied'];
+        const capacityRow: Array<string | number> = [dept, language === 'es' ? 'Capacidad total' : 'Total capacity'];
+        const utilizationRow: Array<string | number> = [dept, language === 'es' ? 'Utilizacion %' : 'Utilization %'];
+
+        allWeeksData.forEach((weekData) => {
+          const deptWeekKey = `${dept}|${weekData.date}`;
+          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
+          const isMfg = dept === 'MFG';
+          const occupiedValue = isMfg ? totalWeekHours : totalWeekHours / 45;
+          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
+          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
+          const utilizationPercent = totalCapacity > 0
+            ? (occupiedValue / totalCapacity) * 100
+            : (occupiedValue > 0 ? 100 : 0);
+
+          availableRow.push(roundValue(availableValue));
+          occupiedRow.push(roundValue(occupiedValue));
+          capacityRow.push(roundValue(totalCapacity));
+          utilizationRow.push(roundValue(utilizationPercent));
+        });
+
+        capacityRows.push(availableRow, occupiedRow, capacityRow, utilizationRow, []);
+      });
+
+      const capacitySheet = XLSX.utils.aoa_to_sheet(capacityRows);
+      capacitySheet['!cols'] = [
+        { wch: 16 },
+        { wch: 20 },
+        ...allWeeksData.map(() => ({ wch: 13 })),
+      ];
+      XLSX.utils.book_append_sheet(workbook, capacitySheet, 'Capacity_Weekly');
+
+      const projectSummaryRows: Array<Array<string | number>> = [
+        [
+          language === 'es' ? 'Proyecto ID' : 'Project ID',
+          language === 'es' ? 'Proyecto' : 'Project',
+          language === 'es' ? 'Cliente' : 'Client',
+          language === 'es' ? 'Departamento' : 'Department',
+          language === 'es' ? 'PM' : 'PM',
+          language === 'es' ? 'Inicio' : 'Start',
+          language === 'es' ? 'Fin' : 'End',
+          language === 'es' ? 'Semanas' : 'Weeks',
+          language === 'es' ? 'Cotizado base (h)' : 'Base quoted (h)',
+          language === 'es' ? 'Change Orders (h)' : 'Change orders (h)',
+          language === 'es' ? 'Cotizado total (h)' : 'Total quoted (h)',
+          language === 'es' ? 'Usado (h)' : 'Used (h)',
+          language === 'es' ? 'Pronosticado (h)' : 'Forecasted (h)',
+          language === 'es' ? 'Planeado total (h)' : 'Total planned (h)',
+          language === 'es' ? 'Utilizacion %' : 'Utilization %',
+        ],
+      ];
+
+      projectsVisibleInCurrentView.forEach((proj) => {
+        const weeks = projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks ?? 0;
+        const pmName = projectManagerNameById.get(proj.id) || '';
+
+        DEPARTMENTS.forEach((dept) => {
+          const quotedBase = getQuotedHours(dept, proj.id);
+          const quotedCO = getQuotedChangeOrders(dept, proj.id);
+          const quotedTotal = quotedBase + quotedCO;
+          const used = getUtilizedHours(dept, proj.id);
+          const forecasted = getForecastedHours(dept, proj.id);
+          const totalPlanned = used + forecasted;
+          const utilization = getUtilizationPercent(dept, proj.id);
+
+          projectSummaryRows.push([
+            proj.id,
+            proj.name,
+            proj.client || '',
+            dept,
+            pmName,
+            proj.startDate || '',
+            proj.endDate || '',
+            weeks,
+            roundValue(quotedBase),
+            roundValue(quotedCO),
+            roundValue(quotedTotal),
+            roundValue(used),
+            roundValue(forecasted),
+            roundValue(totalPlanned),
+            roundValue(utilization),
+          ]);
+        });
+      });
+
+      const projectSummarySheet = XLSX.utils.aoa_to_sheet(projectSummaryRows);
+      projectSummarySheet['!cols'] = [
+        { wch: 12 }, { wch: 34 }, { wch: 26 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 8 },
+        { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 12 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, projectSummarySheet, 'Projects_Summary');
+
+      const projectMatrixRows: Array<Array<string | number>> = [
+        [
+          language === 'es' ? 'Proyecto ID' : 'Project ID',
+          language === 'es' ? 'Proyecto' : 'Project',
+          language === 'es' ? 'Departamento' : 'Department',
+          language === 'es' ? 'Tipo de fila' : 'Row type',
+          ...weekColumns,
+        ],
+      ];
+
+      projectsVisibleInCurrentView.forEach((proj) => {
+        const projectWeekRow: Array<string | number> = [
+          proj.id,
+          proj.name,
+          language === 'es' ? 'SEMANA_PROYECTO' : 'PROJECT_WEEK',
+          language === 'es' ? 'Numero de semana' : 'Week number',
+        ];
+
+        allWeeksData.forEach((weekData) => {
+          projectWeekRow.push(getProjectWeekNumber(proj, weekData.date) ?? '');
+        });
+        projectMatrixRows.push(projectWeekRow);
+
+        DEPARTMENTS.forEach((dept) => {
+          const hoursRow: Array<string | number> = [proj.id, proj.name, dept, language === 'es' ? 'Horas' : 'Hours'];
+
+          allWeeksData.forEach((weekData) => {
+            const cellKey = `${proj.id}|${dept}|${weekData.date}`;
+            const totalHours = assignmentIndex.byCell.get(cellKey)?.totalHours ?? 0;
+            hoursRow.push(roundValue(totalHours));
+          });
+
+          projectMatrixRows.push(hoursRow);
+        });
+
+        projectMatrixRows.push([]);
+      });
+
+      const projectMatrixSheet = XLSX.utils.aoa_to_sheet(projectMatrixRows);
+      projectMatrixSheet['!cols'] = [
+        { wch: 12 },
+        { wch: 34 },
+        { wch: 14 },
+        { wch: 14 },
+        ...allWeeksData.map(() => ({ wch: 12 })),
+      ];
+      XLSX.utils.book_append_sheet(workbook, projectMatrixSheet, 'Projects_Matrix');
+
+      const projectDetailRows: Array<Array<string | number>> = [
+        [
+          language === 'es' ? 'Proyecto ID' : 'Project ID',
+          language === 'es' ? 'Proyecto' : 'Project',
+          language === 'es' ? 'Departamento' : 'Department',
+          language === 'es' ? 'Semana inicio' : 'Week start',
+          'CW',
+          language === 'es' ? 'Mes' : 'Month',
+          language === 'es' ? 'Semana proyecto' : 'Project week',
+          language === 'es' ? 'En rango proyecto' : 'In project range',
+          language === 'es' ? 'En rango departamento' : 'In department range',
+          language === 'es' ? 'Horas' : 'Hours',
+          language === 'es' ? 'Talento' : 'Talent',
+          language === 'es' ? 'Etapa (codigo)' : 'Stage (code)',
+          language === 'es' ? 'Etapa (label)' : 'Stage (label)',
+          language === 'es' ? 'Comentario' : 'Comment',
+          language === 'es' ? 'Asignaciones' : 'Assignments',
+        ],
+      ];
+
+      projectsVisibleInCurrentView.forEach((proj) => {
+        DEPARTMENTS.forEach((dept) => {
+          const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
+          const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
+          const effectiveEndDate = deptMeta?.effectiveEndDate || proj.endDate || proj.startDate;
+
+          allWeeksData.forEach((weekData) => {
+            const week = weekData.date;
+            const cellKey = `${proj.id}|${dept}|${week}`;
+            const cellEntry = assignmentIndex.byCell.get(cellKey);
+            const totalHours = cellEntry?.totalHours ?? 0;
+            const stage = cellEntry?.stage ?? null;
+            const stageLabel = stage ? getStageLabel(stage, t as Record<string, string>) : '';
+            const comment = cellEntry?.comment ?? '';
+            const assignmentCount = cellEntry?.assignments.length ?? 0;
+            const projectWeekNumber = getProjectWeekNumber(proj, week);
+            const inProjectRange = isWeekInProjectRange(week, proj);
+            const inDeptRange = week >= effectiveStartDate && week <= effectiveEndDate;
+            const monthName = parseISODate(week).toLocaleString(locale, { month: 'short', year: 'numeric' });
+
+            projectDetailRows.push([
+              proj.id,
+              proj.name,
+              dept,
+              week,
+              weekData.weekNum,
+              monthName,
+              projectWeekNumber ?? '',
+              inProjectRange ? 1 : 0,
+              inDeptRange ? 1 : 0,
+              roundValue(totalHours),
+              roundValue(calculateTalent(totalHours)),
+              stage ?? '',
+              stageLabel,
+              comment,
+              assignmentCount,
+            ]);
+          });
+        });
+      });
+
+      const projectDetailSheet = XLSX.utils.aoa_to_sheet(projectDetailRows);
+      projectDetailSheet['!cols'] = [
+        { wch: 12 }, { wch: 34 }, { wch: 14 }, { wch: 12 }, { wch: 6 }, { wch: 12 }, { wch: 12 },
+        { wch: 13 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 10 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, projectDetailSheet, 'Projects_Detail');
+
+      const departmentLabel = (departmentFilter === 'General' ? 'general' : departmentFilter)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `capacity-projects-${departmentLabel}-${dateStamp}.xlsx`);
+    } catch (error) {
+      console.error('[CapacityMatrix] Error exporting Excel:', error);
+      alert(language === 'es'
+        ? 'Ocurrio un error al exportar el archivo de Excel.'
+        : 'An error occurred while exporting the Excel file.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   const openExportPdfModal = () => {
     const firstProjectId = projectsVisibleInCurrentView[0]?.id || '';
     setPdfExportScope('single');
@@ -3376,6 +3663,22 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             >
               <FolderPlus size={10} />
               <span className="hidden sm:inline">{t.importProject || 'Import'}</span>
+            </button>
+          )}
+
+          {projectsVisibleInCurrentView.length > 0 && (
+            <button
+              onClick={handleExportTimelineExcel}
+              disabled={isExportingExcel}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+              title={language === 'es' ? 'Exportar timeline en Excel' : 'Export timeline to Excel'}
+            >
+              <span>XLSX</span>
+              <span className="hidden sm:inline">
+                {isExportingExcel
+                  ? (language === 'es' ? 'Exportando...' : 'Exporting...')
+                  : (language === 'es' ? 'Exportar' : 'Export')}
+              </span>
             </button>
           )}
 
