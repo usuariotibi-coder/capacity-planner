@@ -120,7 +120,7 @@ const LoginPage: React.FC = () => {
             <img
               src="/scio-wordmark.svg"
               alt="SCIO Automation"
-              className="h-auto w-[300px] max-w-full drop-shadow-[0_10px_24px_rgba(8,4,14,0.55)] md:w-[340px]"
+              className="h-auto w-[250px] max-w-full md:w-[290px]"
             />
           </div>
 
