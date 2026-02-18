@@ -2289,10 +2289,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         { width: 12 },
         { width: 12 },
         { width: 12 },
+        { width: 12 },
         ...allWeeksData.map(() => ({ width: 9 })),
       ];
 
-      const projEndCol = getColName(4 + allWeeksData.length);
+      const projEndCol = getColName(5 + allWeeksData.length);
       projectsSheet.mergeCells(`A1:${projEndCol}1`);
       const projTitleCell = projectsSheet.getCell('A1');
       projTitleCell.value = language === 'es'
@@ -2324,6 +2325,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         spacerCell.value = '';
         setBodyCell(spacerCell, BG_LIGHT, BRAND_PURPLE);
 
+        const spacerCell2 = projectsSheet.getCell(row, 5);
+        spacerCell2.value = '';
+        setBodyCell(spacerCell2, BG_LIGHT, BRAND_PURPLE);
+
         allWeeksData.forEach((weekData, idx) => {
           const deptWeekKey = `${dept}|${weekData.date}`;
           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
@@ -2335,7 +2340,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             : (occupiedValue > 0 ? 100 : 0);
           const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
 
-          const weekCell = projectsSheet.getCell(row, 5 + idx);
+          const weekCell = projectsSheet.getCell(row, 6 + idx);
           weekCell.value = roundValue(availableValue);
           setBodyCell(weekCell, palette.bg, palette.fg);
         });
@@ -2343,8 +2348,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const monthHeaderRow = 8;
       monthSpans.forEach((monthInfo, idx) => {
-        const startCol = 5 + monthInfo.startIdx;
-        const endCol = 5 + monthInfo.endIdx;
+        const startCol = 6 + monthInfo.startIdx;
+        const endCol = 6 + monthInfo.endIdx;
         const startRef = `${getColName(startCol)}${monthHeaderRow}`;
         const endRef = `${getColName(endCol)}${monthHeaderRow}`;
         projectsSheet.mergeCells(`${startRef}:${endRef}`);
@@ -2357,14 +2362,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const yearWeekLabelCell = projectsSheet.getCell(yearWeekRow, 2);
       yearWeekLabelCell.value = language === 'es' ? 'YEAR WEEK' : 'YEAR WEEK';
       setHeaderCell(yearWeekLabelCell, BRAND_PURPLE);
-      for (let c = 1; c <= 4; c += 1) {
+      for (let c = 1; c <= 5; c += 1) {
         if (c === 2) continue;
         const ccell = projectsSheet.getCell(yearWeekRow, c);
         ccell.value = '';
         setHeaderCell(ccell, BRAND_PURPLE);
       }
       allWeeksData.forEach((weekData, idx) => {
-        const cell = projectsSheet.getCell(yearWeekRow, 5 + idx);
+        const cell = projectsSheet.getCell(yearWeekRow, 6 + idx);
         cell.value = weekData.weekNum;
         setHeaderCell(cell, idx === currentDateWeekIndex ? '57534E' : BRAND_PURPLE_SOFT);
       });
@@ -2373,15 +2378,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const projectWeekLabelCell = projectsSheet.getCell(projectWeekRow, 2);
       projectWeekLabelCell.value = language === 'es' ? 'PROJECT WEEK' : 'PROJECT WEEK';
       setHeaderCell(projectWeekLabelCell, BRAND_PURPLE);
-      for (let c = 1; c <= 4; c += 1) {
+      for (let c = 1; c <= 5; c += 1) {
         if (c === 2) continue;
         const ccell = projectsSheet.getCell(projectWeekRow, c);
         ccell.value = '';
         setHeaderCell(ccell, BRAND_PURPLE);
       }
+      const quotedHeaderCell = projectsSheet.getCell(projectWeekRow, 3);
+      quotedHeaderCell.value = language === 'es' ? 'Cotizado' : 'Quoted';
+      setHeaderCell(quotedHeaderCell, BRAND_PURPLE_SOFT);
+      const usedHeaderCell = projectsSheet.getCell(projectWeekRow, 4);
+      usedHeaderCell.value = language === 'es' ? 'Usado' : 'Used';
+      setHeaderCell(usedHeaderCell, BRAND_PURPLE_SOFT);
+      const forecastHeaderCell = projectsSheet.getCell(projectWeekRow, 5);
+      forecastHeaderCell.value = language === 'es' ? 'Pronostico' : 'Forecast';
+      setHeaderCell(forecastHeaderCell, BRAND_PURPLE_SOFT);
       const firstProjectForScale = projectsVisibleInCurrentView[0];
       allWeeksData.forEach((weekData, idx) => {
-        const cwCell = projectsSheet.getCell(projectWeekRow, 5 + idx);
+        const cwCell = projectsSheet.getCell(projectWeekRow, 6 + idx);
         const weekNum = firstProjectForScale ? getProjectWeekNumber(firstProjectForScale, weekData.date) : null;
         cwCell.value = weekNum ?? '';
         setBodyCell(cwCell, BG_LIGHT, BRAND_PURPLE);
@@ -2412,9 +2426,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           quotedCell.value = roundValue(quoted);
           setBodyCell(quotedCell, 'EEF2FF', '1E3A8A');
 
-          const usedForecastCell = projectsSheet.getCell(projRow, 4);
-          usedForecastCell.value = `${roundValue(used)} / ${roundValue(forecasted)}`;
-          setBodyCell(usedForecastCell, 'ECFDF5', '065F46');
+          const usedCell = projectsSheet.getCell(projRow, 4);
+          usedCell.value = roundValue(used);
+          setBodyCell(usedCell, 'ECFDF5', '065F46');
+
+          const forecastCell = projectsSheet.getCell(projRow, 5);
+          forecastCell.value = roundValue(forecasted);
+          setBodyCell(forecastCell, 'ECFDF5', '065F46');
 
           const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
           const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
@@ -2426,7 +2444,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             const totalHours = cellEntry?.totalHours ?? 0;
             const stage = cellEntry?.stage || '';
             const inDeptRange = week >= effectiveStartDate && week <= effectiveEndDate;
-            const targetCell = projectsSheet.getCell(projRow, 5 + idx);
+            const targetCell = projectsSheet.getCell(projRow, 6 + idx);
 
             targetCell.value = totalHours > 0 ? roundValue(totalHours) : '';
             targetCell.numFmt = '0.###';
