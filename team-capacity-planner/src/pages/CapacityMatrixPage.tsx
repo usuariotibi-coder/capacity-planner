@@ -2645,7 +2645,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             }
           });
 
-          projectRow += 1;
+          const perProjectWeekRow = projectRow + 1;
+          deptSheet.mergeCells(`B${perProjectWeekRow}:C${perProjectWeekRow}`);
+          const perProjectWeekLabelCell = deptSheet.getCell(`B${perProjectWeekRow}`);
+          perProjectWeekLabelCell.value = language === 'es' ? 'PROJECT WEEK' : 'PROJECT WEEK';
+          setBodyCell(perProjectWeekLabelCell, BG_LIGHT, BRAND_PURPLE);
+          perProjectWeekLabelCell.font = { ...perProjectWeekLabelCell.font, bold: true };
+
+          const perProjectWeekUnitCell = deptSheet.getCell(perProjectWeekRow, 4);
+          perProjectWeekUnitCell.value = '';
+          setBodyCell(perProjectWeekUnitCell, BG_LIGHT, BRAND_PURPLE);
+
+          allWeeksData.forEach((weekData, idx) => {
+            const targetCell = deptSheet.getCell(perProjectWeekRow, deptWeekStart + idx);
+            targetCell.value = getProjectWeekNumber(proj, weekData.date) ?? '';
+            setBodyCell(targetCell, BG_LIGHT, BRAND_PURPLE);
+          });
+
+          projectRow += 2;
         });
       };
 
