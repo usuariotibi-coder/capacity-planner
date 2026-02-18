@@ -2237,36 +2237,28 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       });
 
       const capDeptHeader = capacitySheet.getCell('A5');
-      capDeptHeader.value = language === 'es' ? 'Departamento' : 'Department';
+      capDeptHeader.value = language === 'es' ? 'Site' : 'Site';
       setHeaderCell(capDeptHeader, BRAND_PURPLE);
       const capMetricHeader = capacitySheet.getCell('B5');
-      capMetricHeader.value = language === 'es' ? 'Metrica' : 'Metric';
+      capMetricHeader.value = language === 'es' ? 'Capacity' : 'Capacity';
       setHeaderCell(capMetricHeader, BRAND_PURPLE);
       allWeeksData.forEach((weekData, index) => {
         const cell = capacitySheet.getCell(5, weekColStart + index);
-        cell.value = `CW${weekData.weekNum}`;
+        cell.value = weekData.weekNum;
         const isCurrent = index === currentDateWeekIndex;
         setHeaderCell(cell, isCurrent ? '57534E' : BRAND_PURPLE_SOFT);
       });
 
       let capRow = 6;
       DEPARTMENTS.forEach((dept) => {
-        capacitySheet.mergeCells(`A${capRow}:A${capRow + 2}`);
-        const deptCell = capacitySheet.getCell(`A${capRow}`);
+        const deptCell = capacitySheet.getCell(capRow, 1);
         deptCell.value = dept;
-        setHeaderCell(deptCell, BRAND_PURPLE_SOFT);
+        setHeaderCell(deptCell, BRAND_PURPLE_SOFT, WHITE);
 
-        const metricLabels = [
-          language === 'es' ? 'Disponible' : 'Available',
-          language === 'es' ? 'Ocupado' : 'Occupied',
-          language === 'es' ? 'Utilizacion %' : 'Utilization %',
-        ];
-        metricLabels.forEach((label, offset) => {
-          const metricCell = capacitySheet.getCell(capRow + offset, 2);
-          metricCell.value = label;
-          setBodyCell(metricCell, BG_LIGHT, BRAND_PURPLE);
-          metricCell.font = { ...metricCell.font, bold: true };
-        });
+        const metricCell = capacitySheet.getCell(capRow, 2);
+        metricCell.value = language === 'es' ? 'Disponible' : 'Available';
+        setBodyCell(metricCell, BG_LIGHT, BRAND_PURPLE);
+        metricCell.font = { ...metricCell.font, bold: true };
 
         allWeeksData.forEach((weekData, index) => {
           const deptWeekKey = `${dept}|${weekData.date}`;
@@ -2283,19 +2275,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const availableCell = capacitySheet.getCell(capRow, weekColStart + index);
           availableCell.value = roundValue(availableValue);
           setBodyCell(availableCell, palette.bg, palette.fg);
-
-          const occupiedCell = capacitySheet.getCell(capRow + 1, weekColStart + index);
-          occupiedCell.value = roundValue(occupiedValue);
-          setBodyCell(occupiedCell, 'F9FAFB', '1F2937');
-
-          const utilCell = capacitySheet.getCell(capRow + 2, weekColStart + index);
-          utilCell.value = roundValue(utilizationPercent) / 100;
-          utilCell.numFmt = '0%';
-          setBodyCell(utilCell, palette.bg, palette.fg);
-          utilCell.font = { ...utilCell.font, bold: true };
         });
 
-        capRow += 4;
+        capRow += 1;
       });
 
       const projectsSheet = workbook.addWorksheet(`${selectedYear}-MX`, {
@@ -2325,26 +2307,87 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       setBodyCell(projMetaCell, BG_LIGHT);
       projMetaCell.alignment = { vertical: 'middle', horizontal: 'left' };
 
-      const topHeaderRow = 4;
-      const topHeaders = [
-        language === 'es' ? 'Departamento' : 'Department',
-        language === 'es' ? 'Cotizado' : 'Quoted',
-        language === 'es' ? 'Usado' : 'Used',
-        language === 'es' ? 'Pronosticado' : 'Forecasted',
-      ];
-      topHeaders.forEach((label, idx) => {
-        const cell = projectsSheet.getCell(topHeaderRow, idx + 1);
-        cell.value = label;
-        setHeaderCell(cell, BRAND_PURPLE);
+      const summaryStartRow = 2;
+      DEPARTMENTS.forEach((dept, deptIdx) => {
+        const row = summaryStartRow + deptIdx;
+        const capLabelCell = projectsSheet.getCell(row, 2);
+        capLabelCell.value = deptIdx === 0 ? (language === 'es' ? 'CAPACITY' : 'CAPACITY') : '';
+        setBodyCell(capLabelCell, BG_LIGHT, BRAND_PURPLE);
+        capLabelCell.font = { ...capLabelCell.font, bold: true };
+
+        const deptCell = projectsSheet.getCell(row, 3);
+        deptCell.value = dept;
+        setBodyCell(deptCell, BG_LIGHT, BRAND_PURPLE);
+        deptCell.font = { ...deptCell.font, bold: true };
+
+        const spacerCell = projectsSheet.getCell(row, 4);
+        spacerCell.value = '';
+        setBodyCell(spacerCell, BG_LIGHT, BRAND_PURPLE);
+
+        allWeeksData.forEach((weekData, idx) => {
+          const deptWeekKey = `${dept}|${weekData.date}`;
+          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
+          const occupiedValue = dept === 'MFG' ? totalWeekHours : totalWeekHours / 45;
+          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
+          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
+          const utilizationPercent = totalCapacity > 0
+            ? (occupiedValue / totalCapacity) * 100
+            : (occupiedValue > 0 ? 100 : 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
+
+          const weekCell = projectsSheet.getCell(row, 5 + idx);
+          weekCell.value = roundValue(availableValue);
+          setBodyCell(weekCell, palette.bg, palette.fg);
+        });
       });
 
+      const monthHeaderRow = 8;
+      monthSpans.forEach((monthInfo, idx) => {
+        const startCol = 5 + monthInfo.startIdx;
+        const endCol = 5 + monthInfo.endIdx;
+        const startRef = `${getColName(startCol)}${monthHeaderRow}`;
+        const endRef = `${getColName(endCol)}${monthHeaderRow}`;
+        projectsSheet.mergeCells(`${startRef}:${endRef}`);
+        const monthCell = projectsSheet.getCell(startRef);
+        monthCell.value = monthInfo.month;
+        setHeaderCell(monthCell, idx % 2 === 0 ? BRAND_PURPLE : 'FACC15', idx % 2 === 0 ? WHITE : '1F2937');
+      });
+
+      const yearWeekRow = 9;
+      const yearWeekLabelCell = projectsSheet.getCell(yearWeekRow, 2);
+      yearWeekLabelCell.value = language === 'es' ? 'YEAR WEEK' : 'YEAR WEEK';
+      setHeaderCell(yearWeekLabelCell, BRAND_PURPLE);
+      for (let c = 1; c <= 4; c += 1) {
+        if (c === 2) continue;
+        const ccell = projectsSheet.getCell(yearWeekRow, c);
+        ccell.value = '';
+        setHeaderCell(ccell, BRAND_PURPLE);
+      }
       allWeeksData.forEach((weekData, idx) => {
-        const cell = projectsSheet.getCell(topHeaderRow, 5 + idx);
-        cell.value = `CW${weekData.weekNum}`;
+        const cell = projectsSheet.getCell(yearWeekRow, 5 + idx);
+        cell.value = weekData.weekNum;
         setHeaderCell(cell, idx === currentDateWeekIndex ? '57534E' : BRAND_PURPLE_SOFT);
       });
 
-      let projRow = 5;
+      const projectWeekRow = 10;
+      const projectWeekLabelCell = projectsSheet.getCell(projectWeekRow, 2);
+      projectWeekLabelCell.value = language === 'es' ? 'PROJECT WEEK' : 'PROJECT WEEK';
+      setHeaderCell(projectWeekLabelCell, BRAND_PURPLE);
+      for (let c = 1; c <= 4; c += 1) {
+        if (c === 2) continue;
+        const ccell = projectsSheet.getCell(projectWeekRow, c);
+        ccell.value = '';
+        setHeaderCell(ccell, BRAND_PURPLE);
+      }
+      const firstProjectForScale = projectsVisibleInCurrentView[0];
+      allWeeksData.forEach((weekData, idx) => {
+        const cwCell = projectsSheet.getCell(projectWeekRow, 5 + idx);
+        const weekNum = firstProjectForScale ? getProjectWeekNumber(firstProjectForScale, weekData.date) : null;
+        cwCell.value = weekNum ?? '';
+        setBodyCell(cwCell, BG_LIGHT, BRAND_PURPLE);
+      });
+
+      let projRow = 11;
       projectsVisibleInCurrentView.forEach((proj) => {
         projectsSheet.mergeCells(`A${projRow}:${projEndCol}${projRow}`);
         const projHeaderCell = projectsSheet.getCell(`A${projRow}`);
@@ -2360,22 +2403,18 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const used = getUtilizedHours(dept, proj.id);
           const forecasted = getForecastedHours(dept, proj.id);
 
-          const deptCell = projectsSheet.getCell(projRow, 1);
+          const deptCell = projectsSheet.getCell(projRow, 2);
           deptCell.value = dept;
           setBodyCell(deptCell, BG_LIGHT, BRAND_PURPLE);
           deptCell.font = { ...deptCell.font, bold: true };
 
-          const quotedCell = projectsSheet.getCell(projRow, 2);
+          const quotedCell = projectsSheet.getCell(projRow, 3);
           quotedCell.value = roundValue(quoted);
           setBodyCell(quotedCell, 'EEF2FF', '1E3A8A');
 
-          const usedCell = projectsSheet.getCell(projRow, 3);
-          usedCell.value = roundValue(used);
-          setBodyCell(usedCell, 'ECFDF5', '065F46');
-
-          const forecastCell = projectsSheet.getCell(projRow, 4);
-          forecastCell.value = roundValue(forecasted);
-          setBodyCell(forecastCell, 'FEF3C7', '92400E');
+          const usedForecastCell = projectsSheet.getCell(projRow, 4);
+          usedForecastCell.value = `${roundValue(used)} / ${roundValue(forecasted)}`;
+          setBodyCell(usedForecastCell, 'ECFDF5', '065F46');
 
           const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
           const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
@@ -2413,43 +2452,78 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const buildDepartmentYearSheet = (dept: Department) => {
         const sheetName = `${dept}-${selectedYear}`.slice(0, 31);
         const deptSheet = workbook.addWorksheet(sheetName, {
-          views: [{ state: 'frozen', ySplit: 5, xSplit: 2 }],
+          views: [{ state: 'frozen', ySplit: 9, xSplit: 4 }],
         });
+
+        const deptWeekStart = 5;
+        const deptWeekEnd = deptWeekStart + allWeeksData.length - 1;
+        const deptEndCol = getColName(deptWeekEnd);
 
         deptSheet.columns = [
           { width: 20 },
+          { width: 14 },
           { width: 12 },
+          { width: 10 },
+          { width: 10 },
           ...allWeeksData.map(() => ({ width: 9 })),
         ];
 
-        deptSheet.mergeCells(`A1:${fullEndCol}1`);
+        deptSheet.mergeCells(`A1:${deptEndCol}1`);
         const titleCell = deptSheet.getCell('A1');
         titleCell.value = `${dept} - ${selectedYear} ${language === 'es' ? 'Capacidad' : 'Capacity'}`;
         setHeaderCell(titleCell, BRAND_PURPLE);
         titleCell.font = { ...titleCell.font, size: 13, bold: true };
 
-        deptSheet.mergeCells('A2:B2');
+        deptSheet.mergeCells('A2:D2');
         const metaLabel = deptSheet.getCell('A2');
         metaLabel.value = language === 'es' ? 'Vista / Generado' : 'View / Generated';
         setHeaderCell(metaLabel, BRAND_PURPLE_SOFT);
         metaLabel.font = { ...metaLabel.font, size: 9 };
 
-        deptSheet.mergeCells(`C2:${fullEndCol}2`);
-        const metaValue = deptSheet.getCell('C2');
+        deptSheet.mergeCells(`E2:${deptEndCol}2`);
+        const metaValue = deptSheet.getCell('E2');
         metaValue.value = `${viewLabel} | ${generatedAt}`;
         setBodyCell(metaValue, BG_LIGHT);
         metaValue.alignment = { vertical: 'middle', horizontal: 'left' };
 
         deptSheet.getRow(3).height = 8;
-        for (let col = 1; col <= weekColEnd; col += 1) {
+        for (let col = 1; col <= deptWeekEnd; col += 1) {
           const spacerCell = deptSheet.getCell(3, col);
           setBodyCell(spacerCell, WHITE);
           spacerCell.value = '';
         }
 
+        const setMergedLabel = (row: number, label: string) => {
+          deptSheet.mergeCells(`B${row}:C${row}`);
+          const labelCell = deptSheet.getCell(`B${row}`);
+          labelCell.value = label;
+          setBodyCell(labelCell, BG_LIGHT, BRAND_PURPLE);
+          labelCell.font = { ...labelCell.font, bold: true };
+        };
+
+        setMergedLabel(3, 'TOTAL');
+        setMergedLabel(4, language === 'es' ? 'IA Team Members' : 'IA Team Members');
+        setMergedLabel(6, 'CAPACITY');
+        setMergedLabel(8, language === 'es' ? 'MONTH' : 'MONTH');
+        setMergedLabel(9, language === 'es' ? 'YEAR WEEK' : 'YEAR WEEK');
+        setMergedLabel(10, language === 'es' ? 'PTO / HOLIDAY' : 'PTO / HOLIDAY');
+        setMergedLabel(12, language === 'es' ? 'TRAINING / INDIRECTS' : 'TRAINING / INDIRECTS');
+        setMergedLabel(14, language === 'es' ? 'PROJECT WEEK' : 'PROJECT WEEK');
+
+        deptSheet.getCell('D3').value = language === 'es' ? 'Hours' : 'Hours';
+        deptSheet.getCell('D4').value = dept === 'MFG' ? 'Hours' : 'People';
+        deptSheet.getCell('D6').value = dept === 'MFG' ? 'Hours' : 'People';
+        deptSheet.getCell('D11').value = language === 'es' ? 'Talent' : 'Talent';
+        deptSheet.getCell('D13').value = language === 'es' ? 'Talent' : 'Talent';
+        ['D3', 'D4', 'D6', 'D11', 'D13'].forEach((ref) => {
+          const c = deptSheet.getCell(ref);
+          setBodyCell(c, BG_LIGHT, BRAND_PURPLE);
+          c.font = { ...c.font, bold: true };
+        });
+
         monthSpans.forEach((monthInfo, idx) => {
-          const startCol = weekColStart + monthInfo.startIdx;
-          const endCol = weekColStart + monthInfo.endIdx;
+          const startCol = deptWeekStart + monthInfo.startIdx;
+          const endCol = deptWeekStart + monthInfo.endIdx;
           const startRef = `${getColName(startCol)}4`;
           const endRef = `${getColName(endCol)}4`;
           deptSheet.mergeCells(`${startRef}:${endRef}`);
@@ -2458,39 +2532,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           setHeaderCell(monthCell, idx % 2 === 0 ? BRAND_PURPLE : 'FACC15', idx % 2 === 0 ? WHITE : '1F2937');
         });
 
-        const metricHeader = deptSheet.getCell('A5');
-        metricHeader.value = language === 'es' ? 'Metrica' : 'Metric';
-        setHeaderCell(metricHeader, BRAND_PURPLE);
-        const unitHeader = deptSheet.getCell('B5');
-        unitHeader.value = language === 'es' ? 'Unidad' : 'Unit';
-        setHeaderCell(unitHeader, BRAND_PURPLE);
-
         allWeeksData.forEach((weekData, idx) => {
-          const cwCell = deptSheet.getCell(5, weekColStart + idx);
-          cwCell.value = `CW${weekData.weekNum}`;
+          const cwCell = deptSheet.getCell(9, deptWeekStart + idx);
+          cwCell.value = weekData.weekNum;
           const isCurrent = idx === currentDateWeekIndex;
           setHeaderCell(cwCell, isCurrent ? '57534E' : BRAND_PURPLE_SOFT);
-        });
-
-        const usedRow = 6;
-        const capacityRow = 7;
-        const utilRow = 8;
-
-        const rowMeta = [
-          { row: usedRow, label: language === 'es' ? 'Usado' : 'Used', unit: dept === 'MFG' ? 'h' : 'People' },
-          { row: capacityRow, label: language === 'es' ? 'Capacidad' : 'Capacity', unit: dept === 'MFG' ? 'h' : 'People' },
-          { row: utilRow, label: language === 'es' ? 'Utilizacion %' : 'Utilization %', unit: '%' },
-        ];
-        rowMeta.forEach(({ row, label, unit }) => {
-          const labelCell = deptSheet.getCell(row, 1);
-          labelCell.value = label;
-          setBodyCell(labelCell, BG_LIGHT, BRAND_PURPLE);
-          labelCell.font = { ...labelCell.font, bold: true };
-
-          const unitCell = deptSheet.getCell(row, 2);
-          unitCell.value = unit;
-          setBodyCell(unitCell, BG_LIGHT, BRAND_PURPLE);
-          unitCell.font = { ...unitCell.font, bold: true };
         });
 
         allWeeksData.forEach((weekData, idx) => {
@@ -2498,24 +2544,71 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
           const occupiedValue = dept === 'MFG' ? totalWeekHours : totalWeekHours / 45;
           const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
+          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
           const utilizationPercent = totalCapacity > 0
             ? (occupiedValue / totalCapacity) * 100
             : (occupiedValue > 0 ? 100 : 0);
           const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
 
-          const usedCell = deptSheet.getCell(usedRow, weekColStart + idx);
+          const usedCell = deptSheet.getCell(3, deptWeekStart + idx);
           usedCell.value = roundValue(occupiedValue);
           setBodyCell(usedCell, 'F9FAFB', '1F2937');
 
-          const capacityCell = deptSheet.getCell(capacityRow, weekColStart + idx);
+          const capacityCell = deptSheet.getCell(4, deptWeekStart + idx);
           capacityCell.value = roundValue(totalCapacity);
           setBodyCell(capacityCell, 'ECFDF5', '065F46');
 
-          const utilCell = deptSheet.getCell(utilRow, weekColStart + idx);
-          utilCell.value = roundValue(utilizationPercent) / 100;
-          utilCell.numFmt = '0%';
-          setBodyCell(utilCell, palette.bg, palette.fg);
-          utilCell.font = { ...utilCell.font, bold: true };
+          const availableCell = deptSheet.getCell(6, deptWeekStart + idx);
+          availableCell.value = roundValue(availableValue);
+          setBodyCell(availableCell, palette.bg, palette.fg);
+          availableCell.font = { ...availableCell.font, bold: true };
+        });
+
+        const firstVisibleProject = projectsVisibleInCurrentView[0];
+        allWeeksData.forEach((weekData, idx) => {
+          const pwCell = deptSheet.getCell(14, deptWeekStart + idx);
+          const pw = firstVisibleProject ? getProjectWeekNumber(firstVisibleProject, weekData.date) : null;
+          pwCell.value = pw ?? '';
+          setBodyCell(pwCell, BG_LIGHT, BRAND_PURPLE);
+        });
+
+        let projectRow = 15;
+        projectsVisibleInCurrentView.forEach((proj) => {
+          const hasDeptActivity = allWeeksData.some((weekData) => {
+            const entry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${weekData.date}`);
+            return (entry?.totalHours ?? 0) > 0;
+          });
+          if (!hasDeptActivity) return;
+
+          deptSheet.mergeCells(`B${projectRow}:C${projectRow}`);
+          const projLabelCell = deptSheet.getCell(`B${projectRow}`);
+          projLabelCell.value = `${proj.id} ${proj.name}`;
+          setBodyCell(projLabelCell, BG_LIGHT, BRAND_PURPLE);
+          projLabelCell.font = { ...projLabelCell.font, bold: true };
+
+          const unitCell = deptSheet.getCell(projectRow, 4);
+          unitCell.value = language === 'es' ? 'Hours' : 'Hours';
+          setBodyCell(unitCell, BG_LIGHT, BRAND_PURPLE);
+
+          allWeeksData.forEach((weekData, idx) => {
+            const entry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${weekData.date}`);
+            const totalHours = entry?.totalHours ?? 0;
+            const stage = entry?.stage || '';
+            const targetCell = deptSheet.getCell(projectRow, deptWeekStart + idx);
+            targetCell.value = totalHours > 0 ? roundValue(totalHours) : '';
+            targetCell.numFmt = '0.###';
+
+            if (stage && stagePalette[stage]) {
+              const palette = stagePalette[stage];
+              setBodyCell(targetCell, palette.bg, palette.fg);
+            } else if (totalHours > 0) {
+              setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
+            } else {
+              setBodyCell(targetCell, WHITE, '1F2937');
+            }
+          });
+
+          projectRow += 1;
         });
       };
 
