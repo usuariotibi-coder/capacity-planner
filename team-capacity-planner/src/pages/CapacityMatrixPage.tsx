@@ -2098,34 +2098,177 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     try {
       setIsExportingExcel(true);
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.utils.book_new();
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+
+      const BRAND_PURPLE = '2E1A47';
+      const BRAND_PURPLE_SOFT = '827691';
+      const BG_LIGHT = 'F6F3FB';
+      const WHITE = 'FFFFFF';
+      const BORDER_LIGHT = 'D5D1DA';
 
       const roundValue = (value: number): number => {
         if (!Number.isFinite(value)) return 0;
         return Math.round(value * 1000) / 1000;
       };
 
-      const weekColumns = allWeeksData.map((week) => `CW${week.weekNum} (${week.date})`);
+      const getColName = (colNumber: number): string => {
+        let dividend = colNumber;
+        let colName = '';
+        while (dividend > 0) {
+          const modulo = (dividend - 1) % 26;
+          colName = String.fromCharCode(65 + modulo) + colName;
+          dividend = Math.floor((dividend - modulo) / 26);
+        }
+        return colName;
+      };
+
+      const weekColStart = 3;
+      const weekColEnd = weekColStart + allWeeksData.length - 1;
+      const fullEndCol = getColName(weekColEnd);
+
+      const centerCell = (cell: any) => {
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      };
+
+      const setHeaderCell = (cell: any, fill: string, fontColor = WHITE) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+        cell.font = { bold: true, color: { argb: fontColor }, size: 10 };
+        centerCell(cell);
+        cell.border = {
+          top: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          left: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          bottom: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          right: { style: 'thin', color: { argb: BORDER_LIGHT } },
+        };
+      };
+
+      const setBodyCell = (cell: any, fill = WHITE, fontColor = '2E1A47') => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+        cell.font = { color: { argb: fontColor }, size: 9 };
+        centerCell(cell);
+        cell.border = {
+          top: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          left: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          bottom: { style: 'thin', color: { argb: BORDER_LIGHT } },
+          right: { style: 'thin', color: { argb: BORDER_LIGHT } },
+        };
+      };
+
+      const getUtilizationFill = (percent: number, hasCapacity: boolean): { bg: string; fg: string } => {
+        if (!hasCapacity) return { bg: 'E5E7EB', fg: '374151' };
+        if (percent >= 100) return { bg: 'B91C1C', fg: WHITE };
+        if (percent >= 90) return { bg: 'EF4444', fg: WHITE };
+        if (percent >= 70) return { bg: 'FACC15', fg: '1F2937' };
+        return { bg: '86EFAC', fg: '14532D' };
+      };
+
+      const stagePalette: Record<string, { bg: string; fg: string }> = {
+        SWITCH_LAYOUT_REVISION: { bg: 'DDD6FE', fg: '4C1D95' },
+        CONTROLS_DESIGN: { bg: 'BFDBFE', fg: '1E3A8A' },
+        CONCEPT: { bg: 'E0F2FE', fg: '0C4A6E' },
+        DETAIL_DESIGN: { bg: 'CFFAFE', fg: '155E75' },
+        CABINETS_FRAMES: { bg: 'DBEAFE', fg: '1D4ED8' },
+        OVERALL_ASSEMBLY: { bg: 'E9D5FF', fg: '6B21A8' },
+        FINE_TUNING: { bg: 'FBCFE8', fg: '9D174D' },
+        OFFLINE: { bg: 'ECFCCB', fg: '3F6212' },
+        ONLINE: { bg: 'DCFCE7', fg: '166534' },
+        DEBUG: { bg: 'FEF3C7', fg: '92400E' },
+        COMMISSIONING: { bg: 'FFEDD5', fg: '9A3412' },
+        RELEASE: { bg: 'D1FAE5', fg: '065F46' },
+        RED_LINES: { bg: 'FECACA', fg: '991B1B' },
+        SUPPORT: { bg: 'F1F5F9', fg: '334155' },
+        SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'E7E5E4', fg: '57534E' },
+        ROBOT_SIMULATION: { bg: 'E4E4E7', fg: '3F3F46' },
+        STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'FFE4E6', fg: '9F1239' },
+      };
+
       const generatedAt = new Date().toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
       const viewLabel = departmentFilter === 'General'
         ? (language === 'es' ? 'General' : 'General')
         : `${language === 'es' ? 'Departamento' : 'Department'} ${departmentFilter}`;
 
-      const capacityRows: Array<Array<string | number>> = [
-        [language === 'es' ? 'Capacity - Resumen semanal' : 'Capacity - Weekly summary'],
-        [language === 'es' ? 'Vista' : 'View', viewLabel, language === 'es' ? 'Generado' : 'Generated', generatedAt],
-        [],
-        [language === 'es' ? 'Departamento' : 'Department', language === 'es' ? 'Metrica' : 'Metric', ...weekColumns],
+      const capacitySheet = workbook.addWorksheet('Capacity Tool All Sites', {
+        views: [{ state: 'frozen', ySplit: 5, xSplit: 2 }],
+      });
+
+      capacitySheet.columns = [
+        { width: 16 },
+        { width: 18 },
+        ...allWeeksData.map(() => ({ width: 10 })),
       ];
 
-      DEPARTMENTS.forEach((dept) => {
-        const availableRow: Array<string | number> = [dept, language === 'es' ? 'Disponible' : 'Available'];
-        const occupiedRow: Array<string | number> = [dept, language === 'es' ? 'Ocupado' : 'Occupied'];
-        const capacityRow: Array<string | number> = [dept, language === 'es' ? 'Capacidad total' : 'Total capacity'];
-        const utilizationRow: Array<string | number> = [dept, language === 'es' ? 'Utilizacion %' : 'Utilization %'];
+      capacitySheet.mergeCells(`A1:${fullEndCol}1`);
+      const capTitleCell = capacitySheet.getCell('A1');
+      capTitleCell.value = language === 'es'
+        ? 'TEAM CAPACITY - CAPACITY MATRIX'
+        : 'TEAM CAPACITY - CAPACITY MATRIX';
+      setHeaderCell(capTitleCell, BRAND_PURPLE);
+      capTitleCell.font = { ...capTitleCell.font, size: 14, bold: true };
 
-        allWeeksData.forEach((weekData) => {
+      capacitySheet.mergeCells('A2:B2');
+      const capMetaLabelCell = capacitySheet.getCell('A2');
+      capMetaLabelCell.value = language === 'es' ? 'Vista / Generado' : 'View / Generated';
+      setHeaderCell(capMetaLabelCell, BRAND_PURPLE_SOFT);
+      capMetaLabelCell.font = { ...capMetaLabelCell.font, size: 9 };
+
+      capacitySheet.mergeCells(`C2:${fullEndCol}2`);
+      const capMetaValueCell = capacitySheet.getCell('C2');
+      capMetaValueCell.value = `${viewLabel} | ${generatedAt}`;
+      setBodyCell(capMetaValueCell, BG_LIGHT);
+      capMetaValueCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+      capacitySheet.getRow(3).height = 8;
+      for (let col = 1; col <= weekColEnd; col += 1) {
+        const spacerCell = capacitySheet.getCell(3, col);
+        setBodyCell(spacerCell, WHITE);
+        spacerCell.value = '';
+      }
+
+      monthSpans.forEach((monthInfo, idx) => {
+        const startCol = weekColStart + monthInfo.startIdx;
+        const endCol = weekColStart + monthInfo.endIdx;
+        const startRef = `${getColName(startCol)}4`;
+        const endRef = `${getColName(endCol)}4`;
+        capacitySheet.mergeCells(`${startRef}:${endRef}`);
+        const monthCell = capacitySheet.getCell(startRef);
+        monthCell.value = monthInfo.month;
+        setHeaderCell(monthCell, idx % 2 === 0 ? BRAND_PURPLE : 'FACC15', idx % 2 === 0 ? WHITE : '1F2937');
+      });
+
+      const capDeptHeader = capacitySheet.getCell('A5');
+      capDeptHeader.value = language === 'es' ? 'Departamento' : 'Department';
+      setHeaderCell(capDeptHeader, BRAND_PURPLE);
+      const capMetricHeader = capacitySheet.getCell('B5');
+      capMetricHeader.value = language === 'es' ? 'Metrica' : 'Metric';
+      setHeaderCell(capMetricHeader, BRAND_PURPLE);
+      allWeeksData.forEach((weekData, index) => {
+        const cell = capacitySheet.getCell(5, weekColStart + index);
+        cell.value = `CW${weekData.weekNum}`;
+        const isCurrent = index === currentDateWeekIndex;
+        setHeaderCell(cell, isCurrent ? '57534E' : BRAND_PURPLE_SOFT);
+      });
+
+      let capRow = 6;
+      DEPARTMENTS.forEach((dept) => {
+        capacitySheet.mergeCells(`A${capRow}:A${capRow + 2}`);
+        const deptCell = capacitySheet.getCell(`A${capRow}`);
+        deptCell.value = dept;
+        setHeaderCell(deptCell, BRAND_PURPLE_SOFT);
+
+        const metricLabels = [
+          language === 'es' ? 'Disponible' : 'Available',
+          language === 'es' ? 'Ocupado' : 'Occupied',
+          language === 'es' ? 'Utilizacion %' : 'Utilization %',
+        ];
+        metricLabels.forEach((label, offset) => {
+          const metricCell = capacitySheet.getCell(capRow + offset, 2);
+          metricCell.value = label;
+          setBodyCell(metricCell, BG_LIGHT, BRAND_PURPLE);
+          metricCell.font = { ...metricCell.font, bold: true };
+        });
+
+        allWeeksData.forEach((weekData, index) => {
           const deptWeekKey = `${dept}|${weekData.date}`;
           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
           const isMfg = dept === 'MFG';
@@ -2135,205 +2278,319 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const utilizationPercent = totalCapacity > 0
             ? (occupiedValue / totalCapacity) * 100
             : (occupiedValue > 0 ? 100 : 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
 
-          availableRow.push(roundValue(availableValue));
-          occupiedRow.push(roundValue(occupiedValue));
-          capacityRow.push(roundValue(totalCapacity));
-          utilizationRow.push(roundValue(utilizationPercent));
+          const availableCell = capacitySheet.getCell(capRow, weekColStart + index);
+          availableCell.value = roundValue(availableValue);
+          setBodyCell(availableCell, palette.bg, palette.fg);
+
+          const occupiedCell = capacitySheet.getCell(capRow + 1, weekColStart + index);
+          occupiedCell.value = roundValue(occupiedValue);
+          setBodyCell(occupiedCell, 'F9FAFB', '1F2937');
+
+          const utilCell = capacitySheet.getCell(capRow + 2, weekColStart + index);
+          utilCell.value = roundValue(utilizationPercent) / 100;
+          utilCell.numFmt = '0%';
+          setBodyCell(utilCell, palette.bg, palette.fg);
+          utilCell.font = { ...utilCell.font, bold: true };
         });
 
-        capacityRows.push(availableRow, occupiedRow, capacityRow, utilizationRow, []);
+        capRow += 4;
       });
 
-      const capacitySheet = XLSX.utils.aoa_to_sheet(capacityRows);
-      capacitySheet['!cols'] = [
-        { wch: 16 },
-        { wch: 20 },
-        ...allWeeksData.map(() => ({ wch: 13 })),
-      ];
-      XLSX.utils.book_append_sheet(workbook, capacitySheet, 'Capacity_Weekly');
+      const projectsSheet = workbook.addWorksheet(`${selectedYear}-MX`, {
+        views: [{ state: 'frozen', ySplit: 4, xSplit: 4 }],
+      });
 
-      const projectSummaryRows: Array<Array<string | number>> = [
-        [
-          language === 'es' ? 'Proyecto ID' : 'Project ID',
-          language === 'es' ? 'Proyecto' : 'Project',
-          language === 'es' ? 'Cliente' : 'Client',
-          language === 'es' ? 'Departamento' : 'Department',
-          language === 'es' ? 'PM' : 'PM',
-          language === 'es' ? 'Inicio' : 'Start',
-          language === 'es' ? 'Fin' : 'End',
-          language === 'es' ? 'Semanas' : 'Weeks',
-          language === 'es' ? 'Cotizado base (h)' : 'Base quoted (h)',
-          language === 'es' ? 'Change Orders (h)' : 'Change orders (h)',
-          language === 'es' ? 'Cotizado total (h)' : 'Total quoted (h)',
-          language === 'es' ? 'Usado (h)' : 'Used (h)',
-          language === 'es' ? 'Pronosticado (h)' : 'Forecasted (h)',
-          language === 'es' ? 'Planeado total (h)' : 'Total planned (h)',
-          language === 'es' ? 'Utilizacion %' : 'Utilization %',
-        ],
+      projectsSheet.columns = [
+        { width: 14 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        ...allWeeksData.map(() => ({ width: 9 })),
       ];
 
+      const projEndCol = getColName(4 + allWeeksData.length);
+      projectsSheet.mergeCells(`A1:${projEndCol}1`);
+      const projTitleCell = projectsSheet.getCell('A1');
+      projTitleCell.value = language === 'es'
+        ? 'TEAM CAPACITY - PROJECTS MATRIX'
+        : 'TEAM CAPACITY - PROJECTS MATRIX';
+      setHeaderCell(projTitleCell, BRAND_PURPLE);
+      projTitleCell.font = { ...projTitleCell.font, size: 14, bold: true };
+
+      projectsSheet.mergeCells(`A2:${projEndCol}2`);
+      const projMetaCell = projectsSheet.getCell('A2');
+      projMetaCell.value = `${viewLabel} | ${generatedAt}`;
+      setBodyCell(projMetaCell, BG_LIGHT);
+      projMetaCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+      const topHeaderRow = 4;
+      const topHeaders = [
+        language === 'es' ? 'Departamento' : 'Department',
+        language === 'es' ? 'Cotizado' : 'Quoted',
+        language === 'es' ? 'Usado' : 'Used',
+        language === 'es' ? 'Pronosticado' : 'Forecasted',
+      ];
+      topHeaders.forEach((label, idx) => {
+        const cell = projectsSheet.getCell(topHeaderRow, idx + 1);
+        cell.value = label;
+        setHeaderCell(cell, BRAND_PURPLE);
+      });
+
+      allWeeksData.forEach((weekData, idx) => {
+        const cell = projectsSheet.getCell(topHeaderRow, 5 + idx);
+        cell.value = `CW${weekData.weekNum}`;
+        setHeaderCell(cell, idx === currentDateWeekIndex ? '57534E' : BRAND_PURPLE_SOFT);
+      });
+
+      let projRow = 5;
       projectsVisibleInCurrentView.forEach((proj) => {
+        projectsSheet.mergeCells(`A${projRow}:${projEndCol}${projRow}`);
+        const projHeaderCell = projectsSheet.getCell(`A${projRow}`);
+        const pmName = projectManagerNameById.get(proj.id) || '-';
         const weeks = projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks ?? 0;
-        const pmName = projectManagerNameById.get(proj.id) || '';
+        projHeaderCell.value = `${proj.id} | ${proj.name} | ${weeks} ${language === 'es' ? 'semanas' : 'weeks'} | PM: ${pmName}`;
+        setHeaderCell(projHeaderCell, BRAND_PURPLE_SOFT);
+        projHeaderCell.alignment = { vertical: 'middle', horizontal: 'left' };
+        projRow += 1;
 
         DEPARTMENTS.forEach((dept) => {
-          const quotedBase = getQuotedHours(dept, proj.id);
-          const quotedCO = getQuotedChangeOrders(dept, proj.id);
-          const quotedTotal = quotedBase + quotedCO;
+          const quoted = getQuotedHours(dept, proj.id) + getQuotedChangeOrders(dept, proj.id);
           const used = getUtilizedHours(dept, proj.id);
           const forecasted = getForecastedHours(dept, proj.id);
-          const totalPlanned = used + forecasted;
-          const utilization = getUtilizationPercent(dept, proj.id);
 
-          projectSummaryRows.push([
-            proj.id,
-            proj.name,
-            proj.client || '',
-            dept,
-            pmName,
-            proj.startDate || '',
-            proj.endDate || '',
-            weeks,
-            roundValue(quotedBase),
-            roundValue(quotedCO),
-            roundValue(quotedTotal),
-            roundValue(used),
-            roundValue(forecasted),
-            roundValue(totalPlanned),
-            roundValue(utilization),
-          ]);
-        });
-      });
+          const deptCell = projectsSheet.getCell(projRow, 1);
+          deptCell.value = dept;
+          setBodyCell(deptCell, BG_LIGHT, BRAND_PURPLE);
+          deptCell.font = { ...deptCell.font, bold: true };
 
-      const projectSummarySheet = XLSX.utils.aoa_to_sheet(projectSummaryRows);
-      projectSummarySheet['!cols'] = [
-        { wch: 12 }, { wch: 34 }, { wch: 26 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 8 },
-        { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 12 },
-      ];
-      XLSX.utils.book_append_sheet(workbook, projectSummarySheet, 'Projects_Summary');
+          const quotedCell = projectsSheet.getCell(projRow, 2);
+          quotedCell.value = roundValue(quoted);
+          setBodyCell(quotedCell, 'EEF2FF', '1E3A8A');
 
-      const projectMatrixRows: Array<Array<string | number>> = [
-        [
-          language === 'es' ? 'Proyecto ID' : 'Project ID',
-          language === 'es' ? 'Proyecto' : 'Project',
-          language === 'es' ? 'Departamento' : 'Department',
-          language === 'es' ? 'Tipo de fila' : 'Row type',
-          ...weekColumns,
-        ],
-      ];
+          const usedCell = projectsSheet.getCell(projRow, 3);
+          usedCell.value = roundValue(used);
+          setBodyCell(usedCell, 'ECFDF5', '065F46');
 
-      projectsVisibleInCurrentView.forEach((proj) => {
-        const projectWeekRow: Array<string | number> = [
-          proj.id,
-          proj.name,
-          language === 'es' ? 'SEMANA_PROYECTO' : 'PROJECT_WEEK',
-          language === 'es' ? 'Numero de semana' : 'Week number',
-        ];
+          const forecastCell = projectsSheet.getCell(projRow, 4);
+          forecastCell.value = roundValue(forecasted);
+          setBodyCell(forecastCell, 'FEF3C7', '92400E');
 
-        allWeeksData.forEach((weekData) => {
-          projectWeekRow.push(getProjectWeekNumber(proj, weekData.date) ?? '');
-        });
-        projectMatrixRows.push(projectWeekRow);
-
-        DEPARTMENTS.forEach((dept) => {
-          const hoursRow: Array<string | number> = [proj.id, proj.name, dept, language === 'es' ? 'Horas' : 'Hours'];
-
-          allWeeksData.forEach((weekData) => {
-            const cellKey = `${proj.id}|${dept}|${weekData.date}`;
-            const totalHours = assignmentIndex.byCell.get(cellKey)?.totalHours ?? 0;
-            hoursRow.push(roundValue(totalHours));
-          });
-
-          projectMatrixRows.push(hoursRow);
-        });
-
-        projectMatrixRows.push([]);
-      });
-
-      const projectMatrixSheet = XLSX.utils.aoa_to_sheet(projectMatrixRows);
-      projectMatrixSheet['!cols'] = [
-        { wch: 12 },
-        { wch: 34 },
-        { wch: 14 },
-        { wch: 14 },
-        ...allWeeksData.map(() => ({ wch: 12 })),
-      ];
-      XLSX.utils.book_append_sheet(workbook, projectMatrixSheet, 'Projects_Matrix');
-
-      const projectDetailRows: Array<Array<string | number>> = [
-        [
-          language === 'es' ? 'Proyecto ID' : 'Project ID',
-          language === 'es' ? 'Proyecto' : 'Project',
-          language === 'es' ? 'Departamento' : 'Department',
-          language === 'es' ? 'Semana inicio' : 'Week start',
-          'CW',
-          language === 'es' ? 'Mes' : 'Month',
-          language === 'es' ? 'Semana proyecto' : 'Project week',
-          language === 'es' ? 'En rango proyecto' : 'In project range',
-          language === 'es' ? 'En rango departamento' : 'In department range',
-          language === 'es' ? 'Horas' : 'Hours',
-          language === 'es' ? 'Talento' : 'Talent',
-          language === 'es' ? 'Etapa (codigo)' : 'Stage (code)',
-          language === 'es' ? 'Etapa (label)' : 'Stage (label)',
-          language === 'es' ? 'Comentario' : 'Comment',
-          language === 'es' ? 'Asignaciones' : 'Assignments',
-        ],
-      ];
-
-      projectsVisibleInCurrentView.forEach((proj) => {
-        DEPARTMENTS.forEach((dept) => {
           const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
           const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
           const effectiveEndDate = deptMeta?.effectiveEndDate || proj.endDate || proj.startDate;
 
+          allWeeksData.forEach((weekData, idx) => {
+            const week = weekData.date;
+            const cellEntry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${week}`);
+            const totalHours = cellEntry?.totalHours ?? 0;
+            const stage = cellEntry?.stage || '';
+            const inDeptRange = week >= effectiveStartDate && week <= effectiveEndDate;
+            const targetCell = projectsSheet.getCell(projRow, 5 + idx);
+
+            targetCell.value = totalHours > 0 ? roundValue(totalHours) : '';
+            targetCell.numFmt = '0.###';
+
+            if (!inDeptRange) {
+              setBodyCell(targetCell, 'F3F4F6', '6B7280');
+            } else if (stage && stagePalette[stage]) {
+              const palette = stagePalette[stage];
+              setBodyCell(targetCell, palette.bg, palette.fg);
+            } else if (totalHours > 0) {
+              setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
+            } else {
+              setBodyCell(targetCell, 'ECFDF5', '065F46');
+            }
+          });
+
+          projRow += 1;
+        });
+
+        projRow += 1;
+      });
+
+      const buildDepartmentYearSheet = (dept: Department) => {
+        const sheetName = `${dept}-${selectedYear}`.slice(0, 31);
+        const deptSheet = workbook.addWorksheet(sheetName, {
+          views: [{ state: 'frozen', ySplit: 5, xSplit: 2 }],
+        });
+
+        deptSheet.columns = [
+          { width: 20 },
+          { width: 12 },
+          ...allWeeksData.map(() => ({ width: 9 })),
+        ];
+
+        deptSheet.mergeCells(`A1:${fullEndCol}1`);
+        const titleCell = deptSheet.getCell('A1');
+        titleCell.value = `${dept} - ${selectedYear} ${language === 'es' ? 'Capacidad' : 'Capacity'}`;
+        setHeaderCell(titleCell, BRAND_PURPLE);
+        titleCell.font = { ...titleCell.font, size: 13, bold: true };
+
+        deptSheet.mergeCells('A2:B2');
+        const metaLabel = deptSheet.getCell('A2');
+        metaLabel.value = language === 'es' ? 'Vista / Generado' : 'View / Generated';
+        setHeaderCell(metaLabel, BRAND_PURPLE_SOFT);
+        metaLabel.font = { ...metaLabel.font, size: 9 };
+
+        deptSheet.mergeCells(`C2:${fullEndCol}2`);
+        const metaValue = deptSheet.getCell('C2');
+        metaValue.value = `${viewLabel} | ${generatedAt}`;
+        setBodyCell(metaValue, BG_LIGHT);
+        metaValue.alignment = { vertical: 'middle', horizontal: 'left' };
+
+        deptSheet.getRow(3).height = 8;
+        for (let col = 1; col <= weekColEnd; col += 1) {
+          const spacerCell = deptSheet.getCell(3, col);
+          setBodyCell(spacerCell, WHITE);
+          spacerCell.value = '';
+        }
+
+        monthSpans.forEach((monthInfo, idx) => {
+          const startCol = weekColStart + monthInfo.startIdx;
+          const endCol = weekColStart + monthInfo.endIdx;
+          const startRef = `${getColName(startCol)}4`;
+          const endRef = `${getColName(endCol)}4`;
+          deptSheet.mergeCells(`${startRef}:${endRef}`);
+          const monthCell = deptSheet.getCell(startRef);
+          monthCell.value = monthInfo.month;
+          setHeaderCell(monthCell, idx % 2 === 0 ? BRAND_PURPLE : 'FACC15', idx % 2 === 0 ? WHITE : '1F2937');
+        });
+
+        const metricHeader = deptSheet.getCell('A5');
+        metricHeader.value = language === 'es' ? 'Metrica' : 'Metric';
+        setHeaderCell(metricHeader, BRAND_PURPLE);
+        const unitHeader = deptSheet.getCell('B5');
+        unitHeader.value = language === 'es' ? 'Unidad' : 'Unit';
+        setHeaderCell(unitHeader, BRAND_PURPLE);
+
+        allWeeksData.forEach((weekData, idx) => {
+          const cwCell = deptSheet.getCell(5, weekColStart + idx);
+          cwCell.value = `CW${weekData.weekNum}`;
+          const isCurrent = idx === currentDateWeekIndex;
+          setHeaderCell(cwCell, isCurrent ? '57534E' : BRAND_PURPLE_SOFT);
+        });
+
+        const usedRow = 6;
+        const capacityRow = 7;
+        const utilRow = 8;
+
+        const rowMeta = [
+          { row: usedRow, label: language === 'es' ? 'Usado' : 'Used', unit: dept === 'MFG' ? 'h' : 'People' },
+          { row: capacityRow, label: language === 'es' ? 'Capacidad' : 'Capacity', unit: dept === 'MFG' ? 'h' : 'People' },
+          { row: utilRow, label: language === 'es' ? 'Utilizacion %' : 'Utilization %', unit: '%' },
+        ];
+        rowMeta.forEach(({ row, label, unit }) => {
+          const labelCell = deptSheet.getCell(row, 1);
+          labelCell.value = label;
+          setBodyCell(labelCell, BG_LIGHT, BRAND_PURPLE);
+          labelCell.font = { ...labelCell.font, bold: true };
+
+          const unitCell = deptSheet.getCell(row, 2);
+          unitCell.value = unit;
+          setBodyCell(unitCell, BG_LIGHT, BRAND_PURPLE);
+          unitCell.font = { ...unitCell.font, bold: true };
+        });
+
+        allWeeksData.forEach((weekData, idx) => {
+          const deptWeekKey = `${dept}|${weekData.date}`;
+          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
+          const occupiedValue = dept === 'MFG' ? totalWeekHours : totalWeekHours / 45;
+          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
+          const utilizationPercent = totalCapacity > 0
+            ? (occupiedValue / totalCapacity) * 100
+            : (occupiedValue > 0 ? 100 : 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
+
+          const usedCell = deptSheet.getCell(usedRow, weekColStart + idx);
+          usedCell.value = roundValue(occupiedValue);
+          setBodyCell(usedCell, 'F9FAFB', '1F2937');
+
+          const capacityCell = deptSheet.getCell(capacityRow, weekColStart + idx);
+          capacityCell.value = roundValue(totalCapacity);
+          setBodyCell(capacityCell, 'ECFDF5', '065F46');
+
+          const utilCell = deptSheet.getCell(utilRow, weekColStart + idx);
+          utilCell.value = roundValue(utilizationPercent) / 100;
+          utilCell.numFmt = '0%';
+          setBodyCell(utilCell, palette.bg, palette.fg);
+          utilCell.font = { ...utilCell.font, bold: true };
+        });
+      };
+
+      DEPARTMENTS.forEach((dept) => {
+        buildDepartmentYearSheet(dept);
+      });
+
+      const detailSheet = workbook.addWorksheet('DATA');
+      detailSheet.columns = [
+        { header: language === 'es' ? 'Proyecto ID' : 'Project ID', key: 'projectId', width: 12 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 32 },
+        { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
+        { header: language === 'es' ? 'Semana' : 'Week', key: 'week', width: 12 },
+        { header: 'CW', key: 'cw', width: 8 },
+        { header: language === 'es' ? 'Semana proyecto' : 'Project week', key: 'projectWeek', width: 12 },
+        { header: language === 'es' ? 'Horas' : 'Hours', key: 'hours', width: 10 },
+        { header: language === 'es' ? 'Talento' : 'Talent', key: 'talent', width: 10 },
+        { header: language === 'es' ? 'Etapa' : 'Stage', key: 'stage', width: 28 },
+        { header: language === 'es' ? 'Comentario' : 'Comment', key: 'comment', width: 40 },
+      ];
+
+      detailSheet.getRow(1).eachCell((cell: any) => {
+        setHeaderCell(cell, BRAND_PURPLE);
+      });
+
+      projectsVisibleInCurrentView.forEach((proj) => {
+        DEPARTMENTS.forEach((dept) => {
           allWeeksData.forEach((weekData) => {
             const week = weekData.date;
-            const cellKey = `${proj.id}|${dept}|${week}`;
-            const cellEntry = assignmentIndex.byCell.get(cellKey);
+            const cellEntry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${week}`);
             const totalHours = cellEntry?.totalHours ?? 0;
-            const stage = cellEntry?.stage ?? null;
-            const stageLabel = stage ? getStageLabel(stage, t as Record<string, string>) : '';
+            const stage = cellEntry?.stage ?? '';
+            const stageLabel = stage ? getStageLabel(stage as Stage, t as Record<string, string>) : '';
             const comment = cellEntry?.comment ?? '';
-            const assignmentCount = cellEntry?.assignments.length ?? 0;
-            const projectWeekNumber = getProjectWeekNumber(proj, week);
-            const inProjectRange = isWeekInProjectRange(week, proj);
-            const inDeptRange = week >= effectiveStartDate && week <= effectiveEndDate;
-            const monthName = parseISODate(week).toLocaleString(locale, { month: 'short', year: 'numeric' });
 
-            projectDetailRows.push([
-              proj.id,
-              proj.name,
-              dept,
+            detailSheet.addRow({
+              projectId: proj.id,
+              projectName: proj.name,
+              department: dept,
               week,
-              weekData.weekNum,
-              monthName,
-              projectWeekNumber ?? '',
-              inProjectRange ? 1 : 0,
-              inDeptRange ? 1 : 0,
-              roundValue(totalHours),
-              roundValue(calculateTalent(totalHours)),
-              stage ?? '',
-              stageLabel,
+              cw: weekData.weekNum,
+              projectWeek: getProjectWeekNumber(proj, week) ?? '',
+              hours: roundValue(totalHours),
+              talent: roundValue(calculateTalent(totalHours)),
+              stage: stageLabel || stage,
               comment,
-              assignmentCount,
-            ]);
+            });
           });
         });
       });
 
-      const projectDetailSheet = XLSX.utils.aoa_to_sheet(projectDetailRows);
-      projectDetailSheet['!cols'] = [
-        { wch: 12 }, { wch: 34 }, { wch: 14 }, { wch: 12 }, { wch: 6 }, { wch: 12 }, { wch: 12 },
-        { wch: 13 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 10 },
-      ];
-      XLSX.utils.book_append_sheet(workbook, projectDetailSheet, 'Projects_Detail');
+      for (let r = 2; r <= detailSheet.rowCount; r += 1) {
+        const row = detailSheet.getRow(r);
+        row.eachCell((cell: any) => setBodyCell(cell, WHITE, '1F2937'));
+      }
 
       const departmentLabel = (departmentFilter === 'General' ? 'general' : departmentFilter)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-');
       const dateStamp = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(workbook, `capacity-projects-${departmentLabel}-${dateStamp}.xlsx`);
+      const fileName = `capacity-tool-export-${departmentLabel}-${dateStamp}.xlsx`;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob(
+        [buffer],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting Excel:', error);
       alert(language === 'es'
