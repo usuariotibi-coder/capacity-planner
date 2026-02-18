@@ -2281,7 +2281,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       });
 
       const projectsSheet = workbook.addWorksheet(`${selectedYear}-MX`, {
-        views: [{ state: 'frozen', ySplit: 4, xSplit: 4 }],
+        // Freeze between C|D (xSplit=3) and 9|10 (ySplit=9)
+        views: [{ state: 'frozen', ySplit: 9, xSplit: 3 }],
       });
 
       projectsSheet.columns = [
@@ -2410,6 +2411,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         projHeaderCell.value = `${proj.name} | ${weeks} ${language === 'es' ? 'semanas' : 'weeks'} | PM: ${pmName}`;
         setHeaderCell(projHeaderCell, BRAND_PURPLE_SOFT);
         projHeaderCell.alignment = { vertical: 'middle', horizontal: 'left' };
+        projRow += 1;
+
+        // Per-project week scale row (requested for every project block)
+        const projectWeekRowLabelCell = projectsSheet.getCell(projRow, 2);
+        projectWeekRowLabelCell.value = language === 'es' ? 'PROJECT WEEK' : 'PROJECT WEEK';
+        setHeaderCell(projectWeekRowLabelCell, BRAND_PURPLE);
+        for (let c = 1; c <= 5; c += 1) {
+          if (c === 2) continue;
+          const ccell = projectsSheet.getCell(projRow, c);
+          ccell.value = '';
+          setHeaderCell(ccell, BRAND_PURPLE);
+        }
+        allWeeksData.forEach((weekData, idx) => {
+          const cwCell = projectsSheet.getCell(projRow, 6 + idx);
+          const weekNum = getProjectWeekNumber(proj, weekData.date);
+          cwCell.value = weekNum ?? '';
+          setBodyCell(cwCell, BG_LIGHT, BRAND_PURPLE);
+        });
         projRow += 1;
 
         DEPARTMENTS.forEach((dept) => {
