@@ -1,42 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 230" width="620" height="230">
-  <g fill="#dfd9ea">
-    <!-- S -->
-    <rect x="20" y="24" width="145" height="30" rx="6"/>
-    <rect x="20" y="77" width="145" height="30" rx="6"/>
-    <rect x="20" y="130" width="145" height="30" rx="6"/>
-    <rect x="20" y="24" width="32" height="53" rx="6"/>
-    <rect x="133" y="77" width="32" height="53" rx="6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" width="640" height="220">
+  <defs>
+    <linearGradient id="scioLetters" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f0ecf7"/>
+      <stop offset="100%" stop-color="#d8d2e6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- S -->
+  <g fill="url(#scioLetters)">
+    <rect x="22" y="22" width="152" height="34" rx="8" />
+    <rect x="22" y="79" width="152" height="34" rx="8" />
+    <rect x="22" y="136" width="152" height="34" rx="8" />
+    <rect x="22" y="22" width="34" height="57" rx="8" />
+    <rect x="140" y="79" width="34" height="57" rx="8" />
 
     <!-- C -->
-    <rect x="184" y="24" width="145" height="30" rx="6"/>
-    <rect x="184" y="24" width="32" height="136" rx="6"/>
-    <rect x="184" y="130" width="145" height="30" rx="6"/>
+    <rect x="192" y="22" width="152" height="34" rx="8" />
+    <rect x="192" y="22" width="34" height="148" rx="8" />
+    <rect x="192" y="136" width="152" height="34" rx="8" />
 
     <!-- I -->
-    <rect x="350" y="24" width="32" height="136" rx="6"/>
+    <rect x="362" y="22" width="34" height="148" rx="8" />
   </g>
 
   <!-- O -->
-  <path
-    fill="#dfd9ea"
-    fill-rule="evenodd"
-    d="M404 24h166v136H404zM438 58h98v68h-98z"
-  />
+  <path fill="url(#scioLetters)" fill-rule="evenodd" d="M414 22h178v148H414zM448 56h110v80H448z" />
 
-  <!-- Accent -->
-  <rect x="383" y="18" width="22" height="22" rx="3" fill="#ce0037"/>
+  <!-- red accent -->
+  <rect x="396" y="16" width="22" height="22" rx="4" fill="#ce0037" />
 
   <!-- AUTOMATION -->
   <text
-    x="430"
-    y="198"
+    x="445"
+    y="202"
     text-anchor="middle"
-    font-family="'Barlow Condensed', 'Arial Narrow', Arial, sans-serif"
-    font-size="52"
+    font-family="'Arial Black', 'Impact', sans-serif"
+    font-size="50"
     font-style="italic"
-    letter-spacing="1.1"
+    letter-spacing="0.3"
     fill="#ce0037"
-  >
-    AUTOMATION
-  </text>
+    stroke="#140f1e"
+    stroke-width="4.2"
+    paint-order="stroke fill"
+  >AUTOMATION</text>
 </svg>
