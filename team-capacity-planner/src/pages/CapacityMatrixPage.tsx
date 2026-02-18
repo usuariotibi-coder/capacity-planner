@@ -2393,7 +2393,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const projHeaderCell = projectsSheet.getCell(`A${projRow}`);
         const pmName = projectManagerNameById.get(proj.id) || '-';
         const weeks = projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks ?? 0;
-        projHeaderCell.value = `${proj.id} | ${proj.name} | ${weeks} ${language === 'es' ? 'semanas' : 'weeks'} | PM: ${pmName}`;
+        projHeaderCell.value = `${proj.name} | ${weeks} ${language === 'es' ? 'semanas' : 'weeks'} | PM: ${pmName}`;
         setHeaderCell(projHeaderCell, BRAND_PURPLE_SOFT);
         projHeaderCell.alignment = { vertical: 'middle', horizontal: 'left' };
         projRow += 1;
@@ -2582,7 +2582,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           deptSheet.mergeCells(`B${projectRow}:C${projectRow}`);
           const projLabelCell = deptSheet.getCell(`B${projectRow}`);
-          projLabelCell.value = `${proj.id} ${proj.name}`;
+          projLabelCell.value = `${proj.name}`;
           setBodyCell(projLabelCell, BG_LIGHT, BRAND_PURPLE);
           projLabelCell.font = { ...projLabelCell.font, bold: true };
 
