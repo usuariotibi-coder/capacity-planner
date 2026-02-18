@@ -120,7 +120,7 @@ const LoginPage: React.FC = () => {
             <img
               src="/scio-wordmark.svg"
               alt="SCIO Automation"
-              className="h-auto w-[250px] max-w-full md:w-[290px]"
+              className="h-auto w-[290px] max-w-full md:w-[320px]"
             />
           </div>
 
@@ -131,8 +131,6 @@ const LoginPage: React.FC = () => {
             <h1 className="brand-auth-title text-4xl mb-1">
               {t.teamCapacity}
             </h1>
-            <p className="text-[#d5d1da] text-sm font-medium">{t.teamCapacityPlanner}</p>
-            <p className="mt-1 text-[#bdb1d1] text-xs">{t.loginSubtitle}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

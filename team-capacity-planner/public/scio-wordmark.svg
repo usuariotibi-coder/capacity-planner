@@ -1,49 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 235" width="640" height="235">
-  <defs>
-    <linearGradient id="scioFill" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#f3eff8"/>
-      <stop offset="100%" stop-color="#d8d1e7"/>
-    </linearGradient>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 230" width="620" height="230">
+  <g fill="#dfd9ea">
+    <!-- S -->
+    <rect x="20" y="24" width="145" height="30" rx="6"/>
+    <rect x="20" y="77" width="145" height="30" rx="6"/>
+    <rect x="20" y="130" width="145" height="30" rx="6"/>
+    <rect x="20" y="24" width="32" height="53" rx="6"/>
+    <rect x="133" y="77" width="32" height="53" rx="6"/>
 
-  <!-- S -->
-  <g fill="url(#scioFill)">
-    <rect x="24" y="26" width="144" height="32" rx="5"/>
-    <rect x="24" y="84" width="144" height="32" rx="5"/>
-    <rect x="24" y="142" width="144" height="32" rx="5"/>
-    <rect x="24" y="26" width="30" height="58" rx="5"/>
-    <rect x="138" y="84" width="30" height="58" rx="5"/>
+    <!-- C -->
+    <rect x="184" y="24" width="145" height="30" rx="6"/>
+    <rect x="184" y="24" width="32" height="136" rx="6"/>
+    <rect x="184" y="130" width="145" height="30" rx="6"/>
+
+    <!-- I -->
+    <rect x="350" y="24" width="32" height="136" rx="6"/>
   </g>
-
-  <!-- C -->
-  <g fill="url(#scioFill)">
-    <rect x="188" y="26" width="144" height="32" rx="5"/>
-    <rect x="188" y="26" width="30" height="148" rx="5"/>
-    <rect x="188" y="142" width="144" height="32" rx="5"/>
-  </g>
-
-  <!-- I -->
-  <rect x="356" y="26" width="30" height="148" rx="5" fill="url(#scioFill)"/>
 
   <!-- O -->
   <path
-    fill="url(#scioFill)"
+    fill="#dfd9ea"
     fill-rule="evenodd"
-    d="M409 26h169v148H409zM439 58h109v84H439z"
+    d="M404 24h166v136H404zM438 58h98v68h-98z"
   />
 
-  <!-- red square accent -->
-  <rect x="389" y="19" width="21" height="21" rx="3" fill="#ce0037"/>
+  <!-- Accent -->
+  <rect x="383" y="18" width="22" height="22" rx="3" fill="#ce0037"/>
 
   <!-- AUTOMATION -->
   <text
     x="430"
-    y="214"
+    y="198"
     text-anchor="middle"
-    font-family="'Arial Narrow', 'Franklin Gothic Medium', Arial, sans-serif"
-    font-size="56"
+    font-family="'Barlow Condensed', 'Arial Narrow', Arial, sans-serif"
+    font-size="52"
     font-style="italic"
-    letter-spacing="1.3"
+    letter-spacing="1.1"
     fill="#ce0037"
   >
     AUTOMATION
