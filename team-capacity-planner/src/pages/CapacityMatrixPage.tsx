@@ -20,6 +20,8 @@ type DepartmentFilter = 'General' | Department;
 type LegendStage = Exclude<Stage, null>;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
+const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
 
 const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
@@ -83,6 +85,27 @@ const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yello
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
 const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
+
+const getDepartmentVisibilityScopes = (project: Project): Department[] => {
+  const rawScopes = project.visibleInDepartments || [];
+  return rawScopes.filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+};
+
+const isProjectVisibleInDepartment = (project: Project, department: Department): boolean => {
+  const departmentScopes = getDepartmentVisibilityScopes(project);
+  if (departmentScopes.length === 0) {
+    return true;
+  }
+  return departmentScopes.includes(department);
+};
+
+const isProjectVisibleInGeneral = (project: Project): boolean => {
+  const rawScopes = project.visibleInDepartments || [];
+  if (rawScopes.length === 0) {
+    return true;
+  }
+  return rawScopes.includes(GENERAL_VISIBILITY_SCOPE);
+};
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
@@ -1279,12 +1302,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const departmentProjects = useMemo(() => {
     const dept = departmentFilter as Department;
-    return projects.filter((proj) => {
-      if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
-        return proj.visibleInDepartments.includes(dept);
-      }
-      return true;
-    });
+    return projects.filter((proj) => isProjectVisibleInDepartment(proj, dept));
   }, [projects, departmentFilter]);
 
   const generalProjects = useMemo(() => {
@@ -1294,7 +1312,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     const { rangeStart, rangeEnd } = weekRange;
     return projects.filter((proj) => {
-      if (proj.visibleInDepartments && proj.visibleInDepartments.length > 0) {
+      if (!isProjectVisibleInGeneral(proj)) {
         return false;
       }
 
@@ -1682,7 +1700,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const dept = departmentFilter as Department;
     return projects.filter(proj => {
       // Exclude projects that already have this department in visibleInDepartments
-      if (proj.visibleInDepartments && proj.visibleInDepartments.includes(dept)) {
+      if (isProjectVisibleInDepartment(proj, dept)) {
         return false;
       }
       // Exclude projects that already have departmentStages configured for this department

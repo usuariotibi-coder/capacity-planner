@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useProjectStore } from '../stores/projectStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
-import type { Project, Department, DepartmentStageConfig } from '../types';
+import type { Project, Department, DepartmentStageConfig, ProjectVisibilityScope } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
@@ -14,6 +14,19 @@ import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const FACILITIES = ['AL', 'MI', 'MX'] as const;
+const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
+const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
+
+const getDepartmentScopesFromVisibility = (scopes?: ProjectVisibilityScope[]): Department[] => {
+  const rawScopes = scopes || [];
+  return rawScopes.filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+};
+
+const shouldProjectShowInGeneral = (scopes?: ProjectVisibilityScope[]): boolean => {
+  const rawScopes = scopes || [];
+  if (rawScopes.length === 0) return true;
+  return rawScopes.includes(GENERAL_VISIBILITY_SCOPE);
+};
 
 interface HoursPerDepartment {
   PM: number;
@@ -77,6 +90,7 @@ export function ProjectsPage() {
   const [selectedYear] = useState<number>(2025);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
+  const [showInGeneral, setShowInGeneral] = useState<boolean>(true);
   const [formNotice, setFormNotice] = useState<{ type: FormNoticeType; message: string } | null>(null);
 
   useEffect(() => {
@@ -117,6 +131,28 @@ export function ProjectsPage() {
 
     // Calculate relative week (1-based)
     return deptWeekIndex - projectWeekIndex + 1;
+  };
+
+  const buildVisibilityScopesForSubmit = (existingScopes?: ProjectVisibilityScope[]): ProjectVisibilityScope[] => {
+    const departmentScopes = getDepartmentScopesFromVisibility(existingScopes);
+    const hasDepartmentScopes = departmentScopes.length > 0;
+
+    // Keep existing scoped departments. If none exist and General is disabled,
+    // fallback to all departments so the project is still visible in department views.
+    const nextDepartmentScopes: Department[] = hasDepartmentScopes
+      ? departmentScopes
+      : (showInGeneral ? [] : [...DEPARTMENTS]);
+
+    if (!showInGeneral) {
+      return nextDepartmentScopes;
+    }
+
+    if (nextDepartmentScopes.length === 0) {
+      // Legacy/global behavior: empty list means visible in all departments and General view.
+      return [];
+    }
+
+    return [...nextDepartmentScopes, GENERAL_VISIBILITY_SCOPE];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,6 +196,8 @@ export function ProjectsPage() {
       }
     });
 
+    const visibilityScopesForSubmit = buildVisibilityScopesForSubmit(formData.visibleInDepartments);
+
     try {
       if (editingId) {
         console.log('[ProjectsPage] Updating project with budget hours:', deptHoursAllocated);
@@ -170,8 +208,9 @@ export function ProjectsPage() {
           projectManagerId: selectedProjectManagerId || undefined,
           departmentStages: calculatedDepartmentStages,
           departmentHoursAllocated: deptHoursAllocated,
+          visibleInDepartments: visibilityScopesForSubmit,
         });
-        console.log('[ProjectsPage] ✓ Project updated successfully');
+        console.log('[ProjectsPage] âœ“ Project updated successfully');
         setEditingId(null);
         setIsFormOpen(false);
         setFormNotice({
@@ -190,13 +229,14 @@ export function ProjectsPage() {
         projectManagerId: selectedProjectManagerId || undefined,
         departmentStages: calculatedDepartmentStages,
         departmentHoursAllocated: deptHoursAllocated,
+        visibleInDepartments: visibilityScopesForSubmit,
       };
 
       // Wait for project to be created in backend
       const createdProject = await addProject(newProject);
-      console.log('[ProjectsPage] ✓ Project created successfully');
+      console.log('[ProjectsPage] âœ“ Project created successfully');
 
-      // Crear asignaciones automáticas para cada departamento
+      // Crear asignaciones automÃ¡ticas para cada departamento
       const weekStarts = getWeekStartsForProject(formData.startDate, numberOfWeeks);
 
       DEPARTMENTS.forEach((dept) => {
@@ -237,6 +277,7 @@ export function ProjectsPage() {
       setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
       setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '' });
       setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
+      setShowInGeneral(true);
       setIsFormOpen(false);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
@@ -310,6 +351,7 @@ export function ProjectsPage() {
 
     // Load Project Manager if exists
     setSelectedProjectManagerId(proj.projectManagerId || null);
+    setShowInGeneral(shouldProjectShowInGeneral(proj.visibleInDepartments));
 
     setIsFormOpen(true);
   };
@@ -324,6 +366,7 @@ export function ProjectsPage() {
     setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
     setSelectedProjectManagerId(null);
+    setShowInGeneral(true);
     setFormNotice(null);
   };
 
@@ -352,6 +395,7 @@ export function ProjectsPage() {
           onClick={() => {
             if (!hasFullAccess) return;
             setFormNotice(null);
+            setShowInGeneral(true);
             setIsFormOpen(true);
           }}
           disabled={!hasFullAccess}
@@ -399,10 +443,10 @@ export function ProjectsPage() {
                   }`}
                 >
                   {formNotice.type === 'success'
-                    ? (language === 'es' ? 'Operación exitosa' : 'Operation successful')
+                    ? (language === 'es' ? 'OperaciÃ³n exitosa' : 'Operation successful')
                     : formNotice.type === 'warning'
                       ? (language === 'es' ? 'Faltan datos' : 'Missing data')
-                      : (language === 'es' ? 'Ocurrió un error' : 'An error occurred')}
+                      : (language === 'es' ? 'OcurriÃ³ un error' : 'An error occurred')}
                 </p>
                 <p
                   className={`text-xs ${
@@ -439,7 +483,7 @@ export function ProjectsPage() {
       {isFormOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 overflow-y-auto">
           <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-6 shadow-lg w-full max-w-[95vw] sm:max-w-lg md:max-w-2xl">
+            <div className="bg-gradient-to-br from-white via-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-3 sm:p-4 lg:p-5 shadow-lg w-full max-w-[96vw] lg:max-w-5xl">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-2 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded"></div>
                 <h2 className="brand-title text-2xl font-bold">
@@ -447,12 +491,11 @@ export function ProjectsPage() {
                 </h2>
               </div>
 
-              <div className="max-h-[calc(90vh-200px)] overflow-y-auto">
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-3">
                   {/* Row 1: Job and Customer */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.job}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.job}</label>
                       <input
                         type="text"
                         value={formData.name || ''}
@@ -462,7 +505,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">👥 {t.customer}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¥ {t.customer}</label>
                       <input
                         type="text"
                         value={formData.client || ''}
@@ -476,7 +519,7 @@ export function ProjectsPage() {
                   {/* Row 2: Dates and Weeks */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDate}</label>
                       <WeekNumberDatePicker
                         value={formData.startDate || ''}
                         onChange={(date) => setFormData({ ...formData, startDate: date })}
@@ -485,7 +528,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">⏱️ {t.numberOfWeeks}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -506,7 +549,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">🏭 {t.facility}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ­ {t.facility}</label>
                       <select
                         value={formData.facility || 'AL'}
                         onChange={(e) => setFormData({ ...formData, facility: e.target.value as any })}
@@ -521,28 +564,49 @@ export function ProjectsPage() {
                     </div>
                   </div>
 
-                  {/* Row 3: Project Manager */}
-                  <div>
-                    <label className="block text-sm font-bold mb-1.5 text-gray-700">👨‍💼 {t.projectManager}</label>
-                    <select
-                      value={selectedProjectManagerId || ''}
-                      onChange={(e) => setSelectedProjectManagerId(e.target.value || null)}
-                      className="w-full border-2 border-blue-200 rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
-                    >
-                      <option value="">{t.selectProjectManager}</option>
-                      {employees
-                        .filter((emp) => emp.department === 'PM' && emp.isActive)
-                        .map((emp) => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.name}
-                          </option>
-                        ))}
-                    </select>
+                  {/* Row 3: Project Manager + General visibility */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¨â€ðŸ’¼ {t.projectManager}</label>
+                      <select
+                        value={selectedProjectManagerId || ''}
+                        onChange={(e) => setSelectedProjectManagerId(e.target.value || null)}
+                        className="w-full border-2 border-blue-200 rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
+                      >
+                        <option value="">{t.selectProjectManager}</option>
+                        {employees
+                          .filter((emp) => emp.department === 'PM' && emp.isActive)
+                          .map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-indigo-900">
+                          {language === 'es' ? 'Mostrar en pantalla general' : 'Show in General view'}
+                        </p>
+                        <p className="text-xs text-indigo-700">
+                          {language === 'es'
+                            ? 'Si estÃ¡ activo, este proyecto tambiÃ©n aparece en la vista General.'
+                            : 'When enabled, this project also appears in the General screen.'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={showInGeneral}
+                        onChange={(e) => setShowInGeneral(e.target.checked)}
+                        className="h-5 w-5 accent-indigo-600 cursor-pointer"
+                        aria-label={language === 'es' ? 'Mostrar en pantalla general' : 'Show in General view'}
+                      />
+                    </div>
                   </div>
 
                   {/* Budget Hours per Department */}
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg border-l-4 border-green-600">
-                    <h3 className="font-semibold mb-2 text-sm text-green-900">💼 {t.budgetHours}</h3>
+                    <h3 className="font-semibold mb-2 text-sm text-green-900">ðŸ’¼ {t.budgetHours}</h3>
                     <p className="text-xs text-green-700 mb-2">{t.defineHours}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                       {DEPARTMENTS.map((dept) => (
@@ -591,14 +655,14 @@ export function ProjectsPage() {
                   {/* Configuration by Department - Compact */}
                   <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-lg border-l-4 border-indigo-600">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-sm text-indigo-900">📅 {t.configByDepartment}</h3>
+                      <h3 className="font-semibold text-sm text-indigo-900">ðŸ“… {t.configByDepartment}</h3>
                       {formData.startDate && (
                         <span className="text-xs text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full font-medium">
                           {t.startDate}: {formatDateDayFirst(formData.startDate)}
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {DEPARTMENTS.filter(dept => dept !== 'PM').map((dept) => {
                         const deptInfo = getDepartmentIcon(dept);
                         return (
@@ -634,7 +698,7 @@ export function ProjectsPage() {
                           </div>
                         );
                       })}
-                      <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-200 col-span-2 flex items-center gap-2">
+                      <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-200 md:col-span-2 lg:col-span-3 flex items-center gap-2">
                         <span className={`${getDepartmentIcon('PM').color} text-lg`}>{getDepartmentIcon('PM').icon}</span>
                         <div className="flex-1">
                           <span className="font-semibold text-xs text-blue-900">{getDepartmentLabel('PM', t)}</span>
@@ -648,25 +712,24 @@ export function ProjectsPage() {
                   {formData.startDate && (
                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                       <p className="text-xs text-blue-900">
-                        <strong>{t.summary}:</strong> {formatDate(formData.startDate)} • {numberOfWeeks} {t.weeks} • {formatDate(calculateEndDate(formData.startDate, numberOfWeeks))}
+                        <strong>{t.summary}:</strong> {formatDate(formData.startDate)} â€¢ {numberOfWeeks} {t.weeks} â€¢ {formatDate(calculateEndDate(formData.startDate, numberOfWeeks))}
                       </p>
                     </div>
                   )}
                 </form>
-              </div>
 
               <div className="flex gap-3 mt-4 pt-4 border-t-2 border-blue-200 sticky bottom-0 bg-gradient-to-br from-white via-blue-50 to-indigo-50">
                 <button
                   onClick={handleSubmit}
                   className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-6 py-2.5 rounded-lg transition shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                 >
-                  ✓ {editingId ? t.updateProject : t.createProject}
+                  âœ“ {editingId ? t.updateProject : t.createProject}
                 </button>
                 <button
                   onClick={handleCancel}
                   className="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white font-bold px-6 py-2.5 rounded-lg transition shadow-md hover:shadow-lg text-sm"
                 >
-                  ✕ {t.cancel}
+                  âœ• {t.cancel}
                 </button>
               </div>
             </div>
@@ -680,13 +743,13 @@ export function ProjectsPage() {
         <table className="brand-table w-full border-collapse">
           <thead>
             <tr>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">📋 {t.job}</th>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">👥 {t.customer}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">🏭 {t.facility}</th>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">👨‍💼 {t.projectManager}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">📅 {t.start}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">⏱️ {t.weeksLabel}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">⚙️ {t.actions}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ“‹ {t.job}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ‘¥ {t.customer}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">ðŸ­ {t.facility}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ‘¨â€ðŸ’¼ {t.projectManager}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">ðŸ“… {t.start}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">â±ï¸ {t.weeksLabel}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">âš™ï¸ {t.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -728,12 +791,12 @@ export function ProjectsPage() {
                         }`}
                         title={t.edit}
                       >
-                        ✎
+                        âœŽ
                       </button>
                       <button
                         onClick={async () => {
                           if (!hasFullAccess) return;
-                          if (window.confirm(language === 'es' ? `¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
+                          if (window.confirm(language === 'es' ? `Â¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
                             try {
                               await deleteProject(proj.id);
                             } catch (error) {
@@ -768,3 +831,4 @@ export function ProjectsPage() {
     </div>
   );
 }
+

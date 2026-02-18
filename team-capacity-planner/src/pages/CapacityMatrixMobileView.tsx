@@ -20,6 +20,8 @@ interface CapacityMatrixMobileViewProps {
 }
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
+const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
+const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
 
 const defaultScioTeamMembers: Record<Department, Record<string, number>> = {
   'PM': {},
@@ -64,16 +66,32 @@ export function CapacityMatrixMobileView({
 
   const dept = departmentFilter as Department;
 
+  const getDepartmentVisibilityScopes = (project: Project): Department[] => {
+    const rawScopes = project.visibleInDepartments || [];
+    return rawScopes.filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+  };
+
+  const isProjectVisibleInDepartment = (project: Project, department: Department): boolean => {
+    const departmentScopes = getDepartmentVisibilityScopes(project);
+    if (departmentScopes.length === 0) {
+      return true;
+    }
+    return departmentScopes.includes(department);
+  };
+
+  const isProjectVisibleInGeneral = (project: Project): boolean => {
+    const rawScopes = project.visibleInDepartments || [];
+    if (rawScopes.length === 0) {
+      return true;
+    }
+    return rawScopes.includes(GENERAL_VISIBILITY_SCOPE);
+  };
+
   // Filter projects
   const filteredProjects =
     departmentFilter === 'General'
-      ? projects
-      : projects.filter(
-          (p) =>
-            p.visibleInDepartments &&
-            p.visibleInDepartments.length > 0 &&
-            p.visibleInDepartments.includes(departmentFilter)
-        );
+      ? projects.filter((project) => isProjectVisibleInGeneral(project))
+      : projects.filter((project) => isProjectVisibleInDepartment(project, dept));
 
   // Show all weeks
   const weeksToShow = allWeeksData;

@@ -9,6 +9,7 @@ export type Language = 'es' | 'en';
  * Represents the 6 departments in the organization
  */
 export type Department = 'PM' | 'MED' | 'HD' | 'MFG' | 'BUILD' | 'PRG';
+export type ProjectVisibilityScope = Department | 'GENERAL';
 // PM: Project Manager
 // MED: Mechanical Design (Diseño Mecánico)
 // HD: Hardware Design
@@ -109,7 +110,7 @@ export interface Project {
   departmentHoursAllocated?: Record<Department, number>; // Budget hours per department (presupuesto/cotizado)
   departmentHoursUtilized?: Record<Department, number>; // Hours utilized/used per department (horas utilizadas - manually entered)
   departmentHoursForecast?: Record<Department, number>; // Forecasted hours per department (horas pronosticadas - manually entered)
-  visibleInDepartments?: Department[]; // Departments where this project is visible (for quick-created projects)
+  visibleInDepartments?: ProjectVisibilityScope[]; // Departments where this project is visible (GENERAL allows showing in General view too)
 }
 
 /**

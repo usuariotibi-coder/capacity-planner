@@ -68,6 +68,37 @@ html {
   }
 }
 
+/* Auto-scale UI on large displays (2K/4K/TV) so it does not look tiny */
+@media (min-width: 1600px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 14.5px;
+  }
+}
+
+@media (min-width: 2560px) {
+  html {
+    font-size: 15.5px;
+  }
+}
+
+@media (min-width: 3200px) {
+  html {
+    font-size: 16.5px;
+  }
+}
+
+@media (min-width: 3840px) {
+  html {
+    font-size: 17.5px;
+  }
+}
+
 /* Make interactive elements feel clickable, avoid text-caret selection */
 button,
 [role="button"],

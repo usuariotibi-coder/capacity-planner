@@ -118,9 +118,9 @@ const LoginPage: React.FC = () => {
         <div className="relative z-10 w-full max-w-md animate-fade-in">
           <div className="mb-5 flex flex-col items-center">
             <img
-              src="/scio-wordmark-login.png"
+              src="/scio-wordmark-login.png?v=20260218a"
               alt="SCIO Automation"
-              className="h-auto w-[290px] max-w-full md:w-[320px]"
+              className="h-auto w-[290px] max-w-full md:w-[320px] drop-shadow-[0_2px_10px_rgba(213,209,218,0.35)]"
             />
           </div>
 
