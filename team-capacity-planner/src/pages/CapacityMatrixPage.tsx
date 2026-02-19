@@ -3577,7 +3577,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       <>
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
           onClick={() => {
             setEditingCell(null);
             setEditingStage(null);
@@ -3591,7 +3591,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           }}
         />
         {/* Modal */}
-        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl p-6 w-96 z-50 max-h-screen overflow-y-auto">
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl p-6 w-96 z-[90] max-h-screen overflow-y-auto">
           {/* Header */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-800">
@@ -3814,7 +3814,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Delete Confirmation Dialog */}
           {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center rounded-lg">
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[95] flex items-center justify-center rounded-lg">
               <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
                 <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar Eliminación'}</h3>
                 <p className="text-sm text-gray-700 mb-4">
@@ -3919,7 +3919,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       {renderEditModal()}
       {/* Change Order Modal */}
       {isChangeOrderModalOpen && changeOrderContext && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[80] flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl border-2 border-emerald-200 w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-emerald-100">
               <div>
@@ -5830,7 +5830,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         {/* Quick Project Creation Modal */}
         {showQuickProjectModal && canManageProjectsInCurrentDepartment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">➕ {t.createProject}</h2>
@@ -5981,7 +5981,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         {/* Import Existing Project Modal */}
         {showImportProjectModal && canManageProjectsInCurrentDepartment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">📂 {t.importProject || 'Import Existing Project'}</h2>
@@ -6120,7 +6120,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         {/* Export Timeline PDF Modal */}
         {showExportPdfModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-rose-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">
@@ -6295,14 +6295,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
               onClick={() => {
                 setIsPRGModalOpen(false);
                 setPRGTeamName('');
               }}
             />
             {/* Modal */}
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
               <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 rounded-t-lg">
@@ -6403,14 +6403,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
               onClick={() => {
                 setIsBuildModalOpen(false);
                 setBuildTeamName('');
               }}
             />
             {/* Modal */}
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
               <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg">
@@ -6508,7 +6508,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         {/* Comment View Modal for General View */}
         {viewingComment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">💬 {t.comment}</h2>
@@ -6553,7 +6553,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         {/* Delete Confirmation Dialog */}
         {deleteConfirmation.isOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 animate-fade-in">
               <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
