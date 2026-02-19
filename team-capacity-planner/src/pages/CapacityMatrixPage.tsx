@@ -3993,14 +3993,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           onClick={closeEditModal}
         />
         {/* Modal */}
-        <div className="fixed top-1/2 left-1/2 z-[90] w-[96vw] max-w-[1120px] transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl border border-gray-200 shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="fixed top-1/2 left-1/2 z-[90] w-[95vw] max-w-[980px] transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl border border-gray-200 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="flex justify-between items-center gap-4 p-5 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="flex justify-between items-center gap-3 p-3.5 md:p-4 border-b border-gray-200 bg-white flex-shrink-0">
             <div>
-              <h3 className="text-lg md:text-xl font-bold text-gray-800">
+              <h3 className="text-base md:text-lg font-bold text-gray-800">
                 {t.editAssignment}
               </h3>
-              <p className="text-xs md:text-sm text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-0.5">
                 {t.weekAbbr} {weekNum}/{year} · {editingCell.department}
               </p>
             </div>
@@ -4013,14 +4013,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-5 bg-white">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-5 items-start">
+          <div className="flex-1 overflow-y-auto p-3.5 md:p-4 bg-white">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5 md:gap-4 items-start">
           {/* Hours and Stage block */}
           {isBuildOrPRGDepartment ? (
-            <div className="mb-4 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
               {/* SCIO Hours input */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t.scioHours}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.scioHours}</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -4044,7 +4044,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   }}
                   disabled={scioInputLocked}
                   autoFocus
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
                 />
               </div>
@@ -4052,7 +4052,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               {/* External Hours input - conditionally shown based on selected external resource */}
               {selectedEmployeeList.length > 0 && hasExternalSelected && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.enterExternalHours}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.enterExternalHours}</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -4074,7 +4074,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         handleSaveCell();
                       }
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="0"
                   />
                 </div>
@@ -4082,14 +4082,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
               {stageOptions.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.stage}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.stage}</label>
                   <select
                     value={(editingStage || '') as string}
                     onChange={(e) => {
                       const value = e.target.value;
                       setEditingStage(value === '' ? null : (value as Stage));
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">{t.noStage}</option>
                     {stageOptions.map((stage) => (
@@ -4102,9 +4102,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               )}
             </div>
           ) : hasStagePlanner ? (
-            <div className="mb-4 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.hours}</label>
                 <input
                   type="text"
                   value={editingHoursInput}
@@ -4116,7 +4116,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-gray-700">{t.stage}</label>
                   <button
                     type="button"
@@ -4126,7 +4126,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     + {t.add || 'Add'}
                   </button>
                 </div>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 rounded-lg border border-gray-200 bg-white p-2.5">
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 rounded-lg border border-gray-200 bg-white p-2">
                   {editingStageEntries.length === 0 && (
                     <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
                       {t.noStage}
@@ -4153,7 +4153,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 row.id === entry.id ? { ...row, stage: value } : row
                               )));
                             }}
-                            className="border border-gray-300 bg-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             <option value="">{t.noStage}</option>
                             {stageOptions.map((stage) => (
@@ -4182,7 +4182,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             }}
                             readOnly={selectedResourcesCount > 0}
                             disabled={selectedResourcesCount > 0}
-                            className="border border-gray-300 bg-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
+                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
                             placeholder="0"
                           />
                           <button
@@ -4237,8 +4237,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
           ) : (
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.hours}</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -4260,14 +4260,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   }
                 }}
                 autoFocus
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="0"
               />
             </div>
           )}
 
           {canAssignToChangeOrder && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2.5">
               <label className="flex items-center gap-2 text-sm font-semibold text-amber-900 cursor-pointer">
                 <input
                   type="checkbox"
@@ -4299,7 +4299,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <select
                       value={selectedChangeOrderId}
                       onChange={(e) => setSelectedChangeOrderId(e.target.value)}
-                      className="w-full border border-amber-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className="w-full border border-amber-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                       <option value="">
                         {language === 'es' ? '-- Selecciona Change Order --' : '-- Select Change Order --'}
@@ -4313,7 +4313,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </div>
 
                   {selectedChangeOrder && (
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-lg border border-gray-200 bg-white px-2 py-2">
                         <div className="text-[10px] uppercase tracking-wide text-gray-500">
                           {language === 'es' ? 'Cotizado CO' : 'CO Quoted'}
@@ -4349,15 +4349,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
-            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableResources} ({deptEmployees.length})</label>
-              <div className="space-y-2 min-h-[180px] max-h-[56vh] overflow-y-auto bg-white p-2 rounded-lg border border-gray-200">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.availableResources} ({deptEmployees.length})</label>
+              <div className="space-y-1.5 min-h-[120px] max-h-[34vh] overflow-y-auto bg-white p-1.5 rounded-lg border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
                   const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
                   const isSelected = selectedEmployees.has(emp.id);
                   return (
-                    <label key={emp.id} className={`block cursor-pointer p-2 rounded-md transition border ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50 border-violet-100' : 'hover:bg-blue-50 border-transparent hover:border-blue-100'}`}>
+                    <label key={emp.id} className={`block cursor-pointer p-1.5 rounded-md transition border ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50 border-violet-100' : 'hover:bg-blue-50 border-transparent hover:border-blue-100'}`}>
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -4436,14 +4436,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           )}
 
           {/* Comment input */}
-          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.comment}</label>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.comment}</label>
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
-              className="w-full min-h-[120px] border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+              className="w-full min-h-[92px] border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
               placeholder={t.commentPlaceholder}
-              rows={4}
+              rows={3}
             />
           </div>
             </div>
@@ -4505,23 +4505,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-wrap gap-3 justify-between p-4 md:px-5 border-t border-gray-200 flex-shrink-0 bg-white">
+          <div className="flex flex-wrap gap-2.5 justify-between p-3 md:px-4 border-t border-gray-200 flex-shrink-0 bg-white">
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
+              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
               {t.delete}
             </button>
             <div className="flex gap-3">
               <button
                 onClick={closeEditModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleSaveCell}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
+                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
               >
                 {t.save}
               </button>
