@@ -1605,8 +1605,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }));
   };
 
-  const isPlaceholderEmployee = (emp?: Employee | null) =>
-    !!emp && (emp.role === 'Placeholder' || emp.name.endsWith('Placeholder'));
+  function isPlaceholderEmployee(emp?: Employee | null) {
+    return !!emp && (emp.role === 'Placeholder' || emp.name.endsWith('Placeholder'));
+  }
 
   const getOrCreatePlaceholderEmployee = async (department: Department) => {
     const placeholderName = `${department} Placeholder`;
