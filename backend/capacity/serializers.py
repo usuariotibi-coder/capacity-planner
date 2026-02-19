@@ -2087,7 +2087,16 @@ class ScioTeamCapacitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ScioTeamCapacity
-        fields = ('id', 'department', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        fields = (
+            'id',
+            'department',
+            'week_start_date',
+            'capacity',
+            'pto',
+            'training',
+            'created_at',
+            'updated_at',
+        )
         read_only_fields = ('id', 'created_at', 'updated_at')
 
     def get_validators(self):

@@ -2017,7 +2017,7 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     pagination_class = None  # Disabled - return all records at once
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['department', 'week_start_date']
-    ordering_fields = ['department', 'week_start_date', 'capacity']
+    ordering_fields = ['department', 'week_start_date', 'capacity', 'pto', 'training']
     ordering = ['department', 'week_start_date']
 
     def _ensure_full_access(self):
@@ -2037,14 +2037,24 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
         department = serializer.validated_data.get('department')
         week_start_date = serializer.validated_data.get('week_start_date')
         capacity = serializer.validated_data.get('capacity')
+        pto = serializer.validated_data.get('pto', 0)
+        training = serializer.validated_data.get('training', 0)
 
         obj, created = ScioTeamCapacity.objects.update_or_create(
             department=department,
             week_start_date=week_start_date,
-            defaults={'capacity': capacity}
+            defaults={
+                'capacity': capacity,
+                'pto': pto,
+                'training': training,
+            }
         )
 
-        print(f"[ScioTeamCapacity] {'Created' if created else 'Updated'} record: {obj.id}, dept={department}, week={week_start_date}, capacity={capacity}")
+        print(
+            f"[ScioTeamCapacity] {'Created' if created else 'Updated'} record: "
+            f"{obj.id}, dept={department}, week={week_start_date}, "
+            f"capacity={capacity}, pto={pto}, training={training}"
+        )
 
         # Return the serialized object
         result_serializer = self.get_serializer(obj)

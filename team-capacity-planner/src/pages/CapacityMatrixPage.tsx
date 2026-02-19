@@ -103,6 +103,12 @@ interface StageResourceHoursEntry {
   hoursInput: string;
 }
 
+interface ScioCapacityFields {
+  capacity: number;
+  pto: number;
+  training: number;
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -116,6 +122,14 @@ const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yello
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
 const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
+const createEmptyDepartmentWeekValues = (): Record<Department, Record<string, number>> => ({
+  'PM': {},
+  'MED': {},
+  'HD': {},
+  'MFG': {},
+  'BUILD': {},
+  'PRG': {},
+});
 
 const getDepartmentVisibilityScopes = (project: Project): Department[] => {
   const rawScopes = project.visibleInDepartments || [];
@@ -323,14 +337,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
   // Now loads from API instead of localStorage
-  const [scioTeamMembers, setScioTeamMembers] = useState<Record<Department, Record<string, number>>>({
-    'PM': {},
-    'MED': {},
-    'HD': {},
-    'MFG': {},
-    'BUILD': {},
-    'PRG': {},
-  });
+  const [scioTeamMembers, setScioTeamMembers] = useState<Record<Department, Record<string, number>>>(createEmptyDepartmentWeekValues);
+  const [scioPto, setScioPto] = useState<Record<Department, Record<string, number>>>(createEmptyDepartmentWeekValues);
+  const [scioTraining, setScioTraining] = useState<Record<Department, Record<string, number>>>(createEmptyDepartmentWeekValues);
 
   // Track API record IDs for SCIO Team Capacity (for updates)
   // Structure: { `${dept}-${weekDate}`: recordId }
@@ -530,28 +539,29 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Total SCIO records loaded:', data?.length || 0);
 
         // Transform API data to our state structure
-        const newScioTeamMembers: Record<Department, Record<string, number>> = {
-          'PM': {},
-          'MED': {},
-          'HD': {},
-          'MFG': {},
-          'BUILD': {},
-          'PRG': {},
-        };
+        const newScioTeamMembers: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
+        const newScioPto: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
+        const newScioTraining: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
         const newRecordIds: Record<string, string> = {};
 
         for (const record of data) {
           const dept = record.department as Department;
           const weekDate = normalizeWeekStartDate(record.weekStartDate);
-          const capacity = record.capacity;
+          const capacity = Number(record.capacity || 0);
+          const pto = Number(record.pto || 0);
+          const training = Number(record.training || 0);
 
           if (dept && weekDate && newScioTeamMembers[dept]) {
             newScioTeamMembers[dept][weekDate] = capacity;
+            newScioPto[dept][weekDate] = pto;
+            newScioTraining[dept][weekDate] = training;
             newRecordIds[`${dept}-${weekDate}`] = record.id;
           }
         }
 
         setScioTeamMembers(newScioTeamMembers);
+        setScioPto(newScioPto);
+        setScioTraining(newScioTraining);
         setScioTeamRecordIds(newRecordIds);
         console.log('[CapacityMatrix] SCIO Team Capacity state updated');
       } catch (error) {
@@ -723,45 +733,49 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     loadTeamsData();
   }, []);
 
-  // Normalize scioTeamMembers to ensure all departments exist in the structure
-  // This prevents "Cannot read properties of undefined" errors when accessing dept[date]
+  // Normalize weekly capacity maps to ensure all departments exist in the structure.
+  // This prevents "Cannot read properties of undefined" errors when accessing dept[date].
   useEffect(() => {
-    const departments: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
-    const hasAllDepts = departments.every(dept => scioTeamMembers[dept] !== undefined);
+    const normalizeByDepartment = (source: Record<Department, Record<string, number>>) => ({
+      'PM': source['PM'] || {},
+      'MED': source['MED'] || {},
+      'HD': source['HD'] || {},
+      'MFG': source['MFG'] || {},
+      'BUILD': source['BUILD'] || {},
+      'PRG': source['PRG'] || {},
+    });
 
-    if (!hasAllDepts) {
-      const normalized: Record<Department, Record<string, number>> = {
-        'PM': scioTeamMembers['PM'] || {},
-        'MED': scioTeamMembers['MED'] || {},
-        'HD': scioTeamMembers['HD'] || {},
-        'MFG': scioTeamMembers['MFG'] || {},
-        'BUILD': scioTeamMembers['BUILD'] || {},
-        'PRG': scioTeamMembers['PRG'] || {},
-      };
-      setScioTeamMembers(normalized);
-    }
+    setScioTeamMembers(prev => normalizeByDepartment(prev));
+    setScioPto(prev => normalizeByDepartment(prev));
+    setScioTraining(prev => normalizeByDepartment(prev));
   }, []);
 
   // Function to save SCIO Team Capacity to API
-  const saveScioTeamCapacity = async (dept: Department, weekDate: string, capacity: number) => {
-    const recordKey = `${dept}-${weekDate}`;
+  const saveScioTeamCapacity = async (dept: Department, weekDate: string, values: ScioCapacityFields) => {
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    const recordKey = `${dept}-${normalizedWeek}`;
     const existingId = scioTeamRecordIds[recordKey];
+    const safeValues: ScioCapacityFields = {
+      capacity: Math.max(0, Number(values.capacity || 0)),
+      pto: Math.max(0, Number(values.pto || 0)),
+      training: Math.max(0, Number(values.training || 0)),
+    };
+    const shouldDelete = safeValues.capacity === 0 && safeValues.pto === 0 && safeValues.training === 0;
 
-    console.log('[CapacityMatrix] saveScioTeamCapacity called:', { dept, weekDate, capacity, existingId, recordKey });
+    console.log('[CapacityMatrix] saveScioTeamCapacity called:', { dept, weekDate: normalizedWeek, values: safeValues, existingId, recordKey });
 
     try {
-      if (capacity === 0 && existingId) {
-        // Delete the record if capacity is 0
-        console.log('[CapacityMatrix] Deleting SCIO capacity:', recordKey);
+      if (shouldDelete && existingId) {
+        // Delete the record if all fields are zero.
+        console.log('[CapacityMatrix] Deleting SCIO capacity row:', recordKey);
         await scioTeamCapacityApi.delete(existingId);
-        console.log('[CapacityMatrix] SCIO capacity deleted successfully');
+        console.log('[CapacityMatrix] SCIO capacity row deleted successfully');
 
-        // Log activity
         await activityLogApi.logActivity(
           'deleted',
           'ScioTeamCapacity',
           existingId,
-          { department: dept, weekStartDate: weekDate }
+          { department: dept, weekStartDate: normalizedWeek }
         );
 
         setScioTeamRecordIds(prev => {
@@ -769,133 +783,176 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           delete newIds[recordKey];
           return newIds;
         });
-      } else if (existingId) {
+        return;
+      }
+
+      if (shouldDelete && !existingId) {
+        // Nothing to persist when no record exists and all values are zero.
+        return;
+      }
+
+      if (existingId) {
         // Update existing record
-        console.log('[CapacityMatrix] Updating SCIO capacity:', recordKey, capacity);
-        const updateResult = await scioTeamCapacityApi.update(existingId, { capacity });
+        console.log('[CapacityMatrix] Updating SCIO capacity row:', recordKey, safeValues);
+        const updateResult = await scioTeamCapacityApi.update(existingId, safeValues);
         console.log('[CapacityMatrix] SCIO capacity updated successfully:', updateResult);
 
-        // Log activity
         await activityLogApi.logActivity(
           'updated',
           'ScioTeamCapacity',
           existingId,
-          { department: dept, weekStartDate: weekDate, capacity }
+          { department: dept, weekStartDate: normalizedWeek, ...safeValues }
         );
-      } else if (capacity > 0) {
-        // Create new record
-        console.log('[CapacityMatrix] Creating SCIO capacity:', recordKey, capacity);
-        let createdSuccessfully = false;
-        let createdRecordId: string | null = null;
+        return;
+      }
 
-        try {
-          console.log('[CapacityMatrix] Sending CREATE request to API...');
-          const result = await scioTeamCapacityApi.create({
-            department: dept,
-            weekStartDate: weekDate,
-            capacity: capacity,
-          });
-          console.log('[CapacityMatrix] CREATE succeeded, result:', result);
-          console.log('[CapacityMatrix] Record ID assigned:', result.id);
+      // Create new record when at least one field is non-zero.
+      console.log('[CapacityMatrix] Creating SCIO capacity row:', recordKey, safeValues);
+      let createdSuccessfully = false;
+      let createdRecordId: string | null = null;
+
+      try {
+        console.log('[CapacityMatrix] Sending CREATE request to API...');
+        const result = await scioTeamCapacityApi.create({
+          department: dept,
+          weekStartDate: normalizedWeek,
+          ...safeValues,
+        });
+        console.log('[CapacityMatrix] CREATE succeeded, result:', result);
+        createdSuccessfully = true;
+        createdRecordId = result.id;
+
+        setScioTeamRecordIds(prev => ({
+          ...prev,
+          [recordKey]: result.id,
+        }));
+      } catch (createError) {
+        const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
+        console.log('[CapacityMatrix] CREATE failed:', createErrorMsg);
+
+        // If create fails due to unique constraint, resolve and update the existing row.
+        if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
+          console.log('[CapacityMatrix] Detected unique constraint violation, fetching records...');
+          const allScioRecords = await scioTeamCapacityApi.getAll();
+          const existingRecord = allScioRecords.find(
+            (r: any) => r.department === dept && normalizeWeekStartDate(r.weekStartDate) === normalizedWeek
+          );
+
+          if (!existingRecord) {
+            throw createError;
+          }
+
+          console.log('[CapacityMatrix] Found existing record, updating it with ID:', existingRecord.id);
+          await scioTeamCapacityApi.update(existingRecord.id, safeValues);
           createdSuccessfully = true;
-          createdRecordId = result.id;
+          createdRecordId = existingRecord.id;
 
           setScioTeamRecordIds(prev => ({
             ...prev,
-            [recordKey]: result.id,
+            [recordKey]: existingRecord.id,
           }));
-        } catch (createError) {
-          const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
-          console.log('[CapacityMatrix] CREATE failed:', createErrorMsg);
-          console.log('[CapacityMatrix] Checking if this is a unique constraint violation...');
-
-          // If create fails due to unique constraint, try to update instead
-          // This happens when the record already exists but we don't have the ID
-          if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
-            console.log('[CapacityMatrix] Detected unique constraint violation, fetching all records to find existing one...');
-            try {
-              const allScioRecords = await scioTeamCapacityApi.getAll();
-              console.log('[CapacityMatrix] Fetched all SCIO records, total count:', allScioRecords.length);
-
-              const existingRecord = allScioRecords.find(
-                (r: any) => r.department === dept && r.weekStartDate === weekDate
-              );
-
-              if (existingRecord) {
-                console.log('[CapacityMatrix] Found existing record, updating it with ID:', existingRecord.id);
-                const updateResult = await scioTeamCapacityApi.update(existingRecord.id, { capacity });
-                console.log('[CapacityMatrix] UPDATE succeeded:', updateResult);
-                createdSuccessfully = true;
-                createdRecordId = existingRecord.id;
-
-                setScioTeamRecordIds(prev => ({
-                  ...prev,
-                  [recordKey]: existingRecord.id,
-                }));
-              } else {
-                console.log('[CapacityMatrix] No existing record found, will throw original error');
-                throw createError;
-              }
-            } catch (getError) {
-              console.error('[CapacityMatrix] Failed to fetch or update existing record:', getError);
-              throw getError;
-            }
-          } else {
-            // Not a unique constraint error, throw it
-            throw createError;
-          }
-        }
-
-        if (!createdSuccessfully) {
-          throw new Error('Failed to create or update SCIO capacity record');
-        }
-
-        // Log activity if successfully created
-        if (createdRecordId) {
-          await activityLogApi.logActivity(
-            'created',
-            'ScioTeamCapacity',
-            createdRecordId,
-            { department: dept, weekStartDate: weekDate, capacity }
-          );
+        } else {
+          throw createError;
         }
       }
+
+      if (!createdSuccessfully || !createdRecordId) {
+        throw new Error('Failed to create or update SCIO capacity record');
+      }
+
+      await activityLogApi.logActivity(
+        'created',
+        'ScioTeamCapacity',
+        createdRecordId,
+        { department: dept, weekStartDate: normalizedWeek, ...safeValues }
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] Final error saving SCIO capacity:', errorMsg);
-      alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
+      alert(`Error al guardar capacidad SCIO (${dept} - ${normalizedWeek}): ${errorMsg}`);
     }
   };
 
   // Debounced save to avoid too many API calls while typing
   const scioSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  const scheduleScioSave = (dept: Department, weekDate: string, values: ScioCapacityFields) => {
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    const timeoutKey = `${dept}-${normalizedWeek}`;
+    if (scioSaveTimeouts.current[timeoutKey]) {
+      clearTimeout(scioSaveTimeouts.current[timeoutKey]);
+    }
+    scioSaveTimeouts.current[timeoutKey] = setTimeout(() => {
+      saveScioTeamCapacity(dept, normalizedWeek, values);
+    }, 500);
+  };
+
   const handleScioTeamChange = (dept: Department, weekDate: string, newCapacity: number) => {
     if (!hasFullAccess) {
       return;
     }
-    console.log('[CapacityMatrix] handleScioTeamChange called:', { dept, weekDate, newCapacity });
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    const sanitizedCapacity = Math.max(0, newCapacity);
+    console.log('[CapacityMatrix] handleScioTeamChange called:', { dept, weekDate: normalizedWeek, newCapacity: sanitizedCapacity });
 
     // Update local state immediately
     setScioTeamMembers(prev => ({
       ...prev,
       [dept]: {
         ...(prev[dept] || {}),
-        [weekDate]: newCapacity,
+        [normalizedWeek]: sanitizedCapacity,
       },
     }));
 
-    // Debounce the API call (wait 500ms after last keystroke)
-    const timeoutKey = `${dept}-${weekDate}`;
-    if (scioSaveTimeouts.current[timeoutKey]) {
-      console.log('[CapacityMatrix] Clearing previous timeout for key:', timeoutKey);
-      clearTimeout(scioSaveTimeouts.current[timeoutKey]);
+    scheduleScioSave(dept, normalizedWeek, {
+      capacity: sanitizedCapacity,
+      pto: scioPto[dept]?.[normalizedWeek] || 0,
+      training: scioTraining[dept]?.[normalizedWeek] || 0,
+    });
+  };
+
+  const handleScioPtoChange = (dept: Department, weekDate: string, newPto: number) => {
+    if (!hasFullAccess) {
+      return;
     }
-    console.log('[CapacityMatrix] Setting debounce timeout for key:', timeoutKey);
-    scioSaveTimeouts.current[timeoutKey] = setTimeout(() => {
-      console.log('[CapacityMatrix] Debounce timeout fired for key:', timeoutKey);
-      saveScioTeamCapacity(dept, weekDate, newCapacity);
-    }, 500);
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    const sanitizedPto = Math.max(0, newPto);
+
+    setScioPto(prev => ({
+      ...prev,
+      [dept]: {
+        ...(prev[dept] || {}),
+        [normalizedWeek]: sanitizedPto,
+      },
+    }));
+
+    scheduleScioSave(dept, normalizedWeek, {
+      capacity: scioTeamMembers[dept]?.[normalizedWeek] || 0,
+      pto: sanitizedPto,
+      training: scioTraining[dept]?.[normalizedWeek] || 0,
+    });
+  };
+
+  const handleScioTrainingChange = (dept: Department, weekDate: string, newTraining: number) => {
+    if (!hasFullAccess) {
+      return;
+    }
+    const normalizedWeek = normalizeWeekStartDate(weekDate);
+    const sanitizedTraining = Math.max(0, newTraining);
+
+    setScioTraining(prev => ({
+      ...prev,
+      [dept]: {
+        ...(prev[dept] || {}),
+        [normalizedWeek]: sanitizedTraining,
+      },
+    }));
+
+    scheduleScioSave(dept, normalizedWeek, {
+      capacity: scioTeamMembers[dept]?.[normalizedWeek] || 0,
+      pto: scioPto[dept]?.[normalizedWeek] || 0,
+      training: sanitizedTraining,
+    });
   };
 
   // Save Subcontracted Team Capacity to API
@@ -2236,6 +2293,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
   const getDepartmentTotalCapacityForWeek = (department: Department, weekDate: string): number => {
     const baseCapacity = scioTeamMembers[department]?.[weekDate] || 0;
+    const ptoAdjustment = scioPto[department]?.[weekDate] || 0;
+    const trainingAdjustment = scioTraining[department]?.[weekDate] || 0;
+    const effectiveScioCapacity = Math.max(0, baseCapacity - ptoAdjustment - trainingAdjustment);
 
     if (department === 'BUILD') {
       const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
@@ -2248,17 +2308,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return sum + (subcontractedPersonnel[company]?.[weekDate] || 0);
       }, 0);
 
-      return baseCapacity + activeTeamCapacity + predefinedInactiveCapacity;
+      return effectiveScioCapacity + activeTeamCapacity + predefinedInactiveCapacity;
     }
 
     if (department === 'PRG') {
       const externalTeamCapacity = prgActiveTeams.reduce((sum, team) => {
         return sum + (prgExternalPersonnel[team]?.[weekDate] || 0);
       }, 0);
-      return baseCapacity + externalTeamCapacity;
+      return effectiveScioCapacity + externalTeamCapacity;
     }
 
-    return baseCapacity;
+    return effectiveScioCapacity;
   };
 
   const handleExportTimelineExcel = async () => {
@@ -4840,6 +4900,70 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </div>
                       </div>
 
+                      {/* PTO row - subtracts from SCIO Team Members */}
+                      <div className="flex gap-0 mb-0.5">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 border-amber-300`}>
+                          {t.ptoLabel}
+                        </div>
+
+                        <div className="flex gap-0">
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
+                            return (
+                              <input
+                                key={`pto-${dept}-${weekData.date}`}
+                                type="number"
+                                step="0.1"
+                                value={scioPto[dept]?.[weekData.date] || ''}
+                                disabled={!hasFullAccess}
+                                onChange={(e) => {
+                                  const newValue = parseFloat(e.target.value) || 0;
+                                  handleScioPtoChange(dept, weekData.date, newValue);
+                                }}
+                                className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+                                  isCurrentWeek ? CURRENT_WEEK_EDITABLE_CLASS : 'bg-gradient-to-b from-amber-50 to-amber-25 border-amber-300'
+                                }`}
+                                placeholder="0"
+                                title={`${t.ptoLabel} - ${t.week} ${weekData.weekNum}`}
+                                min="0"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Training row - subtracts from SCIO Team Members */}
+                      <div className="flex gap-0 mb-0.5">
+                        <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-sky-100 to-sky-50 text-sky-800 border-sky-300`}>
+                          {t.trainingLabel}
+                        </div>
+
+                        <div className="flex gap-0">
+                          {allWeeksData.map((weekData, idx) => {
+                            const isCurrentWeek = idx === currentDateWeekIndex;
+                            return (
+                              <input
+                                key={`training-${dept}-${weekData.date}`}
+                                type="number"
+                                step="0.1"
+                                value={scioTraining[dept]?.[weekData.date] || ''}
+                                disabled={!hasFullAccess}
+                                onChange={(e) => {
+                                  const newValue = parseFloat(e.target.value) || 0;
+                                  handleScioTrainingChange(dept, weekData.date, newValue);
+                                }}
+                                className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 rounded-md px-1 py-0.5 text-[8px] font-bold text-center focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+                                  isCurrentWeek ? CURRENT_WEEK_EDITABLE_CLASS : 'bg-gradient-to-b from-sky-50 to-sky-25 border-sky-300'
+                                }`}
+                                placeholder="0"
+                                title={`${t.trainingLabel} - ${t.week} ${weekData.weekNum}`}
+                                min="0"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Subcontracted Personnel rows - Only for BUILD department */}
                       {dept === 'BUILD' && (
                         <>
@@ -5064,9 +5188,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           {allWeeksData.map((weekData, idx) => {
                             const isCurrentWeek = idx === currentDateWeekIndex;
 
-                            // Get SCIO Team Members / Hours per Week capacity for this week
-                            const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
-
                             // Calculate total hours occupied for this department this week
                             const deptWeekKey = `${dept}|${weekData.date}`;
                             const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
@@ -5075,34 +5196,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           const isMFG = dept === 'MFG';
                           const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
 
-                          // For BUILD department: include all subcontracted personnel in capacity calculation
-                          // For PRG department: include external teams in capacity calculation
-                          let totalCapacity = weekCapacity;
-                          if (dept === 'BUILD') {
-                            // Sum all subcontracted teams: predefined teams + custom teams added by user
-                            // Predefined teams (AMI, VICER, ITAX, MCI, MG Electrical) use subcontractedPersonnel
-                            // Custom teams use activeTeams with their own data in subcontractedPersonnel
-                            const subcontractSum = Array.from(activeTeams).reduce((sum, company) => {
-                              return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
-                            }, 0);
-
-                            // Also add any predefined teams that might have data but aren't in activeTeams
-                            const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
-                            const predefinedSum = predefinedTeams.reduce((sum, company) => {
-                              // Only count if not already in activeTeams (to avoid double counting)
-                              if (!activeTeams.includes(company)) {
-                                return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
-                              }
-                              return sum;
-                            }, 0);
-
-                            totalCapacity = weekCapacity + subcontractSum + predefinedSum;
-                          } else if (dept === 'PRG') {
-                            const externalSum = prgActiveTeams.reduce((sum, team) => {
-                              return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
-                            }, 0);
-                            totalCapacity = weekCapacity + externalSum;
-                          }
+                          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
 
                           const availableCapacity = totalCapacity - occupiedValue;
                           const unit = isMFG ? 'h' : 'people';
@@ -5713,9 +5807,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         {allWeeksData.map((weekData, idx) => {
                           const isCurrentWeek = idx === currentDateWeekIndex;
 
-                          // Get SCIO Team Members / Hours per Week capacity for this week
-                          const weekCapacity = scioTeamMembers[dept]?.[weekData.date] || 0;
-
                           // Calculate total hours occupied for this department this week
                           const deptWeekKey = `${dept}|${weekData.date}`;
                           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
@@ -5724,32 +5815,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           const isMFG = dept === 'MFG';
                           const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
 
-                          // For BUILD department: include all subcontracted personnel in capacity calculation
-                          // For PRG department: include external teams in capacity calculation
-                          let totalCapacity = weekCapacity;
-                          if (dept === 'BUILD') {
-                            // Sum all subcontracted teams: predefined teams + custom teams added by user
-                            const subcontractSum = Array.from(activeTeams).reduce((sum, company) => {
-                              return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
-                            }, 0);
-
-                            // Also add any predefined teams that might have data but aren't in activeTeams
-                            const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
-                            const predefinedSum = predefinedTeams.reduce((sum, company) => {
-                              // Only count if not already in activeTeams (to avoid double counting)
-                              if (!activeTeams.includes(company)) {
-                                return sum + (subcontractedPersonnel[company]?.[weekData.date] || 0);
-                              }
-                              return sum;
-                            }, 0);
-
-                            totalCapacity = weekCapacity + subcontractSum + predefinedSum;
-                          } else if (dept === 'PRG') {
-                            const externalSum = prgActiveTeams.reduce((sum, team) => {
-                              return sum + (prgExternalPersonnel[team]?.[weekData.date] || 0);
-                            }, 0);
-                            totalCapacity = weekCapacity + externalSum;
-                          }
+                          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
 
                           const availableCapacity = totalCapacity - occupiedValue;
                           const unit = isMFG ? 'h' : 'people';

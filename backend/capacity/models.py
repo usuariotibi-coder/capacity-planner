@@ -243,6 +243,16 @@ class ScioTeamCapacity(models.Model):
     department = models.CharField(max_length=10, choices=Department.choices)
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
     capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="SCIO team capacity for this week")
+    pto = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="PTO adjustment to subtract from SCIO team capacity for this week",
+    )
+    training = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Training adjustment to subtract from SCIO team capacity for this week",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -254,7 +264,7 @@ class ScioTeamCapacity(models.Model):
         unique_together = ['department', 'week_start_date']
 
     def __str__(self):
-        return f"{self.department} - {self.week_start_date}: {self.capacity}"
+        return f"{self.department} - {self.week_start_date}: cap={self.capacity}, pto={self.pto}, training={self.training}"
 
 
 class SubcontractedTeamCapacity(models.Model):
