@@ -3973,21 +3973,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       if (targetAssignments.length === 0) return;
 
-      const isBuildOrPRG = selectedProjectCell.department === 'BUILD' || selectedProjectCell.department === 'PRG';
-      const resetPayload: any = {
-        hours: 0,
-        stage: null,
-        comment: '',
-        changeOrderId: null,
-      };
-      if (isBuildOrPRG) {
-        resetPayload.scioHours = 0;
-        resetPayload.externalHours = 0;
-      }
-
       await Promise.all(
         targetAssignments.map((assignment) =>
-          updateAssignment(assignment.id, resetPayload, { skipRefetch: true })
+          deleteAssignment(assignment.id)
         )
       );
 
@@ -4112,7 +4100,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
   const renderCellContent = (department: Department, weekStart: string, project?: Project) => {
     const projectId = project?.id;
-    const { totalHours, talent, stage, assignments: cellAssignments, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
+    const { totalHours, talent, stage, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
     const weekNum = weekDataByDate.get(weekStart)?.weekNum || 1;
 
     // Get project and department stage info for visual indicators
@@ -4150,6 +4138,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         ? 'border border-dashed border-gray-400'
         : '';
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
+    const hasCellComment = !!(cellComment && cellComment.trim().length > 0);
+    const shouldRenderAsEmpty = totalHours <= 0 && !hasCellComment;
 
     // Get project info for tooltip
     const projectStartDate = projectId ? (projectStartDisplayById.get(projectId) || 'N/A') : 'N/A';
@@ -4196,7 +4186,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     }
 
     // Read-only display
-    if (totalHours === 0 && cellAssignments.length === 0) {
+    if (shouldRenderAsEmpty) {
       // Apply visual indicators for department start/duration (like General view does)
       let cellBgClass = 'bg-gray-50';
       let cellTextClass = 'text-gray-400';
