@@ -4132,11 +4132,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
     const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-    const cellIndicatorBorderClass = showHardOutOfRangeIndicator
-      ? 'border border-dashed border-red-500'
-      : showSoftShiftIndicator
-        ? 'border border-dashed border-gray-400'
-        : '';
+    const cellIndicatorBorderClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
+      ? 'border border-dashed border-black'
+      : '';
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
     const hasCellComment = !!(cellComment && cellComment.trim().length > 0);
     const shouldRenderAsEmpty = totalHours <= 0 && !hasCellComment;
@@ -4159,7 +4157,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
                 ? 'bg-emerald-50 text-emerald-900'
-                : 'bg-gray-100 text-gray-500'
+                : showSoftShiftIndicator
+                  ? 'bg-slate-50 text-slate-500'
+                  : 'bg-gray-100 text-gray-500'
           } ${cellIndicatorBorderClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
@@ -4212,6 +4212,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           );
         }
+      }
+
+      if (!isDeptWeekInRange && showSoftShiftIndicator) {
+        cellBgClass = 'bg-slate-50';
+        cellTextClass = 'text-slate-500';
       }
 
       return (
@@ -6036,7 +6041,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </td>
                         {allWeeksData.map((weekData, weekIdx) => {
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
-                          const projectWeekNumber = getProjectWeekNumber(proj, weekData.date);
+                          const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
+                          const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
+                          const effectiveEndDate = deptMeta?.effectiveEndDate || proj.endDate || proj.startDate;
+                          const weekInDepartmentRange =
+                            weekData.date >= effectiveStartDate && weekData.date <= effectiveEndDate;
+                          const projectWeekNumber = weekInDepartmentRange
+                            ? getProjectWeekNumber(
+                                { ...proj, startDate: effectiveStartDate, endDate: effectiveEndDate },
+                                weekData.date
+                              )
+                            : null;
                           return (
                             <td
                               key={`project-week-${proj.id}-${weekData.date}`}
@@ -6563,11 +6578,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isInRange);
                                   const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
                                   const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-                                  const cellIndicatorBorderClass = showHardOutOfRangeIndicator
-                                    ? 'border border-dashed border-red-500'
-                                    : showSoftShiftIndicator
-                                      ? 'border border-dashed border-gray-400'
-                                      : '';
+                                  const cellIndicatorBorderClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
+                                    ? 'border border-dashed border-black'
+                                    : '';
+                                  const displacedCellBgClass = showSoftShiftIndicator
+                                    ? 'bg-slate-50'
+                                    : (stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50');
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
@@ -6579,16 +6595,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           isCurrentWeekColumn
                                             ? CURRENT_WEEK_SOFT_CELL_CLASS
                                             : 'border-gray-300'
-                                        } ${
-                                          stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50'
-                                        }`}
+                                        } ${displacedCellBgClass}`}
                                       >
                                         <div className={`p-0.5 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
                                               ? 'bg-emerald-50 text-emerald-900'
-                                              : 'bg-gray-100 text-gray-500'
+                                              : showSoftShiftIndicator
+                                                ? 'bg-slate-50 text-slate-500'
+                                                : 'bg-gray-100 text-gray-500'
                                         } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
                                             <button
@@ -6613,9 +6629,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         isCurrentWeekColumn
                                           ? CURRENT_WEEK_SOFT_CELL_CLASS
                                           : 'border-gray-300'
-                                      } ${
-                                        stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50'
-                                      }`}
+                                      } ${displacedCellBgClass}`}
                                     >
                                       {totalHours === 0 ? (
                                         <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight relative ${
@@ -6625,9 +6639,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               ? isDeptFirstWeek
                                                 ? 'text-orange-600 bg-orange-100'
                                               : 'text-purple-600 bg-purple-100'
-                                              : isInRange
-                                                ? 'text-green-600 bg-green-50'
-                                                : 'text-gray-400'
+                                              : showSoftShiftIndicator
+                                                ? 'text-slate-500 bg-slate-50'
+                                                : isInRange
+                                                  ? 'text-green-600 bg-green-50'
+                                                  : 'text-gray-400'
                                         } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
                                             <button
@@ -6765,7 +6781,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-red-500 bg-white" />
+                  <div className="h-4 w-4 rounded border border-dashed border-black bg-white" />
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
               </div>
