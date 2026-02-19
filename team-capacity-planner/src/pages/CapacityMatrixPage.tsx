@@ -4127,6 +4127,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     // Check if current week is within department range using date comparison
     const isDeptWeekInRange = !!effectiveDeptStartDate && !!effectiveDeptEndDate && weekStart >= effectiveDeptStartDate && weekStart <= effectiveDeptEndDate;
     const isDeptFirstWeek = !!effectiveDeptStartDate && weekStart === effectiveDeptStartDate;
+    const isProjectWeekInRange = project ? isWeekInProjectRange(weekStart, project) : true;
     const hasDepartmentTimingShift = !!(
       project &&
       (
@@ -4140,8 +4141,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
-    const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || hasDepartmentTimingShift);
-    const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift;
+    const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || (hasDepartmentTimingShift && isProjectWeekInRange));
+    const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift && isProjectWeekInRange;
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
     // Get project info for tooltip
@@ -6563,8 +6564,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   }
 
                                   const outOfEstimatedRange = !isDeptWeekInRange;
-                                  const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || hasDepartmentTimingShift);
-                                  const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift;
+                                  const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || (hasDepartmentTimingShift && isInRange));
+                                  const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift && isInRange;
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
