@@ -5,7 +5,7 @@
  * Also provides talent level calculation from hours.
  */
 
-import type { Stage } from '../types';
+import type { Department, Stage } from '../types';
 
 /**
  * Stage to Color Mapping
@@ -42,6 +42,20 @@ export const stageColors: Record<string, { bg: string; text: string }> = {
   SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-[#FCE4D6]', text: 'text-slate-900' },
   ROBOT_SIMULATION: { bg: 'bg-[#D9D2E9]', text: 'text-slate-900' },
   STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-[#EAD1DC]', text: 'text-slate-900' },
+};
+
+type NonNullStage = Exclude<Stage, null>;
+
+// Department-specific overrides for legacy spreadsheet compatibility.
+// HD uses a dedicated palette in operational artifacts.
+const departmentStageColorOverrides: Partial<Record<Department, Partial<Record<NonNullStage, { bg: string; text: string }>>>> = {
+  HD: {
+    SWITCH_LAYOUT_REVISION: { bg: 'bg-[#ACB9CA]', text: 'text-slate-900' },
+    CONTROLS_DESIGN: { bg: 'bg-[#ACB9CA]', text: 'text-slate-900' },
+    RELEASE: { bg: 'bg-[#44546A]', text: 'text-white' },
+    RED_LINES: { bg: 'bg-[#FF0000]', text: 'text-white' },
+    SUPPORT: { bg: 'bg-[#F4CCCC]', text: 'text-slate-900' },
+  },
 };
 
 /**
@@ -97,10 +111,16 @@ export function getStageLabel(stage: Stage, t: Record<string, string>): string {
  * const colors = getStageColor('ONLINE');
  * // Returns: { bg: 'bg-green-100', text: 'text-green-900' }
  */
-export function getStageColor(stage: Stage): { bg: string; text: string } {
+export function getStageColor(stage: Stage, department?: Department): { bg: string; text: string } {
   if (!stage) {
     return { bg: 'bg-gray-100', text: 'text-gray-900' };
   }
+
+  if (department) {
+    const override = departmentStageColorOverrides[department]?.[stage as NonNullStage];
+    if (override) return override;
+  }
+
   return stageColors[stage] || { bg: 'bg-gray-100', text: 'text-gray-900' };
 }
 

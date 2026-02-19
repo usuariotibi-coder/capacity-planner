@@ -61,24 +61,8 @@ const DEPARTMENT_LEGEND_STYLES: Record<Department, { badge: string; dot: string 
   PRG: { badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
 };
 
-const LEGEND_STAGE_SWATCH_BG: Record<LegendStage, string> = {
-  SWITCH_LAYOUT_REVISION: 'bg-[#E2F0D9]',
-  CONTROLS_DESIGN: 'bg-[#D9E1F2]',
-  CONCEPT: 'bg-[#C6E0B4]',
-  DETAIL_DESIGN: 'bg-[#A9D18E]',
-  CABINETS_FRAMES: 'bg-[#FBE5D6]',
-  OVERALL_ASSEMBLY: 'bg-[#FFD966]',
-  FINE_TUNING: 'bg-[#FFC000]',
-  OFFLINE: 'bg-[#FFF2CC]',
-  ONLINE: 'bg-[#9DC3E6]',
-  DEBUG: 'bg-[#2E75B6]',
-  COMMISSIONING: 'bg-[#FF0000]',
-  RELEASE: 'bg-[#70AD47]',
-  RED_LINES: 'bg-[#FF0000]',
-  SUPPORT: 'bg-[#F4CCCC]',
-  SUPPORT_MANUALS_FLOW_CHARTS: 'bg-[#FCE4D6]',
-  ROBOT_SIMULATION: 'bg-[#D9D2E9]',
-  STANDARDS_REV_PROGRAMING_CONCEPT: 'bg-[#EAD1DC]',
+const getLegendStageSwatchBg = (stage: LegendStage, department: Department): string => {
+  return getStageColor(stage, department).bg;
 };
 
 interface CellEditState {
@@ -2419,6 +2403,22 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'FFE4E6', fg: '9F1239' },
       };
 
+      const hdStagePalette: Record<string, { bg: string; fg: string }> = {
+        SWITCH_LAYOUT_REVISION: { bg: 'ACB9CA', fg: '111827' },
+        CONTROLS_DESIGN: { bg: 'ACB9CA', fg: '111827' },
+        RELEASE: { bg: '44546A', fg: WHITE },
+        RED_LINES: { bg: 'FF0000', fg: WHITE },
+        SUPPORT: { bg: 'F4CCCC', fg: '111827' },
+      };
+
+      const getExcelStagePalette = (stage: string, department: Department): { bg: string; fg: string } | null => {
+        if (!stage) return null;
+        if (department === 'HD' && hdStagePalette[stage]) {
+          return hdStagePalette[stage];
+        }
+        return stagePalette[stage] || null;
+      };
+
       const generatedAt = new Date().toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
       const viewLabel = departmentFilter === 'General'
         ? (language === 'es' ? 'General' : 'General')
@@ -2706,9 +2706,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
             if (!inDeptRange) {
               setBodyCell(targetCell, 'F3F4F6', '6B7280');
-            } else if (stage && stagePalette[stage]) {
-              const palette = stagePalette[stage];
-              setBodyCell(targetCell, palette.bg, palette.fg);
+            } else if (stage) {
+              const palette = getExcelStagePalette(stage, dept);
+              if (palette) {
+                setBodyCell(targetCell, palette.bg, palette.fg);
+              } else if (totalHours > 0) {
+                setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
+              } else {
+                setBodyCell(targetCell, 'ECFDF5', '065F46');
+              }
             } else if (totalHours > 0) {
               setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
             } else {
@@ -2871,9 +2877,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             targetCell.value = totalHours > 0 ? roundValue(totalHours) : '';
             targetCell.numFmt = '0.###';
 
-            if (stage && stagePalette[stage]) {
-              const palette = stagePalette[stage];
-              setBodyCell(targetCell, palette.bg, palette.fg);
+            if (stage) {
+              const palette = getExcelStagePalette(stage, dept);
+              if (palette) {
+                setBodyCell(targetCell, palette.bg, palette.fg);
+              } else if (totalHours > 0) {
+                setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
+              } else {
+                setBodyCell(targetCell, WHITE, '1F2937');
+              }
             } else if (totalHours > 0) {
               setBodyCell(targetCell, 'DBEAFE', '1E3A8A');
             } else {
@@ -3760,7 +3772,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isDeptFirstWeek = !!effectiveDeptStartDate && weekStart === effectiveDeptStartDate;
 
     // Get stage color for styling
-    const stageColor = stage ? getStageColor(stage) : null;
+    const stageColor = stage ? getStageColor(stage, department) : null;
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
@@ -3981,9 +3993,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           onClick={closeEditModal}
         />
         {/* Modal */}
-        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl p-6 w-96 z-[90] max-h-screen overflow-y-auto">
+        <div className="fixed top-1/2 left-1/2 z-[90] w-[96vw] max-w-[1120px] transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-lg font-bold text-gray-800">
               {t.editAssignment} - {t.weekAbbr} {weekNum}/{year}
             </h3>
@@ -3995,6 +4007,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </button>
           </div>
 
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
           {/* Hours and Stage block */}
           {isBuildOrPRGDepartment ? (
             <div className="mb-4 space-y-3">
@@ -4106,7 +4120,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     + {t.add || 'Add'}
                   </button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {editingStageEntries.length === 0 && (
                     <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
                       {t.noStage}
@@ -4331,7 +4345,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableResources} ({deptEmployees.length})</label>
-              <div className="space-y-2 min-h-[180px] max-h-52 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
+              <div className="space-y-2 min-h-[180px] max-h-[56vh] overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
                   const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
@@ -4426,6 +4440,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               rows={4}
             />
           </div>
+            </div>
 
           {/* Delete Confirmation Dialog */}
           {showDeleteConfirm && (
@@ -4481,9 +4496,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
           )}
+          </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3 justify-between pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap gap-3 justify-between p-4 border-t border-gray-200 flex-shrink-0 bg-white">
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
@@ -6131,7 +6147,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                                   // Get the stage from actual assignments (what was selected when adding hours)
                                   const assignmentStage = cellEntry?.stage ?? null;
-                                  const stageColor = assignmentStage ? getStageColor(assignmentStage) : null;
+                                  const stageColor = assignmentStage ? getStageColor(assignmentStage, dept) : null;
 
                                   // Get comment from first assignment (comments are shared across assignments in same cell)
                                   const cellComment = cellEntry?.comment;
@@ -6392,8 +6408,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {deptStages.length > 0 ? (
                         <div className="grid grid-cols-2 gap-x-1.5 gap-y-0.5">
                           {deptStages.map((stage) => {
-                            const stageColor = getStageColor(stage);
-                            const swatchBg = LEGEND_STAGE_SWATCH_BG[stage] || stageColor.bg;
+                            const swatchBg = getLegendStageSwatchBg(stage, dept);
                             return (
                               <div
                                 key={`legend-stage-${dept}-${stage}`}
