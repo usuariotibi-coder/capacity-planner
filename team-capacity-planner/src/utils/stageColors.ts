@@ -17,31 +17,31 @@ import type { Stage } from '../types';
  */
 export const stageColors: Record<string, { bg: string; text: string }> = {
   // ========== HD DEPARTMENT STAGES ==========
-  SWITCH_LAYOUT_REVISION: { bg: 'bg-purple-100', text: 'text-purple-900' },
-  CONTROLS_DESIGN: { bg: 'bg-indigo-100', text: 'text-indigo-900' },
+  SWITCH_LAYOUT_REVISION: { bg: 'bg-[#E2F0D9]', text: 'text-slate-900' },
+  CONTROLS_DESIGN: { bg: 'bg-[#D9E1F2]', text: 'text-slate-900' },
 
   // ========== MED DEPARTMENT STAGES ==========
-  CONCEPT: { bg: 'bg-sky-100', text: 'text-sky-900' },
-  DETAIL_DESIGN: { bg: 'bg-cyan-100', text: 'text-cyan-900' },
+  CONCEPT: { bg: 'bg-[#C6E0B4]', text: 'text-slate-900' },
+  DETAIL_DESIGN: { bg: 'bg-[#A9D18E]', text: 'text-slate-900' },
 
   // ========== BUILD DEPARTMENT STAGES ==========
-  CABINETS_FRAMES: { bg: 'bg-blue-100', text: 'text-blue-900' },
-  OVERALL_ASSEMBLY: { bg: 'bg-purple-200', text: 'text-purple-900' },
-  FINE_TUNING: { bg: 'bg-pink-100', text: 'text-pink-900' },
+  CABINETS_FRAMES: { bg: 'bg-[#FBE5D6]', text: 'text-slate-900' },
+  OVERALL_ASSEMBLY: { bg: 'bg-[#FFD966]', text: 'text-slate-900' },
+  FINE_TUNING: { bg: 'bg-[#FFC000]', text: 'text-slate-900' },
 
   // ========== PRG DEPARTMENT STAGES ==========
-  OFFLINE: { bg: 'bg-lime-100', text: 'text-lime-900' },
-  ONLINE: { bg: 'bg-green-100', text: 'text-green-900' },
-  DEBUG: { bg: 'bg-amber-100', text: 'text-amber-900' },
-  COMMISSIONING: { bg: 'bg-orange-100', text: 'text-orange-900' },
+  OFFLINE: { bg: 'bg-[#FFF2CC]', text: 'text-slate-900' },
+  ONLINE: { bg: 'bg-[#9DC3E6]', text: 'text-slate-900' },
+  DEBUG: { bg: 'bg-[#2E75B6]', text: 'text-white' },
+  COMMISSIONING: { bg: 'bg-[#FF0000]', text: 'text-white' },
 
   // ========== COMMON STAGES (ALL DEPARTMENTS) ==========
-  RELEASE: { bg: 'bg-emerald-100', text: 'text-emerald-900' },
-  RED_LINES: { bg: 'bg-red-100', text: 'text-red-900' },
-  SUPPORT: { bg: 'bg-slate-100', text: 'text-slate-900' },
-  SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-stone-100', text: 'text-stone-900' },
-  ROBOT_SIMULATION: { bg: 'bg-zinc-100', text: 'text-zinc-900' },
-  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-rose-100', text: 'text-rose-900' },
+  RELEASE: { bg: 'bg-[#70AD47]', text: 'text-white' },
+  RED_LINES: { bg: 'bg-[#FF0000]', text: 'text-white' },
+  SUPPORT: { bg: 'bg-[#F4CCCC]', text: 'text-slate-900' },
+  SUPPORT_MANUALS_FLOW_CHARTS: { bg: 'bg-[#FCE4D6]', text: 'text-slate-900' },
+  ROBOT_SIMULATION: { bg: 'bg-[#D9D2E9]', text: 'text-slate-900' },
+  STANDARDS_REV_PROGRAMING_CONCEPT: { bg: 'bg-[#EAD1DC]', text: 'text-slate-900' },
 };
 
 /**
