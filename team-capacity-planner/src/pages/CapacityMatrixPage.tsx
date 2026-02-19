@@ -79,6 +79,11 @@ interface StageHoursEntry {
   hoursInput: string;
 }
 
+interface StageResourceHoursEntry {
+  hours: number;
+  hoursInput: string;
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -150,6 +155,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingExternalHoursInput, setEditingExternalHoursInput] = useState<string>('');
   const [editingStage, setEditingStage] = useState<Stage>(null);
   const [editingStageEntries, setEditingStageEntries] = useState<StageHoursEntry[]>([]);
+  const [editingStageResourceHours, setEditingStageResourceHours] = useState<Record<string, StageResourceHoursEntry>>({});
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -168,6 +174,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     hoursInput: hours > 0 ? `${hours}` : '',
   });
 
+  const createStageResourceKey = (stageEntryId: string, employeeId: string) => `${stageEntryId}::${employeeId}`;
+
   const roundHours = (value: number) => Math.round((value || 0) * 100) / 100;
   const minYearOption = 2024;
   const maxYearOption = new Date().getFullYear() + 10;
@@ -180,6 +188,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingCell(null);
     setEditingStage(null);
     setEditingStageEntries([]);
+    setEditingStageResourceHours({});
     setEditingHours(0);
     setEditingComment('');
     setEditingHoursInput('');
@@ -197,6 +206,33 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     [editingStageEntries]
   );
 
+  const stageResourceTotalHours = useMemo(() => {
+    if (!editingCell) return 0;
+    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    if (!hasStagePlanner) return 0;
+
+    const selectedIds = Array.from(selectedEmployees).filter((employeeId) => {
+      const emp = employees.find((candidate) => candidate.id === employeeId);
+      return !!emp &&
+        emp.isActive &&
+        !isPlaceholderEmployee(emp) &&
+        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+    });
+
+    if (selectedIds.length === 0) return stageEntriesTotalHours;
+
+    return roundHours(
+      editingStageEntries.reduce((sum, entry) => {
+        const entryHours = selectedIds.reduce((entrySum, employeeId) => {
+          const key = createStageResourceKey(entry.id, employeeId);
+          return entrySum + (editingStageResourceHours[key]?.hours || 0);
+        }, 0);
+        return sum + entryHours;
+      }, 0)
+    );
+  }, [editingCell, selectedEmployees, employees, editingStageEntries, editingStageResourceHours, stageEntriesTotalHours]);
+
   useEffect(() => {
     const weeks = getAllWeeksWithNextYear(selectedYear);
     const rangeStart = weeks[0]?.date || `${selectedYear}-01-01`;
@@ -212,9 +248,54 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
     if (!hasStagePlanner) return;
 
-    setEditingHours(stageEntriesTotalHours);
-    setEditingHoursInput(stageEntriesTotalHours > 0 ? `${stageEntriesTotalHours}` : '');
-  }, [editingCell, stageEntriesTotalHours]);
+    setEditingHours(stageResourceTotalHours);
+    setEditingHoursInput(stageResourceTotalHours > 0 ? `${stageResourceTotalHours}` : '');
+  }, [editingCell, stageResourceTotalHours]);
+
+  useEffect(() => {
+    if (!editingCell) return;
+    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    if (!hasStagePlanner) return;
+
+    const activeEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
+      const emp = employees.find((candidate) => candidate.id === employeeId);
+      return !!emp &&
+        emp.isActive &&
+        !isPlaceholderEmployee(emp) &&
+        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+    });
+
+    setEditingStageResourceHours((prev) => {
+      const next: Record<string, StageResourceHoursEntry> = { ...prev };
+      let changed = false;
+      const validKeys = new Set<string>();
+
+      editingStageEntries.forEach((entry) => {
+        activeEmployeeIds.forEach((employeeId) => {
+          const key = createStageResourceKey(entry.id, employeeId);
+          validKeys.add(key);
+          if (!next[key]) {
+            const defaultHours = activeEmployeeIds.length === 1 ? roundHours(entry.hours || 0) : 0;
+            next[key] = {
+              hours: defaultHours,
+              hoursInput: defaultHours > 0 ? `${defaultHours}` : '',
+            };
+            changed = true;
+          }
+        });
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!validKeys.has(key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [editingCell, editingStageEntries, selectedEmployees, employees]);
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
@@ -3212,6 +3293,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     let totalExternalHours = 0;
     const canUseStagePlanner = !(department === 'BUILD' || department === 'PRG') && STAGE_OPTIONS[department].length > 0;
     let initialStageEntries: StageHoursEntry[] = [];
+    let initialStageResourceHours: Record<string, StageResourceHoursEntry> = {};
 
     if ((department === 'BUILD' || department === 'PRG') && deptAssignments.length > 0) {
       const summedScioHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.scioHours || 0), 0);
@@ -3241,6 +3323,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       } else if (totalHours > 0) {
         initialStageEntries = [createStageHoursEntry(initialStage as Exclude<Stage, null> | '', roundHours(totalHours))];
       }
+
+      if (initialStageEntries.length > 0 && assignedEmployeeIds.size > 0) {
+        initialStageEntries.forEach((entry) => {
+          const stageKey = (entry.stage || '') as Exclude<Stage, null> | '';
+          assignedEmployeeIds.forEach((employeeId) => {
+            const employeeStageHours = roundHours(
+              deptAssignments.reduce((sum, assignment) => {
+                const assignmentStageKey = ((assignment.stage || '') as Exclude<Stage, null> | '');
+                if (assignment.employeeId !== employeeId || assignmentStageKey !== stageKey) return sum;
+                const assignmentHours = typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0);
+                return sum + assignmentHours;
+              }, 0)
+            );
+            initialStageResourceHours[createStageResourceKey(entry.id, employeeId)] = {
+              hours: employeeStageHours,
+              hoursInput: employeeStageHours > 0 ? `${employeeStageHours}` : '',
+            };
+          });
+        });
+      }
     }
 
     setEditingCell({ department, weekStart, projectId });
@@ -3253,6 +3355,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setEditingExternalHoursInput(totalExternalHours ? totalExternalHours.toString() : '');
     setEditingStage(initialStage);
     setEditingStageEntries(initialStageEntries);
+    setEditingStageResourceHours(initialStageResourceHours);
     setEditingComment(initialComment);
     setSelectedEmployees(assignedEmployeeIds);
     setShowDeleteConfirm(false);
@@ -3267,6 +3370,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
     const hasStagePlanner = !isBuildOrPRG && STAGE_OPTIONS[editingCell.department].length > 0;
+
+    const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
+      const emp = employeeById.get(employeeId);
+      return !!emp &&
+        emp.isActive &&
+        !isPlaceholderEmployee(emp) &&
+        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+    });
 
     const normalizedStageEntries = hasStagePlanner
       ? Array.from(
@@ -3283,8 +3394,45 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         }))
       : [];
 
+    const stagePlanByEmployee = new Map<string, { stage: Stage; hours: number }[]>();
+    if (hasStagePlanner && targetEmployeeIds.length > 0) {
+      const employeeStageMap = new Map<string, Map<Exclude<Stage, null> | '', number>>();
+      targetEmployeeIds.forEach((employeeId) => employeeStageMap.set(employeeId, new Map()));
+
+      editingStageEntries.forEach((entry) => {
+        const stageKey = (entry.stage || '') as Exclude<Stage, null> | '';
+        targetEmployeeIds.forEach((employeeId) => {
+          const hoursKey = createStageResourceKey(entry.id, employeeId);
+          const specificHours = roundHours(Math.max(0, editingStageResourceHours[hoursKey]?.hours || 0));
+          if (specificHours <= 0) return;
+          const employeeMap = employeeStageMap.get(employeeId);
+          if (!employeeMap) return;
+          employeeMap.set(stageKey, roundHours((employeeMap.get(stageKey) || 0) + specificHours));
+        });
+      });
+
+      employeeStageMap.forEach((stageMap, employeeId) => {
+        stagePlanByEmployee.set(
+          employeeId,
+          Array.from(stageMap.entries()).map(([stageKey, hours]) => ({
+            stage: (stageKey || null) as Stage,
+            hours,
+          }))
+        );
+      });
+    }
+
     const totalHours = hasStagePlanner
-      ? roundHours(normalizedStageEntries.reduce((sum, entry) => sum + entry.hours, 0))
+      ? (
+          targetEmployeeIds.length > 0
+            ? roundHours(
+                Array.from(stagePlanByEmployee.values()).reduce(
+                  (sum, plan) => sum + plan.reduce((entrySum, entry) => entrySum + entry.hours, 0),
+                  0
+                )
+              )
+            : roundHours(normalizedStageEntries.reduce((sum, entry) => sum + entry.hours, 0))
+        )
       : (isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours);
 
     if (totalHours === 0) {
@@ -3316,18 +3464,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       );
     };
 
-    const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
-      const emp = employeeById.get(employeeId);
-      return !!emp &&
-        emp.isActive &&
-        !isPlaceholderEmployee(emp) &&
-        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
-    });
-
     const upsertStageAssignmentsForEmployee = async (
       employeeId: string,
       stagePlan: { stage: Stage; hours: number }[],
-      divideAcrossEmployees: boolean,
       sourceAssignments: Assignment[],
       assignmentsToResetCollector: Assignment[]
     ) => {
@@ -3345,9 +3484,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       for (const entry of stagePlan) {
         const stageKey = stageKeyFor(entry.stage);
-        const desiredHours = divideAcrossEmployees
-          ? roundHours(entry.hours / targetEmployeeIds.length)
-          : roundHours(entry.hours);
+        const desiredHours = roundHours(entry.hours);
         const existingBucket = existingByStage.get(stageKey) || [];
         const existingAssign = existingBucket.shift();
         existingByStage.set(stageKey, existingBucket);
@@ -3379,10 +3516,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       if (hasStagePlanner) {
         const assignmentsToReset: Assignment[] = [];
         for (const employeeId of targetEmployeeIds) {
+          const employeeStagePlan = stagePlanByEmployee.get(employeeId) || [];
           await upsertStageAssignmentsForEmployee(
             employeeId,
-            normalizedStageEntries,
-            true,
+            employeeStagePlan,
             deptAssignments,
             assignmentsToReset
           );
@@ -3457,7 +3594,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         await upsertStageAssignmentsForEmployee(
           availableEmployee.id,
           normalizedStageEntries,
-          false,
           existingPlaceholderAssignments,
           assignmentsToReset
         );
@@ -3686,13 +3822,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const hasInternalSelected = selectedEmployeeList.some(
       (emp) => !(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
     );
-    const selectedResourcesCount = selectedEmployeeList.length > 0 ? selectedEmployeeList.length : 1;
-    const nonZeroStageEntries = editingStageEntries
-      .filter((entry) => roundHours(entry.hours) > 0)
-      .map((entry) => ({
-        ...entry,
-        perResourceHours: roundHours(entry.hours / selectedResourcesCount),
-      }));
+    const selectedResourcesCount = selectedEmployeeList.length;
     const scioInputLocked = selectedEmployeeList.length > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
@@ -3837,55 +3967,107 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       {t.noStage}
                     </div>
                   )}
-                  {editingStageEntries.map((entry) => (
-                    <div key={entry.id} className="grid grid-cols-[1fr_110px_36px] gap-2">
-                      <select
-                        value={entry.stage}
-                        onChange={(e) => {
-                          const value = e.target.value as Exclude<Stage, null> | '';
-                          setEditingStageEntries((prev) => prev.map((row) => (
-                            row.id === entry.id ? { ...row, stage: value } : row
-                          )));
-                        }}
-                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">{t.noStage}</option>
-                        {stageOptions.map((stage) => (
-                          <option key={stage} value={stage}>
-                            {getStageLabel(stage, t as Record<string, string>)}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={entry.hoursInput}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          const normalized = raw.replace(',', '.');
-                          if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
-                            const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
-                            setEditingStageEntries((prev) => prev.map((row) => (
-                              row.id === entry.id
-                                ? { ...row, hours: num, hoursInput: raw }
-                                : row
-                            )));
-                          }
-                        }}
-                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
-                        className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg"
-                        title={t.delete}
-                      >
-                        <X size={14} className="mx-auto" />
-                      </button>
-                    </div>
-                  ))}
+                  {editingStageEntries.map((entry) => {
+                    const stageRowTotal = selectedResourcesCount > 0
+                      ? roundHours(
+                          selectedEmployeeList.reduce((sum, resource) => {
+                            const key = createStageResourceKey(entry.id, resource.id);
+                            return sum + (editingStageResourceHours[key]?.hours || 0);
+                          }, 0)
+                        )
+                      : roundHours(entry.hours || 0);
+
+                    return (
+                      <div key={entry.id} className="space-y-2">
+                        <div className="grid grid-cols-[1fr_110px_36px] gap-2">
+                          <select
+                            value={entry.stage}
+                            onChange={(e) => {
+                              const value = e.target.value as Exclude<Stage, null> | '';
+                              setEditingStageEntries((prev) => prev.map((row) => (
+                                row.id === entry.id ? { ...row, stage: value } : row
+                              )));
+                            }}
+                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">{t.noStage}</option>
+                            {stageOptions.map((stage) => (
+                              <option key={stage} value={stage}>
+                                {getStageLabel(stage, t as Record<string, string>)}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={selectedResourcesCount > 0 ? `${stageRowTotal || ''}` : entry.hoursInput}
+                            onFocus={(e) => e.currentTarget.select()}
+                            onChange={(e) => {
+                              if (selectedResourcesCount > 0) return;
+                              const raw = e.target.value;
+                              const normalized = raw.replace(',', '.');
+                              if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                                setEditingStageEntries((prev) => prev.map((row) => (
+                                  row.id === entry.id
+                                    ? { ...row, hours: num, hoursInput: raw }
+                                    : row
+                                )));
+                              }
+                            }}
+                            readOnly={selectedResourcesCount > 0}
+                            disabled={selectedResourcesCount > 0}
+                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
+                            placeholder="0"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
+                            className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg"
+                            title={t.delete}
+                          >
+                            <X size={14} className="mx-auto" />
+                          </button>
+                        </div>
+
+                        {selectedResourcesCount > 0 && (
+                          <div className="ml-1 pl-2 border-l-2 border-gray-200 space-y-1">
+                            {selectedEmployeeList.map((resource) => {
+                              const resourceKey = createStageResourceKey(entry.id, resource.id);
+                              const resourceData = editingStageResourceHours[resourceKey] || { hours: 0, hoursInput: '' };
+                              return (
+                                <div key={resourceKey} className="grid grid-cols-[1fr_92px] gap-2 items-center">
+                                  <span className="text-xs text-gray-600 truncate">{resource.name}</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={resourceData.hoursInput}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      const normalized = raw.replace(',', '.');
+                                      if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                        const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                                        setEditingStageResourceHours((prev) => ({
+                                          ...prev,
+                                          [resourceKey]: {
+                                            hours: num,
+                                            hoursInput: raw,
+                                          },
+                                        }));
+                                      }
+                                    }}
+                                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -3975,16 +4157,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
                       </div>
 
-                      {hasStagePlanner && isSelected && nonZeroStageEntries.length > 0 && (
+                      {hasStagePlanner && isSelected && (
                         <div className="pl-6 pt-1 flex flex-wrap gap-1.5">
-                          {nonZeroStageEntries.map((entry) => (
-                            <span
-                              key={`${emp.id}-${entry.id}`}
-                              className="text-[10px] text-gray-600 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5"
-                            >
-                              {entry.stage ? getStageLabel(entry.stage as Exclude<Stage, null>, t as Record<string, string>) : t.noStage}: {formatHours(entry.perResourceHours)}h
-                            </span>
-                          ))}
+                          {editingStageEntries
+                            .map((entry) => {
+                              const key = createStageResourceKey(entry.id, emp.id);
+                              const resourceHours = roundHours(editingStageResourceHours[key]?.hours || 0);
+                              return { entry, resourceHours };
+                            })
+                            .filter(({ resourceHours }) => resourceHours > 0)
+                            .map(({ entry, resourceHours }) => (
+                              <span
+                                key={`${emp.id}-${entry.id}`}
+                                className="text-[10px] text-gray-600 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5"
+                              >
+                                {entry.stage ? getStageLabel(entry.stage as Exclude<Stage, null>, t as Record<string, string>) : t.noStage}: {formatHours(resourceHours)}h
+                              </span>
+                            ))}
                         </div>
                       )}
                     </label>
