@@ -3661,7 +3661,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     const stageOptions = STAGE_OPTIONS[editingCell.department] || [];
     // Filter employees: exclude company entries (where name === subcontractCompany and capacity === 0)
-    // These are company placeholders used in "OcupaciÃ³n semanal total", not actual resources
+    // These are company placeholders used in "Ocupacion semanal total", not actual resources
     const deptEmployees = employees.filter(emp =>
       emp.department === editingCell.department &&
       emp.isActive &&
@@ -3716,7 +3716,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               onClick={closeEditModal}
               className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
             >
-              âœ•
+              X
             </button>
           </div>
 
@@ -3921,7 +3921,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">ðŸ‘¥ {t.availableResources} ({deptEmployees.length})</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableResources} ({deptEmployees.length})</label>
               <div className="space-y-2 min-h-[180px] max-h-52 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
@@ -3964,11 +3964,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         {isBuildOrPRG && (
                           isExternal ? (
                             <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
-                              ðŸ¢ {emp.subcontractCompany}
+                              Ext {emp.subcontractCompany}
                             </span>
                           ) : (
                             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                              ðŸ  Interno
+                              Interno
                             </span>
                           )
                         )}
@@ -3993,7 +3993,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
               {selectedEmployeeList.length > 0 && (
                 <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
-                  âœ“ {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
+                  OK: {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
             </div>
@@ -4001,7 +4001,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Comment input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">ðŸ’¬ {t.comment}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.comment}</label>
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
@@ -4015,9 +4015,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-[95] flex items-center justify-center rounded-lg">
               <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
-                <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar EliminaciÃ³n'}</h3>
+                <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar Eliminacion'}</h3>
                 <p className="text-sm text-gray-700 mb-4">
-                  {t.deleteAllDataConfirm || 'Â¿EstÃ¡s seguro de que deseas eliminar estos datos?'}
+                  {t.deleteAllDataConfirm || 'Estas seguro de que deseas eliminar estos datos?'}
                 </p>
                 <div className="flex gap-3 justify-end">
                   <button
@@ -4059,7 +4059,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
                   >
                     {isDeleting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
-                    {isDeleting ? (t.deletingData || 'Eliminando...') : 'ðŸ—‘ï¸ ' + (t.delete || 'Eliminar')}
+                    {isDeleting ? (t.deletingData || 'Eliminando...') : (t.delete || 'Eliminar')}
                   </button>
                 </div>
               </div>
@@ -4072,7 +4072,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
-              ðŸ—‘ï¸ {t.delete}
+              {t.delete}
             </button>
             <div className="flex gap-3">
               <button
