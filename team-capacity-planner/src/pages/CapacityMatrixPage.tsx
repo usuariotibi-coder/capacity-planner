@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
+﻿import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -72,6 +72,13 @@ interface CapacityMatrixPageProps {
   departmentFilter: DepartmentFilter;
 }
 
+interface StageHoursEntry {
+  id: string;
+  stage: Exclude<Stage, null> | '';
+  hours: number;
+  hoursInput: string;
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -142,6 +149,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingScioHoursInput, setEditingScioHoursInput] = useState<string>('');
   const [editingExternalHoursInput, setEditingExternalHoursInput] = useState<string>('');
   const [editingStage, setEditingStage] = useState<Stage>(null);
+  const [editingStageEntries, setEditingStageEntries] = useState<StageHoursEntry[]>([]);
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -152,11 +160,41 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const createStageHoursEntry = (stage: Exclude<Stage, null> | '' = '', hours = 0): StageHoursEntry => ({
+    id: generateId(),
+    stage,
+    hours,
+    hoursInput: hours > 0 ? `${hours}` : '',
+  });
+
+  const roundHours = (value: number) => Math.round((value || 0) * 100) / 100;
   const minYearOption = 2024;
   const maxYearOption = new Date().getFullYear() + 10;
   const yearOptions = Array.from(
     { length: maxYearOption - minYearOption + 1 },
     (_, idx) => minYearOption + idx
+  );
+
+  const closeEditModal = () => {
+    setEditingCell(null);
+    setEditingStage(null);
+    setEditingStageEntries([]);
+    setEditingHours(0);
+    setEditingComment('');
+    setEditingHoursInput('');
+    setEditingScioHours(0);
+    setEditingScioHoursInput('');
+    setEditingExternalHours(0);
+    setEditingExternalHoursInput('');
+    setInitialScioHours(0);
+    setSelectedEmployees(new Set());
+    setShowDeleteConfirm(false);
+  };
+
+  const stageEntriesTotalHours = useMemo(
+    () => roundHours(editingStageEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0)),
+    [editingStageEntries]
   );
 
   useEffect(() => {
@@ -167,6 +205,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     // We only want to refetch when the range actually changes (e.g. user selects another year).
     fetchAssignments({ startDate: rangeStart, endDate: rangeEnd });
   }, [selectedYear, fetchAssignments]);
+
+  useEffect(() => {
+    if (!editingCell) return;
+    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    if (!hasStagePlanner) return;
+
+    setEditingHours(stageEntriesTotalHours);
+    setEditingHoursInput(stageEntriesTotalHours > 0 ? `${stageEntriesTotalHours}` : '');
+  }, [editingCell, stageEntriesTotalHours]);
 
   // SCIO Team Members state - store capacity per department and per week
   // Structure: { dept: { weekDate: hours } }
@@ -375,7 +423,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
         const data = await scioTeamCapacityApi.getAll();
         console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
-        console.log('[CapacityMatrix] 📊 Total SCIO records loaded:', data?.length || 0);
+        console.log('[CapacityMatrix] ðŸ“Š Total SCIO records loaded:', data?.length || 0);
 
         // Transform API data to our state structure
         const newScioTeamMembers: Record<Department, Record<string, number>> = {
@@ -602,7 +650,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Delete the record if capacity is 0
         console.log('[CapacityMatrix] Deleting SCIO capacity:', recordKey);
         await scioTeamCapacityApi.delete(existingId);
-        console.log('[CapacityMatrix] ✅ SCIO capacity deleted successfully');
+        console.log('[CapacityMatrix] âœ… SCIO capacity deleted successfully');
 
         // Log activity
         await activityLogApi.logActivity(
@@ -621,7 +669,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Update existing record
         console.log('[CapacityMatrix] Updating SCIO capacity:', recordKey, capacity);
         const updateResult = await scioTeamCapacityApi.update(existingId, { capacity });
-        console.log('[CapacityMatrix] ✅ SCIO capacity updated successfully:', updateResult);
+        console.log('[CapacityMatrix] âœ… SCIO capacity updated successfully:', updateResult);
 
         // Log activity
         await activityLogApi.logActivity(
@@ -643,8 +691,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             weekStartDate: weekDate,
             capacity: capacity,
           });
-          console.log('[CapacityMatrix] ✅ CREATE succeeded, result:', result);
-          console.log('[CapacityMatrix] 🎯 Record ID assigned:', result.id);
+          console.log('[CapacityMatrix] âœ… CREATE succeeded, result:', result);
+          console.log('[CapacityMatrix] ðŸŽ¯ Record ID assigned:', result.id);
           createdSuccessfully = true;
           createdRecordId = result.id;
 
@@ -654,12 +702,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           }));
         } catch (createError) {
           const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
-          console.log('[CapacityMatrix] ❌ CREATE failed:', createErrorMsg);
+          console.log('[CapacityMatrix] âŒ CREATE failed:', createErrorMsg);
           console.log('[CapacityMatrix] Checking if this is a unique constraint violation...');
 
           // If create fails due to unique constraint, try to update instead
           // This happens when the record already exists but we don't have the ID
-          if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
+          if (createErrorMsg.includes('conjunto Ãºnico') || createErrorMsg.includes('unique')) {
             console.log('[CapacityMatrix] Detected unique constraint violation, fetching all records to find existing one...');
             try {
               const allScioRecords = await scioTeamCapacityApi.getAll();
@@ -670,9 +718,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               );
 
               if (existingRecord) {
-                console.log('[CapacityMatrix] ✅ Found existing record, updating it with ID:', existingRecord.id);
+                console.log('[CapacityMatrix] âœ… Found existing record, updating it with ID:', existingRecord.id);
                 const updateResult = await scioTeamCapacityApi.update(existingRecord.id, { capacity });
-                console.log('[CapacityMatrix] ✅ UPDATE succeeded:', updateResult);
+                console.log('[CapacityMatrix] âœ… UPDATE succeeded:', updateResult);
                 createdSuccessfully = true;
                 createdRecordId = existingRecord.id;
 
@@ -681,11 +729,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   [recordKey]: existingRecord.id,
                 }));
               } else {
-                console.log('[CapacityMatrix] ❌ No existing record found, will throw original error');
+                console.log('[CapacityMatrix] âŒ No existing record found, will throw original error');
                 throw createError;
               }
             } catch (getError) {
-              console.error('[CapacityMatrix] ❌ Failed to fetch or update existing record:', getError);
+              console.error('[CapacityMatrix] âŒ Failed to fetch or update existing record:', getError);
               throw getError;
             }
           } else {
@@ -710,7 +758,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] ❌ Final error saving SCIO capacity:', errorMsg);
+      console.error('[CapacityMatrix] âŒ Final error saving SCIO capacity:', errorMsg);
       alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
     }
   };
@@ -3034,7 +3082,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting timeline PDF:', error);
       alert(language === 'es'
-        ? 'Ocurrió un error al exportar el PDF.'
+        ? 'OcurriÃ³ un error al exportar el PDF.'
         : 'An error occurred while exporting the PDF.');
     } finally {
       if (previousExpandedState.size > 0) {
@@ -3162,6 +3210,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     // Use the whole cell totals (sum of assignments), not only first assignment.
     let totalScioHours = 0;
     let totalExternalHours = 0;
+    const canUseStagePlanner = !(department === 'BUILD' || department === 'PRG') && STAGE_OPTIONS[department].length > 0;
+    let initialStageEntries: StageHoursEntry[] = [];
 
     if ((department === 'BUILD' || department === 'PRG') && deptAssignments.length > 0) {
       const summedScioHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.scioHours || 0), 0);
@@ -3176,6 +3226,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         totalScioHours = totalHours;
         totalExternalHours = 0;
       }
+    } else if (canUseStagePlanner) {
+      const stageTotals = new Map<Exclude<Stage, null> | '', number>();
+      deptAssignments.forEach((assignment) => {
+        const stageKey = (assignment.stage as Exclude<Stage, null> | null) || '';
+        const assignmentHours = typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0);
+        stageTotals.set(stageKey, roundHours((stageTotals.get(stageKey) || 0) + assignmentHours));
+      });
+
+      if (stageTotals.size > 0) {
+        initialStageEntries = Array.from(stageTotals.entries()).map(([stageKey, hoursValue]) =>
+          createStageHoursEntry(stageKey, hoursValue)
+        );
+      } else if (totalHours > 0) {
+        initialStageEntries = [createStageHoursEntry(initialStage as Exclude<Stage, null> | '', roundHours(totalHours))];
+      }
     }
 
     setEditingCell({ department, weekStart, projectId });
@@ -3187,8 +3252,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setEditingScioHoursInput(totalScioHours ? totalScioHours.toString() : '');
     setEditingExternalHoursInput(totalExternalHours ? totalExternalHours.toString() : '');
     setEditingStage(initialStage);
+    setEditingStageEntries(initialStageEntries);
     setEditingComment(initialComment);
     setSelectedEmployees(assignedEmployeeIds);
+    setShowDeleteConfirm(false);
   };
 
   const handleSaveCell = async () => {
@@ -3198,21 +3265,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       return;
     }
 
-    // For BUILD and PRG, use separate SCIO and external hours
-    const isBuildOrPRG = editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG');
-    const totalHours = isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours;
+    const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    const hasStagePlanner = !isBuildOrPRG && STAGE_OPTIONS[editingCell.department].length > 0;
 
-    if (!editingCell || totalHours === 0) {
-      setEditingCell(null);
-      setEditingStage(null);
-      setEditingComment('');
-      setEditingScioHours(0);
-      setInitialScioHours(0);
-      setEditingExternalHours(0);
-      setEditingHoursInput('');
-      setEditingScioHoursInput('');
-      setEditingExternalHoursInput('');
-      setSelectedEmployees(new Set());
+    const normalizedStageEntries = hasStagePlanner
+      ? Array.from(
+          editingStageEntries.reduce((acc, entry) => {
+            const normalizedHours = roundHours(Math.max(0, entry.hours || 0));
+            if (normalizedHours <= 0) return acc;
+            const stageKey = entry.stage || '';
+            acc.set(stageKey, roundHours((acc.get(stageKey) || 0) + normalizedHours));
+            return acc;
+          }, new Map<Exclude<Stage, null> | '', number>()).entries()
+        ).map(([stageKey, stageHours]) => ({
+          stage: (stageKey || null) as Stage,
+          hours: stageHours,
+        }))
+      : [];
+
+    const totalHours = hasStagePlanner
+      ? roundHours(normalizedStageEntries.reduce((sum, entry) => sum + entry.hours, 0))
+      : (isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours);
+
+    if (totalHours === 0) {
+      closeEditModal();
       return;
     }
 
@@ -3240,8 +3316,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       );
     };
 
-    // Persist exactly what user selected in the modal.
-    // If selection is empty, we should remove current assignments instead of restoring previous ones.
     const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
       const emp = employeeById.get(employeeId);
       return !!emp &&
@@ -3249,90 +3323,152 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         !isPlaceholderEmployee(emp) &&
         !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
     });
-    if (targetEmployeeIds.length > 0) {
-      // Update or create assignments for selected employees
-      const upsertPromises = targetEmployeeIds.map(async (employeeId) => {
-        const existingAssign = deptAssignments.find(a => a.employeeId === employeeId);
-        const hoursPerEmployee = Math.round((totalHours / targetEmployeeIds.length) * 100) / 100;
 
-        // For BUILD and PRG, split hours proportionally
-        let scioHours = editingScioHours;
-        let externalHours = editingExternalHours;
-        if (targetEmployeeIds.length > 1) {
-          scioHours = Math.round((editingScioHours / targetEmployeeIds.length) * 100) / 100;
-          externalHours = Math.round((editingExternalHours / targetEmployeeIds.length) * 100) / 100;
-        }
+    const upsertStageAssignmentsForEmployee = async (
+      employeeId: string,
+      stagePlan: { stage: Stage; hours: number }[],
+      divideAcrossEmployees: boolean,
+      sourceAssignments: Assignment[],
+      assignmentsToResetCollector: Assignment[]
+    ) => {
+      const stageKeyFor = (stage: Stage) => (stage || '');
+      const existingByStage = new Map<string, Assignment[]>();
 
-        const updateData: any = {
-          hours: hoursPerEmployee,
-          stage: editingStage,
+      sourceAssignments
+        .filter((assignment) => assignment.employeeId === employeeId)
+        .forEach((assignment) => {
+          const key = stageKeyFor((assignment.stage || null) as Stage);
+          const bucket = existingByStage.get(key) || [];
+          bucket.push(assignment);
+          existingByStage.set(key, bucket);
+        });
+
+      for (const entry of stagePlan) {
+        const stageKey = stageKeyFor(entry.stage);
+        const desiredHours = divideAcrossEmployees
+          ? roundHours(entry.hours / targetEmployeeIds.length)
+          : roundHours(entry.hours);
+        const existingBucket = existingByStage.get(stageKey) || [];
+        const existingAssign = existingBucket.shift();
+        existingByStage.set(stageKey, existingBucket);
+
+        const payload: any = {
+          hours: desiredHours,
+          stage: entry.stage,
           comment: editingComment || undefined,
         };
 
-        // Add SCIO and external hours for BUILD and PRG departments
-        if (isBuildOrPRG) {
-          updateData.scioHours = scioHours;
-          updateData.externalHours = externalHours;
+        if (existingAssign) {
+          await updateAssignment(existingAssign.id, payload, { skipRefetch: true });
+        } else if (editingCell.projectId) {
+          await addAssignment({
+            employeeId,
+            projectId: editingCell.projectId,
+            weekStartDate: editingCell.weekStart,
+            ...payload,
+          } as any);
+        }
+      }
+
+      existingByStage.forEach((remaining) => {
+        remaining.forEach((assignment) => assignmentsToResetCollector.push(assignment));
+      });
+    };
+
+    if (targetEmployeeIds.length > 0) {
+      if (hasStagePlanner) {
+        const assignmentsToReset: Assignment[] = [];
+        for (const employeeId of targetEmployeeIds) {
+          await upsertStageAssignmentsForEmployee(
+            employeeId,
+            normalizedStageEntries,
+            true,
+            deptAssignments,
+            assignmentsToReset
+          );
         }
 
-        if (existingAssign) {
-          // Update existing assignment
-          await updateAssignment(existingAssign.id, updateData, { skipRefetch: true });
-        } else {
-          // Create new assignment
-          if (editingCell.projectId) {
-            const newAssignment: any = {
+        const selectedSet = new Set(targetEmployeeIds);
+        deptAssignments
+          .filter((assignment) => !selectedSet.has(assignment.employeeId))
+          .forEach((assignment) => assignmentsToReset.push(assignment));
+
+        await resetAssignmentsToZero(assignmentsToReset);
+      } else {
+        const upsertPromises = targetEmployeeIds.map(async (employeeId) => {
+          const existingAssign = deptAssignments.find((assignment) => assignment.employeeId === employeeId);
+          const hoursPerEmployee = roundHours(totalHours / targetEmployeeIds.length);
+
+          let scioHours = editingScioHours;
+          let externalHours = editingExternalHours;
+          if (targetEmployeeIds.length > 1) {
+            scioHours = roundHours(editingScioHours / targetEmployeeIds.length);
+            externalHours = roundHours(editingExternalHours / targetEmployeeIds.length);
+          }
+
+          const updateData: any = {
+            hours: hoursPerEmployee,
+            stage: editingStage,
+            comment: editingComment || undefined,
+          };
+
+          if (isBuildOrPRG) {
+            updateData.scioHours = scioHours;
+            updateData.externalHours = externalHours;
+          }
+
+          if (existingAssign) {
+            await updateAssignment(existingAssign.id, updateData, { skipRefetch: true });
+          } else if (editingCell.projectId) {
+            await addAssignment({
               employeeId,
               projectId: editingCell.projectId,
               weekStartDate: editingCell.weekStart,
-              hours: hoursPerEmployee,
-              stage: editingStage,
-              comment: editingComment || undefined,
-            };
-
-            // Add SCIO and external hours for BUILD and PRG departments
-            if (isBuildOrPRG) {
-              newAssignment.scioHours = scioHours;
-              newAssignment.externalHours = externalHours;
-            }
-
-            console.log('[CapacityMatrix] Creating new assignment for employee:', employeeId, newAssignment);
-            await addAssignment(newAssignment);
+              ...updateData,
+            } as any);
           }
-        }
-      });
-      await Promise.all(upsertPromises);
+        });
+        await Promise.all(upsertPromises);
 
-      // Delete assignments for employees that were deselected
-      const assignmentsToDelete = deptAssignments.filter((assign) => !targetEmployeeIds.includes(assign.employeeId));
-      await resetAssignmentsToZero(assignmentsToDelete);
+        const assignmentsToDelete = deptAssignments.filter((assignment) => !targetEmployeeIds.includes(assignment.employeeId));
+        await resetAssignmentsToZero(assignmentsToDelete);
+      }
     } else {
-      const existingPlaceholderAssignment = deptAssignments.find((assign) => {
-        const emp = employeeById.get(assign.employeeId) || assign.employee;
+      const availableEmployee = await getOrCreatePlaceholderEmployee(editingCell.department);
+      if (!availableEmployee) {
+        console.error('[CapacityMatrix] No placeholder employee available for department:', editingCell.department);
+        alert('No se pudo crear un recurso automatico para guardar estas horas. Intenta de nuevo.');
+        return;
+      }
+
+      if (!editingCell.projectId) {
+        console.error('[CapacityMatrix] No project ID available');
+        alert('Error: No se encontro el ID del proyecto.');
+        return;
+      }
+
+      const existingPlaceholderAssignments = deptAssignments.filter((assignment) => {
+        const emp = employeeById.get(assignment.employeeId) || assignment.employee;
         return !!emp && isPlaceholderEmployee(emp);
       });
+      const assignmentsToReset = deptAssignments.filter((assignment) => !existingPlaceholderAssignments.includes(assignment));
 
-      // No resources selected: keep at most one placeholder assignment with the entered hours.
-      // Reset all non-placeholder assignments to avoid delete throttling.
-      const assignmentsToReset = deptAssignments.filter((assign) => assign.id !== existingPlaceholderAssignment?.id);
-      await resetAssignmentsToZero(assignmentsToReset);
-
-      // Create new assignment for placeholder resource when no one is selected
-      console.log('[CapacityMatrix] Looking for available employee in department:', editingCell.department);
-      console.log('[CapacityMatrix] All employees:', employees.map(e => ({ name: e.name, dept: e.department, active: e.isActive })));
-      const availableEmployee = await getOrCreatePlaceholderEmployee(editingCell.department);
-
-      console.log('[CapacityMatrix] Found available employee:', availableEmployee);
-      console.log('[CapacityMatrix] Project ID:', editingCell.projectId);
-
-      if (availableEmployee && editingCell.projectId) {
+      if (hasStagePlanner) {
+        await upsertStageAssignmentsForEmployee(
+          availableEmployee.id,
+          normalizedStageEntries,
+          false,
+          existingPlaceholderAssignments,
+          assignmentsToReset
+        );
+      } else {
+        const existingPlaceholderAssignment = existingPlaceholderAssignments[0];
         const placeholderUpdateData: any = {
           hours: totalHours,
           stage: editingStage,
           comment: editingComment || undefined,
         };
 
-        // Add SCIO and external hours for BUILD and PRG departments
         if (isBuildOrPRG) {
           placeholderUpdateData.scioHours = editingScioHours;
           placeholderUpdateData.externalHours = editingExternalHours;
@@ -3340,40 +3476,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         if (existingPlaceholderAssignment) {
           await updateAssignment(existingPlaceholderAssignment.id, placeholderUpdateData, { skipRefetch: true });
+          existingPlaceholderAssignments.slice(1).forEach((assignment) => assignmentsToReset.push(assignment));
         } else {
-          const newAssignment: any = {
+          await addAssignment({
             employeeId: availableEmployee.id,
             projectId: editingCell.projectId,
             weekStartDate: editingCell.weekStart,
             ...placeholderUpdateData,
-          };
-          console.log('[CapacityMatrix] Creating new assignment:', newAssignment);
-          await addAssignment(newAssignment);
-        }
-      } else {
-        if (!availableEmployee) {
-          console.error('[CapacityMatrix] No placeholder employee available for department:', editingCell.department);
-          alert('No se pudo crear un recurso automatico para guardar estas horas. Intenta de nuevo.');
-        }
-        if (!editingCell.projectId) {
-          console.error('[CapacityMatrix] No project ID available');
-          alert('Error: No se encontro el ID del proyecto.');
+          } as any);
         }
       }
+
+      await resetAssignmentsToZero(assignmentsToReset);
     }
 
-    setEditingCell(null);
-    setEditingStage(null);
-    setEditingComment('');
-    setEditingScioHours(0);
-    setInitialScioHours(0);
-    setEditingExternalHours(0);
-    setEditingHoursInput('');
-    setEditingScioHoursInput('');
-    setEditingExternalHoursInput('');
-    setSelectedEmployees(new Set());
-
-    // Refresh in background so the modal closes immediately after save.
+    closeEditModal();
     void fetchAssignments(true);
   };
 
@@ -3408,9 +3525,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const deptDisplayDate = deptMeta?.deptDisplayDate || t.notConfigured;
 
     // Build tooltip text, including comment if present
-    let tooltipText = `📅 ${t.projectTooltip}: ${projectStartDate}\n👷 ${department}: ${deptDisplayDate}`;
+    let tooltipText = `ðŸ“… ${t.projectTooltip}: ${projectStartDate}\nðŸ‘· ${department}: ${deptDisplayDate}`;
     if (cellComment) {
-      tooltipText += `\n\n💬 ${cellComment}`;
+      tooltipText += `\n\nðŸ’¬ ${cellComment}`;
     }
 
     if (projectId && projectCellViewMode === 'compact') {
@@ -3427,7 +3544,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         >
           {cellComment && (
             <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
-              💬
+              ðŸ’¬
             </div>
           )}
           <div className="text-[10px] font-bold leading-tight">{compactTalentDisplay}</div>
@@ -3487,7 +3604,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           ) : (
             <>
               <div className="font-bold text-xs opacity-60">Week {weekNum}</div>
-              <div>{canEdit ? '+ Add' : '—'}</div>
+              <div>{canEdit ? '+ Add' : 'â€”'}</div>
             </>
           )}
         </div>
@@ -3529,7 +3646,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {/* Comment indicator - shows when cell has a comment */}
         {cellComment && (
           <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
-            💬
+            ðŸ’¬
           </div>
         )}
         {/* Pencil icon for editing */}
@@ -3544,13 +3661,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     const stageOptions = STAGE_OPTIONS[editingCell.department] || [];
     // Filter employees: exclude company entries (where name === subcontractCompany and capacity === 0)
-    // These are company placeholders used in "Ocupación semanal total", not actual resources
+    // These are company placeholders used in "OcupaciÃ³n semanal total", not actual resources
     const deptEmployees = employees.filter(emp =>
       emp.department === editingCell.department &&
       emp.isActive &&
       !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0)
     );
     const isBuildOrPRGDepartment = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    const hasStagePlanner = !isBuildOrPRGDepartment && stageOptions.length > 0;
     const selectedEmployeeList = Array.from(selectedEmployees)
       .map((empId) => employees.find((e) => e.id === empId))
       .filter((emp): emp is Employee =>
@@ -3568,6 +3686,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const hasInternalSelected = selectedEmployeeList.some(
       (emp) => !(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
     );
+    const selectedResourcesCount = selectedEmployeeList.length > 0 ? selectedEmployeeList.length : 1;
+    const nonZeroStageEntries = editingStageEntries
+      .filter((entry) => roundHours(entry.hours) > 0)
+      .map((entry) => ({
+        ...entry,
+        perResourceHours: roundHours(entry.hours / selectedResourcesCount),
+      }));
     const scioInputLocked = selectedEmployeeList.length > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
@@ -3578,17 +3703,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
-          onClick={() => {
-            setEditingCell(null);
-            setEditingStage(null);
-            setEditingHours(0);
-            setEditingComment('');
-            setEditingHoursInput('');
-            setEditingScioHoursInput('');
-            setEditingExternalHoursInput('');
-            setInitialScioHours(0);
-            setSelectedEmployees(new Set());
-          }}
+          onClick={closeEditModal}
         />
         {/* Modal */}
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl p-6 w-96 z-[90] max-h-screen overflow-y-auto">
@@ -3598,25 +3713,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               {t.editAssignment} - {t.weekAbbr} {weekNum}/{year}
             </h3>
             <button
-              onClick={() => {
-                setEditingCell(null);
-                setEditingStage(null);
-                setEditingHours(0);
-                setEditingComment('');
-                setEditingHoursInput('');
-                setEditingScioHoursInput('');
-                setEditingExternalHoursInput('');
-                setInitialScioHours(0);
-                setSelectedEmployees(new Set());
-              }}
+              onClick={closeEditModal}
               className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
             >
-              ✕
+              âœ•
             </button>
           </div>
 
-          {/* Hours input - For BUILD and PRG, show separate SCIO and External hours */}
-          {editingCell && (editingCell.department === 'BUILD' || editingCell.department === 'PRG') ? (
+          {/* Hours and Stage block */}
+          {isBuildOrPRGDepartment ? (
             <div className="mb-4 space-y-3">
               {/* SCIO Hours input */}
               <div>
@@ -3633,7 +3738,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       setEditingScioHoursInput(raw);
                       const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
                       setEditingScioHours(num);
-                      // Update total hours for backward compatibility
                       setEditingHours(num + editingExternalHours);
                     }
                   }}
@@ -3666,7 +3770,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         setEditingExternalHoursInput(raw);
                         const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
                         setEditingExternalHours(num);
-                        // Update total hours for backward compatibility
                         setEditingHours(editingScioHours + num);
                       }
                     }}
@@ -3681,9 +3784,112 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   />
                 </div>
               )}
+
+              {stageOptions.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ {t.stage}</label>
+                  <select
+                    value={(editingStage || '') as string}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEditingStage(value === '' ? null : (value as Stage));
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">{t.noStage}</option>
+                    {stageOptions.map((stage) => (
+                      <option key={stage} value={stage}>
+                        {getStageLabel(stage, t as Record<string, string>)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          ) : hasStagePlanner ? (
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
+                <input
+                  type="text"
+                  value={editingHoursInput}
+                  readOnly
+                  disabled
+                  className="w-full border border-gray-200 bg-gray-100 rounded-lg px-3 py-2 text-sm text-gray-700 font-semibold"
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">🏷️ {t.stage}</label>
+                  <button
+                    type="button"
+                    onClick={() => setEditingStageEntries((prev) => [...prev, createStageHoursEntry()])}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1"
+                  >
+                    + {t.add || 'Add'}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editingStageEntries.length === 0 && (
+                    <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
+                      {t.noStage}
+                    </div>
+                  )}
+                  {editingStageEntries.map((entry) => (
+                    <div key={entry.id} className="grid grid-cols-[1fr_110px_36px] gap-2">
+                      <select
+                        value={entry.stage}
+                        onChange={(e) => {
+                          const value = e.target.value as Exclude<Stage, null> | '';
+                          setEditingStageEntries((prev) => prev.map((row) => (
+                            row.id === entry.id ? { ...row, stage: value } : row
+                          )));
+                        }}
+                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">{t.noStage}</option>
+                        {stageOptions.map((stage) => (
+                          <option key={stage} value={stage}>
+                            {getStageLabel(stage, t as Record<string, string>)}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={entry.hoursInput}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const normalized = raw.replace(',', '.');
+                          if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                            const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                            setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id
+                                ? { ...row, hours: num, hoursInput: raw }
+                                : row
+                            )));
+                          }
+                        }}
+                        className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
+                        className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg"
+                        title={t.delete}
+                      >
+                        <X size={14} className="mx-auto" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
-            /* Standard hours input for other departments */
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
               <input
@@ -3712,89 +3918,82 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               />
             </div>
           )}
-
-          {/* Stage selection dropdown */}
-          {stageOptions.length > 0 && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ {t.stage}</label>
-              <select
-                value={(editingStage || '') as string}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setEditingStage(value === '' ? null : (value as Stage));
-                }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">{t.noStage}</option>
-                {stageOptions.map((stage) => (
-                  <option key={stage} value={stage}>
-                    {getStageLabel(stage, t as Record<string, string>)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">👥 {t.availableResources} ({deptEmployees.length})</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ðŸ‘¥ {t.availableResources} ({deptEmployees.length})</label>
               <div className="space-y-2 min-h-[180px] max-h-52 overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
                   const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+                  const isSelected = selectedEmployees.has(emp.id);
                   return (
-                    <label key={emp.id} className={`flex items-center gap-2 cursor-pointer p-1 rounded transition ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50' : 'hover:bg-blue-50'}`}>
-                      <input
-                        type="checkbox"
-                        checked={selectedEmployees.has(emp.id)}
-                        onChange={(e) => {
-                          const newSelected = new Set(selectedEmployees);
-                          if (e.target.checked) {
-                            newSelected.add(emp.id);
-                          } else {
-                            newSelected.delete(emp.id);
-                          }
-                          setSelectedEmployees(newSelected);
-
-                          // BUILD/PRG: external hours field should only exist when an external is selected.
-                          if (isBuildOrPRGDepartment) {
-                            const updatedSelectedList = Array.from(newSelected)
-                              .map((empId) => employees.find((e) => e.id === empId))
-                              .filter(Boolean);
-                            const stillHasExternal = updatedSelectedList.some(
-                              (selectedEmp) => !!(selectedEmp?.isSubcontractedMaterial && selectedEmp?.subcontractCompany)
-                            );
-                            if (!stillHasExternal) {
-                              setEditingExternalHours(0);
-                              setEditingExternalHoursInput('');
-                              setEditingHours(editingScioHours);
+                    <label key={emp.id} className={`block cursor-pointer p-1 rounded transition ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50' : 'hover:bg-blue-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedEmployees);
+                            if (e.target.checked) {
+                              newSelected.add(emp.id);
+                            } else {
+                              newSelected.delete(emp.id);
                             }
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-500 rounded cursor-pointer"
-                      />
-                      <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
-                      {/* Badge showing Internal or Company name */}
-                      {isBuildOrPRG && (
-                        isExternal ? (
-                          <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
-                            🏢 {emp.subcontractCompany}
-                          </span>
-                        ) : (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                            🏠 Interno
-                          </span>
-                        )
+                            setSelectedEmployees(newSelected);
+
+                            // BUILD/PRG: external hours field should only exist when an external is selected.
+                            if (isBuildOrPRGDepartment) {
+                              const updatedSelectedList = Array.from(newSelected)
+                                .map((empId) => employees.find((e) => e.id === empId))
+                                .filter(Boolean);
+                              const stillHasExternal = updatedSelectedList.some(
+                                (selectedEmp) => !!(selectedEmp?.isSubcontractedMaterial && selectedEmp?.subcontractCompany)
+                              );
+                              if (!stillHasExternal) {
+                                setEditingExternalHours(0);
+                                setEditingExternalHoursInput('');
+                                setEditingHours(editingScioHours);
+                              }
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-500 rounded cursor-pointer"
+                        />
+                        <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
+                        {/* Badge showing Internal or Company name */}
+                        {isBuildOrPRG && (
+                          isExternal ? (
+                            <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
+                              ðŸ¢ {emp.subcontractCompany}
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                              ðŸ  Interno
+                            </span>
+                          )
+                        )}
+                        <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
+                      </div>
+
+                      {hasStagePlanner && isSelected && nonZeroStageEntries.length > 0 && (
+                        <div className="pl-6 pt-1 flex flex-wrap gap-1.5">
+                          {nonZeroStageEntries.map((entry) => (
+                            <span
+                              key={`${emp.id}-${entry.id}`}
+                              className="text-[10px] text-gray-600 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5"
+                            >
+                              {entry.stage ? getStageLabel(entry.stage as Exclude<Stage, null>, t as Record<string, string>) : t.noStage}: {formatHours(entry.perResourceHours)}h
+                            </span>
+                          ))}
+                        </div>
                       )}
-                      <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
                     </label>
                   );
                 })}
               </div>
               {selectedEmployeeList.length > 0 && (
                 <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
-                  ✓ {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
+                  âœ“ {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
             </div>
@@ -3802,7 +4001,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Comment input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">💬 {t.comment}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">ðŸ’¬ {t.comment}</label>
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
@@ -3816,9 +4015,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-[95] flex items-center justify-center rounded-lg">
               <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
-                <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar Eliminación'}</h3>
+                <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar EliminaciÃ³n'}</h3>
                 <p className="text-sm text-gray-700 mb-4">
-                  {t.deleteAllDataConfirm || '¿Estás seguro de que deseas eliminar estos datos?'}
+                  {t.deleteAllDataConfirm || 'Â¿EstÃ¡s seguro de que deseas eliminar estos datos?'}
                 </p>
                 <div className="flex gap-3 justify-end">
                   <button
@@ -3850,15 +4049,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           }
 
                           // Close modals
-                          setShowDeleteConfirm(false);
-                          setEditingCell(null);
-                          setEditingStage(null);
-                          setEditingHours(0);
-                          setEditingComment('');
-                          setEditingHoursInput('');
-                          setEditingScioHoursInput('');
-                          setEditingExternalHoursInput('');
-                          setSelectedEmployees(new Set());
+                          closeEditModal();
                         }
                       } finally {
                         setIsDeleting(false);
@@ -3868,7 +4059,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
                   >
                     {isDeleting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
-                    {isDeleting ? (t.deletingData || 'Eliminando...') : '🗑️ ' + (t.delete || 'Eliminar')}
+                    {isDeleting ? (t.deletingData || 'Eliminando...') : 'ðŸ—‘ï¸ ' + (t.delete || 'Eliminar')}
                   </button>
                 </div>
               </div>
@@ -3881,21 +4072,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
-              🗑️ {t.delete}
+              ðŸ—‘ï¸ {t.delete}
             </button>
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setEditingCell(null);
-                  setEditingStage(null);
-                  setEditingHours(0);
-                  setEditingComment('');
-                  setEditingHoursInput('');
-                  setEditingScioHoursInput('');
-                  setEditingExternalHoursInput('');
-                  setSelectedEmployees(new Set());
-                  setShowDeleteConfirm(false);
-                }}
+                onClick={closeEditModal}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
               >
                 {t.cancel}
@@ -4140,7 +4321,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       className="text-[#4f3a70] hover:text-[#2e1a47] font-bold text-xs cursor-pointer transition"
                       title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
                     >
-                      {showDepartmentPanel ? '▼' : '▶'}
+                      {showDepartmentPanel ? 'â–¼' : 'â–¶'}
                     </button>
                   </div>
 
@@ -4486,7 +4667,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <div className="flex gap-0 mb-0.5">
                           {/* Label */}
                           <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
-                            {dept === 'BUILD' ? '🏢 Ext' : '👥 Ext'}
+                            {dept === 'BUILD' ? 'ðŸ¢ Ext' : 'ðŸ‘¥ Ext'}
                           </div>
 
                           {/* Week cells */}
@@ -4704,7 +4885,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               </span>
                             </>
                           )}
-                          <span className="text-gray-400">•</span>
+                          <span className="text-gray-400">â€¢</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -4941,7 +5122,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       className="p-1 text-indigo-600 hover:text-indigo-800 font-bold text-lg cursor-pointer transition"
                       title={expandedProjects[proj.id] ? 'Hide project' : 'Show project'}
                     >
-                      {expandedProjects[proj.id] ? '▼' : '▶'}
+                      {expandedProjects[proj.id] ? 'â–¼' : 'â–¶'}
                     </button>
                   </div>
 
@@ -5033,7 +5214,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   : 'bg-slate-50 text-slate-600 border-gray-300'
                               }`}
                             >
-                              {projectWeekNumber ?? '—'}
+                              {projectWeekNumber ?? 'â€”'}
                             </td>
                           );
                         })}
@@ -5094,7 +5275,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               <div className="sticky top-0 z-40 mb-0.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-0.5 shadow-sm">
                 <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
                   <div className="flex items-center gap-0.5">
-                    <span>💚</span>
+                    <span>ðŸ’š</span>
                     <span>Capacity</span>
                   </div>
                   <button
@@ -5102,7 +5283,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     className="text-green-600 hover:text-green-800 font-bold text-[10px] cursor-pointer"
                     title="Hide Capacity panel"
                   >
-                    ✕
+                    âœ•
                   </button>
                 </h2>
 
@@ -5259,7 +5440,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   {availableCapacity.toFixed(2)}
                                 </div>
                               ) : (
-                                <div className={`${textColor} text-[6px]`}>—</div>
+                                <div className={`${textColor} text-[6px]`}>â€”</div>
                               )}
                             </div>
                           );
@@ -5280,7 +5461,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 className="mb-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-lg transition"
                 title="Show Capacity panel"
               >
-                💚 Show Capacity
+                ðŸ’š Show Capacity
               </button>
             )}
 
@@ -5497,7 +5678,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       : 'bg-slate-50 text-slate-600 border-gray-300'
                                   }`}
                                 >
-                                  {projectWeekNumber ?? '—'}
+                                  {projectWeekNumber ?? 'â€”'}
                                 </td>
                               );
                             })}
@@ -5650,7 +5831,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
                                               title={cellComment}
                                             >
-                                              💬
+                                              ðŸ’¬
                                             </button>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
@@ -5690,10 +5871,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 type="button"
                 onClick={() => setShowLegend(false)}
                 className="inline-flex items-center gap-1 rounded-md border border-[#d6d0e2] bg-white px-2 py-0.5 text-[9px] font-semibold text-[#4f3a70] hover:bg-[#f4f1f8] transition"
-                title={language === 'es' ? 'Cerrar guía' : 'Close guide'}
+                title={language === 'es' ? 'Cerrar guÃ­a' : 'Close guide'}
               >
                 <X size={11} />
-                <span className="hidden sm:inline">{language === 'es' ? 'Cerrar guía' : 'Close guide'}</span>
+                <span className="hidden sm:inline">{language === 'es' ? 'Cerrar guÃ­a' : 'Close guide'}</span>
               </button>
             </div>
           </div>
@@ -5833,7 +6014,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">➕ {t.createProject}</h2>
+                <h2 className="text-lg font-bold">âž• {t.createProject}</h2>
                 <button
                   onClick={() => {
                     setShowQuickProjectModal(false);
@@ -5866,7 +6047,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 )}
                 {/* Job */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.job}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.job}</label>
                   <input
                     type="text"
                     value={quickProjectForm.name}
@@ -5878,7 +6059,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Customer */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">👥 {t.customer}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¥ {t.customer}</label>
                   <input
                     type="text"
                     value={quickProjectForm.client}
@@ -5890,7 +6071,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDate}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDate}</label>
                   <WeekNumberDatePicker
                     value={quickProjectForm.startDate}
                     onChange={(date) => setQuickProjectForm({ ...quickProjectForm, startDate: date })}
@@ -5901,7 +6082,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Number of Weeks */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">⏱️ {t.numberOfWeeks}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
                   <input
                     type="text"
                     value={quickProjectForm.numberOfWeeks}
@@ -5925,7 +6106,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Facility - Only MI and AL */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">🏭 {t.facility}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ­ {t.facility}</label>
                   <select
                     value={quickProjectForm.facility}
                     onChange={(e) => setQuickProjectForm({ ...quickProjectForm, facility: e.target.value as 'AL' | 'MI' | 'MX' })}
@@ -5939,7 +6120,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Budget Hours */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">💚 {t.budgetHours || 'Horas Presupuestadas'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ’š {t.budgetHours || 'Horas Presupuestadas'}</label>
                   <input
                     type="text"
                     value={quickProjectForm.budgetHours}
@@ -5984,7 +6165,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">📂 {t.importProject || 'Import Existing Project'}</h2>
+                <h2 className="text-lg font-bold">ðŸ“‚ {t.importProject || 'Import Existing Project'}</h2>
                 <button
                   onClick={() => {
                     setShowImportProjectModal(false);
@@ -6017,7 +6198,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 )}
                 {/* Select Project */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📋 {t.selectProject || 'Select Project'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.selectProject || 'Select Project'}</label>
                   <select
                     value={importProjectForm.projectId}
                     onChange={(e) => setImportProjectForm({ ...importProjectForm, projectId: e.target.value })}
@@ -6035,7 +6216,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     return selectedProject && (
                       <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
                         <div><strong>{t.facility || 'Facility'}:</strong> {selectedProject.facility}</div>
-                        <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate} → {selectedProject.endDate}</div>
+                        <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate} â†’ {selectedProject.endDate}</div>
                       </div>
                     );
                   })()}
@@ -6043,7 +6224,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Start Date for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">📅 {t.startDateDept || 'Start Date for'} {departmentFilter}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDateDept || 'Start Date for'} {departmentFilter}</label>
                   <WeekNumberDatePicker
                     value={importProjectForm.startDate}
                     onChange={(date) => setImportProjectForm({ ...importProjectForm, startDate: date })}
@@ -6054,7 +6235,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Number of Weeks for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">⏱️ {t.numberOfWeeks}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
                   <input
                     type="text"
                     value={importProjectForm.numberOfWeeks}
@@ -6078,7 +6259,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Budget Hours for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">💚 {t.budgetHours || 'Budget Hours'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ’š {t.budgetHours || 'Budget Hours'}</label>
                   <input
                     type="text"
                     value={importProjectForm.budgetHours}
@@ -6124,7 +6305,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-rose-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">
-                  {language === 'es' ? '📄 Exportar Timeline PDF' : '📄 Export Timeline PDF'}
+                  {language === 'es' ? 'ðŸ“„ Exportar Timeline PDF' : 'ðŸ“„ Export Timeline PDF'}
                 </h2>
                 <button
                   onClick={closeExportPdfModal}
@@ -6511,7 +6692,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">💬 {t.comment}</h2>
+                <h2 className="text-lg font-bold">ðŸ’¬ {t.comment}</h2>
                 <button
                   onClick={() => setViewingComment(null)}
                   className="hover:bg-amber-700 p-1 rounded transition"
