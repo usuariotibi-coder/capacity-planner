@@ -1076,6 +1076,13 @@ class AssignmentSerializer(serializers.ModelSerializer):
     project_id = serializers.SerializerMethodField(
         help_text="UUID of the project"
     )
+    change_order_id = serializers.PrimaryKeyRelatedField(
+        source='change_order',
+        queryset=ProjectChangeOrder.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="Optional Change Order UUID for this assignment"
+    )
     stage_display = serializers.CharField(
         source='get_stage_display',
         read_only=True,
@@ -1100,6 +1107,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'employee_id',
             'project',
             'project_id',
+            'change_order_id',
             'week_start_date',
             'week_number',
             'hours',
@@ -1205,6 +1213,19 @@ class AssignmentSerializer(serializers.ModelSerializer):
         hours = data.get('hours')
         scio_hours = data.get('scio_hours')
         external_hours = data.get('external_hours')
+        change_order = data.get('change_order', getattr(self.instance, 'change_order', None))
+
+        employee = data.get('employee', getattr(self.instance, 'employee', None))
+        project = data.get('project', getattr(self.instance, 'project', None))
+
+        if employee is None:
+            employee_id = self.initial_data.get('employee_id')
+            if employee_id:
+                employee = Employee.objects.filter(id=employee_id).first()
+        if project is None:
+            project_id = self.initial_data.get('project_id')
+            if project_id:
+                project = Project.objects.filter(id=project_id).first()
 
         # If scio_hours and external_hours are both provided,
         # their sum should equal total hours
@@ -1217,6 +1238,25 @@ class AssignmentSerializer(serializers.ModelSerializer):
                             f"Total hours ({hours}) must equal "
                             f"scio_hours ({scio_hours}) + "
                             f"external_hours ({external_hours})"
+                        )
+                    }
+                )
+
+        if change_order is not None:
+            if project and str(change_order.project_id) != str(project.id):
+                raise serializers.ValidationError(
+                    {
+                        "change_order_id": (
+                            "Selected Change Order does not belong to this project."
+                        )
+                    }
+                )
+
+            if employee and change_order.department != employee.department:
+                raise serializers.ValidationError(
+                    {
+                        "change_order_id": (
+                            "Selected Change Order department does not match employee department."
                         )
                     }
                 )
@@ -1348,6 +1388,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.UUIDField(read_only=True)
     project_id = serializers.UUIDField(read_only=True)
+    change_order_id = serializers.UUIDField(source='change_order_id', read_only=True)
     department = serializers.CharField(source='employee.department', read_only=True)
 
     class Meta:
@@ -1356,6 +1397,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
             'id',
             'employee_id',
             'project_id',
+            'change_order_id',
             'department',
             'week_start_date',
             'hours',

@@ -1264,7 +1264,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = (
         Assignment.objects
         .all()
-        .select_related('employee', 'project')
+        .select_related('employee', 'project', 'change_order')
     )
     serializer_class = AssignmentSerializer
     permission_classes = [IsAuthenticated]

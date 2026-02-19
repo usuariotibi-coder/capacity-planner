@@ -175,6 +175,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingStage, setEditingStage] = useState<Stage>(null);
   const [editingStageEntries, setEditingStageEntries] = useState<StageHoursEntry[]>([]);
   const [editingStageResourceHours, setEditingStageResourceHours] = useState<Record<string, StageResourceHoursEntry>>({});
+  const [assignToChangeOrder, setAssignToChangeOrder] = useState<boolean>(false);
+  const [selectedChangeOrderId, setSelectedChangeOrderId] = useState<string>('');
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -208,6 +210,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingStage(null);
     setEditingStageEntries([]);
     setEditingStageResourceHours({});
+    setAssignToChangeOrder(false);
+    setSelectedChangeOrderId('');
     setEditingHours(0);
     setEditingComment('');
     setEditingHoursInput('');
@@ -2107,6 +2111,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return changeOrderSummaryByProjectDept.get(`${projectId}|${department}`) || { totalHours: 0, count: 0, orders: [] as ProjectChangeOrder[] };
   };
 
+  const getChangeOrdersForProjectDept = (department: Department, projectId?: string) => {
+    if (!projectId) return [] as ProjectChangeOrder[];
+    return getChangeOrderSummary(department, projectId).orders || [];
+  };
+
   const formatHours = (value: number): string => {
     if (!Number.isFinite(value)) return '0';
     const rounded = Math.round(value * 1000) / 1000;
@@ -3290,6 +3299,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const initialComment = (cellComment ?? deptAssignments.find(
       (assignment) => typeof assignment.comment === 'string' && assignment.comment.trim().length > 0
     )?.comment) || '';
+    const availableChangeOrders = getChangeOrdersForProjectDept(department, projectId);
+    const initialChangeOrderId = deptAssignments.find((assignment) => assignment.changeOrderId)?.changeOrderId || '';
+    const shouldAssignToChangeOrder = !!initialChangeOrderId;
 
     const isSelectableModalEmployee = (emp?: Employee | null): emp is Employee =>
       !!emp &&
@@ -3376,6 +3388,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setEditingStage(initialStage);
     setEditingStageEntries(initialStageEntries);
     setEditingStageResourceHours(initialStageResourceHours);
+    setAssignToChangeOrder(shouldAssignToChangeOrder);
+    setSelectedChangeOrderId(
+      shouldAssignToChangeOrder
+        ? initialChangeOrderId
+        : (availableChangeOrders.length === 1 ? availableChangeOrders[0].id : '')
+    );
     setEditingComment(initialComment);
     setSelectedEmployees(assignedEmployeeIds);
     setShowDeleteConfirm(false);
@@ -3390,6 +3408,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
     const hasStagePlanner = !isBuildOrPRG && STAGE_OPTIONS[editingCell.department].length > 0;
+    const availableChangeOrders = getChangeOrdersForProjectDept(editingCell.department, editingCell.projectId);
+    const changeOrderIdToPersist = assignToChangeOrder ? (selectedChangeOrderId || null) : null;
+
+    if (assignToChangeOrder && availableChangeOrders.length > 0 && !selectedChangeOrderId) {
+      alert(language === 'es'
+        ? 'Selecciona un Change Order para continuar.'
+        : 'Please select a Change Order to continue.');
+      return;
+    }
 
     const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
       const emp = employeeById.get(employeeId);
@@ -3472,6 +3499,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         hours: 0,
         stage: null,
         comment: '',
+        changeOrderId: null,
       };
       if (isBuildOrPRG) {
         resetPayload.scioHours = 0;
@@ -3513,6 +3541,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           hours: desiredHours,
           stage: entry.stage,
           comment: editingComment || undefined,
+          changeOrderId: changeOrderIdToPersist,
         };
 
         if (existingAssign) {
@@ -3567,6 +3596,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             hours: hoursPerEmployee,
             stage: editingStage,
             comment: editingComment || undefined,
+            changeOrderId: changeOrderIdToPersist,
           };
 
           if (isBuildOrPRG) {
@@ -3623,6 +3653,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           hours: totalHours,
           stage: editingStage,
           comment: editingComment || undefined,
+          changeOrderId: changeOrderIdToPersist,
         };
 
         if (isBuildOrPRG) {
@@ -3847,6 +3878,40 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
+    const availableChangeOrders = getChangeOrdersForProjectDept(editingCell.department, editingCell.projectId);
+    const canAssignToChangeOrder = !!editingCell.projectId && availableChangeOrders.length > 0;
+    const selectedChangeOrder = availableChangeOrders.find((order) => order.id === selectedChangeOrderId) || null;
+    const modalTotalHours = roundHours(
+      isBuildOrPRGDepartment
+        ? (editingScioHours + editingExternalHours)
+        : editingHours
+    );
+    const currentCellAssignments = getDepartmentWeekData(
+      editingCell.department,
+      editingCell.weekStart,
+      editingCell.projectId
+    ).assignments;
+    const currentCellSelectedCOHours = roundHours(
+      currentCellAssignments.reduce((sum, assignment) => {
+        if (!selectedChangeOrderId || assignment.changeOrderId !== selectedChangeOrderId) return sum;
+        return sum + (typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0));
+      }, 0)
+    );
+    const selectedCOUsedHours = roundHours(
+      assignments.reduce((sum, assignment) => {
+        if (!selectedChangeOrderId) return sum;
+        if (assignment.projectId !== editingCell.projectId) return sum;
+        if (getAssignmentDepartment(assignment) !== editingCell.department) return sum;
+        if (assignment.changeOrderId !== selectedChangeOrderId) return sum;
+        return sum + (typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0));
+      }, 0)
+    );
+    const projectedCOUsedHours = roundHours(
+      assignToChangeOrder && selectedChangeOrderId
+        ? (selectedCOUsedHours - currentCellSelectedCOHours + modalTotalHours)
+        : selectedCOUsedHours
+    );
+    const projectedCORemainingHours = roundHours((selectedChangeOrder?.hoursQuoted || 0) - projectedCOUsedHours);
 
     return (
       <>
@@ -4120,6 +4185,88 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               />
             </div>
           )}
+
+          {canAssignToChangeOrder && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-semibold text-amber-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={assignToChangeOrder}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAssignToChangeOrder(checked);
+                    if (checked) {
+                      if (!selectedChangeOrderId || !availableChangeOrders.some((order) => order.id === selectedChangeOrderId)) {
+                        setSelectedChangeOrderId(availableChangeOrders[0]?.id || '');
+                      }
+                    } else {
+                      setSelectedChangeOrderId('');
+                    }
+                  }}
+                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                />
+                <span>
+                  {language === 'es' ? 'Asignar horas a Change Order' : 'Assign hours to Change Order'}
+                </span>
+              </label>
+
+              {assignToChangeOrder && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-900 mb-1">
+                      {language === 'es' ? 'Selecciona Change Order' : 'Select Change Order'}
+                    </label>
+                    <select
+                      value={selectedChangeOrderId}
+                      onChange={(e) => setSelectedChangeOrderId(e.target.value)}
+                      className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    >
+                      <option value="">
+                        {language === 'es' ? '-- Selecciona Change Order --' : '-- Select Change Order --'}
+                      </option>
+                      {availableChangeOrders.map((order) => (
+                        <option key={order.id} value={order.id}>
+                          {order.name} ({formatHours(order.hoursQuoted)}h)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedChangeOrder && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                          {language === 'es' ? 'Cotizado CO' : 'CO Quoted'}
+                        </div>
+                        <div className="text-sm font-bold text-gray-800">{formatHours(selectedChangeOrder.hoursQuoted)}h</div>
+                      </div>
+                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                          {language === 'es' ? 'Usado CO' : 'CO Used'}
+                        </div>
+                        <div className="text-sm font-bold text-gray-800">{formatHours(selectedCOUsedHours)}h</div>
+                      </div>
+                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                          {language === 'es' ? 'Usado (guardando)' : 'Used (after save)'}
+                        </div>
+                        <div className="text-sm font-bold text-gray-800">{formatHours(projectedCOUsedHours)}h</div>
+                      </div>
+                      <div className={`rounded border px-2 py-1.5 ${projectedCORemainingHours < 0 ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'}`}>
+                        <div className={`text-[10px] uppercase tracking-wide ${projectedCORemainingHours < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                          {language === 'es' ? 'Restante CO' : 'CO Remaining'}
+                        </div>
+                        <div className={`text-sm font-bold ${projectedCORemainingHours < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                          {formatHours(projectedCORemainingHours)}h
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="mb-4">

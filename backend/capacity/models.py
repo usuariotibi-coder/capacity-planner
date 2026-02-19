@@ -165,6 +165,14 @@ class Assignment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='assignments')
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='assignments')
+    change_order = models.ForeignKey(
+        'ProjectChangeOrder',
+        on_delete=models.SET_NULL,
+        related_name='assignments',
+        null=True,
+        blank=True,
+        help_text="Optional Change Order this assignment belongs to"
+    )
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
     hours = models.FloatField(validators=[MinValueValidator(0)], help_text="Total hours allocated")
     scio_hours = models.FloatField(null=True, blank=True, validators=[MinValueValidator(0)], help_text="Internal SCIO hours (BUILD/PRG only)")
