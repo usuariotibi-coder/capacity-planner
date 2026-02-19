@@ -203,7 +203,7 @@ SIMPLE_JWT = {
 # Session Management
 SESSION_INACTIVITY_TIMEOUT_MINUTES = config(
     'SESSION_INACTIVITY_TIMEOUT_MINUTES',
-    default=20,
+    default=90,
     cast=int,
 )
 MAX_ACTIVE_SESSIONS_PER_USER = config(

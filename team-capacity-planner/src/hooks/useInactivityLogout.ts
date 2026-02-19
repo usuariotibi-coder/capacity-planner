@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../utils/apiUrl';
 
-const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes in milliseconds
+const INACTIVITY_TIMEOUT = 90 * 60 * 1000; // 90 minutes in milliseconds
 const SESSION_CHECK_INTERVAL = 60 * 1000; // Check session status every 1 minute
 const BASE_URL = API_BASE_URL;
 const API_URL = `${BASE_URL}/api`;
@@ -22,7 +22,7 @@ export const useInactivityLogout = () => {
 
       // Set new timer for inactivity logout
       inactivityTimer = setTimeout(() => {
-        console.log('[useInactivityLogout] User inactive for 20 minutes, logging out...');
+        console.log('[useInactivityLogout] User inactive for 90 minutes, logging out...');
         logout();
       }, INACTIVITY_TIMEOUT);
     };

@@ -93,7 +93,7 @@ Session logic combines backend and frontend checks.
 - Enforced at login (`CaseInsensitiveTokenObtainPairSerializer`).
 
 ### Inactivity timeout
-- Config: `SESSION_INACTIVITY_TIMEOUT_MINUTES` (default `20`).
+- Config: `SESSION_INACTIVITY_TIMEOUT_MINUTES` (default `90`).
 - Stale sessions are deactivated in middleware and session status checks.
 
 ### Token/session binding
