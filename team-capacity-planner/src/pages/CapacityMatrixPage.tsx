@@ -4141,8 +4141,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
-    const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || (hasDepartmentTimingShift && isProjectWeekInRange));
-    const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift && isProjectWeekInRange;
+    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
+    const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+    const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
+    const cellIndicatorBorderClass = showHardOutOfRangeIndicator
+      ? 'border border-dashed border-red-500'
+      : showSoftShiftIndicator
+        ? 'border border-dashed border-gray-400'
+        : '';
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
     // Get project info for tooltip
@@ -4164,7 +4170,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               : isDeptWeekInRange
                 ? 'bg-emerald-50 text-emerald-900'
                 : 'bg-gray-100 text-gray-500'
-          } ${showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''} ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${cellIndicatorBorderClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
           {cellComment && (
@@ -4220,7 +4226,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${showTimingShiftIndicator ? 'border border-dashed border-red-500' : ''}`}
+          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${cellIndicatorBorderClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
@@ -4248,7 +4254,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
         } ${stageColor ? stageColor.text : 'text-blue-900'} ${
-          showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''
+          cellIndicatorBorderClass
         }`}
         title={tooltipText}
       >
@@ -6564,8 +6570,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   }
 
                                   const outOfEstimatedRange = !isDeptWeekInRange;
-                                  const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || (hasDepartmentTimingShift && isInRange));
-                                  const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift && isInRange;
+                                  const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isInRange);
+                                  const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+                                  const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
+                                  const cellIndicatorBorderClass = showHardOutOfRangeIndicator
+                                    ? 'border border-dashed border-red-500'
+                                    : showSoftShiftIndicator
+                                      ? 'border border-dashed border-gray-400'
+                                      : '';
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
@@ -6587,7 +6599,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? 'bg-emerald-50 text-emerald-900'
                                               : 'bg-gray-100 text-gray-500'
-                                        } ${showOutOfRangeIndicator ? 'border border-dashed border-red-500' : ''}`}>
+                                        } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6626,7 +6638,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               : isInRange
                                                 ? 'text-green-600 bg-green-50'
                                                 : 'text-gray-400'
-                                        } ${showTimingShiftIndicator ? 'border border-dashed border-red-500' : ''}`}>
+                                        } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6655,7 +6667,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       ) : (
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
-                                        } ${!isDeptWeekInRange ? 'border border-dashed border-red-500' : ''}`}>
+                                        } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
