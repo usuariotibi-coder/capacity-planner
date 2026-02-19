@@ -3787,7 +3787,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           </span>
                         )
                       )}
-                      <span className="text-xs text-gray-500 ml-auto">{emp.capacity}{t.hoursPerSemWeek}</span>
+                      <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
                     </label>
                   );
                 })}
