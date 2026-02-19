@@ -4127,13 +4127,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     // Check if current week is within department range using date comparison
     const isDeptWeekInRange = !!effectiveDeptStartDate && !!effectiveDeptEndDate && weekStart >= effectiveDeptStartDate && weekStart <= effectiveDeptEndDate;
     const isDeptFirstWeek = !!effectiveDeptStartDate && weekStart === effectiveDeptStartDate;
+    const hasDepartmentTimingShift = !!(
+      project &&
+      (
+        (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate) ||
+        (deptMeta?.deptEndDate && project.endDate && deptMeta.deptEndDate !== project.endDate)
+      )
+    );
 
     // Get stage color for styling
     const stageColor = stage ? getStageColor(stage, department) : null;
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
     const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
-    const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+    const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || hasDepartmentTimingShift);
+    const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift;
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
     // Get project info for tooltip
@@ -4211,7 +4219,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
+          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${showTimingShiftIndicator ? 'border border-dashed border-red-500' : ''}`}
           title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
@@ -6540,6 +6548,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const effectiveDeptEndDate = deptMeta?.effectiveEndDate || proj.endDate;
                                   const isDeptWeekInRange = week >= effectiveDeptStartDate && week <= effectiveDeptEndDate;
                                   const isDeptFirstWeek = week === effectiveDeptStartDate;
+                                  const hasDepartmentTimingShift = !!(
+                                    (deptMeta?.deptStartDate && deptMeta.deptStartDate !== proj.startDate) ||
+                                    (deptMeta?.deptEndDate && proj.endDate && deptMeta.deptEndDate !== proj.endDate)
+                                  );
 
                                   // Calculate consecutive week number within the department (1, 2, 3, etc.)
                                   let deptConsecutiveWeek = 0;
@@ -6551,7 +6563,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   }
 
                                   const outOfEstimatedRange = !isDeptWeekInRange;
-                                  const showOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+                                  const showOutOfRangeIndicator = outOfEstimatedRange && (totalHours > 0 || hasDepartmentTimingShift);
+                                  const showTimingShiftIndicator = outOfEstimatedRange && hasDepartmentTimingShift;
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
@@ -6608,11 +6621,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? isDeptFirstWeek
                                                 ? 'text-orange-600 bg-orange-100'
-                                                : 'text-purple-600 bg-purple-100'
+                                              : 'text-purple-600 bg-purple-100'
                                               : isInRange
                                                 ? 'text-green-600 bg-green-50'
                                                 : 'text-gray-400'
-                                        }`}>
+                                        } ${showTimingShiftIndicator ? 'border border-dashed border-red-500' : ''}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
