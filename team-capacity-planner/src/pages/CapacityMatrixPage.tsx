@@ -40,6 +40,18 @@ const getStagePriority = (department: Department, stage: Stage): number => {
   return index >= 0 ? index : -1;
 };
 
+// The last option in each department dropdown has the highest hierarchy.
+// If a cell has multiple stages, we always show the dominant one by priority.
+const isHigherPriorityStage = (
+  department: Department,
+  candidate: Stage,
+  current: Stage
+): boolean => {
+  if (!candidate) return false;
+  if (!current) return true;
+  return getStagePriority(department, candidate) > getStagePriority(department, current);
+};
+
 const DEPARTMENT_LEGEND_STYLES: Record<Department, { badge: string; dot: string }> = {
   PM: { badge: 'border-purple-200 bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
   MED: { badge: 'border-blue-200 bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
@@ -1396,12 +1408,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         : (assignment.hours ?? 0);
       cellEntry.totalHours += assignmentHours;
       cellEntry.assignments.push(assignment);
-      if (assignment.stage) {
-        const currentPriority = getStagePriority(dept, cellEntry.stage);
-        const incomingPriority = getStagePriority(dept, assignment.stage);
-        if (!cellEntry.stage || incomingPriority > currentPriority) {
-          cellEntry.stage = assignment.stage;
-        }
+      if (isHigherPriorityStage(dept, assignment.stage, cellEntry.stage)) {
+        cellEntry.stage = assignment.stage;
       }
       if (cellEntry.comment === undefined && assignment.comment) {
         cellEntry.comment = assignment.comment;
