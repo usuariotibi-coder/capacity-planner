@@ -1388,7 +1388,7 @@ class AssignmentListSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.UUIDField(read_only=True)
     project_id = serializers.UUIDField(read_only=True)
-    change_order_id = serializers.UUIDField(source='change_order_id', read_only=True)
+    change_order_id = serializers.UUIDField(read_only=True)
     department = serializers.CharField(source='employee.department', read_only=True)
 
     class Meta:
