@@ -33,6 +33,13 @@ const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
   'MFG': [],
 };
 
+const getStagePriority = (department: Department, stage: Stage): number => {
+  if (!stage) return -1;
+  const orderedStages = STAGE_OPTIONS[department] || [];
+  const index = orderedStages.indexOf(stage as Exclude<Stage, null>);
+  return index >= 0 ? index : -1;
+};
+
 const DEPARTMENT_LEGEND_STYLES: Record<Department, { badge: string; dot: string }> = {
   PM: { badge: 'border-purple-200 bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
   MED: { badge: 'border-blue-200 bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
@@ -1389,8 +1396,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         : (assignment.hours ?? 0);
       cellEntry.totalHours += assignmentHours;
       cellEntry.assignments.push(assignment);
-      if (!cellEntry.stage && assignment.stage) {
-        cellEntry.stage = assignment.stage;
+      if (assignment.stage) {
+        const currentPriority = getStagePriority(dept, cellEntry.stage);
+        const incomingPriority = getStagePriority(dept, assignment.stage);
+        if (!cellEntry.stage || incomingPriority > currentPriority) {
+          cellEntry.stage = assignment.stage;
+        }
       }
       if (cellEntry.comment === undefined && assignment.comment) {
         cellEntry.comment = assignment.comment;
