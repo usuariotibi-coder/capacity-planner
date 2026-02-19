@@ -3989,29 +3989,35 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       <>
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
+          className="fixed inset-0 bg-slate-900/55 backdrop-blur-[2px] z-[80]"
           onClick={closeEditModal}
         />
         {/* Modal */}
-        <div className="fixed top-1/2 left-1/2 z-[90] w-[96vw] max-w-[1120px] transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="fixed top-1/2 left-1/2 z-[90] w-[96vw] max-w-[1120px] transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl border border-slate-200 shadow-[0_30px_80px_rgba(15,23,42,0.35)] max-h-[92vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
-            <h3 className="text-lg font-bold text-gray-800">
-              {t.editAssignment} - {t.weekAbbr} {weekNum}/{year}
-            </h3>
+          <div className="flex justify-between items-start gap-4 p-5 border-b border-indigo-300/60 bg-gradient-to-r from-indigo-900 via-violet-800 to-fuchsia-700 flex-shrink-0">
+            <div>
+              <h3 className="text-xl font-extrabold text-white tracking-tight">
+                {t.editAssignment}
+              </h3>
+              <p className="text-xs md:text-sm text-indigo-100/90 font-semibold mt-1">
+                {t.weekAbbr} {weekNum}/{year} · {editingCell.department}
+              </p>
+            </div>
             <button
               onClick={closeEditModal}
-              className="text-gray-500 hover:text-gray-700 transition text-2xl leading-none"
+              className="h-8 w-8 rounded-full border border-white/40 text-white/90 hover:bg-white/20 hover:text-white transition flex items-center justify-center"
+              title={t.close || 'Close'}
             >
-              X
+              <X size={16} />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+          <div className="flex-1 overflow-y-auto p-5 md:p-6 bg-slate-50/80">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
           {/* Hours and Stage block */}
           {isBuildOrPRGDepartment ? (
-            <div className="mb-4 space-y-3">
+            <div className="mb-4 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               {/* SCIO Hours input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t.scioHours}</label>
@@ -4038,7 +4044,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   }}
                   disabled={scioInputLocked}
                   autoFocus
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
                 />
               </div>
@@ -4068,7 +4074,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         handleSaveCell();
                       }
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                     placeholder="0"
                   />
                 </div>
@@ -4083,7 +4089,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       const value = e.target.value;
                       setEditingStage(value === '' ? null : (value as Stage));
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="">{t.noStage}</option>
                     {stageOptions.map((stage) => (
@@ -4096,7 +4102,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               )}
             </div>
           ) : hasStagePlanner ? (
-            <div className="mb-4 space-y-3">
+            <div className="mb-4 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
                 <input
@@ -4115,14 +4121,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <button
                     type="button"
                     onClick={() => setEditingStageEntries((prev) => [...prev, createStageHoursEntry()])}
-                    className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1"
+                    className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-md px-2.5 py-1 transition"
                   >
                     + {t.add || 'Add'}
                   </button>
                 </div>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
                   {editingStageEntries.length === 0 && (
-                    <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
+                    <div className="text-xs text-gray-500 border border-dashed border-slate-300 rounded-lg px-3 py-2 bg-white">
                       {t.noStage}
                     </div>
                   )}
@@ -4147,7 +4153,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 row.id === entry.id ? { ...row, stage: value } : row
                               )));
                             }}
-                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="border border-slate-300 bg-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           >
                             <option value="">{t.noStage}</option>
                             {stageOptions.map((stage) => (
@@ -4176,13 +4182,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             }}
                             readOnly={selectedResourcesCount > 0}
                             disabled={selectedResourcesCount > 0}
-                            className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
+                            className="border border-slate-300 bg-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
                             placeholder="0"
                           />
                           <button
                             type="button"
                             onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
-                            className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg"
+                            className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg transition"
                             title={t.delete}
                           >
                             <X size={14} className="mx-auto" />
@@ -4190,7 +4196,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </div>
 
                         {selectedResourcesCount > 0 && (
-                          <div className="ml-1 pl-2 border-l-2 border-gray-200 space-y-1">
+                          <div className="ml-1 pl-2 border-l-2 border-slate-200 space-y-1.5">
                             {selectedEmployeeList.map((resource) => {
                               const resourceKey = createStageResourceKey(entry.id, resource.id);
                               const resourceData = editingStageResourceHours[resourceKey] || { hours: 0, hoursInput: '' };
@@ -4216,7 +4222,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         }));
                                       }
                                     }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="border border-slate-300 rounded-md px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                     placeholder="0"
                                   />
                                 </div>
@@ -4231,7 +4237,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
           ) : (
-            <div className="mb-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
               <input
                 type="text"
@@ -4254,15 +4260,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   }
                 }}
                 autoFocus
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="0"
               />
             </div>
           )}
 
           {canAssignToChangeOrder && (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-3">
-              <label className="flex items-center gap-2 text-sm font-semibold text-amber-900 cursor-pointer">
+            <div className="mb-4 rounded-xl border border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50 p-4 space-y-3 shadow-sm">
+              <label className="flex items-center gap-2 text-sm font-bold text-amber-900 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={assignToChangeOrder}
@@ -4293,7 +4299,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <select
                       value={selectedChangeOrderId}
                       onChange={(e) => setSelectedChangeOrderId(e.target.value)}
-                      className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className="w-full border border-amber-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                       <option value="">
                         {language === 'es' ? '-- Selecciona Change Order --' : '-- Select Change Order --'}
@@ -4307,26 +4313,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </div>
 
                   {selectedChangeOrder && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
                         <div className="text-[10px] uppercase tracking-wide text-gray-500">
                           {language === 'es' ? 'Cotizado CO' : 'CO Quoted'}
                         </div>
                         <div className="text-sm font-bold text-gray-800">{formatHours(selectedChangeOrder.hoursQuoted)}h</div>
                       </div>
-                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                      <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
                         <div className="text-[10px] uppercase tracking-wide text-gray-500">
                           {language === 'es' ? 'Usado CO' : 'CO Used'}
                         </div>
                         <div className="text-sm font-bold text-gray-800">{formatHours(selectedCOUsedHours)}h</div>
                       </div>
-                      <div className="rounded border border-gray-200 bg-white px-2 py-1.5">
+                      <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
                         <div className="text-[10px] uppercase tracking-wide text-gray-500">
                           {language === 'es' ? 'Usado (guardando)' : 'Used (after save)'}
                         </div>
                         <div className="text-sm font-bold text-gray-800">{formatHours(projectedCOUsedHours)}h</div>
                       </div>
-                      <div className={`rounded border px-2 py-1.5 ${projectedCORemainingHours < 0 ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'}`}>
+                      <div className={`rounded-lg border px-2 py-2 ${projectedCORemainingHours < 0 ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'}`}>
                         <div className={`text-[10px] uppercase tracking-wide ${projectedCORemainingHours < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
                           {language === 'es' ? 'Restante CO' : 'CO Remaining'}
                         </div>
@@ -4343,15 +4349,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
-            <div className="mb-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableResources} ({deptEmployees.length})</label>
-              <div className="space-y-2 min-h-[180px] max-h-[56vh] overflow-y-auto bg-gray-50 p-2 rounded border border-gray-200">
+              <div className="space-y-2 min-h-[180px] max-h-[56vh] overflow-y-auto bg-slate-50 p-2 rounded-lg border border-slate-200">
                 {deptEmployees.map((emp) => {
                   const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
                   const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
                   const isSelected = selectedEmployees.has(emp.id);
                   return (
-                    <label key={emp.id} className={`block cursor-pointer p-1 rounded transition ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50' : 'hover:bg-blue-50'}`}>
+                    <label key={emp.id} className={`block cursor-pointer p-2 rounded-md transition border ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50 border-violet-100' : 'hover:bg-indigo-50 border-transparent hover:border-indigo-100'}`}>
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -4380,7 +4386,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }
                             }
                           }}
-                          className="w-4 h-4 text-blue-500 rounded cursor-pointer"
+                          className="w-4 h-4 text-indigo-500 rounded cursor-pointer"
                         />
                         <span className="text-sm text-gray-700 truncate font-medium">{emp.name}</span>
                         {/* Badge showing Internal or Company name */}
@@ -4390,7 +4396,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               Ext {emp.subcontractCompany}
                             </span>
                           ) : (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
                               Interno
                             </span>
                           )
@@ -4422,7 +4428,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 })}
               </div>
               {selectedEmployeeList.length > 0 && (
-                <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
+                <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 p-2 rounded border border-indigo-200">
                   {(language === 'es' ? 'Seleccionados' : 'Selected')}: {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
@@ -4430,12 +4436,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           )}
 
           {/* Comment input */}
-          <div className="mb-4">
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.comment}</label>
             <textarea
               value={editingComment}
               onChange={(e) => setEditingComment(e.target.value)}
-              className="w-full min-h-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+              className="w-full min-h-[120px] border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
               placeholder={t.commentPlaceholder}
               rows={4}
             />
@@ -4444,8 +4450,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           {/* Delete Confirmation Dialog */}
           {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-[95] flex items-center justify-center rounded-lg">
-              <div className="bg-white rounded-lg shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
+            <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-[2px] z-[95] flex items-center justify-center rounded-lg">
+              <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm mx-4 border-2 border-red-200">
                 <h3 className="text-lg font-bold text-red-700 mb-2">{t.deleteConfirm || 'Confirmar Eliminacion'}</h3>
                 <p className="text-sm text-gray-700 mb-4">
                   {t.deleteAllDataConfirm || 'Estas seguro de que deseas eliminar estos datos?'}
@@ -4454,7 +4460,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <button
                     onClick={() => setShowDeleteConfirm(false)}
                     disabled={isDeleting}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition"
+                    className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 disabled:opacity-50 transition"
                   >
                     {t.cancel}
                   </button>
@@ -4487,7 +4493,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       }
                     }}
                     disabled={isDeleting}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
                   >
                     {isDeleting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
                     {isDeleting ? (t.deletingData || 'Eliminando...') : (t.delete || 'Eliminar')}
@@ -4499,23 +4505,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-wrap gap-3 justify-between p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          <div className="flex flex-wrap gap-3 justify-between p-4 md:px-6 border-t border-slate-200 flex-shrink-0 bg-slate-50/90 backdrop-blur-sm">
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
+              className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
             >
               {t.delete}
             </button>
             <div className="flex gap-3">
               <button
                 onClick={closeEditModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                className="px-5 py-2 text-sm font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 transition"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleSaveCell}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
+                className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg hover:from-emerald-600 hover:to-green-700 transition shadow-sm"
               >
                 {t.save}
               </button>
