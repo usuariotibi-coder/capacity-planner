@@ -3958,6 +3958,47 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     }
   };
 
+  const clearSelectedProjectCell = async () => {
+    if (!selectedProjectCell) return;
+    if (!canEditDepartment(selectedProjectCell.department)) return;
+    if (isPastingProjectCellRef.current) return;
+
+    isPastingProjectCellRef.current = true;
+    try {
+      const { assignments: targetAssignments } = getDepartmentWeekData(
+        selectedProjectCell.department,
+        selectedProjectCell.weekStart,
+        selectedProjectCell.projectId
+      );
+
+      if (targetAssignments.length === 0) return;
+
+      const isBuildOrPRG = selectedProjectCell.department === 'BUILD' || selectedProjectCell.department === 'PRG';
+      const resetPayload: any = {
+        hours: 0,
+        stage: null,
+        comment: '',
+        changeOrderId: null,
+      };
+      if (isBuildOrPRG) {
+        resetPayload.scioHours = 0;
+        resetPayload.externalHours = 0;
+      }
+
+      await Promise.all(
+        targetAssignments.map((assignment) =>
+          updateAssignment(assignment.id, resetPayload, { skipRefetch: true })
+        )
+      );
+
+      await fetchAssignments(true);
+    } catch (error) {
+      console.error('[CapacityMatrix] Error clearing project cell:', error);
+    } finally {
+      isPastingProjectCellRef.current = false;
+    }
+  };
+
   useEffect(() => {
     if (!selectedProjectCell) return;
     if (departmentFilter === 'General') {
@@ -3997,6 +4038,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       if (shortcutKey && lowerKey === 'v') {
         event.preventDefault();
         void pasteIntoSelectedProjectCell();
+        return;
+      }
+
+      if ((event.key === 'Delete' || event.key === 'Backspace') && !shortcutKey && !event.altKey) {
+        if (canEditDepartment(selectedProjectCell.department)) {
+          event.preventDefault();
+          void clearSelectedProjectCell();
+        }
         return;
       }
 
