@@ -71,6 +71,27 @@ interface CellEditState {
   projectId?: string;
 }
 
+interface ProjectCellSelectionState {
+  department: Department;
+  weekStart: string;
+  projectId: string;
+}
+
+interface ProjectCellClipboardEntry {
+  employeeId: string;
+  hours: number;
+  stage: Stage;
+  comment?: string;
+  scioHours?: number;
+  externalHours?: number;
+  changeOrderId?: string | null;
+}
+
+interface ProjectCellClipboardState {
+  source: ProjectCellSelectionState;
+  entries: ProjectCellClipboardEntry[];
+}
+
 interface CapacityMatrixPageProps {
   departmentFilter: DepartmentFilter;
 }
@@ -185,6 +206,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [selectedProjectCell, setSelectedProjectCell] = useState<ProjectCellSelectionState | null>(null);
+  const [projectCellClipboard, setProjectCellClipboard] = useState<ProjectCellClipboardState | null>(null);
 
   const createStageHoursEntry = (stage: Exclude<Stage, null> | '' = '', hours = 0): StageHoursEntry => ({
     id: generateId(),
@@ -1210,6 +1233,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const departmentCapacityScrollRef = useRef<HTMLDivElement>(null);
   const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
+  const isPastingProjectCellRef = useRef(false);
   const isSyncingHorizontalScrollRef = useRef(false);
   const syncedBaseScrollProgressRef = useRef(0);
   const activeSyncedProjectIdRef = useRef<string | null>(null);
@@ -1633,6 +1658,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectsVisibleInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
   }, [departmentFilter, orderedDepartmentProjects, orderedGeneralProjects]);
+
+  const departmentProjectRowById = useMemo(() => {
+    const map = new Map<string, number>();
+    orderedDepartmentProjects.forEach((proj, idx) => map.set(proj.id, idx));
+    return map;
+  }, [orderedDepartmentProjects]);
+
+  const weekIndexByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    allWeeksData.forEach((week, idx) => map.set(week.date, idx));
+    return map;
+  }, [allWeeksData]);
 
   useEffect(() => {
     if (!showExportPdfModal) return;
@@ -3753,6 +3790,277 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     void fetchAssignments(true);
   };
 
+  const getProjectCellKey = (projectId: string, department: Department, weekStart: string) =>
+    `${projectId}|${department}|${weekStart}`;
+
+  const selectProjectCell = (department: Department, weekStart: string, projectId?: string) => {
+    if (departmentFilter === 'General' || !projectId) return;
+    setSelectedProjectCell({ department, weekStart, projectId });
+  };
+
+  const copySelectedProjectCell = () => {
+    if (!selectedProjectCell) return;
+    const { assignments: sourceAssignments } = getDepartmentWeekData(
+      selectedProjectCell.department,
+      selectedProjectCell.weekStart,
+      selectedProjectCell.projectId
+    );
+
+    const entries: ProjectCellClipboardEntry[] = sourceAssignments
+      .map((assignment) => {
+        const effectiveHours = roundHours(
+          typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0)
+        );
+        return {
+          employeeId: assignment.employeeId,
+          hours: effectiveHours,
+          stage: assignment.stage || null,
+          comment: assignment.comment || '',
+          scioHours: typeof assignment.scioHours === 'number' ? roundHours(assignment.scioHours) : undefined,
+          externalHours: typeof assignment.externalHours === 'number' ? roundHours(assignment.externalHours) : undefined,
+          changeOrderId: assignment.changeOrderId ?? null,
+        };
+      })
+      .filter((entry) => entry.hours > 0 || (entry.scioHours || 0) > 0 || (entry.externalHours || 0) > 0);
+
+    setProjectCellClipboard({
+      source: selectedProjectCell,
+      entries,
+    });
+  };
+
+  const pasteIntoSelectedProjectCell = async () => {
+    if (!selectedProjectCell || !projectCellClipboard) return;
+    if (!canEditDepartment(selectedProjectCell.department)) return;
+    if (isPastingProjectCellRef.current) return;
+
+    const targetProjectId = selectedProjectCell.projectId;
+    if (!targetProjectId) return;
+
+    isPastingProjectCellRef.current = true;
+    try {
+      const isBuildOrPRG = selectedProjectCell.department === 'BUILD' || selectedProjectCell.department === 'PRG';
+      const sourceIsSameProject = projectCellClipboard.source.projectId === targetProjectId;
+      const availableTargetChangeOrderIds = new Set(
+        getChangeOrdersForProjectDept(selectedProjectCell.department, targetProjectId).map((order) => order.id)
+      );
+
+      const resolveTargetChangeOrderId = (incomingId?: string | null): string | null => {
+        if (!incomingId) return null;
+        if (!sourceIsSameProject) return null;
+        return availableTargetChangeOrderIds.has(incomingId) ? incomingId : null;
+      };
+
+      const normalizedEntries = new Map<string, ProjectCellClipboardEntry>();
+      projectCellClipboard.entries.forEach((entry) => {
+        const hours = roundHours(Math.max(0, entry.hours || 0));
+        let scioHours = roundHours(Math.max(0, entry.scioHours || 0));
+        let externalHours = roundHours(Math.max(0, entry.externalHours || 0));
+
+        if (isBuildOrPRG && scioHours === 0 && externalHours === 0 && hours > 0) {
+          scioHours = hours;
+        }
+
+        if (hours <= 0 && scioHours <= 0 && externalHours <= 0) return;
+
+        const resolvedChangeOrderId = resolveTargetChangeOrderId(entry.changeOrderId);
+        const stageKey = entry.stage || '';
+        const mapKey = `${entry.employeeId}|${stageKey}|${resolvedChangeOrderId || ''}`;
+        const existing = normalizedEntries.get(mapKey);
+
+        if (existing) {
+          existing.hours = roundHours(existing.hours + hours);
+          existing.scioHours = roundHours((existing.scioHours || 0) + scioHours);
+          existing.externalHours = roundHours((existing.externalHours || 0) + externalHours);
+          if (!existing.comment && entry.comment) existing.comment = entry.comment;
+          return;
+        }
+
+        normalizedEntries.set(mapKey, {
+          employeeId: entry.employeeId,
+          hours,
+          stage: entry.stage || null,
+          comment: entry.comment || '',
+          scioHours: isBuildOrPRG ? scioHours : undefined,
+          externalHours: isBuildOrPRG ? externalHours : undefined,
+          changeOrderId: resolvedChangeOrderId,
+        });
+      });
+
+      const { assignments: targetAssignments } = getDepartmentWeekData(
+        selectedProjectCell.department,
+        selectedProjectCell.weekStart,
+        targetProjectId
+      );
+
+      const existingByKey = new Map<string, Assignment[]>();
+      targetAssignments.forEach((assignment) => {
+        const key = `${assignment.employeeId}|${assignment.stage || ''}|${assignment.changeOrderId || ''}`;
+        const bucket = existingByKey.get(key) || [];
+        bucket.push(assignment);
+        existingByKey.set(key, bucket);
+      });
+
+      for (const [key, entry] of normalizedEntries.entries()) {
+        const bucket = existingByKey.get(key) || [];
+        const existingAssignment = bucket.shift();
+        existingByKey.set(key, bucket);
+
+        const payload: any = {
+          hours: entry.hours,
+          stage: entry.stage,
+          comment: entry.comment || undefined,
+          changeOrderId: entry.changeOrderId ?? null,
+        };
+
+        if (isBuildOrPRG) {
+          payload.scioHours = roundHours(entry.scioHours || 0);
+          payload.externalHours = roundHours(entry.externalHours || 0);
+        }
+
+        if (existingAssignment) {
+          await updateAssignment(existingAssignment.id, payload, { skipRefetch: true });
+        } else {
+          await addAssignment({
+            employeeId: entry.employeeId,
+            projectId: targetProjectId,
+            weekStartDate: selectedProjectCell.weekStart,
+            ...payload,
+          } as any);
+        }
+      }
+
+      const assignmentsToReset = Array.from(existingByKey.values()).flat();
+      if (assignmentsToReset.length > 0) {
+        const resetPayload: any = {
+          hours: 0,
+          stage: null,
+          comment: '',
+          changeOrderId: null,
+        };
+        if (isBuildOrPRG) {
+          resetPayload.scioHours = 0;
+          resetPayload.externalHours = 0;
+        }
+
+        await Promise.all(
+          assignmentsToReset.map((assignment) =>
+            updateAssignment(assignment.id, resetPayload, { skipRefetch: true })
+          )
+        );
+      }
+
+      await fetchAssignments(true);
+    } catch (error) {
+      console.error('[CapacityMatrix] Error pasting project cell:', error);
+    } finally {
+      isPastingProjectCellRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedProjectCell) return;
+    if (departmentFilter === 'General') {
+      setSelectedProjectCell(null);
+      return;
+    }
+    if (!departmentProjectRowById.has(selectedProjectCell.projectId) || !weekIndexByDate.has(selectedProjectCell.weekStart)) {
+      setSelectedProjectCell(null);
+    }
+  }, [selectedProjectCell, departmentFilter, departmentProjectRowById, weekIndexByDate]);
+
+  useEffect(() => {
+    if (departmentFilter === 'General') return;
+
+    const handleGridKeyboard = (event: KeyboardEvent) => {
+      if (editingCell) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName.toLowerCase();
+        if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') {
+          return;
+        }
+      }
+
+      if (!selectedProjectCell) return;
+
+      const shortcutKey = event.ctrlKey || event.metaKey;
+      const lowerKey = event.key.toLowerCase();
+
+      if (shortcutKey && lowerKey === 'c') {
+        event.preventDefault();
+        copySelectedProjectCell();
+        return;
+      }
+
+      if (shortcutKey && lowerKey === 'v') {
+        event.preventDefault();
+        void pasteIntoSelectedProjectCell();
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        if (canEditDepartment(selectedProjectCell.department)) {
+          event.preventDefault();
+          handleEditCell(selectedProjectCell.department, selectedProjectCell.weekStart, selectedProjectCell.projectId);
+        }
+        return;
+      }
+
+      const currentRow = departmentProjectRowById.get(selectedProjectCell.projectId);
+      const currentWeek = weekIndexByDate.get(selectedProjectCell.weekStart);
+      if (currentRow === undefined || currentWeek === undefined) return;
+
+      let nextRow = currentRow;
+      let nextWeek = currentWeek;
+      switch (event.key) {
+        case 'ArrowLeft':
+          nextWeek = Math.max(0, currentWeek - 1);
+          break;
+        case 'ArrowRight':
+          nextWeek = Math.min(allWeeksData.length - 1, currentWeek + 1);
+          break;
+        case 'ArrowUp':
+          nextRow = Math.max(0, currentRow - 1);
+          break;
+        case 'ArrowDown':
+          nextRow = Math.min(orderedDepartmentProjects.length - 1, currentRow + 1);
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      const nextProject = orderedDepartmentProjects[nextRow];
+      const nextWeekData = allWeeksData[nextWeek];
+      if (!nextProject || !nextWeekData) return;
+
+      const nextSelection: ProjectCellSelectionState = {
+        department: selectedProjectCell.department,
+        projectId: nextProject.id,
+        weekStart: nextWeekData.date,
+      };
+      setSelectedProjectCell(nextSelection);
+
+      const nextKey = getProjectCellKey(nextProject.id, selectedProjectCell.department, nextWeekData.date);
+      const nextCellEl = projectCellRefs.current.get(nextKey);
+      nextCellEl?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
+
+    window.addEventListener('keydown', handleGridKeyboard);
+    return () => window.removeEventListener('keydown', handleGridKeyboard);
+  }, [
+    departmentFilter,
+    editingCell,
+    selectedProjectCell,
+    projectCellClipboard,
+    orderedDepartmentProjects,
+    allWeeksData,
+    departmentProjectRowById,
+    weekIndexByDate,
+  ]);
+
   const renderCellContent = (department: Department, weekStart: string, project?: Project) => {
     const projectId = project?.id;
     const { totalHours, talent, stage, assignments: cellAssignments, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
@@ -3854,7 +4162,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          onClick={() => canEdit && handleEditCell(department, weekStart, projectId)}
           className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
@@ -5709,17 +6016,34 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           const week = weekData.date;
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
                           const canEditThisDepartment = canEditDepartment(dept);
+                          const isSelectedCell =
+                            selectedProjectCell?.projectId === proj.id &&
+                            selectedProjectCell?.department === dept &&
+                            selectedProjectCell?.weekStart === week;
+                          const cellKey = getProjectCellKey(proj.id, dept, week);
                           return (
                             <td
                               key={`${proj.id}-${dept}-${week}`}
+                              ref={(el) => {
+                                if (el) {
+                                  projectCellRefs.current.set(cellKey, el);
+                                } else {
+                                  projectCellRefs.current.delete(cellKey);
+                                }
+                              }}
                               data-week-index={weekIdx}
-                              onClick={() => canEditThisDepartment && handleEditCell(dept, week, proj.id)}
+                              onClick={() => selectProjectCell(dept, week, proj.id)}
+                              onDoubleClick={() => canEditThisDepartment && handleEditCell(dept, week, proj.id)}
                               className={`border p-0 relative text-xs transition-all ${
-                                canEditThisDepartment ? 'cursor-pointer hover:shadow-md' : ''
+                                canEditThisDepartment ? 'cursor-pointer hover:shadow-md' : 'cursor-cell'
                               } ${
                                 isCurrentWeekColumn
                                   ? CURRENT_WEEK_SOFT_CELL_CLASS
                                   : 'border-gray-300'
+                              } ${
+                                isSelectedCell
+                                  ? 'after:absolute after:inset-0 after:border-2 after:border-blue-600 after:rounded-[2px] after:pointer-events-none'
+                                  : ''
                               }`}
                             >
                               {renderCellContent(dept, week, proj)}
