@@ -50,7 +50,7 @@ type NonNullStage = Exclude<Stage, null>;
 // HD uses a dedicated palette in operational artifacts.
 const departmentStageColorOverrides: Partial<Record<Department, Partial<Record<NonNullStage, { bg: string; text: string }>>>> = {
   HD: {
-    SWITCH_LAYOUT_REVISION: { bg: 'bg-[#ACB9CA]', text: 'text-slate-900' },
+    SWITCH_LAYOUT_REVISION: { bg: 'bg-[#D9E1F2]', text: 'text-slate-900' },
     CONTROLS_DESIGN: { bg: 'bg-[#ACB9CA]', text: 'text-slate-900' },
     RELEASE: { bg: 'bg-[#44546A]', text: 'text-white' },
     RED_LINES: { bg: 'bg-[#FF0000]', text: 'text-white' },

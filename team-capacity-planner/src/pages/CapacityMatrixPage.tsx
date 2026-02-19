@@ -2404,7 +2404,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       };
 
       const hdStagePalette: Record<string, { bg: string; fg: string }> = {
-        SWITCH_LAYOUT_REVISION: { bg: 'ACB9CA', fg: '111827' },
+        SWITCH_LAYOUT_REVISION: { bg: 'D9E1F2', fg: '111827' },
         CONTROLS_DESIGN: { bg: 'ACB9CA', fg: '111827' },
         RELEASE: { bg: '44546A', fg: WHITE },
         RED_LINES: { bg: 'FF0000', fg: WHITE },
