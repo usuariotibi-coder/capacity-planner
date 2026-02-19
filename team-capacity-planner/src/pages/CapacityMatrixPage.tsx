@@ -504,7 +504,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
         const data = await scioTeamCapacityApi.getAll();
         console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
-        console.log('[CapacityMatrix] ðŸ“Š Total SCIO records loaded:', data?.length || 0);
+        console.log('[CapacityMatrix] Total SCIO records loaded:', data?.length || 0);
 
         // Transform API data to our state structure
         const newScioTeamMembers: Record<Department, Record<string, number>> = {
@@ -731,7 +731,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Delete the record if capacity is 0
         console.log('[CapacityMatrix] Deleting SCIO capacity:', recordKey);
         await scioTeamCapacityApi.delete(existingId);
-        console.log('[CapacityMatrix] âœ… SCIO capacity deleted successfully');
+        console.log('[CapacityMatrix] SCIO capacity deleted successfully');
 
         // Log activity
         await activityLogApi.logActivity(
@@ -750,7 +750,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Update existing record
         console.log('[CapacityMatrix] Updating SCIO capacity:', recordKey, capacity);
         const updateResult = await scioTeamCapacityApi.update(existingId, { capacity });
-        console.log('[CapacityMatrix] âœ… SCIO capacity updated successfully:', updateResult);
+        console.log('[CapacityMatrix] SCIO capacity updated successfully:', updateResult);
 
         // Log activity
         await activityLogApi.logActivity(
@@ -772,8 +772,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             weekStartDate: weekDate,
             capacity: capacity,
           });
-          console.log('[CapacityMatrix] âœ… CREATE succeeded, result:', result);
-          console.log('[CapacityMatrix] ðŸŽ¯ Record ID assigned:', result.id);
+          console.log('[CapacityMatrix] CREATE succeeded, result:', result);
+          console.log('[CapacityMatrix] Record ID assigned:', result.id);
           createdSuccessfully = true;
           createdRecordId = result.id;
 
@@ -783,12 +783,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           }));
         } catch (createError) {
           const createErrorMsg = createError instanceof Error ? createError.message : 'Error desconocido';
-          console.log('[CapacityMatrix] âŒ CREATE failed:', createErrorMsg);
+          console.log('[CapacityMatrix] CREATE failed:', createErrorMsg);
           console.log('[CapacityMatrix] Checking if this is a unique constraint violation...');
 
           // If create fails due to unique constraint, try to update instead
           // This happens when the record already exists but we don't have the ID
-          if (createErrorMsg.includes('conjunto Ãºnico') || createErrorMsg.includes('unique')) {
+          if (createErrorMsg.includes('conjunto único') || createErrorMsg.includes('unique')) {
             console.log('[CapacityMatrix] Detected unique constraint violation, fetching all records to find existing one...');
             try {
               const allScioRecords = await scioTeamCapacityApi.getAll();
@@ -799,9 +799,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
               );
 
               if (existingRecord) {
-                console.log('[CapacityMatrix] âœ… Found existing record, updating it with ID:', existingRecord.id);
+                console.log('[CapacityMatrix] Found existing record, updating it with ID:', existingRecord.id);
                 const updateResult = await scioTeamCapacityApi.update(existingRecord.id, { capacity });
-                console.log('[CapacityMatrix] âœ… UPDATE succeeded:', updateResult);
+                console.log('[CapacityMatrix] UPDATE succeeded:', updateResult);
                 createdSuccessfully = true;
                 createdRecordId = existingRecord.id;
 
@@ -810,11 +810,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
                   [recordKey]: existingRecord.id,
                 }));
               } else {
-                console.log('[CapacityMatrix] âŒ No existing record found, will throw original error');
+                console.log('[CapacityMatrix] No existing record found, will throw original error');
                 throw createError;
               }
             } catch (getError) {
-              console.error('[CapacityMatrix] âŒ Failed to fetch or update existing record:', getError);
+              console.error('[CapacityMatrix] Failed to fetch or update existing record:', getError);
               throw getError;
             }
           } else {
@@ -839,7 +839,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] âŒ Final error saving SCIO capacity:', errorMsg);
+      console.error('[CapacityMatrix] Final error saving SCIO capacity:', errorMsg);
       alert(`Error al guardar capacidad SCIO (${dept} - ${weekDate}): ${errorMsg}`);
     }
   };
@@ -3164,7 +3164,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting timeline PDF:', error);
       alert(language === 'es'
-        ? 'OcurriÃ³ un error al exportar el PDF.'
+        ? 'Ocurrió un error al exportar el PDF.'
         : 'An error occurred while exporting the PDF.');
     } finally {
       if (previousExpandedState.size > 0) {
@@ -3662,9 +3662,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const deptDisplayDate = deptMeta?.deptDisplayDate || t.notConfigured;
 
     // Build tooltip text, including comment if present
-    let tooltipText = `ðŸ“… ${t.projectTooltip}: ${projectStartDate}\nðŸ‘· ${department}: ${deptDisplayDate}`;
+    let tooltipText = `${t.projectTooltip}: ${projectStartDate}\n${department}: ${deptDisplayDate}`;
     if (cellComment) {
-      tooltipText += `\n\nðŸ’¬ ${cellComment}`;
+      tooltipText += `\n\n${t.comment}: ${cellComment}`;
     }
 
     if (projectId && projectCellViewMode === 'compact') {
@@ -3681,7 +3681,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         >
           {cellComment && (
             <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
-              ðŸ’¬
+              <MessageCircle size={10} />
             </div>
           )}
           <div className="text-[10px] font-bold leading-tight">{compactTalentDisplay}</div>
@@ -3741,7 +3741,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           ) : (
             <>
               <div className="font-bold text-xs opacity-60">Week {weekNum}</div>
-              <div>{canEdit ? '+ Add' : 'â€”'}</div>
+              <div>{canEdit ? '+ Add' : '—'}</div>
             </>
           )}
         </div>
@@ -3783,7 +3783,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {/* Comment indicator - shows when cell has a comment */}
         {cellComment && (
           <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
-            ðŸ’¬
+            <MessageCircle size={10} />
           </div>
         )}
         {/* Pencil icon for editing */}
@@ -3918,7 +3918,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
               {stageOptions.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ {t.stage}</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.stage}</label>
                   <select
                     value={(editingStage || '') as string}
                     onChange={(e) => {
@@ -3940,7 +3940,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           ) : hasStagePlanner ? (
             <div className="mb-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
                 <input
                   type="text"
                   value={editingHoursInput}
@@ -3953,7 +3953,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">🏷️ {t.stage}</label>
+                  <label className="block text-sm font-medium text-gray-700">{t.stage}</label>
                   <button
                     type="button"
                     onClick={() => setEditingStageEntries((prev) => [...prev, createStageHoursEntry()])}
@@ -4074,7 +4074,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           ) : (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ {t.hours}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.hours}</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -4183,7 +4183,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
               {selectedEmployeeList.length > 0 && (
                 <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
-                  OK: {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
+                  {(language === 'es' ? 'Seleccionados' : 'Selected')}: {selectedEmployeeList.length} {selectedEmployeeList.length !== 1 ? t.resourcesSelected : t.resourceSelected}
                 </div>
               )}
             </div>
@@ -4511,7 +4511,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       className="text-[#4f3a70] hover:text-[#2e1a47] font-bold text-xs cursor-pointer transition"
                       title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
                     >
-                      {showDepartmentPanel ? 'â–¼' : 'â–¶'}
+                      {showDepartmentPanel ? '▼' : '▶'}
                     </button>
                   </div>
 
@@ -4857,7 +4857,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <div className="flex gap-0 mb-0.5">
                           {/* Label */}
                           <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[8px] font-bold px-1 py-0.5 rounded-md border-2 bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800 border-purple-300`}>
-                            {dept === 'BUILD' ? 'ðŸ¢ Ext' : 'ðŸ‘¥ Ext'}
+                            {dept === 'BUILD' ? 'Ext' : 'Ext'}
                           </div>
 
                           {/* Week cells */}
@@ -5075,7 +5075,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               </span>
                             </>
                           )}
-                          <span className="text-gray-400">â€¢</span>
+                          <span className="text-gray-400">•</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -5312,7 +5312,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       className="p-1 text-indigo-600 hover:text-indigo-800 font-bold text-lg cursor-pointer transition"
                       title={expandedProjects[proj.id] ? 'Hide project' : 'Show project'}
                     >
-                      {expandedProjects[proj.id] ? 'â–¼' : 'â–¶'}
+                      {expandedProjects[proj.id] ? '▼' : '▶'}
                     </button>
                   </div>
 
@@ -5404,7 +5404,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   : 'bg-slate-50 text-slate-600 border-gray-300'
                               }`}
                             >
-                              {projectWeekNumber ?? 'â€”'}
+                              {projectWeekNumber ?? '—'}
                             </td>
                           );
                         })}
@@ -5465,7 +5465,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               <div className="sticky top-0 z-40 mb-0.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-0.5 shadow-sm">
                 <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
                   <div className="flex items-center gap-0.5">
-                    <span>ðŸ’š</span>
+                    <span>Capacity</span>
                     <span>Capacity</span>
                   </div>
                   <button
@@ -5473,7 +5473,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     className="text-green-600 hover:text-green-800 font-bold text-[10px] cursor-pointer"
                     title="Hide Capacity panel"
                   >
-                    âœ•
+                    ✕
                   </button>
                 </h2>
 
@@ -5630,7 +5630,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   {availableCapacity.toFixed(2)}
                                 </div>
                               ) : (
-                                <div className={`${textColor} text-[6px]`}>â€”</div>
+                                <div className={`${textColor} text-[6px]`}>—</div>
                               )}
                             </div>
                           );
@@ -5651,7 +5651,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 className="mb-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-lg transition"
                 title="Show Capacity panel"
               >
-                ðŸ’š Show Capacity
+                Show Capacity
               </button>
             )}
 
@@ -5868,7 +5868,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       : 'bg-slate-50 text-slate-600 border-gray-300'
                                   }`}
                                 >
-                                  {projectWeekNumber ?? 'â€”'}
+                                  {projectWeekNumber ?? '—'}
                                 </td>
                               );
                             })}
@@ -6021,7 +6021,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               className="absolute top-0.5 left-0.5 text-amber-600 hover:text-amber-800 cursor-pointer"
                                               title={cellComment}
                                             >
-                                              ðŸ’¬
+                                              <MessageCircle size={10} />
                                             </button>
                                           )}
                                           <div className="text-[10px] font-bold leading-tight">{formatHours(totalHours)}h</div>
@@ -6061,10 +6061,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 type="button"
                 onClick={() => setShowLegend(false)}
                 className="inline-flex items-center gap-1 rounded-md border border-[#d6d0e2] bg-white px-2 py-0.5 text-[9px] font-semibold text-[#4f3a70] hover:bg-[#f4f1f8] transition"
-                title={language === 'es' ? 'Cerrar guÃ­a' : 'Close guide'}
+                title={language === 'es' ? 'Cerrar guía' : 'Close guide'}
               >
                 <X size={11} />
-                <span className="hidden sm:inline">{language === 'es' ? 'Cerrar guÃ­a' : 'Close guide'}</span>
+                <span className="hidden sm:inline">{language === 'es' ? 'Cerrar guía' : 'Close guide'}</span>
               </button>
             </div>
           </div>
@@ -6204,7 +6204,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">âž• {t.createProject}</h2>
+                <h2 className="text-lg font-bold">{t.createProject}</h2>
                 <button
                   onClick={() => {
                     setShowQuickProjectModal(false);
@@ -6237,7 +6237,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 )}
                 {/* Job */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.job}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.job}</label>
                   <input
                     type="text"
                     value={quickProjectForm.name}
@@ -6249,7 +6249,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Customer */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¥ {t.customer}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.customer}</label>
                   <input
                     type="text"
                     value={quickProjectForm.client}
@@ -6261,7 +6261,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDate}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDate}</label>
                   <WeekNumberDatePicker
                     value={quickProjectForm.startDate}
                     onChange={(date) => setQuickProjectForm({ ...quickProjectForm, startDate: date })}
@@ -6272,7 +6272,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Number of Weeks */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.numberOfWeeks}</label>
                   <input
                     type="text"
                     value={quickProjectForm.numberOfWeeks}
@@ -6296,7 +6296,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Facility - Only MI and AL */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ­ {t.facility}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.facility}</label>
                   <select
                     value={quickProjectForm.facility}
                     onChange={(e) => setQuickProjectForm({ ...quickProjectForm, facility: e.target.value as 'AL' | 'MI' | 'MX' })}
@@ -6310,7 +6310,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Budget Hours */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ’š {t.budgetHours || 'Horas Presupuestadas'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.budgetHours || 'Horas Presupuestadas'}</label>
                   <input
                     type="text"
                     value={quickProjectForm.budgetHours}
@@ -6355,7 +6355,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">ðŸ“‚ {t.importProject || 'Import Existing Project'}</h2>
+                <h2 className="text-lg font-bold">{t.importProject || 'Import Existing Project'}</h2>
                 <button
                   onClick={() => {
                     setShowImportProjectModal(false);
@@ -6388,7 +6388,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 )}
                 {/* Select Project */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.selectProject || 'Select Project'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.selectProject || 'Select Project'}</label>
                   <select
                     value={importProjectForm.projectId}
                     onChange={(e) => setImportProjectForm({ ...importProjectForm, projectId: e.target.value })}
@@ -6406,7 +6406,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     return selectedProject && (
                       <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
                         <div><strong>{t.facility || 'Facility'}:</strong> {selectedProject.facility}</div>
-                        <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate} â†’ {selectedProject.endDate}</div>
+                        <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate}{' -> '}{selectedProject.endDate}</div>
                       </div>
                     );
                   })()}
@@ -6414,7 +6414,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Start Date for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDateDept || 'Start Date for'} {departmentFilter}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDateDept || 'Start Date for'} {departmentFilter}</label>
                   <WeekNumberDatePicker
                     value={importProjectForm.startDate}
                     onChange={(date) => setImportProjectForm({ ...importProjectForm, startDate: date })}
@@ -6425,7 +6425,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Number of Weeks for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.numberOfWeeks}</label>
                   <input
                     type="text"
                     value={importProjectForm.numberOfWeeks}
@@ -6449,7 +6449,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Budget Hours for this department */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ’š {t.budgetHours || 'Budget Hours'}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.budgetHours || 'Budget Hours'}</label>
                   <input
                     type="text"
                     value={importProjectForm.budgetHours}
@@ -6495,7 +6495,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-rose-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
                 <h2 className="text-lg font-bold">
-                  {language === 'es' ? 'ðŸ“„ Exportar Timeline PDF' : 'ðŸ“„ Export Timeline PDF'}
+                  {language === 'es' ? 'Exportar Timeline PDF' : 'Export Timeline PDF'}
                 </h2>
                 <button
                   onClick={closeExportPdfModal}
@@ -6882,7 +6882,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-                <h2 className="text-lg font-bold">ðŸ’¬ {t.comment}</h2>
+                <h2 className="text-lg font-bold">{t.comment}</h2>
                 <button
                   onClick={() => setViewingComment(null)}
                   className="hover:bg-amber-700 p-1 rounded transition"

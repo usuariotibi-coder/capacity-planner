@@ -210,7 +210,7 @@ export function ProjectsPage() {
           departmentHoursAllocated: deptHoursAllocated,
           visibleInDepartments: visibilityScopesForSubmit,
         });
-        console.log('[ProjectsPage] âœ“ Project updated successfully');
+        console.log('[ProjectsPage] Project updated successfully');
         setEditingId(null);
         setIsFormOpen(false);
         setFormNotice({
@@ -234,9 +234,9 @@ export function ProjectsPage() {
 
       // Wait for project to be created in backend
       const createdProject = await addProject(newProject);
-      console.log('[ProjectsPage] âœ“ Project created successfully');
+      console.log('[ProjectsPage] Project created successfully');
 
-      // Crear asignaciones automÃ¡ticas para cada departamento
+      // Crear asignaciones automáticas para cada departamento
       const weekStarts = getWeekStartsForProject(formData.startDate, numberOfWeeks);
 
       DEPARTMENTS.forEach((dept) => {
@@ -443,10 +443,10 @@ export function ProjectsPage() {
                   }`}
                 >
                   {formNotice.type === 'success'
-                    ? (language === 'es' ? 'OperaciÃ³n exitosa' : 'Operation successful')
+                    ? (language === 'es' ? 'Operación exitosa' : 'Operation successful')
                     : formNotice.type === 'warning'
                       ? (language === 'es' ? 'Faltan datos' : 'Missing data')
-                      : (language === 'es' ? 'OcurriÃ³ un error' : 'An error occurred')}
+                      : (language === 'es' ? 'Ocurrió un error' : 'An error occurred')}
                 </p>
                 <p
                   className={`text-xs ${
@@ -495,7 +495,7 @@ export function ProjectsPage() {
                   {/* Row 1: Job and Customer */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“‹ {t.job}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.job}</label>
                       <input
                         type="text"
                         value={formData.name || ''}
@@ -505,7 +505,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¥ {t.customer}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.customer}</label>
                       <input
                         type="text"
                         value={formData.client || ''}
@@ -519,7 +519,7 @@ export function ProjectsPage() {
                   {/* Row 2: Dates and Weeks */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ“… {t.startDate}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDate}</label>
                       <WeekNumberDatePicker
                         value={formData.startDate || ''}
                         onChange={(date) => setFormData({ ...formData, startDate: date })}
@@ -528,7 +528,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">â±ï¸ {t.numberOfWeeks}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.numberOfWeeks}</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -549,7 +549,7 @@ export function ProjectsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ­ {t.facility}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.facility}</label>
                       <select
                         value={formData.facility || 'AL'}
                         onChange={(e) => setFormData({ ...formData, facility: e.target.value as any })}
@@ -567,7 +567,7 @@ export function ProjectsPage() {
                   {/* Row 3: Project Manager + General visibility */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-bold mb-1.5 text-gray-700">ðŸ‘¨â€ðŸ’¼ {t.projectManager}</label>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.projectManager}</label>
                       <select
                         value={selectedProjectManagerId || ''}
                         onChange={(e) => setSelectedProjectManagerId(e.target.value || null)}
@@ -590,7 +590,7 @@ export function ProjectsPage() {
                         </p>
                         <p className="text-xs text-indigo-700">
                           {language === 'es'
-                            ? 'Si estÃ¡ activo, este proyecto tambiÃ©n aparece en la vista General.'
+                            ? 'Si está activo, este proyecto también aparece en la vista General.'
                             : 'When enabled, this project also appears in the General screen.'}
                         </p>
                       </div>
@@ -606,7 +606,7 @@ export function ProjectsPage() {
 
                   {/* Budget Hours per Department */}
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg border-l-4 border-green-600">
-                    <h3 className="font-semibold mb-2 text-sm text-green-900">ðŸ’¼ {t.budgetHours}</h3>
+                    <h3 className="font-semibold mb-2 text-sm text-green-900">{t.budgetHours}</h3>
                     <p className="text-xs text-green-700 mb-2">{t.defineHours}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                       {DEPARTMENTS.map((dept) => (
@@ -655,7 +655,7 @@ export function ProjectsPage() {
                   {/* Configuration by Department - Compact */}
                   <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-lg border-l-4 border-indigo-600">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-sm text-indigo-900">ðŸ“… {t.configByDepartment}</h3>
+                      <h3 className="font-semibold text-sm text-indigo-900">{t.configByDepartment}</h3>
                       {formData.startDate && (
                         <span className="text-xs text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full font-medium">
                           {t.startDate}: {formatDateDayFirst(formData.startDate)}
@@ -712,7 +712,7 @@ export function ProjectsPage() {
                   {formData.startDate && (
                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                       <p className="text-xs text-blue-900">
-                        <strong>{t.summary}:</strong> {formatDate(formData.startDate)} â€¢ {numberOfWeeks} {t.weeks} â€¢ {formatDate(calculateEndDate(formData.startDate, numberOfWeeks))}
+                        <strong>{t.summary}:</strong> {formatDate(formData.startDate)} • {numberOfWeeks} {t.weeks} • {formatDate(calculateEndDate(formData.startDate, numberOfWeeks))}
                       </p>
                     </div>
                   )}
@@ -723,13 +723,13 @@ export function ProjectsPage() {
                   onClick={handleSubmit}
                   className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-6 py-2.5 rounded-lg transition shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                 >
-                  âœ“ {editingId ? t.updateProject : t.createProject}
+                  {editingId ? t.updateProject : t.createProject}
                 </button>
                 <button
                   onClick={handleCancel}
                   className="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white font-bold px-6 py-2.5 rounded-lg transition shadow-md hover:shadow-lg text-sm"
                 >
-                  âœ• {t.cancel}
+                  {t.cancel}
                 </button>
               </div>
             </div>
@@ -743,13 +743,13 @@ export function ProjectsPage() {
         <table className="brand-table w-full border-collapse">
           <thead>
             <tr>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ“‹ {t.job}</th>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ‘¥ {t.customer}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">ðŸ­ {t.facility}</th>
-              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">ðŸ‘¨â€ðŸ’¼ {t.projectManager}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">ðŸ“… {t.start}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">â±ï¸ {t.weeksLabel}</th>
-              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">âš™ï¸ {t.actions}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">{t.job}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">{t.customer}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">{t.facility}</th>
+              <th className="border border-blue-500 px-4 py-3 text-left font-bold uppercase text-sm">{t.projectManager}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">{t.start}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">{t.weeksLabel}</th>
+              <th className="border border-blue-500 px-4 py-3 text-center font-bold uppercase text-sm">{t.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -791,12 +791,12 @@ export function ProjectsPage() {
                         }`}
                         title={t.edit}
                       >
-                        âœŽ
+                        ✎
                       </button>
                       <button
                         onClick={async () => {
                           if (!hasFullAccess) return;
-                          if (window.confirm(language === 'es' ? `Â¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
+                          if (window.confirm(language === 'es' ? `¿Eliminar proyecto "${proj.name}"?` : `Delete project "${proj.name}"?`)) {
                             try {
                               await deleteProject(proj.id);
                             } catch (error) {
