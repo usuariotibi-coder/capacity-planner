@@ -4115,7 +4115,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     if (projectId && projectCellViewMode === 'compact') {
       return (
         <div
-          className={`p-0.5 text-center text-xs font-semibold h-full w-full flex flex-col items-center justify-center relative group ${
+          className={`absolute inset-0 p-0.5 text-center text-xs font-semibold flex flex-col items-center justify-center relative group ${
             stageColor
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
@@ -4123,7 +4123,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 : showSoftShiftIndicator
                   ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
-          } ${cellIndicatorPatternClass} ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
           {cellComment && (
@@ -6561,7 +6561,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                         } ${displacedCellBgClass}`}
                                       >
-                                        <div className={`p-0.5 h-full w-full text-center text-[10px] font-semibold leading-tight relative ${
+                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative flex items-center justify-center ${
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
@@ -6569,7 +6569,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               : hasShiftIndicator
                                                 ? 'bg-[#eaf2ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
-                                        } ${cellIndicatorPatternClass}`}>
+                                        }`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
