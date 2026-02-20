@@ -1315,12 +1315,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       deptDisplayDate: string;
       effectiveStartDate: string;
       effectiveEndDate: string;
+      expectedStartDate: string;
+      expectedEndDate: string;
     }>();
 
     projects.forEach((proj) => {
       DEPARTMENTS.forEach((dept) => {
         let deptStartDate: string | undefined;
         let deptDuration = 0;
+        let minConfiguredWeekStart: number | null = null;
+        let maxConfiguredWeekEnd: number | null = null;
 
         if (dept === 'PM') {
           deptStartDate = proj.startDate;
@@ -1350,6 +1354,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
             deptStartDate = minWeekStartDate;
             if (Number.isFinite(minWeekStart) && Number.isFinite(maxWeekEnd)) {
+              minConfiguredWeekStart = minWeekStart;
+              maxConfiguredWeekEnd = maxWeekEnd;
               deptDuration = Math.max(0, maxWeekEnd - minWeekStart + 1);
             }
 
@@ -1370,6 +1376,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         const effectiveStartDate = deptStartDate || proj.startDate;
         const effectiveEndDate = deptEndDate || proj.endDate || proj.startDate;
+        let expectedStartDate = proj.startDate;
+        let expectedEndDate = proj.endDate || proj.startDate;
+        if (proj.startDate && minConfiguredWeekStart !== null && maxConfiguredWeekEnd !== null) {
+          const expectedStart = parseISODate(proj.startDate);
+          expectedStart.setDate(expectedStart.getDate() + ((minConfiguredWeekStart - 1) * 7));
+          expectedStartDate = formatToISO(expectedStart);
+
+          const expectedEnd = parseISODate(proj.startDate);
+          expectedEnd.setDate(expectedEnd.getDate() + (maxConfiguredWeekEnd * 7) - 1);
+          expectedEndDate = formatToISO(expectedEnd);
+        }
         const deptDisplayDate = deptStartDate
           ? new Date(deptStartDate).toLocaleDateString(locale)
           : t.notConfigured;
@@ -1380,6 +1397,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           deptDisplayDate,
           effectiveStartDate,
           effectiveEndDate,
+          expectedStartDate,
+          expectedEndDate,
         });
       });
     });
@@ -1403,17 +1422,23 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptMeta = projectDeptMetaByKey.get(`${project.id}|${department}`);
     const effectiveDeptStartDate = deptMeta?.effectiveStartDate || project.startDate || '';
     const effectiveDeptEndDate = deptMeta?.effectiveEndDate || project.endDate || project.startDate || '';
+    const expectedDeptStartDate = deptMeta?.expectedStartDate || project.startDate || '';
+    const expectedDeptEndDate = deptMeta?.expectedEndDate || project.endDate || project.startDate || '';
     const isDeptWeekInRange =
       !!effectiveDeptStartDate &&
       !!effectiveDeptEndDate &&
       weekStart >= effectiveDeptStartDate &&
       weekStart <= effectiveDeptEndDate;
-    const isProjectWeekInRange = isWeekInProjectRange(weekStart, project);
-    const hasDepartmentTimingShift = !!(
-      (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate)
-    );
+    const isExpectedWeekInRange =
+      !!expectedDeptStartDate &&
+      !!expectedDeptEndDate &&
+      weekStart >= expectedDeptStartDate &&
+      weekStart <= expectedDeptEndDate;
+    const hasDepartmentTimingShift =
+      effectiveDeptStartDate.slice(0, 10) !== expectedDeptStartDate.slice(0, 10) ||
+      effectiveDeptEndDate.slice(0, 10) !== expectedDeptEndDate.slice(0, 10);
     const outOfEstimatedRange = !isDeptWeekInRange;
-    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
+    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isExpectedWeekInRange);
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
     const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
 
@@ -6554,9 +6579,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const effectiveDeptEndDate = deptMeta?.effectiveEndDate || proj.endDate;
                                   const isDeptWeekInRange = week >= effectiveDeptStartDate && week <= effectiveDeptEndDate;
                                   const isDeptFirstWeek = week === effectiveDeptStartDate;
-                                  const hasDepartmentTimingShift = !!(
-                                    (deptMeta?.deptStartDate && deptMeta.deptStartDate !== proj.startDate)
-                                  );
 
                                   // Calculate consecutive week number within the department (1, 2, 3, etc.)
                                   let deptConsecutiveWeek = 0;
@@ -6567,10 +6589,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     deptConsecutiveWeek = weeksDiff + 1;
                                   }
 
-                                  const outOfEstimatedRange = !isDeptWeekInRange;
-                                  const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isInRange);
-                                  const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
-                                  const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
+                                  const {
+                                    showHardOutOfRangeIndicator,
+                                    showSoftShiftIndicator,
+                                  } = getCellShiftIndicators(proj, dept, week, totalHours);
                                   const displacedCellBgClass = stageColor
                                     ? stageColor.bg
                                     : isDeptWeekInRange
