@@ -1512,17 +1512,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const effectiveDeptStartDate = deptMeta?.effectiveStartDate || project.startDate || '';
     const effectiveDeptEndDate = deptMeta?.effectiveEndDate || project.endDate || project.startDate || '';
     const expectedDeptStartDate = deptMeta?.expectedStartDate || project.startDate || '';
-    const expectedDeptEndDate = deptMeta?.expectedEndDate || project.endDate || project.startDate || '';
     const isDeptWeekInRange =
       !!effectiveDeptStartDate &&
       !!effectiveDeptEndDate &&
       weekStart >= effectiveDeptStartDate &&
       weekStart <= effectiveDeptEndDate;
-    const isExpectedWeekInRange =
-      !!expectedDeptStartDate &&
-      !!expectedDeptEndDate &&
-      weekStart >= expectedDeptStartDate &&
-      weekStart <= expectedDeptEndDate;
     const normalizedEffectiveStart = effectiveDeptStartDate.slice(0, 10);
     const normalizedExpectedStart = expectedDeptStartDate.slice(0, 10);
     const hasDepartmentTimingShift =
@@ -1530,30 +1524,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       !!normalizedExpectedStart &&
       normalizedEffectiveStart !== normalizedExpectedStart;
     let isDateShiftDifferenceWeek = false;
-    if (
-      hasDepartmentTimingShift &&
-      !!expectedDeptStartDate &&
-      !!expectedDeptEndDate
-    ) {
-      const expectedStartDateObj = parseISODate(expectedDeptStartDate);
-      const effectiveStartDateObj = parseISODate(effectiveDeptStartDate);
-      const dayDiff = Math.round(
-        (effectiveStartDateObj.getTime() - expectedStartDateObj.getTime()) / (24 * 60 * 60 * 1000)
-      );
+    if (hasDepartmentTimingShift) {
+      const shiftGapStart =
+        normalizedEffectiveStart < normalizedExpectedStart
+          ? normalizedEffectiveStart
+          : normalizedExpectedStart;
+      const shiftGapEndExclusive =
+        normalizedEffectiveStart < normalizedExpectedStart
+          ? normalizedExpectedStart
+          : normalizedEffectiveStart;
 
-      const shiftedExpectedStartDateObj = parseISODate(expectedDeptStartDate);
-      shiftedExpectedStartDateObj.setDate(shiftedExpectedStartDateObj.getDate() + dayDiff);
-      const shiftedExpectedEndDateObj = parseISODate(expectedDeptEndDate);
-      shiftedExpectedEndDateObj.setDate(shiftedExpectedEndDateObj.getDate() + dayDiff);
-
-      const shiftedExpectedStart = formatToISO(shiftedExpectedStartDateObj);
-      const shiftedExpectedEnd = formatToISO(shiftedExpectedEndDateObj);
-      const isShiftedExpectedWeekInRange =
-        weekStart >= shiftedExpectedStart &&
-        weekStart <= shiftedExpectedEnd;
-
-      // Show soft shift only in the real delta between previous saved dates and modified dates.
-      isDateShiftDifferenceWeek = isExpectedWeekInRange !== isShiftedExpectedWeekInRange;
+      // Mark only the exact gap between original saved start date and updated start date.
+      isDateShiftDifferenceWeek =
+        !!weekStart &&
+        weekStart >= shiftGapStart &&
+        weekStart < shiftGapEndExclusive;
     }
     const outOfEstimatedRange = !isDeptWeekInRange;
     const isDisplacedByTimingShift = hasDepartmentTimingShift && isDateShiftDifferenceWeek;
