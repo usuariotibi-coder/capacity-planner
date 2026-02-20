@@ -6129,7 +6129,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }`}
                             >
                               {showSoftShiftIndicator && (
-                                <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                <>
+                                  <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
+                                  <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                </>
                               )}
                               {showHardOutOfRangeIndicator && (
                                 <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6614,7 +6617,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         } ${displacedCellBgClass}`}
                                       >
                                         {showSoftShiftIndicator && (
-                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                          <>
+                                            <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
+                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                          </>
                                         )}
                                         {showHardOutOfRangeIndicator && (
                                           <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6654,7 +6660,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       } ${displacedCellBgClass}`}
                                     >
                                       {showSoftShiftIndicator && (
-                                        <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                        <>
+                                          <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
+                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                        </>
                                       )}
                                       {showHardOutOfRangeIndicator && (
                                         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6807,7 +6816,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-black bg-white" />
+                  <div className="h-4 w-4 rounded border border-dashed border-black bg-[#eaf2ff]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">
                     {language === 'es' ? 'Desfase por fecha' : 'Date shift'}
                   </span>
