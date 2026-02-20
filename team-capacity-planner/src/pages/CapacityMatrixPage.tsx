@@ -1410,8 +1410,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       weekStart <= effectiveDeptEndDate;
     const isProjectWeekInRange = isWeekInProjectRange(weekStart, project);
     const hasDepartmentTimingShift = !!(
-      (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate) ||
-      (deptMeta?.deptEndDate && project.endDate && deptMeta.deptEndDate !== project.endDate)
+      (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate)
     );
     const outOfEstimatedRange = !isDeptWeekInRange;
     const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
@@ -6556,8 +6555,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const isDeptWeekInRange = week >= effectiveDeptStartDate && week <= effectiveDeptEndDate;
                                   const isDeptFirstWeek = week === effectiveDeptStartDate;
                                   const hasDepartmentTimingShift = !!(
-                                    (deptMeta?.deptStartDate && deptMeta.deptStartDate !== proj.startDate) ||
-                                    (deptMeta?.deptEndDate && proj.endDate && deptMeta.deptEndDate !== proj.endDate)
+                                    (deptMeta?.deptStartDate && deptMeta.deptStartDate !== proj.startDate)
                                   );
 
                                   // Calculate consecutive week number within the department (1, 2, 3, etc.)
