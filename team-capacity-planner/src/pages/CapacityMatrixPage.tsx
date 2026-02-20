@@ -6688,7 +6688,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     : isDeptWeekInRange
                                       ? (isDeptFirstWeek ? 'bg-orange-100' : 'bg-[#bfdbfe]')
                                       : isInRange
-                                        ? 'bg-green-50'
+                                        ? 'bg-[#bfdbfe]'
                                         : 'bg-gray-50';
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
@@ -6715,7 +6715,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? 'bg-[#bfdbfe] text-[#1e40af]'
                                               : isInRange
-                                                ? 'bg-green-50 text-green-700'
+                                                ? 'bg-[#bfdbfe] text-[#1e40af]'
                                                 : 'bg-gray-100 text-gray-500'
                                         }`}>
                                           {cellComment && (
@@ -6758,7 +6758,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 ? 'text-orange-600'
                                               : 'text-[#1e40af]'
                                               : isInRange
-                                                ? 'text-green-600'
+                                                ? 'text-[#1e40af]'
                                                 : 'text-gray-400'
                                         }`}>
                                           {cellComment && (
