@@ -1367,6 +1367,44 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
     return map;
   }, [projects, locale, t.notConfigured]);
+
+  const getCellShiftIndicators = (
+    project: Project | undefined,
+    department: Department,
+    weekStart: string,
+    totalHours: number
+  ) => {
+    if (!project) {
+      return {
+        showHardOutOfRangeIndicator: false,
+        showSoftShiftIndicator: false,
+      };
+    }
+
+    const deptMeta = projectDeptMetaByKey.get(`${project.id}|${department}`);
+    const effectiveDeptStartDate = deptMeta?.effectiveStartDate || project.startDate || '';
+    const effectiveDeptEndDate = deptMeta?.effectiveEndDate || project.endDate || project.startDate || '';
+    const isDeptWeekInRange =
+      !!effectiveDeptStartDate &&
+      !!effectiveDeptEndDate &&
+      weekStart >= effectiveDeptStartDate &&
+      weekStart <= effectiveDeptEndDate;
+    const isProjectWeekInRange = isWeekInProjectRange(weekStart, project);
+    const hasDepartmentTimingShift = !!(
+      (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate) ||
+      (deptMeta?.deptEndDate && project.endDate && deptMeta.deptEndDate !== project.endDate)
+    );
+    const outOfEstimatedRange = !isDeptWeekInRange;
+    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
+    const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+    const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
+
+    return {
+      showHardOutOfRangeIndicator,
+      showSoftShiftIndicator,
+    };
+  };
+
   const monthSpans = useMemo(() => {
     const months: Array<{ month: string; startIdx: number; endIdx: number }> = [];
     let currentMonth = '';
@@ -4123,15 +4161,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           } overflow-hidden ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
-          {showSoftShiftIndicator && (
-            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-          )}
-          {showHardOutOfRangeIndicator && (
-            <>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-            </>
-          )}
           {cellComment && (
             <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
               <MessageCircle size={10} />
@@ -4193,15 +4222,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded relative overflow-hidden ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
-          {showSoftShiftIndicator && (
-            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-          )}
-          {showHardOutOfRangeIndicator && (
-            <>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-            </>
-          )}
           {indicatorContent ? (
             indicatorContent
           ) : (
@@ -4229,15 +4249,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         } ${stageColor ? stageColor.text : 'text-blue-900'} overflow-hidden`}
         title={tooltipText}
       >
-        {showSoftShiftIndicator && (
-          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-        )}
-        {showHardOutOfRangeIndicator && (
-          <>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-          </>
-        )}
         {isGeneralView ? (
           <div className="text-[10px] font-bold leading-tight">{talent}</div>
         ) : (
@@ -6074,6 +6085,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             selectedProjectCell?.projectId === proj.id &&
                             selectedProjectCell?.department === dept &&
                             selectedProjectCell?.weekStart === week;
+                          const indicatorCellEntry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${week}`);
+                          const indicatorTotalHours = indicatorCellEntry?.totalHours ?? 0;
+                          const {
+                            showHardOutOfRangeIndicator,
+                            showSoftShiftIndicator,
+                          } = getCellShiftIndicators(proj, dept, week, indicatorTotalHours);
                           const cellKey = getProjectCellKey(proj.id, dept, week);
                           return (
                             <td
@@ -6096,10 +6113,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   : 'border-gray-300'
                               } ${
                                 isSelectedCell
-                                  ? 'after:absolute after:inset-0 after:border-2 after:border-blue-600 after:rounded-[2px] after:pointer-events-none'
+                                  ? 'after:absolute after:inset-0 after:border-2 after:border-blue-600 after:rounded-[2px] after:pointer-events-none after:z-20'
                                   : ''
                               }`}
                             >
+                              {showSoftShiftIndicator && (
+                                <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                              )}
+                              {showHardOutOfRangeIndicator && (
+                                <>
+                                  <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                  <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                </>
+                              )}
                               {renderCellContent(dept, week, proj)}
                             </td>
                           );
@@ -6580,6 +6606,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                         } ${displacedCellBgClass}`}
                                       >
+                                        {showSoftShiftIndicator && (
+                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                        )}
+                                        {showHardOutOfRangeIndicator && (
+                                          <>
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                          </>
+                                        )}
                                         <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative flex items-center justify-center overflow-hidden ${
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
@@ -6589,15 +6624,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 ? 'bg-[#eaf2ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
                                         }`}>
-                                          {showSoftShiftIndicator && (
-                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                          )}
-                                          {showHardOutOfRangeIndicator && (
-                                            <>
-                                              <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                              <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                            </>
-                                          )}
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6623,6 +6649,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                       } ${displacedCellBgClass}`}
                                     >
+                                      {showSoftShiftIndicator && (
+                                        <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                      )}
+                                      {showHardOutOfRangeIndicator && (
+                                        <>
+                                          <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                          <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
+                                        </>
+                                      )}
                                       {totalHours === 0 ? (
                                         <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight relative overflow-hidden ${
                                           stageColor
@@ -6637,15 +6672,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
                                         }`}>
-                                          {showSoftShiftIndicator && (
-                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                          )}
-                                          {showHardOutOfRangeIndicator && (
-                                            <>
-                                              <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                              <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                            </>
-                                          )}
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6675,15 +6701,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative overflow-hidden ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
                                         }`}>
-                                          {showSoftShiftIndicator && (
-                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                          )}
-                                          {showHardOutOfRangeIndicator && (
-                                            <>
-                                              <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                              <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.60)_0px,rgba(15,23,42,0.60)_2px,transparent_2px,transparent_4px)] z-10" />
-                                            </>
-                                          )}
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
