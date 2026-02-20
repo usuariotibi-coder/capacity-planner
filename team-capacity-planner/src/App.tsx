@@ -58,6 +58,8 @@ function MainApp() {
   });
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const userMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const {
@@ -137,6 +139,27 @@ function MainApp() {
       document.removeEventListener('keydown', handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+
+    const updateUserMenuPosition = () => {
+      if (!userMenuTriggerRef.current) return;
+      const rect = userMenuTriggerRef.current.getBoundingClientRect();
+      setUserMenuPosition({
+        top: Math.max(8, rect.bottom + 6),
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+
+    updateUserMenuPosition();
+    window.addEventListener('resize', updateUserMenuPosition);
+    window.addEventListener('scroll', updateUserMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateUserMenuPosition);
+      window.removeEventListener('scroll', updateUserMenuPosition, true);
+    };
+  }, [isUserMenuOpen]);
 
   if (isLoading) {
     console.log('[MainApp] Still loading...');
@@ -333,6 +356,7 @@ function MainApp() {
             {currentUser && (
               <div ref={userMenuRef} className="relative hidden sm:block">
                 <button
+                  ref={userMenuTriggerRef}
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
                   className="user-profile-pill flex items-center justify-between gap-2 pl-3 pr-2 py-1.5"
@@ -354,7 +378,14 @@ function MainApp() {
                   </div>
                 </button>
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[168px] rounded-md border border-white/20 bg-[#2E1A47] p-1 shadow-lg">
+                  <div
+                    className="fixed z-[200] min-w-[168px] rounded-md border border-white/20 bg-[#2E1A47] p-1 shadow-lg"
+                    style={
+                      userMenuPosition
+                        ? { top: `${userMenuPosition.top}px`, right: `${userMenuPosition.right}px` }
+                        : undefined
+                    }
+                  >
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
