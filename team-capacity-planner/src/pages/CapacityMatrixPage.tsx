@@ -4109,7 +4109,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     if (projectId && projectCellViewMode === 'compact') {
       return (
         <div
-          className={`p-0.5 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
+          className={`p-0.5 text-center text-xs font-semibold h-full w-full flex flex-col items-center justify-center relative group ${
             stageColor
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
@@ -4117,9 +4117,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 : showSoftShiftIndicator
                   ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
-          } ${cellIndicatorBorderClass} ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
+          {(showHardOutOfRangeIndicator || showSoftShiftIndicator) && (
+            <div className="pointer-events-none absolute inset-0 border border-dashed border-black" />
+          )}
           {cellComment && (
             <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
               <MessageCircle size={10} />
@@ -6553,9 +6556,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           isCurrentWeekColumn
                                             ? CURRENT_WEEK_SOFT_CELL_CLASS
                                             : 'border-gray-300'
-                                        } ${displacedCellBgClass}`}
+                                        } ${displacedCellBgClass} ${cellIndicatorBorderClass}`}
                                       >
-                                        <div className={`p-0.5 rounded text-center text-[10px] font-semibold leading-tight relative ${
+                                        <div className={`p-0.5 h-full w-full text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
@@ -6563,7 +6566,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               : hasShiftIndicator
                                                 ? 'bg-[#eaf2ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
-                                        } ${cellIndicatorBorderClass}`}>
+                                        }`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
