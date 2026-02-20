@@ -4156,7 +4156,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             stageColor
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
-                ? 'bg-emerald-50 text-emerald-900'
+                ? 'bg-[#bfdbfe] text-[#1e40af]'
                 : showSoftShiftIndicator
                   ? 'bg-[#dbeafe] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
@@ -4203,8 +4203,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           );
         } else {
-          cellBgClass = 'bg-purple-100';
-          cellTextClass = 'text-purple-600';
+          cellBgClass = 'bg-[#bfdbfe]';
+          cellTextClass = 'text-[#1e40af]';
           indicatorContent = (
             <div className="flex flex-col items-center gap-0.5">
               <span className="font-bold text-base">{deptConsecutiveWeek}</span>
@@ -6601,7 +6601,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
-                                              ? 'bg-emerald-50 text-emerald-900'
+                                              ? 'bg-[#bfdbfe] text-[#1e40af]'
                                               : showSoftShiftIndicator
                                                 ? 'bg-[#dbeafe] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
@@ -6638,7 +6638,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? isDeptFirstWeek
                                                 ? 'text-orange-600 bg-orange-100'
-                                              : 'text-purple-600 bg-purple-100'
+                                              : 'text-[#1e40af] bg-[#bfdbfe]'
                                               : showSoftShiftIndicator
                                                 ? 'text-[#1e3a8a] bg-[#dbeafe]'
                                                 : isInRange
