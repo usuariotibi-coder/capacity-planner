@@ -19,13 +19,19 @@ const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
 
 const getDepartmentScopesFromVisibility = (scopes?: ProjectVisibilityScope[]): Department[] => {
   const rawScopes = scopes || [];
-  return rawScopes.filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+  return rawScopes
+    .map((scope) => (typeof scope === 'string' ? scope.trim().toUpperCase() : ''))
+    .filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
 };
 
 const shouldProjectShowInGeneral = (scopes?: ProjectVisibilityScope[]): boolean => {
   const rawScopes = scopes || [];
   if (rawScopes.length === 0) return true;
-  return rawScopes.includes(GENERAL_VISIBILITY_SCOPE);
+  return rawScopes.some(
+    (scope) =>
+      typeof scope === 'string' &&
+      scope.trim().toUpperCase() === GENERAL_VISIBILITY_SCOPE
+  );
 };
 
 interface HoursPerDepartment {
@@ -133,14 +139,22 @@ export function ProjectsPage() {
     return deptWeekIndex - projectWeekIndex + 1;
   };
 
-  const buildVisibilityScopesForSubmit = (existingScopes?: ProjectVisibilityScope[]): ProjectVisibilityScope[] => {
-    const departmentScopes = getDepartmentScopesFromVisibility(existingScopes);
-    const hasDepartmentScopes = departmentScopes.length > 0;
+  const buildVisibilityScopesForSubmit = (
+    existingScopes?: ProjectVisibilityScope[],
+    configuredDepartments: Department[] = []
+  ): ProjectVisibilityScope[] => {
+    const existingDepartmentScopes = getDepartmentScopesFromVisibility(existingScopes);
+    const mergedDepartmentScopeSet = new Set<Department>([
+      ...existingDepartmentScopes,
+      ...configuredDepartments,
+    ]);
+    const mergedDepartmentScopes = DEPARTMENTS.filter((dept) => mergedDepartmentScopeSet.has(dept));
+    const hasDepartmentScopes = mergedDepartmentScopes.length > 0;
 
     // Keep existing scoped departments. If none exist and General is disabled,
     // fallback to all departments so the project is still visible in department views.
     const nextDepartmentScopes: Department[] = hasDepartmentScopes
-      ? departmentScopes
+      ? mergedDepartmentScopes
       : (showInGeneral ? [] : [...DEPARTMENTS]);
 
     if (!showInGeneral) {
@@ -196,7 +210,15 @@ export function ProjectsPage() {
       }
     });
 
-    const visibilityScopesForSubmit = buildVisibilityScopesForSubmit(formData.visibleInDepartments);
+    const configuredDepartments = DEPARTMENTS.filter((dept) => {
+      const hasStageConfig = (calculatedDepartmentStages[dept] || []).length > 0;
+      const hasBudgetConfig = Number(deptHoursAllocated[dept] || 0) > 0;
+      return hasStageConfig || hasBudgetConfig;
+    });
+    const visibilityScopesForSubmit = buildVisibilityScopesForSubmit(
+      formData.visibleInDepartments,
+      configuredDepartments
+    );
 
     try {
       if (editingId) {

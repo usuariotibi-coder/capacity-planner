@@ -138,7 +138,40 @@ const createEmptyDepartmentWeekValues = (): Record<Department, Record<string, nu
 
 const getDepartmentVisibilityScopes = (project: Project): Department[] => {
   const rawScopes = project.visibleInDepartments || [];
-  return rawScopes.filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+  return rawScopes
+    .map((scope) => (typeof scope === 'string' ? scope.trim().toUpperCase() : ''))
+    .filter((scope): scope is Department => DEPARTMENT_SET.has(scope as Department));
+};
+
+const hasDepartmentStageConfiguration = (project: Project, department: Department): boolean => {
+  const stageEntries = project.departmentStages?.[department];
+  if (!Array.isArray(stageEntries) || stageEntries.length === 0) {
+    return false;
+  }
+
+  return stageEntries.some((entry) => {
+    const weekStartNum = Number(entry.weekStart);
+    const weekEndNum = Number(entry.weekEnd);
+    const durationNum = Number(entry.durationWeeks);
+    const hasValidWeekRange =
+      Number.isFinite(weekStartNum) &&
+      Number.isFinite(weekEndNum) &&
+      weekEndNum >= weekStartNum;
+    const hasValidDuration = Number.isFinite(durationNum) && durationNum > 0;
+    const hasStartDate = typeof entry.departmentStartDate === 'string' && entry.departmentStartDate.length > 0;
+    return hasValidWeekRange || hasValidDuration || hasStartDate;
+  });
+};
+
+const hasDepartmentHoursConfiguration = (project: Project, department: Department): boolean => {
+  const allocated = Number(project.departmentHoursAllocated?.[department] || 0);
+  const utilized = Number(project.departmentHoursUtilized?.[department] || 0);
+  const forecast = Number(project.departmentHoursForecast?.[department] || 0);
+  return allocated > 0 || utilized > 0 || forecast > 0;
+};
+
+const hasDepartmentConfiguration = (project: Project, department: Department): boolean => {
+  return hasDepartmentStageConfiguration(project, department) || hasDepartmentHoursConfiguration(project, department);
 };
 
 const isProjectVisibleInDepartment = (project: Project, department: Department): boolean => {
@@ -146,7 +179,11 @@ const isProjectVisibleInDepartment = (project: Project, department: Department):
   if (departmentScopes.length === 0) {
     return true;
   }
-  return departmentScopes.includes(department);
+  if (departmentScopes.includes(department)) {
+    return true;
+  }
+  // If a department has explicit configuration, always expose the project in that department.
+  return hasDepartmentConfiguration(project, department);
 };
 
 const isProjectVisibleInGeneral = (project: Project): boolean => {
@@ -154,7 +191,59 @@ const isProjectVisibleInGeneral = (project: Project): boolean => {
   if (rawScopes.length === 0) {
     return true;
   }
-  return rawScopes.includes(GENERAL_VISIBILITY_SCOPE);
+  return rawScopes.some(
+    (scope) =>
+      typeof scope === 'string' &&
+      scope.trim().toUpperCase() === GENERAL_VISIBILITY_SCOPE
+  );
+};
+
+const projectHasDepartmentRangeOverlap = (project: Project, rangeStart: string, rangeEnd: string): boolean => {
+  if (!project.startDate) {
+    return false;
+  }
+
+  for (const department of DEPARTMENTS) {
+    const stageEntries = project.departmentStages?.[department];
+    if (!Array.isArray(stageEntries) || stageEntries.length === 0) continue;
+
+    for (const entry of stageEntries) {
+      const weekStartNum = Number(entry.weekStart);
+      const weekEndNum = Number(entry.weekEnd);
+      const durationNum = Number(entry.durationWeeks);
+
+      let stageStart = typeof entry.departmentStartDate === 'string' && entry.departmentStartDate
+        ? entry.departmentStartDate.slice(0, 10)
+        : '';
+      if (!stageStart && Number.isFinite(weekStartNum)) {
+        const startFromProject = parseISODate(project.startDate);
+        startFromProject.setDate(startFromProject.getDate() + ((weekStartNum - 1) * 7));
+        stageStart = formatToISO(startFromProject);
+      }
+
+      let stageDuration = Number.isFinite(durationNum) && durationNum > 0 ? durationNum : 0;
+      if (
+        stageDuration <= 0 &&
+        Number.isFinite(weekStartNum) &&
+        Number.isFinite(weekEndNum) &&
+        weekEndNum >= weekStartNum
+      ) {
+        stageDuration = weekEndNum - weekStartNum + 1;
+      }
+
+      if (!stageStart || stageDuration <= 0) continue;
+
+      const stageEndDate = parseISODate(stageStart);
+      stageEndDate.setDate(stageEndDate.getDate() + (stageDuration * 7) - 1);
+      const stageEnd = formatToISO(stageEndDate);
+
+      if (stageStart <= rangeEnd && stageEnd >= rangeStart) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 };
 
 export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
@@ -1622,8 +1711,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         : false;
 
       const hasAssignmentsInRange = assignmentProjectIdsInRange.has(proj.id);
+      const hasDepartmentOverlapInRange = projectHasDepartmentRangeOverlap(proj, rangeStart, rangeEnd);
 
-      return projectOverlapsRange || hasAssignmentsInRange;
+      return projectOverlapsRange || hasAssignmentsInRange || hasDepartmentOverlapInRange;
     });
   }, [projects, departmentFilter, weekRange, assignmentProjectIdsInRange]);
 
