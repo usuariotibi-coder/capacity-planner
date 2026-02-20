@@ -4116,23 +4116,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     // Check if current week is within department range using date comparison
     const isDeptWeekInRange = !!effectiveDeptStartDate && !!effectiveDeptEndDate && weekStart >= effectiveDeptStartDate && weekStart <= effectiveDeptEndDate;
     const isDeptFirstWeek = !!effectiveDeptStartDate && weekStart === effectiveDeptStartDate;
-    const isProjectWeekInRange = project ? isWeekInProjectRange(weekStart, project) : true;
-    const hasDepartmentTimingShift = !!(
-      project &&
-      (
-        (deptMeta?.deptStartDate && deptMeta.deptStartDate !== project.startDate) ||
-        (deptMeta?.deptEndDate && project.endDate && deptMeta.deptEndDate !== project.endDate)
-      )
-    );
 
     // Get stage color for styling
     const stageColor = stage ? getStageColor(stage, department) : null;
     const isGeneralView = departmentFilter === 'General';
     const canEdit = departmentFilter !== 'General' && canEditDepartment(departmentFilter as Department);
-    const outOfEstimatedRange = projectId ? !isDeptWeekInRange : false;
-    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
-    const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
-    const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
     const hasCellComment = !!(cellComment && cellComment.trim().length > 0);
     const shouldRenderAsEmpty = totalHours <= 0 && !hasCellComment;
@@ -4155,9 +4143,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
                 ? 'bg-[#bfdbfe] text-[#1e40af]'
-                : showSoftShiftIndicator
-                  ? 'bg-[#f5f9ff] text-[#1e3a8a]'
-                  : 'bg-gray-100 text-gray-500'
+                : 'bg-gray-100 text-gray-500'
           } overflow-hidden ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
@@ -4210,11 +4196,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
           );
         }
-      }
-
-      if (!isDeptWeekInRange && showSoftShiftIndicator) {
-        cellBgClass = 'bg-[#f5f9ff]';
-        cellTextClass = 'text-[#1e3a8a]';
       }
 
       return (
@@ -6578,16 +6559,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isInRange);
                                   const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
                                   const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-                                  const hasShiftIndicator = showHardOutOfRangeIndicator || showSoftShiftIndicator;
-                                  const displacedCellBgClass = hasShiftIndicator
-                                    ? 'bg-[#eaf2ff]'
-                                    : stageColor
-                                      ? stageColor.bg
-                                      : isDeptWeekInRange
-                                        ? (isDeptFirstWeek ? 'bg-orange-100' : 'bg-[#bfdbfe]')
-                                        : isInRange
-                                          ? 'bg-green-50'
-                                          : 'bg-gray-50';
+                                  const displacedCellBgClass = stageColor
+                                    ? stageColor.bg
+                                    : isDeptWeekInRange
+                                      ? (isDeptFirstWeek ? 'bg-orange-100' : 'bg-[#bfdbfe]')
+                                      : isInRange
+                                        ? 'bg-green-50'
+                                        : 'bg-gray-50';
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
@@ -6612,8 +6590,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
                                               ? 'bg-[#bfdbfe] text-[#1e40af]'
-                                              : hasShiftIndicator
-                                                ? 'bg-[#eaf2ff] text-[#1e3a8a]'
+                                              : isInRange
+                                                ? 'bg-green-50 text-green-700'
                                                 : 'bg-gray-100 text-gray-500'
                                         }`}>
                                           {cellComment && (
@@ -6655,11 +6633,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               ? isDeptFirstWeek
                                                 ? 'text-orange-600'
                                               : 'text-[#1e40af]'
-                                              : hasShiftIndicator
-                                                ? 'text-[#1e3a8a]'
-                                                : isInRange
-                                                  ? 'text-green-600'
-                                                  : 'text-gray-400'
+                                              : isInRange
+                                                ? 'text-green-600'
+                                                : 'text-gray-400'
                                         }`}>
                                           {cellComment && (
                                             <button
