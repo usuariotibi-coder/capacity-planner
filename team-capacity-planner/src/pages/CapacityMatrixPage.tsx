@@ -4150,7 +4150,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     if (projectId && projectCellViewMode === 'compact') {
       return (
         <div
-          className={`absolute inset-0 p-0.5 text-center text-xs font-semibold flex flex-col items-center justify-center relative group ${
+          className={`absolute inset-0 p-0.5 text-center text-xs font-semibold flex flex-col items-center justify-center group ${
             stageColor
               ? `${stageColor.bg} ${stageColor.text}`
               : isDeptWeekInRange
@@ -4219,7 +4219,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          className={`absolute inset-0 p-2 text-center text-sm flex flex-col items-center justify-center relative overflow-hidden ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
+          className={`absolute inset-0 p-2 text-center text-sm flex flex-col items-center justify-center overflow-hidden ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
@@ -4244,7 +4244,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     return (
       <div
-        className={`absolute inset-0 p-0.5 text-center text-xs font-semibold flex flex-col items-center justify-center relative group ${
+        className={`absolute inset-0 p-0.5 text-center text-xs font-semibold flex flex-col items-center justify-center group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
         } ${stageColor ? stageColor.text : 'text-blue-900'} overflow-hidden`}
         title={tooltipText}
@@ -6609,7 +6609,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         {showHardOutOfRangeIndicator && (
                                           <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
                                         )}
-                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative flex items-center justify-center overflow-hidden ${
+                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight flex items-center justify-center overflow-hidden ${
                                           stageColor
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
@@ -6650,7 +6650,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
                                       )}
                                       {totalHours === 0 ? (
-                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-medium leading-tight relative overflow-hidden flex items-center justify-center ${
+                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-medium leading-tight overflow-hidden flex items-center justify-center ${
                                           stageColor
                                             ? `${stageColor.text}`
                                             : isDeptWeekInRange
@@ -6689,7 +6689,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           )}
                                         </div>
                                       ) : (
-                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative overflow-hidden flex flex-col items-center justify-center ${
+                                        <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight overflow-hidden flex flex-col items-center justify-center ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
                                         }`}>
                                           {cellComment && (
