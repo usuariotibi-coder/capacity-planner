@@ -6037,17 +6037,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         </td>
                         {allWeeksData.map((weekData, weekIdx) => {
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
-                          const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
-                          const effectiveStartDate = deptMeta?.effectiveStartDate || proj.startDate;
-                          const effectiveEndDate = deptMeta?.effectiveEndDate || proj.endDate || proj.startDate;
-                          const weekInDepartmentRange =
-                            weekData.date >= effectiveStartDate && weekData.date <= effectiveEndDate;
-                          const projectWeekNumber = weekInDepartmentRange
-                            ? getProjectWeekNumber(
-                                { ...proj, startDate: effectiveStartDate, endDate: effectiveEndDate },
-                                weekData.date
-                              )
-                            : null;
+                          // Project Week must always reflect the project global timeline,
+                          // not the current department timing shift.
+                          const projectWeekNumber = getProjectWeekNumber(proj, weekData.date);
                           return (
                             <td
                               key={`project-week-${proj.id}-${weekData.date}`}
