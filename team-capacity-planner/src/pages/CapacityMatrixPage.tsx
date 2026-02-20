@@ -4095,8 +4095,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
     const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-    const cellIndicatorBorderClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
-      ? 'border border-dashed border-black'
+    const cellIndicatorPatternClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
+      ? 'bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]'
       : '';
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
     const hasCellComment = !!(cellComment && cellComment.trim().length > 0);
@@ -4123,12 +4123,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 : showSoftShiftIndicator
                   ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
-          } ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${cellIndicatorPatternClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
-          {(showHardOutOfRangeIndicator || showSoftShiftIndicator) && (
-            <div className="pointer-events-none absolute inset-0 border border-dashed border-black" />
-          )}
           {cellComment && (
             <div className="absolute top-0.5 left-0.5 text-amber-600" title={cellComment}>
               <MessageCircle size={10} />
@@ -4187,7 +4184,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${cellIndicatorBorderClass}`}
+          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${cellIndicatorPatternClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
@@ -4215,7 +4212,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
         } ${stageColor ? stageColor.text : 'text-blue-900'} ${
-          cellIndicatorBorderClass
+          cellIndicatorPatternClass
         }`}
         title={tooltipText}
       >
@@ -6545,8 +6542,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
                                   const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
                                   const hasShiftIndicator = showHardOutOfRangeIndicator || showSoftShiftIndicator;
-                                  const cellIndicatorBorderClass = hasShiftIndicator
-                                    ? 'border border-dashed border-black'
+                                  const cellIndicatorPatternClass = hasShiftIndicator
+                                    ? 'bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]'
                                     : '';
                                   const displacedCellBgClass = hasShiftIndicator
                                     ? 'bg-[#eaf2ff]'
@@ -6562,7 +6559,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           isCurrentWeekColumn
                                             ? CURRENT_WEEK_SOFT_CELL_CLASS
                                             : 'border-gray-300'
-                                        } ${displacedCellBgClass} ${cellIndicatorBorderClass}`}
+                                        } ${displacedCellBgClass}`}
                                       >
                                         <div className={`p-0.5 h-full w-full text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor
@@ -6572,7 +6569,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               : hasShiftIndicator
                                                 ? 'bg-[#eaf2ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
-                                        }`}>
+                                        } ${cellIndicatorPatternClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6611,7 +6608,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 : isInRange
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
-                                        } ${cellIndicatorBorderClass}`}>
+                                        } ${cellIndicatorPatternClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6640,7 +6637,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       ) : (
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
-                                        } ${cellIndicatorBorderClass}`}>
+                                        } ${cellIndicatorPatternClass}`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6748,7 +6745,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-black bg-white" />
+                  <div className="h-4 w-4 rounded border border-slate-300 bg-white bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
               </div>
