@@ -4158,7 +4158,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               : isDeptWeekInRange
                 ? 'bg-emerald-50 text-emerald-900'
                 : showSoftShiftIndicator
-                  ? 'bg-slate-50 text-slate-500'
+                  ? 'bg-[#dbeafe] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
           } ${cellIndicatorBorderClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
@@ -4215,8 +4215,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       }
 
       if (!isDeptWeekInRange && showSoftShiftIndicator) {
-        cellBgClass = 'bg-slate-50';
-        cellTextClass = 'text-slate-500';
+        cellBgClass = 'bg-[#dbeafe]';
+        cellTextClass = 'text-[#1e3a8a]';
       }
 
       return (
@@ -6582,7 +6582,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     ? 'border border-dashed border-black'
                                     : '';
                                   const displacedCellBgClass = showSoftShiftIndicator
-                                    ? 'bg-slate-50'
+                                    ? 'bg-[#dbeafe]'
                                     : (stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50');
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
@@ -6603,7 +6603,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? 'bg-emerald-50 text-emerald-900'
                                               : showSoftShiftIndicator
-                                                ? 'bg-slate-50 text-slate-500'
+                                                ? 'bg-[#dbeafe] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
                                         } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
@@ -6640,7 +6640,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 ? 'text-orange-600 bg-orange-100'
                                               : 'text-purple-600 bg-purple-100'
                                               : showSoftShiftIndicator
-                                                ? 'text-slate-500 bg-slate-50'
+                                                ? 'text-[#1e3a8a] bg-[#dbeafe]'
                                                 : isInRange
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
