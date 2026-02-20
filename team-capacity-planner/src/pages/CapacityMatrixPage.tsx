@@ -6535,11 +6535,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isInRange);
                                   const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
                                   const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-                                  const cellIndicatorBorderClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
+                                  const hasShiftIndicator = showHardOutOfRangeIndicator || showSoftShiftIndicator;
+                                  const cellIndicatorBorderClass = hasShiftIndicator
                                     ? 'border border-dashed border-black'
                                     : '';
-                                  const displacedCellBgClass = showSoftShiftIndicator
-                                    ? 'bg-[#f5f9ff]'
+                                  const displacedCellBgClass = hasShiftIndicator
+                                    ? 'bg-[#eaf2ff]'
                                     : (stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50');
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
@@ -6559,8 +6560,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             ? `${stageColor.bg} ${stageColor.text}`
                                             : isDeptWeekInRange
                                               ? 'bg-[#bfdbfe] text-[#1e40af]'
-                                              : showSoftShiftIndicator
-                                                ? 'bg-[#f5f9ff] text-[#1e3a8a]'
+                                              : hasShiftIndicator
+                                                ? 'bg-[#eaf2ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
                                         } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
@@ -6596,8 +6597,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                               ? isDeptFirstWeek
                                                 ? 'text-orange-600 bg-orange-100'
                                               : 'text-[#1e40af] bg-[#bfdbfe]'
-                                              : showSoftShiftIndicator
-                                                ? 'text-[#1e3a8a] bg-[#f5f9ff]'
+                                              : hasShiftIndicator
+                                                ? 'text-[#1e3a8a] bg-[#eaf2ff]'
                                                 : isInRange
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
