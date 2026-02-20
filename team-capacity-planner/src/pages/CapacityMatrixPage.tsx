@@ -1327,18 +1327,37 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           deptDuration = proj.numberOfWeeks || 0;
         } else {
           const deptStages = proj.departmentStages?.[dept];
-          const deptFirstStage = deptStages && deptStages.length > 0 ? deptStages[0] : null;
-          deptStartDate = deptFirstStage?.departmentStartDate;
-          deptDuration = deptFirstStage?.durationWeeks || 0;
+          if (deptStages && deptStages.length > 0) {
+            let minWeekStart = Number.POSITIVE_INFINITY;
+            let maxWeekEnd = Number.NEGATIVE_INFINITY;
+            let minWeekStartDate: string | undefined;
 
-          if (!deptDuration && deptFirstStage?.weekEnd && deptFirstStage?.weekStart) {
-            deptDuration = deptFirstStage.weekEnd - deptFirstStage.weekStart + 1;
-          }
+            deptStages.forEach((stageCfg) => {
+              const weekStartNum = Number(stageCfg.weekStart);
+              const weekEndNum = Number(stageCfg.weekEnd);
+              if (!Number.isFinite(weekStartNum) || !Number.isFinite(weekEndNum) || weekEndNum < weekStartNum) {
+                return;
+              }
 
-          if (!deptStartDate && deptFirstStage?.weekStart && proj.startDate) {
-            const fallbackStart = parseISODate(proj.startDate);
-            fallbackStart.setDate(fallbackStart.getDate() + ((deptFirstStage.weekStart - 1) * 7));
-            deptStartDate = formatToISO(fallbackStart);
+              if (weekStartNum < minWeekStart) {
+                minWeekStart = weekStartNum;
+                minWeekStartDate = stageCfg.departmentStartDate;
+              }
+              if (weekEndNum > maxWeekEnd) {
+                maxWeekEnd = weekEndNum;
+              }
+            });
+
+            deptStartDate = minWeekStartDate;
+            if (Number.isFinite(minWeekStart) && Number.isFinite(maxWeekEnd)) {
+              deptDuration = Math.max(0, maxWeekEnd - minWeekStart + 1);
+            }
+
+            if (!deptStartDate && Number.isFinite(minWeekStart) && proj.startDate) {
+              const fallbackStart = parseISODate(proj.startDate);
+              fallbackStart.setDate(fallbackStart.getDate() + ((minWeekStart - 1) * 7));
+              deptStartDate = formatToISO(fallbackStart);
+            }
           }
         }
 
