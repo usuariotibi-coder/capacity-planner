@@ -4095,8 +4095,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isProjectWeekInRange);
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
     const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
-    const cellIndicatorPatternClass = (showHardOutOfRangeIndicator || showSoftShiftIndicator)
-      ? 'bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]'
+    const softShiftIndicatorClass = showSoftShiftIndicator
+      ? 'border border-dashed border-black'
+      : '';
+    const hardOutOfRangeIndicatorClass = showHardOutOfRangeIndicator
+      ? 'before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)] after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]'
       : '';
     const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
     const hasCellComment = !!(cellComment && cellComment.trim().length > 0);
@@ -4123,7 +4126,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 : showSoftShiftIndicator
                   ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
-          } ${canEdit ? 'cursor-pointer' : ''}`}
+          } ${softShiftIndicatorClass} ${hardOutOfRangeIndicatorClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
         >
           {cellComment && (
@@ -4184,7 +4187,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       return (
         <div
-          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${cellIndicatorPatternClass}`}
+          className={`p-3 text-center text-sm h-full flex flex-col items-center justify-center rounded relative ${canEdit ? 'cursor-pointer hover:opacity-80' : ''} ${cellBgClass} ${cellTextClass} ${softShiftIndicatorClass} ${hardOutOfRangeIndicatorClass}`}
           title={canEdit ? t.clickToAdd : ''}
         >
           {indicatorContent ? (
@@ -4211,9 +4214,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       <div
         className={`p-1 rounded text-center text-xs font-semibold h-full flex flex-col items-center justify-center relative group ${
           stageColor ? stageColor.bg : 'bg-blue-100'
-        } ${stageColor ? stageColor.text : 'text-blue-900'} ${
-          cellIndicatorPatternClass
-        }`}
+        } ${stageColor ? stageColor.text : 'text-blue-900'} ${softShiftIndicatorClass} ${hardOutOfRangeIndicatorClass}`}
         title={tooltipText}
       >
         {isGeneralView ? (
@@ -6542,8 +6543,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
                                   const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
                                   const hasShiftIndicator = showHardOutOfRangeIndicator || showSoftShiftIndicator;
-                                  const cellIndicatorPatternClass = hasShiftIndicator
-                                    ? 'bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]'
+                                  const softShiftIndicatorClass = showSoftShiftIndicator
+                                    ? 'border border-dashed border-black'
+                                    : '';
+                                  const hardOutOfRangeIndicatorClass = showHardOutOfRangeIndicator
+                                    ? 'before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)] after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]'
                                     : '';
                                   const displacedCellBgClass = hasShiftIndicator
                                     ? 'bg-[#eaf2ff]'
@@ -6559,7 +6563,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           isCurrentWeekColumn
                                             ? CURRENT_WEEK_SOFT_CELL_CLASS
                                             : 'border-gray-300'
-                                        } ${displacedCellBgClass}`}
+                                        } ${displacedCellBgClass} ${softShiftIndicatorClass} ${hardOutOfRangeIndicatorClass}`}
                                       >
                                         <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative flex items-center justify-center ${
                                           stageColor
@@ -6589,11 +6593,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     <td
                                       key={`${proj.id}-${dept}-${week}`}
                                       data-week-index={weekIdx}
-                                      className={`border p-0 relative text-xs ${
-                                        isCurrentWeekColumn
-                                          ? CURRENT_WEEK_SOFT_CELL_CLASS
-                                          : 'border-gray-300'
-                                      } ${displacedCellBgClass}`}
+                                        className={`border p-0 relative text-xs ${
+                                          isCurrentWeekColumn
+                                            ? CURRENT_WEEK_SOFT_CELL_CLASS
+                                            : 'border-gray-300'
+                                      } ${displacedCellBgClass} ${softShiftIndicatorClass} ${hardOutOfRangeIndicatorClass}`}
                                     >
                                       {totalHours === 0 ? (
                                         <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight relative ${
@@ -6608,7 +6612,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 : isInRange
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
-                                        } ${cellIndicatorPatternClass}`}>
+                                        }`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6637,7 +6641,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       ) : (
                                         <div className={`p-0 rounded text-center text-[10px] font-semibold leading-tight relative ${
                                           stageColor ? `${stageColor.bg} ${stageColor.text}` : 'bg-blue-100 text-blue-900'
-                                        } ${cellIndicatorPatternClass}`}>
+                                        }`}>
                                           {cellComment && (
                                             <button
                                               onClick={() => setViewingComment({ comment: cellComment, projectName: proj.name, department: dept })}
@@ -6727,7 +6731,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               <p className="mb-1 text-[10px] font-semibold text-[#2e1a47]">
                 {language === 'es' ? 'Como leer las celdas' : 'How to read cells'}
               </p>
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-6">
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
                   <div className="flex h-4 w-4 items-center justify-center rounded border border-blue-300 bg-blue-100 text-[9px] font-bold text-blue-700">h</div>
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.hoursLegend}</span>
@@ -6745,7 +6749,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-slate-300 bg-white bg-[repeating-linear-gradient(-45deg,rgba(15,23,42,0.10)_0px,rgba(15,23,42,0.10)_1px,transparent_1px,transparent_6px)]" />
+                  <div className="h-4 w-4 rounded border border-dashed border-black bg-white" />
+                  <span className="text-[10px] font-medium text-[#3f3354]">
+                    {language === 'es' ? 'Desfase por fecha' : 'Date shift'}
+                  </span>
+                </div>
+                <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
+                  <div className="relative h-4 w-4 rounded border border-slate-300 bg-white overflow-hidden">
+                    <span className="absolute inset-y-0 left-0 w-[2px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]" />
+                    <span className="absolute inset-y-0 right-0 w-[2px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]" />
+                  </div>
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
               </div>
