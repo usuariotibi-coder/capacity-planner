@@ -6589,7 +6589,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const hasShiftIndicator = showHardOutOfRangeIndicator || showSoftShiftIndicator;
                                   const displacedCellBgClass = hasShiftIndicator
                                     ? 'bg-[#eaf2ff]'
-                                    : (stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50');
+                                    : stageColor
+                                      ? stageColor.bg
+                                      : isDeptWeekInRange
+                                        ? (isDeptFirstWeek ? 'bg-orange-100' : 'bg-[#bfdbfe]')
+                                        : isInRange
+                                          ? 'bg-green-50'
+                                          : 'bg-gray-50';
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
                                   if (projectCellViewMode === 'compact') {
@@ -6655,12 +6661,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             ? `${stageColor.text}`
                                             : isDeptWeekInRange
                                               ? isDeptFirstWeek
-                                                ? 'text-orange-600 bg-orange-100'
-                                              : 'text-[#1e40af] bg-[#bfdbfe]'
+                                                ? 'text-orange-600'
+                                              : 'text-[#1e40af]'
                                               : hasShiftIndicator
-                                                ? 'text-[#1e3a8a] bg-[#eaf2ff]'
+                                                ? 'text-[#1e3a8a]'
                                                 : isInRange
-                                                  ? 'text-green-600 bg-green-50'
+                                                  ? 'text-green-600'
                                                   : 'text-gray-400'
                                         }`}>
                                           {cellComment && (
