@@ -327,7 +327,6 @@ function MainApp() {
             <LogOut size={12} className="md:w-3 md:h-3" />
             <span className="hidden md:inline">{t.logout}</span>
           </button>
-          <p className="hidden md:block text-[9px] text-[#d5d1da] text-center">{t.teamCapacityPlanner}</p>
         </div>
         </div>
       </div>

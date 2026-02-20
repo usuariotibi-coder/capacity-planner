@@ -2250,45 +2250,40 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
-    const cardWidthClass = isMobile ? 'w-[280px]' : 'w-full';
+    const cardWidthClass = isMobile ? 'w-[300px]' : 'w-full';
 
     return (
       <div
         key={dept}
-        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2 py-1.5 border border-gray-200`}
+        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2.5 py-2 border border-gray-200`}
         title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center justify-center gap-1 rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[60px]">
+        <div className="flex items-center justify-between gap-2 min-w-0 mb-1.5">
+          <div className="flex items-center justify-center gap-1 rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[66px]">
             <span className={`text-[11px] ${deptInfo.color}`}>{deptInfo.icon}</span>
-            <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
+            <span className="text-[11px] font-bold text-gray-800 leading-none tracking-wide">{dept}</span>
           </div>
-          <div className="grid grid-cols-4 gap-1.5 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 leading-none min-w-0">
-              <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <span className="text-[8px] font-semibold truncate">{t.quotedLabel}</span>
-                <span className="text-[10px] font-bold shrink-0">{formatHours(totalQuotedHoursValue)}h</span>
-              </div>
-            </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 leading-none min-w-0">
-              <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <span className="text-[8px] font-semibold truncate">{t.usedLabel}</span>
-                <span className="text-[10px] font-bold shrink-0">{formatHours(utilizedHoursValue)}h</span>
-              </div>
-            </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 leading-none min-w-0">
-              <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <span className="text-[8px] font-semibold truncate">{t.pronosticado}</span>
-                <span className="text-[10px] font-bold shrink-0">{formatHours(forecastedHoursValue)}h</span>
-              </div>
-            </div>
-            <div className={`rounded px-2 py-1 text-[10px] font-bold leading-none text-center flex items-center justify-center ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
-              {utilizationPercent}%
-            </div>
+          <div className={`rounded px-2 py-1 text-[10px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[52px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+            {utilizationPercent}%
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5 min-w-0">
+          <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 min-w-0 text-center">
+            <div className="text-[9px] font-semibold leading-tight whitespace-nowrap">{t.quotedLabel}</div>
+            <div className="text-[10px] font-bold leading-tight mt-0.5">{formatHours(totalQuotedHoursValue)}h</div>
+          </div>
+          <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 min-w-0 text-center">
+            <div className="text-[9px] font-semibold leading-tight whitespace-nowrap">{t.usedLabel}</div>
+            <div className="text-[10px] font-bold leading-tight mt-0.5">{formatHours(utilizedHoursValue)}h</div>
+          </div>
+          <div className="rounded bg-slate-100 border border-slate-300 px-2 py-1 text-slate-700 min-w-0 text-center">
+            <div className="text-[9px] font-semibold leading-tight whitespace-nowrap">{t.pronosticado}</div>
+            <div className="text-[10px] font-bold leading-tight mt-0.5">{formatHours(forecastedHoursValue)}h</div>
           </div>
         </div>
       </div>
