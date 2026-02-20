@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -56,6 +56,8 @@ function MainApp() {
     }
     return 'day';
   });
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
   const {
@@ -113,6 +115,28 @@ function MainApp() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   if (isLoading) {
     console.log('[MainApp] Still loading...');
@@ -307,24 +331,52 @@ function MainApp() {
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* User Info Widget - Responsive */}
             {currentUser && (
-              <div
-                className="user-profile-pill hidden sm:flex items-center justify-between gap-2 pl-3 pr-2 py-1.5"
-                title={userRoleLabel ? `${currentUser} - ${userRoleLabel}` : currentUser}
-              >
-                <div className="user-profile-info min-w-0">
-                  <p className="user-profile-name truncate text-[11px] font-semibold leading-none">
-                    {currentUser}
-                  </p>
-                  <p className="user-profile-role mt-0.5 truncate text-[10px] leading-none">
-                    {userRoleLabel}
-                  </p>
-                </div>
-                <div className="user-profile-avatar h-9 w-9 shrink-0 rounded-full flex items-center justify-center">
-                  <span className="user-profile-avatar-text text-[12px] font-bold">
-                    {currentUser.charAt(0).toUpperCase()}
-                    {currentUser.split(' ').length > 1 ? currentUser.split(' ')[1].charAt(0).toUpperCase() : ''}
-                  </span>
-                </div>
+              <div ref={userMenuRef} className="relative hidden sm:block">
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  className="user-profile-pill flex items-center justify-between gap-2 pl-3 pr-2 py-1.5"
+                  title={userRoleLabel ? `${currentUser} - ${userRoleLabel}` : currentUser}
+                >
+                  <div className="user-profile-info min-w-0 text-left">
+                    <p className="user-profile-name truncate text-[11px] font-semibold leading-none">
+                      {currentUser}
+                    </p>
+                    <p className="user-profile-role mt-0.5 truncate text-[10px] leading-none">
+                      {userRoleLabel}
+                    </p>
+                  </div>
+                  <div className="user-profile-avatar h-9 w-9 shrink-0 rounded-full flex items-center justify-center">
+                    <span className="user-profile-avatar-text text-[12px] font-bold">
+                      {currentUser.charAt(0).toUpperCase()}
+                      {currentUser.split(' ').length > 1 ? currentUser.split(' ')[1].charAt(0).toUpperCase() : ''}
+                    </span>
+                  </div>
+                </button>
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[168px] rounded-md border border-white/20 bg-[#2E1A47] p-1 shadow-lg">
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        window.location.href = '/change-password';
+                      }}
+                      className="w-full flex items-center gap-2 rounded px-2 py-1.5 text-[11px] text-[#d8d2e5] hover:bg-white/12 transition"
+                    >
+                      <Lock size={12} />
+                      <span>{t.changePassword}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2 rounded px-2 py-1.5 text-[11px] text-[#d8d2e5] hover:bg-white/12 transition"
+                    >
+                      <LogOut size={12} />
+                      <span>{t.logout}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
