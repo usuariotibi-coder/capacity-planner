@@ -2212,37 +2212,43 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
-    const cardWidthClass = isMobile ? 'w-[220px]' : 'w-full';
+    const cardWidthClass = isMobile ? 'w-[250px]' : 'w-full';
 
     return (
       <div
         key={dept}
-        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded p-0.5 border border-gray-100`}
+        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-1.5 py-1 border border-gray-200`}
         title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center gap-0.5 min-w-0">
-          <div className="flex items-center gap-0.5 rounded bg-white/70 border border-slate-200 px-1 py-[1px] shrink-0">
-            <span className={`text-[9px] ${deptInfo.color}`}>{deptInfo.icon}</span>
-            <span className="text-[9px] font-bold text-gray-800">{dept}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center justify-center gap-1 rounded bg-white/80 border border-slate-300 px-1.5 py-0.5 shrink-0 min-w-[52px]">
+            <span className={`text-[10px] ${deptInfo.color}`}>{deptInfo.icon}</span>
+            <span className="text-[10px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
-          <div className="flex items-center gap-0.5 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none shrink-0">
-              <span className="text-[7px] font-semibold">{t.quotedLabel}</span>
-              <span className="text-[8px] font-bold ml-0.5">{formatHours(totalQuotedHoursValue)}h</span>
+          <div className="grid grid-cols-4 gap-1 min-w-0 flex-1">
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-slate-700 leading-none min-w-0">
+              <div className="flex items-center justify-between gap-1 min-w-0">
+                <span className="text-[7px] font-semibold truncate">{t.quotedLabel}</span>
+                <span className="text-[9px] font-bold shrink-0">{formatHours(totalQuotedHoursValue)}h</span>
+              </div>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none shrink-0">
-              <span className="text-[7px] font-semibold">{t.usedLabel}</span>
-              <span className="text-[8px] font-bold ml-0.5">{formatHours(utilizedHoursValue)}h</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-slate-700 leading-none min-w-0">
+              <div className="flex items-center justify-between gap-1 min-w-0">
+                <span className="text-[7px] font-semibold truncate">{t.usedLabel}</span>
+                <span className="text-[9px] font-bold shrink-0">{formatHours(utilizedHoursValue)}h</span>
+              </div>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-[1px] text-slate-700 leading-none shrink-0">
-              <span className="text-[7px] font-semibold">{t.pronosticado}</span>
-              <span className="text-[8px] font-bold ml-0.5">{formatHours(forecastedHoursValue)}h</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-0.5 text-slate-700 leading-none min-w-0">
+              <div className="flex items-center justify-between gap-1 min-w-0">
+                <span className="text-[7px] font-semibold truncate">{t.pronosticado}</span>
+                <span className="text-[9px] font-bold shrink-0">{formatHours(forecastedHoursValue)}h</span>
+              </div>
             </div>
-            <div className={`rounded px-1 py-[1px] text-[8px] font-bold leading-none shrink-0 ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+            <div className={`rounded px-1.5 py-0.5 text-[9px] font-bold leading-none text-center flex items-center justify-center ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
               {utilizationPercent}%
             </div>
           </div>
@@ -6378,12 +6384,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {expandedProjects[proj.id] && (
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
-                      <div className="capacity-project-summary-shell bg-white rounded p-0.5 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
+                      <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
                         <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}`, display: 'inline-block', minWidth: '100%' }}>
-                          <div className="flex md:hidden gap-1 min-w-max">
+                          <div className="flex md:hidden gap-1.5 min-w-max">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
                           </div>
-                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
+                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1.5">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                           </div>
                         </div>
