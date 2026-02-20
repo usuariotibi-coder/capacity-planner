@@ -4158,7 +4158,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               : isDeptWeekInRange
                 ? 'bg-[#bfdbfe] text-[#1e40af]'
                 : showSoftShiftIndicator
-                  ? 'bg-[#dbeafe] text-[#1e3a8a]'
+                  ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                   : 'bg-gray-100 text-gray-500'
           } ${cellIndicatorBorderClass} ${canEdit ? 'cursor-pointer' : ''}`}
           title={tooltipText}
@@ -4215,7 +4215,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       }
 
       if (!isDeptWeekInRange && showSoftShiftIndicator) {
-        cellBgClass = 'bg-[#dbeafe]';
+        cellBgClass = 'bg-[#f5f9ff]';
         cellTextClass = 'text-[#1e3a8a]';
       }
 
@@ -6582,7 +6582,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     ? 'border border-dashed border-black'
                                     : '';
                                   const displacedCellBgClass = showSoftShiftIndicator
-                                    ? 'bg-[#dbeafe]'
+                                    ? 'bg-[#f5f9ff]'
                                     : (stageColor ? stageColor.bg : isInRange ? 'bg-green-50' : 'bg-gray-50');
                                   const compactTalentDisplay = Math.abs(talent) < 0.0001 ? '' : talent;
 
@@ -6603,7 +6603,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : isDeptWeekInRange
                                               ? 'bg-[#bfdbfe] text-[#1e40af]'
                                               : showSoftShiftIndicator
-                                                ? 'bg-[#dbeafe] text-[#1e3a8a]'
+                                                ? 'bg-[#f5f9ff] text-[#1e3a8a]'
                                                 : 'bg-gray-100 text-gray-500'
                                         } ${cellIndicatorBorderClass}`}>
                                           {cellComment && (
@@ -6640,7 +6640,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                                 ? 'text-orange-600 bg-orange-100'
                                               : 'text-[#1e40af] bg-[#bfdbfe]'
                                               : showSoftShiftIndicator
-                                                ? 'text-[#1e3a8a] bg-[#dbeafe]'
+                                                ? 'text-[#1e3a8a] bg-[#f5f9ff]'
                                                 : isInRange
                                                   ? 'text-green-600 bg-green-50'
                                                   : 'text-gray-400'
