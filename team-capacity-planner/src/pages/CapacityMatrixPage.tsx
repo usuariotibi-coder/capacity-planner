@@ -6121,10 +6121,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                 <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                               )}
                               {showHardOutOfRangeIndicator && (
-                                <>
-                                  <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                  <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                </>
+                                <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
                               )}
                               {renderCellContent(dept, week, proj)}
                             </td>
@@ -6610,10 +6607,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                           <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                         )}
                                         {showHardOutOfRangeIndicator && (
-                                          <>
-                                            <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                            <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                          </>
+                                          <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
                                         )}
                                         <div className={`absolute inset-0 p-0.5 text-center text-[10px] font-semibold leading-tight relative flex items-center justify-center overflow-hidden ${
                                           stageColor
@@ -6653,10 +6647,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                       )}
                                       {showHardOutOfRangeIndicator && (
-                                        <>
-                                          <div className="pointer-events-none absolute inset-y-0 left-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                          <div className="pointer-events-none absolute inset-y-0 right-0 w-[4px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.70)_0px,rgba(15,23,42,0.70)_2px,transparent_2px,transparent_4px)] z-10" />
-                                        </>
+                                        <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
                                       )}
                                       {totalHours === 0 ? (
                                         <div className={`p-0.5 text-center text-[10px] rounded font-medium leading-tight relative overflow-hidden ${
@@ -6814,10 +6805,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="relative h-4 w-4 rounded border border-slate-300 bg-white overflow-hidden">
-                    <span className="absolute inset-y-0 left-0 w-[2px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]" />
-                    <span className="absolute inset-y-0 right-0 w-[2px] bg-[repeating-linear-gradient(180deg,rgba(15,23,42,0.45)_0px,rgba(15,23,42,0.45)_2px,transparent_2px,transparent_4px)]" />
-                  </div>
+                  <div className="h-4 w-4 rounded border border-slate-300 bg-white bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.outOfRangeLegend}</span>
                 </div>
               </div>
