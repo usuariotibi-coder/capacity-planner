@@ -1523,11 +1523,40 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       !!expectedDeptEndDate &&
       weekStart >= expectedDeptStartDate &&
       weekStart <= expectedDeptEndDate;
+    const normalizedEffectiveStart = effectiveDeptStartDate.slice(0, 10);
+    const normalizedExpectedStart = expectedDeptStartDate.slice(0, 10);
     const hasDepartmentTimingShift =
-      effectiveDeptStartDate.slice(0, 10) !== expectedDeptStartDate.slice(0, 10) ||
-      effectiveDeptEndDate.slice(0, 10) !== expectedDeptEndDate.slice(0, 10);
+      !!normalizedEffectiveStart &&
+      !!normalizedExpectedStart &&
+      normalizedEffectiveStart !== normalizedExpectedStart;
+    let isDateShiftDifferenceWeek = false;
+    if (
+      hasDepartmentTimingShift &&
+      !!expectedDeptStartDate &&
+      !!expectedDeptEndDate
+    ) {
+      const expectedStartDateObj = parseISODate(expectedDeptStartDate);
+      const effectiveStartDateObj = parseISODate(effectiveDeptStartDate);
+      const dayDiff = Math.round(
+        (effectiveStartDateObj.getTime() - expectedStartDateObj.getTime()) / (24 * 60 * 60 * 1000)
+      );
+
+      const shiftedExpectedStartDateObj = parseISODate(expectedDeptStartDate);
+      shiftedExpectedStartDateObj.setDate(shiftedExpectedStartDateObj.getDate() + dayDiff);
+      const shiftedExpectedEndDateObj = parseISODate(expectedDeptEndDate);
+      shiftedExpectedEndDateObj.setDate(shiftedExpectedEndDateObj.getDate() + dayDiff);
+
+      const shiftedExpectedStart = formatToISO(shiftedExpectedStartDateObj);
+      const shiftedExpectedEnd = formatToISO(shiftedExpectedEndDateObj);
+      const isShiftedExpectedWeekInRange =
+        weekStart >= shiftedExpectedStart &&
+        weekStart <= shiftedExpectedEnd;
+
+      // Show soft shift only in the real delta between previous saved dates and modified dates.
+      isDateShiftDifferenceWeek = isExpectedWeekInRange !== isShiftedExpectedWeekInRange;
+    }
     const outOfEstimatedRange = !isDeptWeekInRange;
-    const isDisplacedByTimingShift = hasDepartmentTimingShift && (isDeptWeekInRange !== isExpectedWeekInRange);
+    const isDisplacedByTimingShift = hasDepartmentTimingShift && isDateShiftDifferenceWeek;
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
     const showSoftShiftIndicator = isDisplacedByTimingShift && !showHardOutOfRangeIndicator;
 
@@ -6219,7 +6248,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }`}
                             >
                               {showSoftShiftIndicator && (
-                                <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                <>
+                                  <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                  <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                </>
                               )}
                               {showHardOutOfRangeIndicator && (
                                 <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6704,7 +6736,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         } ${displacedCellBgClass}`}
                                       >
                                         {showSoftShiftIndicator && (
-                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                          <>
+                                            <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                          </>
                                         )}
                                         {showHardOutOfRangeIndicator && (
                                           <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6744,7 +6779,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       } ${displacedCellBgClass}`}
                                     >
                                       {showSoftShiftIndicator && (
-                                        <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                        <>
+                                          <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                        </>
                                       )}
                                       {showHardOutOfRangeIndicator && (
                                         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
