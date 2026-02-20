@@ -6219,10 +6219,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }`}
                             >
                               {showSoftShiftIndicator && (
-                                <>
-                                  <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
-                                  <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                </>
+                                <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                               )}
                               {showHardOutOfRangeIndicator && (
                                 <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6707,10 +6704,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         } ${displacedCellBgClass}`}
                                       >
                                         {showSoftShiftIndicator && (
-                                          <>
-                                            <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
-                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                          </>
+                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                         )}
                                         {showHardOutOfRangeIndicator && (
                                           <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6750,10 +6744,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       } ${displacedCellBgClass}`}
                                     >
                                       {showSoftShiftIndicator && (
-                                        <>
-                                          <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/70 z-[5]" />
-                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
-                                        </>
+                                        <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                       )}
                                       {showHardOutOfRangeIndicator && (
                                         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
