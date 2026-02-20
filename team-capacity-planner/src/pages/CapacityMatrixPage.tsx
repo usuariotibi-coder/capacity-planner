@@ -6234,7 +6234,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             >
                               {showSoftShiftIndicator && (
                                 <>
-                                  <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                  <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/35 z-[9]" />
                                   <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                 </>
                               )}
@@ -6722,7 +6722,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       >
                                         {showSoftShiftIndicator && (
                                           <>
-                                            <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/35 z-[9]" />
                                             <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                           </>
                                         )}
@@ -6765,7 +6765,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     >
                                       {showSoftShiftIndicator && (
                                         <>
-                                          <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/45 z-[6]" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[#eaf2ff]/35 z-[9]" />
                                           <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                         </>
                                       )}
