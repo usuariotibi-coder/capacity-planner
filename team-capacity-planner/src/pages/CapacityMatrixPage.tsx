@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle, History } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -115,6 +115,29 @@ interface ScioCapacityFields {
   training: number;
 }
 
+interface ActivityLogUserSummary {
+  username?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+interface ActivityLogEntry {
+  id: string;
+  action: string;
+  modelName: string;
+  objectId: string;
+  changes: any;
+  createdAt: string;
+  user?: ActivityLogUserSummary | null;
+}
+
+interface TimingProjectGroup {
+  projectId: string;
+  projectName: string;
+  entries: ActivityLogEntry[];
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -128,6 +151,35 @@ const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yello
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
 const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
+const PROJECT_TIMING_KEYS = new Set(['startDate', 'endDate', 'numberOfWeeks', 'departmentStages']);
+const PROJECT_TIMING_NESTED_KEYS = new Set(['departmentStartDate', 'durationWeeks', 'weekStart', 'weekEnd']);
+
+const asObject = (value: unknown): Record<string, any> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, any>;
+};
+
+const extractProjectUpdatePayload = (changes: unknown): Record<string, any> | null => {
+  const changesObj = asObject(changes);
+  if (!changesObj) return null;
+  const updates = asObject(changesObj.updates);
+  return updates || changesObj;
+};
+
+const hasTimingDataDeep = (value: unknown, depth = 0): boolean => {
+  if (depth > 6 || value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.some((entry) => hasTimingDataDeep(entry, depth + 1));
+
+  const obj = asObject(value);
+  if (!obj) return false;
+
+  for (const [key, nested] of Object.entries(obj)) {
+    if (PROJECT_TIMING_KEYS.has(key) || PROJECT_TIMING_NESTED_KEYS.has(key)) return true;
+    if (hasTimingDataDeep(nested, depth + 1)) return true;
+  }
+
+  return false;
+};
 const createEmptyDepartmentWeekValues = (): Record<Department, Record<string, number>> => ({
   'PM': {},
   'MED': {},
@@ -273,6 +325,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const { hasFullAccess, isReadOnly, currentUserDepartment, currentUserOtherDepartment } = useAuth();
   const t = useTranslation(language);
   const locale = language === 'es' ? 'es-ES' : 'en-US';
+  const isPmGeneralView = departmentFilter === 'General' && currentUserDepartment === 'PM';
 
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
@@ -581,6 +634,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [showTimingChangesModal, setShowTimingChangesModal] = useState(false);
+  const [timingChangesFromDate, setTimingChangesFromDate] = useState<string>(() => `${new Date().getFullYear()}-01-01`);
+  const [timingChangesToDate, setTimingChangesToDate] = useState<string>(() => formatToISO(new Date()));
+  const [timingChangesLogs, setTimingChangesLogs] = useState<ActivityLogEntry[]>([]);
+  const [isTimingChangesLoading, setIsTimingChangesLoading] = useState(false);
+  const [timingChangesError, setTimingChangesError] = useState<string | null>(null);
   const [formValidationPopup, setFormValidationPopup] = useState<{
     scope: FormValidationScope;
     title: string;
@@ -616,6 +675,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const timeout = setTimeout(() => setFormValidationPopup(null), 4500);
     return () => clearTimeout(timeout);
   }, [formValidationPopup]);
+
+  useEffect(() => {
+    if (isPmGeneralView) return;
+    setShowTimingChangesModal(false);
+    setTimingChangesLogs([]);
+    setTimingChangesError(null);
+  }, [isPmGeneralView]);
 
   useEffect(() => {
     try {
@@ -1355,6 +1421,128 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     () => new Map(projects.map((proj) => [proj.id, proj])),
     [projects]
   );
+  const formatTimingUserName = (user: ActivityLogEntry['user']) => {
+    const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+    if (fullName) return fullName;
+    if (user?.username) return user.username;
+    if (user?.email) return user.email;
+    return language === 'es' ? 'Usuario no identificado' : 'Unknown user';
+  };
+  const formatTimingDateTime = (value: string) => {
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+  const getTimingSummaryLines = (log: ActivityLogEntry): string[] => {
+    const updates = extractProjectUpdatePayload(log.changes);
+    if (!updates) {
+      return [language === 'es' ? 'Cambio de timing detectado' : 'Timing change detected'];
+    }
+
+    const lines: string[] = [];
+
+    const startDateValue = typeof updates.startDate === 'string' ? updates.startDate : '';
+    const endDateValue = typeof updates.endDate === 'string' ? updates.endDate : '';
+    const weeksValue = Number(updates.numberOfWeeks);
+    const hasWeeksValue = Number.isFinite(weeksValue) && weeksValue > 0;
+
+    if (startDateValue || endDateValue || hasWeeksValue) {
+      const projectRangePieces: string[] = [];
+      if (startDateValue || endDateValue) {
+        projectRangePieces.push(`${startDateValue || '—'} → ${endDateValue || '—'}`);
+      }
+      if (hasWeeksValue) {
+        projectRangePieces.push(`${weeksValue} ${language === 'es' ? 'semanas' : 'weeks'}`);
+      }
+      lines.push(
+        `${language === 'es' ? 'Calendario del proyecto' : 'Project schedule'}: ${projectRangePieces.join(' | ')}`
+      );
+    }
+
+    const departmentStages = asObject(updates.departmentStages);
+    if (departmentStages) {
+      DEPARTMENTS.forEach((dept) => {
+        const deptStagesRaw = departmentStages[dept];
+        if (!Array.isArray(deptStagesRaw) || deptStagesRaw.length === 0) return;
+
+        const firstStage = asObject(deptStagesRaw[0]);
+        const stageStartDate = typeof firstStage?.departmentStartDate === 'string'
+          ? firstStage.departmentStartDate
+          : '';
+        const stageWeekStart = Number(firstStage?.weekStart);
+        const stageWeekEnd = Number(firstStage?.weekEnd);
+        const stageDuration = Number(firstStage?.durationWeeks);
+        const hasWeekRange = Number.isFinite(stageWeekStart) && Number.isFinite(stageWeekEnd) && stageWeekEnd >= stageWeekStart;
+        const hasDuration = Number.isFinite(stageDuration) && stageDuration > 0;
+
+        const parts: string[] = [];
+        if (stageStartDate) parts.push(stageStartDate);
+        if (hasDuration) parts.push(`${stageDuration} ${language === 'es' ? 'sem' : 'wk'}`);
+        if (hasWeekRange) parts.push(`W${stageWeekStart}–W${stageWeekEnd}`);
+
+        lines.push(
+          `${dept}: ${parts.length > 0 ? parts.join(' | ') : (language === 'es' ? 'timing actualizado' : 'timing updated')}`
+        );
+      });
+    }
+
+    if (lines.length === 0) {
+      const timingKeys = Object.keys(updates).filter((key) =>
+        PROJECT_TIMING_KEYS.has(key) || PROJECT_TIMING_NESTED_KEYS.has(key)
+      );
+      if (timingKeys.length > 0) {
+        lines.push(
+          `${language === 'es' ? 'Campos de timing' : 'Timing fields'}: ${timingKeys.join(', ')}`
+        );
+      } else {
+        lines.push(language === 'es' ? 'Cambio de timing detectado' : 'Timing change detected');
+      }
+    }
+
+    return lines;
+  };
+  const timingChangesByProject = useMemo<TimingProjectGroup[]>(() => {
+    const grouped = new Map<string, TimingProjectGroup>();
+
+    timingChangesLogs.forEach((log) => {
+      const updates = extractProjectUpdatePayload(log.changes);
+      if (!updates || !hasTimingDataDeep(updates)) return;
+
+      const projectId = log.objectId;
+      const fallbackName = typeof updates.name === 'string' ? updates.name : '';
+      const projectName = projectById.get(projectId)?.name
+        || fallbackName
+        || `${language === 'es' ? 'Proyecto' : 'Project'} ${projectId.slice(0, 8)}`;
+
+      const existing = grouped.get(projectId);
+      if (existing) {
+        existing.entries.push(log);
+      } else {
+        grouped.set(projectId, { projectId, projectName, entries: [log] });
+      }
+    });
+
+    return Array.from(grouped.values())
+      .map((group) => ({
+        ...group,
+        entries: [...group.entries].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+      }))
+      .sort((a, b) => {
+        const dateA = a.entries[0]?.createdAt ? new Date(a.entries[0].createdAt).getTime() : 0;
+        const dateB = b.entries[0]?.createdAt ? new Date(b.entries[0].createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+  }, [timingChangesLogs, projectById, language]);
   const changeOrderSummaryByProjectDept = useMemo(() => {
     const map = new Map<string, { totalHours: number; count: number; orders: ProjectChangeOrder[] }>();
 
@@ -2527,6 +2715,71 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     departmentFilter !== 'General' &&
     departmentFilter !== 'PM' &&
     canEditDepartment(departmentFilter as Department);
+
+  const loadProjectTimingChanges = async (
+    startDate = timingChangesFromDate,
+    endDate = timingChangesToDate
+  ) => {
+    if (!startDate || !endDate) {
+      setTimingChangesLogs([]);
+      setTimingChangesError(language === 'es'
+        ? 'Selecciona ambas fechas para consultar los cambios.'
+        : 'Select both dates to query timing changes.');
+      return;
+    }
+    if (startDate > endDate) {
+      setTimingChangesLogs([]);
+      setTimingChangesError(language === 'es'
+        ? 'La fecha inicial no puede ser mayor a la fecha final.'
+        : 'The start date cannot be greater than the end date.');
+      return;
+    }
+
+    setIsTimingChangesLoading(true);
+    setTimingChangesError(null);
+    try {
+      const response = await activityLogApi.getFiltered({
+        modelName: 'Project',
+        action: 'updated',
+        startDate,
+        endDate,
+        ordering: '-created_at',
+        pageSize: 500,
+      });
+
+      const rows = Array.isArray(response) ? response as ActivityLogEntry[] : [];
+      const filteredRows = rows.filter((row) => {
+        if (!row || row.modelName !== 'Project') return false;
+        const action = (row.action || '').toLowerCase();
+        if (action !== 'updated' && action !== 'update') return false;
+
+        const updates = extractProjectUpdatePayload(row.changes);
+        if (!updates) return false;
+        return hasTimingDataDeep(updates);
+      });
+
+      setTimingChangesLogs(filteredRows);
+    } catch (error) {
+      console.error('[CapacityMatrix] Error loading project timing changes:', error);
+      setTimingChangesLogs([]);
+      setTimingChangesError(error instanceof Error
+        ? error.message
+        : (language === 'es'
+            ? 'No se pudieron cargar los cambios de timing.'
+            : 'Unable to load timing changes.'));
+    } finally {
+      setIsTimingChangesLoading(false);
+    }
+  };
+
+  const openTimingChangesModal = () => {
+    const defaultFromDate = `${selectedYear}-01-01`;
+    const defaultToDate = `${selectedYear + 1}-12-31`;
+    setTimingChangesFromDate(defaultFromDate);
+    setTimingChangesToDate(defaultToDate);
+    setShowTimingChangesModal(true);
+    void loadProjectTimingChanges(defaultFromDate, defaultToDate);
+  };
 
   const getDepartmentTotalCapacityForWeek = (department: Department, weekDate: string): number => {
     const baseCapacity = scioTeamMembers[department]?.[weekDate] || 0;
@@ -5241,6 +5494,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </span>
             </button>
           )}
+
+          {isPmGeneralView && (
+            <button
+              onClick={openTimingChangesModal}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0 border border-amber-600"
+              title={language === 'es' ? 'Ver cambios de timing por proyecto' : 'View project timing changes'}
+            >
+              <History size={10} />
+              <span className="hidden sm:inline">
+                {language === 'es' ? 'Cambios Timing' : 'Timing Changes'}
+              </span>
+            </button>
+          )}
+
           {/* Create Project Button - Only in department view (except PM) */}
           {canManageProjectsInCurrentDepartment && (
             <button
@@ -7119,6 +7386,127 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
             <div className="capacity-visual-guide-footnote rounded-md border border-[#ddd5ea] bg-white/80 px-2 py-1 text-[10px] text-[#4b3d61]">
               {departmentFilter === 'General' ? t.readOnlyView : t.backgroundColors}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimingChangesModal && isPmGeneralView && (
+        <div className="fixed inset-0 z-[92] bg-black/55 flex items-center justify-center p-3">
+          <div className="w-full max-w-6xl max-h-[92vh] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold">
+                  {language === 'es' ? 'Cambios de Timing por Proyecto' : 'Project Timing Changes'}
+                </h3>
+                <p className="text-[11px] opacity-90">
+                  {language === 'es'
+                    ? 'Vista General - solo Project Manager'
+                    : 'General View - Project Manager only'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTimingChangesModal(false)}
+                className="h-8 w-8 rounded-full border border-white/30 hover:bg-white/20 transition flex items-center justify-center"
+                aria-label={language === 'es' ? 'Cerrar' : 'Close'}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 border-b border-[#e4ddeef0] bg-[#fdfaf5]">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-[#4f3a70]">
+                  <span>{language === 'es' ? 'Fecha desde' : 'From date'}</span>
+                  <input
+                    type="date"
+                    value={timingChangesFromDate}
+                    onChange={(e) => setTimingChangesFromDate(e.target.value)}
+                    className="border border-[#cfbfd7] rounded-md px-2 py-1.5 text-xs bg-white text-[#2e1a47] focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-[#4f3a70]">
+                  <span>{language === 'es' ? 'Fecha hasta' : 'To date'}</span>
+                  <input
+                    type="date"
+                    value={timingChangesToDate}
+                    onChange={(e) => setTimingChangesToDate(e.target.value)}
+                    className="border border-[#cfbfd7] rounded-md px-2 py-1.5 text-xs bg-white text-[#2e1a47] focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void loadProjectTimingChanges()}
+                  disabled={isTimingChangesLoading}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold rounded-md transition"
+                >
+                  <History size={12} />
+                  <span>
+                    {isTimingChangesLoading
+                      ? (language === 'es' ? 'Consultando...' : 'Loading...')
+                      : (language === 'es' ? 'Buscar cambios' : 'Search changes')}
+                  </span>
+                </button>
+                <div className="text-[11px] text-[#6f5b80]">
+                  {language === 'es'
+                    ? `Proyectos con cambios: ${timingChangesByProject.length}`
+                    : `Projects with changes: ${timingChangesByProject.length}`}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-[#f7f4fb] p-4">
+              {isTimingChangesLoading ? (
+                <div className="text-sm font-semibold text-[#4f3a70]">
+                  {language === 'es' ? 'Cargando cambios de timing...' : 'Loading timing changes...'}
+                </div>
+              ) : timingChangesError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {timingChangesError}
+                </div>
+              ) : timingChangesByProject.length === 0 ? (
+                <div className="rounded-lg border border-[#dfd5ef] bg-white px-3 py-3 text-sm text-[#5d4a72]">
+                  {language === 'es'
+                    ? 'No se encontraron cambios de timing para el rango seleccionado.'
+                    : 'No timing changes were found for the selected range.'}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {timingChangesByProject.map((group) => (
+                    <div key={`timing-group-${group.projectId}`} className="rounded-lg border border-[#d8d0e4] bg-white shadow-sm overflow-hidden">
+                      <div className="px-3 py-2 bg-gradient-to-r from-[#f3ecff] to-[#eee5fb] border-b border-[#d8d0e4] flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold text-[#2e1a47] truncate">{group.projectName}</span>
+                          <span className="text-[10px] font-semibold text-[#7a6b8f]">#{group.projectId.slice(0, 8)}</span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          {group.entries.length} {language === 'es' ? 'cambios' : 'changes'}
+                        </span>
+                      </div>
+
+                      <div className="divide-y divide-[#efe8f8]">
+                        {group.entries.map((entry) => (
+                          <div key={entry.id} className="px-3 py-2.5">
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#5a4670]">
+                              <span>{formatTimingDateTime(entry.createdAt)}</span>
+                              <span className="text-[#9b8bb1]">|</span>
+                              <span>{formatTimingUserName(entry.user)}</span>
+                            </div>
+                            <div className="mt-1.5 space-y-1">
+                              {getTimingSummaryLines(entry).map((line, idx) => (
+                                <p key={`${entry.id}-line-${idx}`} className="text-xs text-[#2f2243] leading-relaxed">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

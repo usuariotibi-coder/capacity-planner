@@ -875,6 +875,46 @@ export const activityLogApi = {
     return data.results || data;
   },
 
+  getFiltered: async (options?: {
+    modelName?: string;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+    ordering?: string;
+    pageSize?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (options?.modelName) params.set('model_name', options.modelName);
+    if (options?.action) params.set('action', options.action);
+    if (options?.startDate) params.set('start_date', options.startDate);
+    if (options?.endDate) params.set('end_date', options.endDate);
+    if (options?.ordering) params.set('ordering', options.ordering);
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+
+    let endpoint = `/api/activity-logs/${params.toString() ? `?${params.toString()}` : ''}`;
+    const rows: any[] = [];
+    let safetyCounter = 0;
+
+    while (endpoint && safetyCounter < 100) {
+      safetyCounter += 1;
+      const data = await apiFetch(endpoint);
+
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      const pageRows = Array.isArray(data?.results) ? data.results : [];
+      rows.push(...pageRows);
+
+      const next = typeof data?.next === 'string' && data.next
+        ? toRelativeApiEndpoint(data.next)
+        : '';
+      endpoint = next;
+    }
+
+    return rows;
+  },
+
   logActivity: async (action: string, modelName: string, objectId: string, changes?: any) => {
     try {
       const normalizedAction = (() => {
