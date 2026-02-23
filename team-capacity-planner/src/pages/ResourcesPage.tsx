@@ -516,42 +516,43 @@ export function ResourcesPage() {
 
             const projectHours = new Map<string, { hours: number; changeOrders: Set<string> }>();
             weekAssignments.forEach((assignment) => {
-              const existing = projectHours.get(assignment.projectId) || { hours: 0, changeOrders: new Set<string>() };
+              const projectName =
+                projectById.get(assignment.projectId)?.name ||
+                (language === 'es' ? 'Proyecto eliminado' : 'Deleted project');
+              const existing = projectHours.get(projectName) || { hours: 0, changeOrders: new Set<string>() };
               existing.hours += getAssignmentHours(assignment);
               if (assignment.changeOrderId) {
                 const coName = changeOrderById.get(assignment.changeOrderId)?.name;
                 if (coName) existing.changeOrders.add(coName);
               }
-              projectHours.set(assignment.projectId, existing);
+              projectHours.set(projectName, existing);
             });
 
             const projectLines = [...projectHours.entries()]
               .sort((a, b) => b[1].hours - a[1].hours)
-              .map(([projectId, info]) => {
-                const projectName =
-                  projectById.get(projectId)?.name ||
-                  (language === 'es' ? 'Proyecto eliminado' : 'Deleted project');
+              .map(([projectName, info]) => {
                 const coSuffix = info.changeOrders.size > 0
                   ? ` | CO: ${[...info.changeOrders].join(', ')}`
                   : '';
                 return `${projectName} (${formatHours(info.hours)}h)${coSuffix}`;
               });
 
-            const displayedLines = projectLines.slice(0, 3);
-            if (projectLines.length > 3) {
-              displayedLines.push(language === 'es' ? `+${projectLines.length - 3} proyectos mas` : `+${projectLines.length - 3} more projects`);
-            }
-
             const summaryLine = language === 'es'
               ? `Total ${formatHours(weekTotal)}h | ${utilization}% ocup.`
               : `Total ${formatHours(weekTotal)}h | ${utilization}% util.`;
 
-            return `${summaryLine}\n${displayedLines.join('\n')}`;
+            return `${summaryLine}\n${projectLines.join('\n')}`;
           }),
         ];
 
         const row = calendarSheet.addRow(rowValues);
-        row.height = 64;
+        const detailLineCount = rowValues
+          .slice(3)
+          .reduce<number>((max, value) => {
+            if (typeof value !== 'string' || value.length === 0) return max;
+            return Math.max(max, value.split('\n').length);
+          }, 1);
+        row.height = Math.max(64, Math.min(220, 18 + (detailLineCount * 13)));
         const rowStripe = row.number % 2 === 0 ? 'FFFFFF' : 'FCFCFF';
 
         row.eachCell((cell: any, colNumber: number) => {
