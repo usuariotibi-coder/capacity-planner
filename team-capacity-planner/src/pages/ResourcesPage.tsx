@@ -345,43 +345,144 @@ export function ResourcesPage() {
       const calendarWeeks = allWeeksData.filter((week) => !week.isNextYear);
       const calendarSheet = workbook.addWorksheet(language === 'es' ? 'Calendario Semanal' : 'Weekly Calendar');
       const totalCalendarColumns = 3 + calendarWeeks.length;
-      calendarSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 3 }];
+      calendarSheet.properties.defaultRowHeight = 22;
+      calendarSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 5 }];
       calendarSheet.columns = [
         { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
         { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 18 },
-        { header: language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk', key: 'capacity', width: 11 },
-        ...calendarWeeks.map((week, index) => ({
-          header: `CW${week.weekNum}\n${week.date}`,
+        { header: language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk', key: 'capacity', width: 10 },
+        ...calendarWeeks.map((_, index) => ({
+          header: `CW_${index}`,
           key: `cw_${index}`,
-          width: 20,
+          width: 22,
         })),
       ];
+
+      const weekDateFormatter = new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', {
+        month: 'short',
+        day: '2-digit',
+      });
+      const monthFormatter = new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', {
+        month: 'long',
+        year: 'numeric',
+      });
 
       calendarSheet.mergeCells(1, 1, 1, totalCalendarColumns);
       const calendarTitle = calendarSheet.getCell(1, 1);
       calendarTitle.value = `${language === 'es' ? 'Calendario Semanal por Recurso' : 'Weekly Resource Calendar'} - ${department}`;
       applyHeader(calendarTitle);
-      calendarTitle.font = { ...calendarTitle.font, size: 13 };
+      calendarTitle.font = { ...calendarTitle.font, size: 14 };
 
       calendarSheet.mergeCells(2, 1, 2, totalCalendarColumns);
       const calendarMeta = calendarSheet.getCell(2, 1);
       calendarMeta.value = language === 'es'
-        ? `Ano: ${selectedYear} | Formato de celda: Total semanal + proyectos | Colores: Azul (normal), Amarillo (>85%), Rojo (sobrecapacidad)`
-        : `Year: ${selectedYear} | Cell format: Weekly total + projects | Colors: Blue (normal), Yellow (>85%), Red (over capacity)`;
+        ? `Ano: ${selectedYear} | Vista por semana: Total + % ocupacion + proyectos`
+        : `Year: ${selectedYear} | Weekly view: Total + % utilization + projects`;
       applyBody(calendarMeta, ACCENT_FILL, 'left');
 
-      const calendarHeaders = [
+      // Legend row
+      calendarSheet.mergeCells(3, 1, 3, 2);
+      const legendLabel = calendarSheet.getCell(3, 1);
+      legendLabel.value = language === 'es' ? 'Leyenda de colores' : 'Color legend';
+      applyBody(legendLabel, 'EEF2FF', 'left');
+      legendLabel.font = { ...(legendLabel.font || {}), bold: true, color: { argb: '312E81' } };
+
+      const legendCapacity = calendarSheet.getCell(3, 3);
+      legendCapacity.value = language === 'es' ? `Capacidad base: ${DEFAULT_WEEKLY_CAPACITY}h` : `Base capacity: ${DEFAULT_WEEKLY_CAPACITY}h`;
+      applyBody(legendCapacity, 'F3F4F6', 'center');
+      legendCapacity.font = { ...(legendCapacity.font || {}), bold: true };
+
+      const legendStartCol = 4;
+      const legendSpans = Math.max(1, Math.floor((totalCalendarColumns - legendStartCol + 1) / 3));
+      const normalEnd = Math.min(totalCalendarColumns, legendStartCol + legendSpans - 1);
+      const warningEnd = Math.min(totalCalendarColumns, normalEnd + legendSpans);
+
+      calendarSheet.mergeCells(3, legendStartCol, 3, normalEnd);
+      const normalLegend = calendarSheet.getCell(3, legendStartCol);
+      normalLegend.value = language === 'es' ? 'Normal (0% - 84%)' : 'Normal (0% - 84%)';
+      applyBody(normalLegend, 'DBEAFE', 'center');
+      normalLegend.font = { ...(normalLegend.font || {}), bold: true };
+
+      if (normalEnd + 1 <= warningEnd) {
+        calendarSheet.mergeCells(3, normalEnd + 1, 3, warningEnd);
+        const warningLegend = calendarSheet.getCell(3, normalEnd + 1);
+        warningLegend.value = language === 'es' ? 'Atencion (85% - 100%)' : 'Warning (85% - 100%)';
+        applyBody(warningLegend, 'FEF3C7', 'center');
+        warningLegend.font = { ...(warningLegend.font || {}), bold: true };
+      }
+
+      if (warningEnd + 1 <= totalCalendarColumns) {
+        calendarSheet.mergeCells(3, warningEnd + 1, 3, totalCalendarColumns);
+        const overLegend = calendarSheet.getCell(3, warningEnd + 1);
+        overLegend.value = language === 'es' ? 'Sobrecapacidad (>100%)' : 'Over capacity (>100%)';
+        applyBody(overLegend, 'FEE2E2', 'center');
+        overLegend.font = { ...(overLegend.font || {}), bold: true };
+      }
+
+      // Month band row + week header row
+      const monthBandRow = 4;
+      const weekHeaderRow = 5;
+      const firstWeekColumn = 4;
+
+      const staticHeaders = [
         language === 'es' ? 'Recurso' : 'Resource',
         language === 'es' ? 'Rol' : 'Role',
-        language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk',
-        ...calendarWeeks.map((week) => `CW${week.weekNum}\n${week.date}`),
+        language === 'es' ? 'Cap.\nh/sem' : 'Cap.\nh/wk',
       ];
-      calendarSheet.getRow(3).values = calendarHeaders;
-      calendarSheet.getRow(3).height = 34;
-      calendarSheet.getRow(3).eachCell((cell: any) => applyHeader(cell));
+
+      staticHeaders.forEach((header, idx) => {
+        const col = idx + 1;
+        calendarSheet.mergeCells(monthBandRow, col, weekHeaderRow, col);
+        const headerCell = calendarSheet.getCell(monthBandRow, col);
+        headerCell.value = header;
+        applyHeader(headerCell);
+      });
+
+      type MonthGroup = { label: string; startCol: number; endCol: number };
+      const monthGroups: MonthGroup[] = [];
+      calendarWeeks.forEach((week, weekIndex) => {
+        const weekDate = new Date(`${week.date}T00:00:00`);
+        const monthLabel = monthFormatter.format(weekDate);
+        const col = firstWeekColumn + weekIndex;
+        const lastGroup = monthGroups[monthGroups.length - 1];
+        if (!lastGroup || lastGroup.label !== monthLabel) {
+          monthGroups.push({ label: monthLabel, startCol: col, endCol: col });
+        } else {
+          lastGroup.endCol = col;
+        }
+      });
+
+      monthGroups.forEach((group, index) => {
+        calendarSheet.mergeCells(monthBandRow, group.startCol, monthBandRow, group.endCol);
+        const groupCell = calendarSheet.getCell(monthBandRow, group.startCol);
+        groupCell.value = group.label;
+        applyHeader(groupCell);
+        groupCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: index % 2 === 0 ? '3D2460' : '4C1D95' },
+        };
+        groupCell.font = { ...(groupCell.font || {}), bold: true, size: 10, color: { argb: HEADER_TEXT } };
+      });
+
+      calendarWeeks.forEach((week, weekIndex) => {
+        const weekDate = new Date(`${week.date}T00:00:00`);
+        const col = firstWeekColumn + weekIndex;
+        const weekHeaderCell = calendarSheet.getCell(weekHeaderRow, col);
+        weekHeaderCell.value = `CW${week.weekNum}\n${weekDateFormatter.format(weekDate)}`;
+        applyHeader(weekHeaderCell);
+        weekHeaderCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '2E1A47' },
+        };
+      });
+
+      calendarSheet.getRow(monthBandRow).height = 24;
+      calendarSheet.getRow(weekHeaderRow).height = 36;
       calendarSheet.autoFilter = {
-        from: { row: 3, column: 1 },
-        to: { row: 3, column: totalCalendarColumns },
+        from: { row: weekHeaderRow, column: 1 },
+        to: { row: weekHeaderRow, column: totalCalendarColumns },
       };
 
       const employeeAssignmentsByWeek = new Map<string, Map<string, Assignment[]>>();
@@ -401,6 +502,7 @@ export function ResourcesPage() {
           const weekTotal = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
           weeklyTotals.set(weekDate, weekTotal);
         });
+
         const rowValues = [
           employee.name,
           employee.role || '',
@@ -408,61 +510,90 @@ export function ResourcesPage() {
           ...calendarWeeks.map((week) => {
             const weekAssignments = assignmentMap.get(week.date) || [];
             if (weekAssignments.length === 0) return '';
+
             const weekTotal = weeklyTotals.get(week.date) || 0;
-            const totalLabel = language === 'es'
-              ? `Total: ${formatHours(weekTotal)}h`
-              : `Total: ${formatHours(weekTotal)}h`;
+            const utilization = weeklyCapacity > 0 ? Math.round((weekTotal / weeklyCapacity) * 100) : 0;
 
-            const projectLines = weekAssignments
-              .map((assignment) => {
+            const projectHours = new Map<string, { hours: number; changeOrders: Set<string> }>();
+            weekAssignments.forEach((assignment) => {
+              const existing = projectHours.get(assignment.projectId) || { hours: 0, changeOrders: new Set<string>() };
+              existing.hours += getAssignmentHours(assignment);
+              if (assignment.changeOrderId) {
+                const coName = changeOrderById.get(assignment.changeOrderId)?.name;
+                if (coName) existing.changeOrders.add(coName);
+              }
+              projectHours.set(assignment.projectId, existing);
+            });
+
+            const projectLines = [...projectHours.entries()]
+              .sort((a, b) => b[1].hours - a[1].hours)
+              .map(([projectId, info]) => {
                 const projectName =
-                  projectById.get(assignment.projectId)?.name ||
+                  projectById.get(projectId)?.name ||
                   (language === 'es' ? 'Proyecto eliminado' : 'Deleted project');
-                const hours = formatHours(getAssignmentHours(assignment));
-                const changeOrderName = assignment.changeOrderId
-                  ? changeOrderById.get(assignment.changeOrderId)?.name
+                const coSuffix = info.changeOrders.size > 0
+                  ? ` | CO: ${[...info.changeOrders].join(', ')}`
                   : '';
-                return changeOrderName
-                  ? `${projectName} (${hours}h) [CO: ${changeOrderName}]`
-                  : `${projectName} (${hours}h)`;
-              })
-              .join('\n');
+                return `${projectName} (${formatHours(info.hours)}h)${coSuffix}`;
+              });
 
-            return `${totalLabel}\n${projectLines}`;
+            const displayedLines = projectLines.slice(0, 3);
+            if (projectLines.length > 3) {
+              displayedLines.push(language === 'es' ? `+${projectLines.length - 3} proyectos mas` : `+${projectLines.length - 3} more projects`);
+            }
+
+            const summaryLine = language === 'es'
+              ? `Total ${formatHours(weekTotal)}h | ${utilization}% ocup.`
+              : `Total ${formatHours(weekTotal)}h | ${utilization}% util.`;
+
+            return `${summaryLine}\n${displayedLines.join('\n')}`;
           }),
         ];
 
         const row = calendarSheet.addRow(rowValues);
-        row.height = 50;
+        row.height = 64;
+        const rowStripe = row.number % 2 === 0 ? 'FFFFFF' : 'FCFCFF';
+
         row.eachCell((cell: any, colNumber: number) => {
+          if (colNumber <= 2) {
+            applyBody(cell, rowStripe, 'left');
+            if (colNumber === 1) {
+              cell.font = { ...(cell.font || {}), bold: true };
+            }
+            return;
+          }
+
           if (colNumber === 3) {
             applyBody(cell, 'F3F4F6', 'center');
             cell.font = { ...(cell.font || {}), bold: true };
             return;
           }
 
-          const isScheduleCell = colNumber > 3;
-          if (!isScheduleCell) {
-            applyBody(cell, 'FFFFFF', 'left');
-            return;
-          }
-
-          const weekIndex = colNumber - 4;
+          const weekIndex = colNumber - firstWeekColumn;
           const weekDate = calendarWeeks[weekIndex]?.date;
           const weekTotal = weekDate ? (weeklyTotals.get(weekDate) || 0) : 0;
+          const utilization = weeklyCapacity > 0 ? weekTotal / weeklyCapacity : 0;
           const fill = weekTotal <= 0
-            ? 'FFFFFF'
-            : weekTotal > weeklyCapacity
+            ? rowStripe
+            : utilization > 1
               ? 'FEE2E2'
-              : weekTotal >= (weeklyCapacity * 0.85)
+              : utilization >= 0.85
                 ? 'FEF3C7'
                 : 'DBEAFE';
 
           applyBody(cell, fill, 'left');
+          cell.alignment = { ...(cell.alignment || {}), vertical: 'top', wrapText: true };
+
+          if (weekIndex % 4 === 0) {
+            cell.border = {
+              ...(cell.border || {}),
+              left: { style: 'medium', color: { argb: 'C4B5FD' } },
+            };
+          }
         });
       });
 
-      if (calendarSheet.rowCount === 3) {
+      if (calendarSheet.rowCount === weekHeaderRow) {
         const noDataRow = calendarSheet.addRow([
           language === 'es'
             ? 'Sin asignaciones semanales para este departamento.'
