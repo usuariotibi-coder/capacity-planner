@@ -50,7 +50,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       || isStaff
       || department === 'PM'
       || (department === 'OTHER' && otherDepartment === 'BUSINESS_INTELLIGENCE');
-    const readOnly = department === 'OTHER' && otherDepartment !== 'BUSINESS_INTELLIGENCE';
+    const readOnly =
+      department === 'OTHER' &&
+      otherDepartment !== 'BUSINESS_INTELLIGENCE' &&
+      otherDepartment !== 'HEAD_ENGINEERING';
     setHasFullAccess(full);
     setIsReadOnly(readOnly);
   };

@@ -14,6 +14,7 @@ const OTHER_DEPARTMENTS: OtherDepartment[] = [
   'FINANCE',
   'HUMAN_RESOURCES',
   'BUSINESS_INTELLIGENCE',
+  'HEAD_ENGINEERING',
 ];
 
 interface EditState {
@@ -77,6 +78,7 @@ export function RegisteredUsersPage() {
     if (value === 'FINANCE') return t.departmentFinance;
     if (value === 'HUMAN_RESOURCES') return t.departmentHumanResources;
     if (value === 'BUSINESS_INTELLIGENCE') return t.departmentBusinessIntelligence;
+    if (value === 'HEAD_ENGINEERING') return t.departmentHeadEngineering;
     return value;
   };
 

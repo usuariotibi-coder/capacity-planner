@@ -14,6 +14,7 @@ from .models import (
     EmailVerification,
     Employee,
     Facility,
+    OtherDepartment,
     Project,
     ProjectBudget,
     UserDepartment,
@@ -242,6 +243,58 @@ class ProjectDepartmentPermissionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class HeadEngineeringPermissionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='head-engineering-user',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(
+            user=self.user,
+            department=UserDepartment.OTHER,
+            other_department=OtherDepartment.HEAD_ENGINEERING,
+        )
+        self.client.force_authenticate(user=self.user)
+
+        self.med_employee = Employee.objects.create(
+            name='MED Editable',
+            role='Mechanical Engineer',
+            department=Department.MED,
+            capacity=45,
+            is_active=True,
+        )
+        self.pm_employee = Employee.objects.create(
+            name='PM Not Editable',
+            role='Project Manager',
+            department=Department.PM,
+            capacity=45,
+            is_active=True,
+        )
+
+    def test_head_engineering_can_modify_med_employee(self):
+        response = self.client.patch(
+            reverse('employee-detail', args=[self.med_employee.id]),
+            {'role': 'Mechanical Lead Engineer'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.med_employee.refresh_from_db()
+        self.assertEqual(self.med_employee.role, 'Mechanical Lead Engineer')
+
+    def test_head_engineering_cannot_modify_pm_employee(self):
+        response = self.client.patch(
+            reverse('employee-detail', args=[self.pm_employee.id]),
+            {'role': 'Senior PM'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.pm_employee.refresh_from_db()
+        self.assertEqual(self.pm_employee.role, 'Project Manager')
 
 
 class SessionControlTests(APITestCase):

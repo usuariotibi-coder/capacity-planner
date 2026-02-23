@@ -14,6 +14,7 @@ const OTHER_DEPARTMENTS: OtherDepartment[] = [
   'FINANCE',
   'HUMAN_RESOURCES',
   'BUSINESS_INTELLIGENCE',
+  'HEAD_ENGINEERING',
 ];
 
 type Step = 'register' | 'verify' | 'success';
@@ -651,6 +652,7 @@ const RegisterPage: React.FC = () => {
                       {dept === 'FINANCE' && t.departmentFinance}
                       {dept === 'HUMAN_RESOURCES' && t.departmentHumanResources}
                       {dept === 'BUSINESS_INTELLIGENCE' && t.departmentBusinessIntelligence}
+                      {dept === 'HEAD_ENGINEERING' && t.departmentHeadEngineering}
                     </option>
                   ))}
                 </select>

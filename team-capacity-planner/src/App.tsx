@@ -200,6 +200,7 @@ function MainApp() {
     if (currentUserOtherDepartment === 'FINANCE') return t.departmentFinance || 'Finance';
     if (currentUserOtherDepartment === 'HUMAN_RESOURCES') return t.departmentHumanResources || 'Human Resources';
     if (currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE') return t.departmentBusinessIntelligence || 'Business Intelligence';
+    if (currentUserOtherDepartment === 'HEAD_ENGINEERING') return t.departmentHeadEngineering || 'Head Engineering';
     return currentUserOtherDepartment;
   })();
 
@@ -213,6 +214,7 @@ function MainApp() {
     if (currentUserOtherDepartment === 'HUMAN_RESOURCES') return 'HR';
     if (currentUserOtherDepartment === 'OPERATIONS') return 'OPS';
     if (currentUserOtherDepartment === 'FINANCE') return 'FIN';
+    if (currentUserOtherDepartment === 'HEAD_ENGINEERING') return 'HE';
     return 'OTH';
   })();
 

@@ -21,7 +21,7 @@ export type ProjectVisibilityScope = Department | 'GENERAL';
  * USER DEPARTMENT TYPES (for permissions/registration)
  */
 export type UserDepartment = Department | 'OTHER';
-export type OtherDepartment = 'OPERATIONS' | 'FINANCE' | 'HUMAN_RESOURCES' | 'BUSINESS_INTELLIGENCE';
+export type OtherDepartment = 'OPERATIONS' | 'FINANCE' | 'HUMAN_RESOURCES' | 'BUSINESS_INTELLIGENCE' | 'HEAD_ENGINEERING';
 
 /**
  * FACILITY TYPES

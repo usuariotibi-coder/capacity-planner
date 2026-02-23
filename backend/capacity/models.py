@@ -40,6 +40,7 @@ class OtherDepartment(models.TextChoices):
     FINANCE = 'FINANCE', 'Finance'
     HUMAN_RESOURCES = 'HUMAN_RESOURCES', 'Human Resources'
     BUSINESS_INTELLIGENCE = 'BUSINESS_INTELLIGENCE', 'Business Intelligence'
+    HEAD_ENGINEERING = 'HEAD_ENGINEERING', 'Head Engineering'
 
 
 class Facility(models.TextChoices):

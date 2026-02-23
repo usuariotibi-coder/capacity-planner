@@ -23,6 +23,7 @@ const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
 const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
+const HEAD_ENGINEERING_MANAGED_DEPARTMENTS: Department[] = ['MED', 'HD'];
 
 const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
   'HD': ['SWITCH_LAYOUT_REVISION', 'CONTROLS_DESIGN', 'RELEASE', 'RED_LINES', 'SUPPORT'],
@@ -269,7 +270,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     });
   }, [projects]);
   const { language } = useLanguage();
-  const { hasFullAccess, isReadOnly, currentUserDepartment } = useAuth();
+  const { hasFullAccess, isReadOnly, currentUserDepartment, currentUserOtherDepartment } = useAuth();
   const t = useTranslation(language);
   const locale = language === 'es' ? 'es-ES' : 'en-US';
 
@@ -2506,6 +2507,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   const canEditDepartment = (department: Department): boolean => {
     if (hasFullAccess) return true;
     if (isReadOnly) return false;
+    if (
+      currentUserDepartment === 'OTHER' &&
+      currentUserOtherDepartment === 'HEAD_ENGINEERING'
+    ) {
+      return HEAD_ENGINEERING_MANAGED_DEPARTMENTS.includes(department);
+    }
     if (
       currentUserDepartment &&
       SHARED_EDIT_DEPARTMENTS.includes(currentUserDepartment as Department) &&

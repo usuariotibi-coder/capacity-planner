@@ -335,6 +335,7 @@ export const translations = {
     departmentFinance: 'Finanzas',
     departmentHumanResources: 'Recursos Humanos',
     departmentBusinessIntelligence: 'Business Intelligence',
+    departmentHeadEngineering: 'Head Engineering',
     logout: 'Cerrar Sesión',
 
     // Capacity Matrix extras
@@ -747,6 +748,7 @@ export const translations = {
     departmentFinance: 'Finance',
     departmentHumanResources: 'Human Resources',
     departmentBusinessIntelligence: 'Business Intelligence',
+    departmentHeadEngineering: 'Head Engineering',
     logout: 'Logout',
 
     // Capacity Matrix extras

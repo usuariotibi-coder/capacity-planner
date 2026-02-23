@@ -160,7 +160,11 @@ def _has_full_access(user):
 
 def _is_read_only_user(user):
     department, other_department = _resolve_user_department(user)
-    return department == UserDepartment.OTHER and other_department != OtherDepartment.BUSINESS_INTELLIGENCE
+    if department != UserDepartment.OTHER:
+        return False
+    if other_department in {OtherDepartment.BUSINESS_INTELLIGENCE, OtherDepartment.HEAD_ENGINEERING}:
+        return False
+    return True
 
 
 def _can_edit_department(user, department_code):
@@ -168,9 +172,14 @@ def _can_edit_department(user, department_code):
         return True
     if _is_read_only_user(user):
         return False
-    user_department, _ = _resolve_user_department(user)
+    user_department, other_department = _resolve_user_department(user)
     if not user_department:
         return False
+    if (
+        user_department == UserDepartment.OTHER
+        and other_department == OtherDepartment.HEAD_ENGINEERING
+    ):
+        return department_code in {UserDepartment.MED, UserDepartment.HD}
     shared_departments = {UserDepartment.BUILD, UserDepartment.MFG}
     if user_department in shared_departments and department_code in shared_departments:
         return True

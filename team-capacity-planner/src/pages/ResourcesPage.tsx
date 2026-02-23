@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
+const HEAD_ENGINEERING_MANAGED_DEPARTMENTS: Department[] = ['MED', 'HD'];
 const DEFAULT_WEEKLY_CAPACITY = 45;
 
 export function ResourcesPage() {
@@ -26,11 +27,20 @@ export function ResourcesPage() {
   const { activeTeams: prgActiveTeams } = usePRGTeamsStore();
   const { language } = useLanguage();
   const t = useTranslation(language);
-  const { hasFullAccess, isReadOnly, currentUserDepartment } = useAuth();
-  const canCreateEmployee = hasFullAccess || (!isReadOnly && Boolean(currentUserDepartment));
+  const { hasFullAccess, isReadOnly, currentUserDepartment, currentUserOtherDepartment } = useAuth();
+  const hasHeadEngineeringScope =
+    currentUserDepartment === 'OTHER' &&
+    currentUserOtherDepartment === 'HEAD_ENGINEERING';
+  const canCreateEmployee =
+    hasFullAccess ||
+    hasHeadEngineeringScope ||
+    (!isReadOnly && Boolean(currentUserDepartment && DEPARTMENTS.includes(currentUserDepartment as Department)));
   const canEditEmployee = (department: Department) => {
     if (hasFullAccess) return true;
     if (isReadOnly) return false;
+    if (hasHeadEngineeringScope) {
+      return HEAD_ENGINEERING_MANAGED_DEPARTMENTS.includes(department);
+    }
     if (
       currentUserDepartment &&
       SHARED_EDIT_DEPARTMENTS.includes(currentUserDepartment as Department) &&
@@ -41,12 +51,25 @@ export function ResourcesPage() {
     return currentUserDepartment === department;
   };
   const getDefaultDepartment = (): Department => {
+    if (hasHeadEngineeringScope) {
+      return 'MED';
+    }
     if (!hasFullAccess && !isReadOnly && currentUserDepartment && DEPARTMENTS.includes(currentUserDepartment as Department)) {
       return currentUserDepartment as Department;
     }
     return 'PM';
   };
-  const lockedDepartment = (!hasFullAccess && !isReadOnly && currentUserDepartment) ? currentUserDepartment : null;
+  const lockedDepartment: Department | null =
+    !hasFullAccess &&
+    !isReadOnly &&
+    !hasHeadEngineeringScope &&
+    currentUserDepartment &&
+    DEPARTMENTS.includes(currentUserDepartment as Department)
+      ? (currentUserDepartment as Department)
+      : null;
+  const availableDepartmentOptions: Department[] = hasHeadEngineeringScope
+    ? HEAD_ENGINEERING_MANAGED_DEPARTMENTS
+    : DEPARTMENTS;
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -682,9 +705,9 @@ export function ResourcesPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveDepartment = (lockedDepartment || formData.department) as Department | undefined;
-    const canSubmit = editingId
-      ? Boolean(effectiveDepartment && canEditEmployee(effectiveDepartment))
-      : canCreateEmployee;
+    const canSubmit =
+      Boolean(effectiveDepartment && canEditEmployee(effectiveDepartment)) &&
+      (editingId ? true : canCreateEmployee);
     if (!canSubmit) return;
 
     if (!formData.name || !formData.role || !effectiveDepartment) {
@@ -823,12 +846,12 @@ export function ResourcesPage() {
                 <div>
                   <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.department}</label>
                   <select
-                    value={(lockedDepartment as Department) || formData.department || 'PM'}
+                    value={lockedDepartment || formData.department || getDefaultDepartment()}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value as Department })}
                     className="brand-select w-full px-3 py-2 text-[#2e1a47]"
                     disabled={Boolean(lockedDepartment)}
                   >
-                    {DEPARTMENTS.map((dept) => (
+                    {availableDepartmentOptions.map((dept) => (
                       <option key={dept} value={dept}>
                         {dept}
                       </option>
