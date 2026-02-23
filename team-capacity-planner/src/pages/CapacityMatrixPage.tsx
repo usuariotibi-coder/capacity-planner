@@ -6241,8 +6241,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             >
                               {showSoftShiftIndicator && (
                                 <>
-                                  <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
-                                  <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                  <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                  <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
+                                  <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                                 </>
                               )}
                               {showHardOutOfRangeIndicator && (
@@ -6729,8 +6730,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       >
                                         {showSoftShiftIndicator && (
                                           <>
-                                            <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
-                                            <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
+                                            <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                                           </>
                                         )}
                                         {showHardOutOfRangeIndicator && (
@@ -6772,8 +6774,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     >
                                       {showSoftShiftIndicator && (
                                         <>
-                                          <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
-                                          <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
+                                          <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                                         </>
                                       )}
                                       {showHardOutOfRangeIndicator && (
@@ -6927,7 +6930,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-black bg-[#eaf2ff]" />
+                  <div className="h-4 w-4 rounded border-2 border-dashed border-[#1e3a8a] bg-[#dbeafe] bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">
                     {language === 'es' ? 'Desfase por fecha' : 'Date shift'}
                   </span>
