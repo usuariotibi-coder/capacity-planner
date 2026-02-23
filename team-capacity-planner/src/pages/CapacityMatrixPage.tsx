@@ -6241,7 +6241,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             >
                               {showSoftShiftIndicator && (
                                 <>
-                                  <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/35 z-[9]" />
+                                  <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
                                   <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                 </>
                               )}
@@ -6729,7 +6729,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       >
                                         {showSoftShiftIndicator && (
                                           <>
-                                            <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/35 z-[9]" />
+                                            <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
                                             <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                           </>
                                         )}
@@ -6772,7 +6772,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     >
                                       {showSoftShiftIndicator && (
                                         <>
-                                          <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/35 z-[9]" />
+                                          <div className="pointer-events-none absolute inset-0 bg-[#dcebff]/50 z-[9]" />
                                           <div className="pointer-events-none absolute inset-0 border border-dashed border-black z-10" />
                                         </>
                                       )}
@@ -6927,7 +6927,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border border-dashed border-black bg-[#f4f8ff]" />
+                  <div className="h-4 w-4 rounded border border-dashed border-black bg-[#eaf2ff]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">
                     {language === 'es' ? 'Desfase por fecha' : 'Date shift'}
                   </span>
