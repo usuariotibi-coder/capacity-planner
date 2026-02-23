@@ -4,10 +4,11 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import type { Assignment, Employee, Department } from '../types';
+import { changeOrdersApi } from '../services/api';
+import type { Assignment, Employee, Department, ProjectChangeOrder } from '../types';
 import { generateId } from '../utils/id';
 import { getAllWeeksWithNextYear } from '../utils/dateUtils';
-import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X, Download, FileSpreadsheet } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
@@ -58,6 +59,7 @@ export function ResourcesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [exportingDepartment, setExportingDepartment] = useState<Department | null>(null);
   const minYearOption = 2024;
   const maxYearOption = new Date().getFullYear() + 10;
   const yearOptions = Array.from(
@@ -146,6 +148,261 @@ export function ResourcesPage() {
       return rounded.toString();
     }
     return rounded.toFixed(2).replace(/\.?0+$/, '');
+  };
+
+  const handleExportDepartmentResources = async (department: Department, deptEmployees: Employee[]) => {
+    if (exportingDepartment) return;
+    if (deptEmployees.length === 0) {
+      alert(language === 'es' ? 'No hay recursos para exportar en este departamento.' : 'There are no resources to export in this department.');
+      return;
+    }
+
+    setExportingDepartment(department);
+    try {
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const generatedAt = new Date();
+      const dateStamp = generatedAt.toISOString().slice(0, 10);
+      const generatedLabel = generatedAt.toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
+
+      const weekMap = new Map(allWeeksData.map((week) => [week.date, week.weekNum]));
+      const projectById = new Map(projects.map((project) => [project.id, project]));
+      const departmentEmployeeIds = new Set(deptEmployees.map((employee) => employee.id));
+      const departmentAssignments = assignments.filter((assignment) =>
+        departmentEmployeeIds.has(assignment.employeeId) && hasWorkHours(assignment)
+      );
+
+      let allChangeOrders: ProjectChangeOrder[] = [];
+      try {
+        const changeOrderRows = await changeOrdersApi.getAll();
+        allChangeOrders = (Array.isArray(changeOrderRows) ? changeOrderRows : []).filter((order) => order?.department === department);
+      } catch (changeOrderError) {
+        console.error('[ResourcesPage] Failed to load change orders for export:', changeOrderError);
+      }
+      const changeOrderById = new Map(allChangeOrders.map((order) => [order.id, order]));
+
+      const HEADER_FILL = '2E1A47';
+      const HEADER_TEXT = 'FFFFFF';
+      const ACCENT_FILL = 'EDE9FE';
+      const BODY_BORDER = 'D6D3E1';
+
+      const applyHeader = (cell: any) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } };
+        cell.font = { bold: true, color: { argb: HEADER_TEXT }, size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'thin', color: { argb: BODY_BORDER } },
+          left: { style: 'thin', color: { argb: BODY_BORDER } },
+          bottom: { style: 'thin', color: { argb: BODY_BORDER } },
+          right: { style: 'thin', color: { argb: BODY_BORDER } },
+        };
+      };
+
+      const applyBody = (cell: any, fill = 'FFFFFF', align: 'left' | 'center' | 'right' = 'left') => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+        cell.font = { color: { argb: '1F2937' }, size: 9 };
+        cell.alignment = { vertical: 'middle', horizontal: align, wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: BODY_BORDER } },
+          left: { style: 'thin', color: { argb: BODY_BORDER } },
+          bottom: { style: 'thin', color: { argb: BODY_BORDER } },
+          right: { style: 'thin', color: { argb: BODY_BORDER } },
+        };
+      };
+
+      const summarySheet = workbook.addWorksheet(language === 'es' ? 'Resumen Recursos' : 'Resource Summary');
+      summarySheet.columns = [
+        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 28 },
+        { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 24 },
+        { header: language === 'es' ? 'Capacidad h/sem' : 'Capacity h/wk', key: 'capacity', width: 14 },
+        { header: language === 'es' ? 'Estado' : 'Status', key: 'status', width: 12 },
+        { header: language === 'es' ? 'Horas Asignadas' : 'Assigned Hours', key: 'hours', width: 15 },
+        { header: language === 'es' ? 'Proyectos' : 'Projects', key: 'projects', width: 12 },
+        { header: language === 'es' ? 'Change Orders' : 'Change Orders', key: 'changeOrders', width: 14 },
+        { header: language === 'es' ? 'Promedio h/sem' : 'Avg h/week', key: 'avg', width: 14 },
+      ];
+
+      summarySheet.mergeCells('A1:H1');
+      const summaryTitle = summarySheet.getCell('A1');
+      summaryTitle.value = `${language === 'es' ? 'Exportacion de Recursos' : 'Resources Export'} - ${department}`;
+      applyHeader(summaryTitle);
+      summaryTitle.font = { ...summaryTitle.font, size: 13 };
+
+      summarySheet.mergeCells('A2:H2');
+      const summaryMeta = summarySheet.getCell('A2');
+      summaryMeta.value = `${language === 'es' ? 'Ano' : 'Year'}: ${selectedYear} | ${language === 'es' ? 'Generado' : 'Generated'}: ${generatedLabel}`;
+      applyBody(summaryMeta, ACCENT_FILL, 'left');
+
+      summarySheet.getRow(3).values = summarySheet.columns.map((column) => column.header as string);
+      summarySheet.getRow(3).eachCell((cell: any) => applyHeader(cell));
+
+      deptEmployees.forEach((employee) => {
+        const employeeAssignments = departmentAssignments.filter((assignment) => assignment.employeeId === employee.id);
+        const totalHours = employeeAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
+        const uniqueProjects = new Set(employeeAssignments.map((assignment) => assignment.projectId));
+        const employeeChangeOrders = new Set(
+          employeeAssignments
+            .map((assignment) => assignment.changeOrderId)
+            .filter((changeOrderId): changeOrderId is string => Boolean(changeOrderId))
+        );
+        const avgPerWeek = allWeeksData.length > 0 ? totalHours / allWeeksData.length : totalHours;
+
+        summarySheet.addRow({
+          resource: employee.name,
+          role: employee.role,
+          capacity: employee.capacity || 0,
+          status: employee.isActive ? (language === 'es' ? 'Activo' : 'Active') : (language === 'es' ? 'Inactivo' : 'Inactive'),
+          hours: Math.round(totalHours * 100) / 100,
+          projects: uniqueProjects.size,
+          changeOrders: employeeChangeOrders.size,
+          avg: Math.round(avgPerWeek * 100) / 100,
+        });
+      });
+
+      for (let row = 4; row <= summarySheet.rowCount; row += 1) {
+        const current = summarySheet.getRow(row);
+        current.eachCell((cell: any, colNumber: number) => {
+          const isNumeric = [3, 5, 6, 7, 8].includes(colNumber);
+          applyBody(cell, 'FFFFFF', isNumeric ? 'center' : 'left');
+        });
+      }
+
+      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Asignaciones' : 'Assignments');
+      detailSheet.columns = [
+        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
+        { header: language === 'es' ? 'Semana' : 'Week', key: 'week', width: 12 },
+        { header: 'CW', key: 'cw', width: 8 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
+        { header: language === 'es' ? 'Cliente' : 'Client', key: 'client', width: 20 },
+        { header: language === 'es' ? 'Horas Totales' : 'Total Hours', key: 'hours', width: 12 },
+        { header: language === 'es' ? 'Horas SCIO' : 'SCIO Hours', key: 'scio', width: 12 },
+        { header: language === 'es' ? 'Horas Externas' : 'External Hours', key: 'external', width: 14 },
+        { header: language === 'es' ? 'Etapa' : 'Stage', key: 'stage', width: 24 },
+        { header: language === 'es' ? 'Change Order' : 'Change Order', key: 'co', width: 18 },
+        { header: language === 'es' ? 'CO Cotizado (h)' : 'CO Quoted (h)', key: 'coQuoted', width: 14 },
+        { header: language === 'es' ? 'Comentario' : 'Comment', key: 'comment', width: 36 },
+      ];
+      detailSheet.getRow(1).values = detailSheet.columns.map((column) => column.header as string);
+      detailSheet.getRow(1).eachCell((cell: any) => applyHeader(cell));
+
+      const sortedAssignments = [...departmentAssignments].sort((a, b) => {
+        const employeeA = employees.find((employee) => employee.id === a.employeeId)?.name || '';
+        const employeeB = employees.find((employee) => employee.id === b.employeeId)?.name || '';
+        if (employeeA !== employeeB) return employeeA.localeCompare(employeeB);
+        return a.weekStartDate.localeCompare(b.weekStartDate);
+      });
+
+      sortedAssignments.forEach((assignment) => {
+        const employee = employees.find((item) => item.id === assignment.employeeId);
+        const project = projectById.get(assignment.projectId);
+        const changeOrder = assignment.changeOrderId ? changeOrderById.get(assignment.changeOrderId) : undefined;
+        const scioHours = typeof assignment.scioHours === 'number' ? assignment.scioHours : 0;
+        const externalHours = typeof assignment.externalHours === 'number' ? assignment.externalHours : 0;
+
+        detailSheet.addRow({
+          resource: employee?.name || (language === 'es' ? 'Recurso eliminado' : 'Deleted resource'),
+          week: assignment.weekStartDate,
+          cw: weekMap.get(assignment.weekStartDate) || '',
+          project: project?.name || (language === 'es' ? 'Proyecto eliminado' : 'Deleted project'),
+          client: project?.client || '',
+          hours: Math.round(getAssignmentHours(assignment) * 100) / 100,
+          scio: Math.round(scioHours * 100) / 100,
+          external: Math.round(externalHours * 100) / 100,
+          stage: assignment.stage || '',
+          co: changeOrder?.name || '',
+          coQuoted: changeOrder?.hoursQuoted || 0,
+          comment: assignment.comment || '',
+        });
+      });
+
+      if (detailSheet.rowCount === 1) {
+        detailSheet.addRow({
+          resource: language === 'es' ? 'Sin asignaciones para este departamento en el ano seleccionado.' : 'No assignments for this department in the selected year.',
+        });
+      }
+
+      for (let row = 2; row <= detailSheet.rowCount; row += 1) {
+        const current = detailSheet.getRow(row);
+        current.eachCell((cell: any, colNumber: number) => {
+          const isNumeric = [2, 3, 6, 7, 8, 11].includes(colNumber);
+          applyBody(cell, row % 2 === 0 ? 'FFFFFF' : 'FAFAFF', isNumeric ? 'center' : 'left');
+        });
+      }
+
+      const projectSheet = workbook.addWorksheet(language === 'es' ? 'Proyectos y CO' : 'Projects and CO');
+      projectSheet.columns = [
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 32 },
+        { header: language === 'es' ? 'Cliente' : 'Client', key: 'client', width: 20 },
+        { header: language === 'es' ? 'Horas Departamento' : 'Department Hours', key: 'hours', width: 16 },
+        { header: language === 'es' ? '# Recursos' : '# Resources', key: 'resources', width: 12 },
+        { header: language === 'es' ? 'Change Orders' : 'Change Orders', key: 'coList', width: 46 },
+      ];
+      projectSheet.getRow(1).values = projectSheet.columns.map((column) => column.header as string);
+      projectSheet.getRow(1).eachCell((cell: any) => applyHeader(cell));
+
+      const projectAccumulator = new Map<string, { hours: number; resources: Set<string> }>();
+      departmentAssignments.forEach((assignment) => {
+        const entry = projectAccumulator.get(assignment.projectId) || { hours: 0, resources: new Set<string>() };
+        entry.hours += getAssignmentHours(assignment);
+        entry.resources.add(assignment.employeeId);
+        projectAccumulator.set(assignment.projectId, entry);
+      });
+
+      const projectRows = [...projectAccumulator.entries()]
+        .sort((a, b) => b[1].hours - a[1].hours);
+
+      projectRows.forEach(([projectId, data]) => {
+        const project = projectById.get(projectId);
+        const projectChangeOrders = allChangeOrders
+          .filter((order) => order.projectId === projectId)
+          .map((order) => `${order.name} (${formatHours(order.hoursQuoted || 0)}h)`)
+          .join(', ');
+
+        projectSheet.addRow({
+          project: project?.name || (language === 'es' ? 'Proyecto eliminado' : 'Deleted project'),
+          client: project?.client || '',
+          hours: Math.round(data.hours * 100) / 100,
+          resources: data.resources.size,
+          coList: projectChangeOrders || (language === 'es' ? 'Sin change orders' : 'No change orders'),
+        });
+      });
+
+      if (projectSheet.rowCount === 1) {
+        projectSheet.addRow({
+          project: language === 'es' ? 'Sin datos de proyectos para este departamento.' : 'No project data for this department.',
+        });
+      }
+
+      for (let row = 2; row <= projectSheet.rowCount; row += 1) {
+        const current = projectSheet.getRow(row);
+        current.eachCell((cell: any, colNumber: number) => {
+          const isNumeric = [3, 4].includes(colNumber);
+          applyBody(cell, row % 2 === 0 ? 'FFFFFF' : 'FAFAFF', isNumeric ? 'center' : 'left');
+        });
+      }
+
+      const fileName = `resources-${department.toLowerCase()}-${selectedYear}-${dateStamp}.xlsx`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob(
+        [buffer],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('[ResourcesPage] Error exporting resources by department:', error);
+      alert(language === 'es'
+        ? 'Ocurrio un error al exportar el Excel del departamento.'
+        : 'An error occurred while exporting the department Excel file.');
+    } finally {
+      setExportingDepartment(null);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -457,7 +714,24 @@ export function ResourcesPage() {
 
           return (
             <div key={dept} className={`mb-8 border rounded-lg p-4 ${getDepartmentColor(dept)}`}>
-              <h2 className="text-xl font-bold mb-4 text-gray-800">{dept} {t.departmentLabel}</h2>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-bold text-gray-800">{dept} {t.departmentLabel}</h2>
+                <button
+                  type="button"
+                  onClick={() => void handleExportDepartmentResources(dept, deptEmployees)}
+                  disabled={exportingDepartment !== null}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-1.5 text-white text-sm font-semibold shadow-sm hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                  title={language === 'es' ? `Exportar recursos de ${dept}` : `Export ${dept} resources`}
+                >
+                  {exportingDepartment === dept ? (
+                    <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />
+                  ) : (
+                    <FileSpreadsheet size={16} />
+                  )}
+                  <span>{language === 'es' ? 'Exportar Excel' : 'Export Excel'}</span>
+                  <Download size={14} />
+                </button>
+              </div>
               <div className="space-y-2">
                 {deptEmployees.map((emp) => {
                   const empAssignments = getEmployeeAssignments(emp.id);
