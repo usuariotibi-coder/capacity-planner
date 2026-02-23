@@ -329,6 +329,93 @@ export function ResourcesPage() {
         });
       }
 
+      const calendarWeeks = allWeeksData.filter((week) => !week.isNextYear);
+      const calendarSheet = workbook.addWorksheet(language === 'es' ? 'Calendario Semanal' : 'Weekly Calendar');
+      const totalCalendarColumns = 2 + calendarWeeks.length;
+      calendarSheet.views = [{ state: 'frozen', xSplit: 2, ySplit: 3 }];
+      calendarSheet.columns = [
+        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
+        { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 18 },
+        ...calendarWeeks.map((week, index) => ({
+          header: `CW${week.weekNum}\n${week.date}`,
+          key: `cw_${index}`,
+          width: 16,
+        })),
+      ];
+
+      calendarSheet.mergeCells(1, 1, 1, totalCalendarColumns);
+      const calendarTitle = calendarSheet.getCell(1, 1);
+      calendarTitle.value = `${language === 'es' ? 'Calendario Semanal por Recurso' : 'Weekly Resource Calendar'} - ${department}`;
+      applyHeader(calendarTitle);
+      calendarTitle.font = { ...calendarTitle.font, size: 13 };
+
+      calendarSheet.mergeCells(2, 1, 2, totalCalendarColumns);
+      const calendarMeta = calendarSheet.getCell(2, 1);
+      calendarMeta.value = `${language === 'es' ? 'Ano' : 'Year'}: ${selectedYear} | ${language === 'es' ? 'Cada celda muestra proyecto(s) y horas de la semana' : 'Each cell shows project(s) and weekly hours'}`;
+      applyBody(calendarMeta, ACCENT_FILL, 'left');
+
+      const calendarHeaders = [
+        language === 'es' ? 'Recurso' : 'Resource',
+        language === 'es' ? 'Rol' : 'Role',
+        ...calendarWeeks.map((week) => `CW${week.weekNum}\n${week.date}`),
+      ];
+      calendarSheet.getRow(3).values = calendarHeaders;
+      calendarSheet.getRow(3).height = 34;
+      calendarSheet.getRow(3).eachCell((cell: any) => applyHeader(cell));
+
+      const employeeAssignmentsByWeek = new Map<string, Map<string, Assignment[]>>();
+      departmentAssignments.forEach((assignment) => {
+        const byWeek = employeeAssignmentsByWeek.get(assignment.employeeId) || new Map<string, Assignment[]>();
+        const currentAssignments = byWeek.get(assignment.weekStartDate) || [];
+        currentAssignments.push(assignment);
+        byWeek.set(assignment.weekStartDate, currentAssignments);
+        employeeAssignmentsByWeek.set(assignment.employeeId, byWeek);
+      });
+
+      deptEmployees.forEach((employee) => {
+        const assignmentMap = employeeAssignmentsByWeek.get(employee.id) || new Map<string, Assignment[]>();
+        const rowValues = [
+          employee.name,
+          employee.role || '',
+          ...calendarWeeks.map((week) => {
+            const weekAssignments = assignmentMap.get(week.date) || [];
+            if (weekAssignments.length === 0) return '';
+
+            return weekAssignments
+              .map((assignment) => {
+                const projectName =
+                  projectById.get(assignment.projectId)?.name ||
+                  (language === 'es' ? 'Proyecto eliminado' : 'Deleted project');
+                const hours = formatHours(getAssignmentHours(assignment));
+                const changeOrderName = assignment.changeOrderId
+                  ? changeOrderById.get(assignment.changeOrderId)?.name
+                  : '';
+                return changeOrderName
+                  ? `${projectName} (${hours}h) [CO: ${changeOrderName}]`
+                  : `${projectName} (${hours}h)`;
+              })
+              .join('\n');
+          }),
+        ];
+
+        const row = calendarSheet.addRow(rowValues);
+        row.height = 42;
+        row.eachCell((cell: any, colNumber: number) => {
+          const isScheduleCell = colNumber > 2;
+          const hasAssignment = isScheduleCell && Boolean(cell.value);
+          applyBody(cell, hasAssignment ? 'DBEAFE' : 'FFFFFF', isScheduleCell ? 'left' : 'left');
+        });
+      });
+
+      if (calendarSheet.rowCount === 3) {
+        const noDataRow = calendarSheet.addRow([
+          language === 'es'
+            ? 'Sin asignaciones semanales para este departamento.'
+            : 'No weekly assignments for this department.',
+        ]);
+        noDataRow.eachCell((cell: any) => applyBody(cell, 'FFFFFF', 'left'));
+      }
+
       const projectSheet = workbook.addWorksheet(language === 'es' ? 'Proyectos y CO' : 'Projects and CO');
       projectSheet.columns = [
         { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 32 },
