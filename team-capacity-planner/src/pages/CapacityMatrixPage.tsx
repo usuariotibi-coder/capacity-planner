@@ -1499,13 +1499,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     project: Project | undefined,
     department: Department,
     weekStart: string,
-    totalHours: number,
-    projectDeptTotalHours: number
+    totalHours: number
   ) => {
     if (!project) {
       return {
         showHardOutOfRangeIndicator: false,
-        showSoftShiftIndicator: false,
+        showShiftGapBackground: false,
+        showShiftDashedIndicator: false,
       };
     }
 
@@ -1543,18 +1543,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
     const outOfEstimatedRange = !isDeptWeekInRange;
     const isDisplacedByTimingShift = hasDepartmentTimingShift && isDateShiftDifferenceWeek;
-    const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
-    const shouldShowShiftForCell =
-      totalHours > 0 ||
-      projectDeptTotalHours <= 0;
-    const showSoftShiftIndicator =
-      isDisplacedByTimingShift &&
-      shouldShowShiftForCell &&
-      !showHardOutOfRangeIndicator;
+    const showShiftGapBackground = isDisplacedByTimingShift;
+    const showShiftDashedIndicator = isDisplacedByTimingShift && totalHours > 0;
+    const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0 && !isDisplacedByTimingShift;
 
     return {
       showHardOutOfRangeIndicator,
-      showSoftShiftIndicator,
+      showShiftGapBackground,
+      showShiftDashedIndicator,
     };
   };
 
@@ -6217,16 +6213,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             selectedProjectCell?.weekStart === week;
                           const indicatorCellEntry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${week}`);
                           const indicatorTotalHours = indicatorCellEntry?.totalHours ?? 0;
-                          const indicatorProjectDeptTotalHours = assignmentIndex.projectDeptTotals.get(`${proj.id}|${dept}`) ?? 0;
                           const {
                             showHardOutOfRangeIndicator,
-                            showSoftShiftIndicator,
+                            showShiftGapBackground,
+                            showShiftDashedIndicator,
                           } = getCellShiftIndicators(
                             proj,
                             dept,
                             week,
-                            indicatorTotalHours,
-                            indicatorProjectDeptTotalHours
+                            indicatorTotalHours
                           );
                           const cellKey = getProjectCellKey(proj.id, dept, week);
                           return (
@@ -6254,12 +6249,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   : ''
                               }`}
                             >
-                              {showSoftShiftIndicator && (
-                                <>
-                                  <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
-                                  <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
-                                  <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
-                                </>
+                              {showShiftGapBackground && (
+                                <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                              )}
+                              {showShiftDashedIndicator && (
+                                <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                               )}
                               {showHardOutOfRangeIndicator && (
                                 <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6721,13 +6715,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                                   const {
                                     showHardOutOfRangeIndicator,
-                                    showSoftShiftIndicator,
+                                    showShiftGapBackground,
+                                    showShiftDashedIndicator,
                                   } = getCellShiftIndicators(
                                     proj,
                                     dept,
                                     week,
-                                    totalHours,
-                                    assignmentIndex.projectDeptTotals.get(`${proj.id}|${dept}`) ?? 0
+                                    totalHours
                                   );
                                   const displacedCellBgClass = stageColor
                                     ? stageColor.bg
@@ -6749,12 +6743,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                         } ${displacedCellBgClass}`}
                                       >
-                                        {showSoftShiftIndicator && (
-                                          <>
-                                            <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
-                                            <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
-                                            <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
-                                          </>
+                                        {showShiftGapBackground && (
+                                          <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                        )}
+                                        {showShiftDashedIndicator && (
+                                          <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                                         )}
                                         {showHardOutOfRangeIndicator && (
                                           <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6793,12 +6786,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                       } ${displacedCellBgClass}`}
                                     >
-                                      {showSoftShiftIndicator && (
-                                        <>
-                                          <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
-                                          <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)] z-[9]" />
-                                          <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
-                                        </>
+                                      {showShiftGapBackground && (
+                                        <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                      )}
+                                      {showShiftDashedIndicator && (
+                                        <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
                                       )}
                                       {showHardOutOfRangeIndicator && (
                                         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px),repeating-linear-gradient(-45deg,rgba(15,23,42,0.16)_0px,rgba(15,23,42,0.16)_1px,transparent_1px,transparent_6px)] z-10" />
@@ -6951,7 +6943,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span className="text-[10px] font-medium text-[#3f3354]">{t.currentWeekLegend}</span>
                 </div>
                 <div className="capacity-visual-guide-card flex items-center gap-1.5 rounded-md border border-[#e4dfec] bg-white px-1.5 py-1">
-                  <div className="h-4 w-4 rounded border-2 border-dashed border-[#1e3a8a] bg-[#dbeafe] bg-[repeating-linear-gradient(-45deg,rgba(30,64,175,0.16)_0px,rgba(30,64,175,0.16)_1px,transparent_1px,transparent_5px)]" />
+                  <div className="h-4 w-4 rounded border-2 border-dashed border-[#1e3a8a] bg-[#dbeafe]" />
                   <span className="text-[10px] font-medium text-[#3f3354]">
                     {language === 'es' ? 'Desfase por fecha' : 'Date shift'}
                   </span>
