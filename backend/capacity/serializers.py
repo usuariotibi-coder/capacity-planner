@@ -753,6 +753,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'number_of_weeks',
             'project_manager',
             'project_manager_id',
+            'is_high_probability',
             'is_hidden',
             'hidden_at',
             'assignment_count',

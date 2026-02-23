@@ -857,6 +857,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             (('facility',), project.facility),
             (('number_of_weeks', 'numberOfWeeks'), project.number_of_weeks),
             (('project_manager_id', 'projectManagerId'), project.project_manager_id),
+            (('is_high_probability', 'isHighProbability'), project.is_high_probability),
         )
 
         for keys, current_value in shared_field_specs:

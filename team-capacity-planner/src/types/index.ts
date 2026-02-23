@@ -104,6 +104,7 @@ export interface Project {
   facility: Facility;
   numberOfWeeks: number;
   projectManagerId?: string; // ID of the assigned Project Manager (PM department)
+  isHighProbability?: boolean; // Marks projects with high execution probability
   isHidden?: boolean;
   hiddenAt?: string | null;
   departmentStages?: Record<Department, DepartmentStageConfig[]>;

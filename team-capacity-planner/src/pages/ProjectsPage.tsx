@@ -59,6 +59,7 @@ export function ProjectsPage() {
     client: '',
     startDate: '',
     facility: 'AL',
+    isHighProbability: false,
   });
   const [numberOfWeeks, setNumberOfWeeks] = useState<number>(4);
   const [hoursPerDept, setHoursPerDept] = useState<HoursPerDepartment>({
@@ -260,6 +261,7 @@ export function ProjectsPage() {
         facility: formData.facility,
         numberOfWeeks,
         projectManagerId: selectedProjectManagerId || undefined,
+        isHighProbability: !!formData.isHighProbability,
         departmentStages: calculatedDepartmentStages,
         departmentHoursAllocated: deptHoursAllocated,
         visibleInDepartments: visibilityScopesForSubmit,
@@ -392,7 +394,7 @@ export function ProjectsPage() {
   const handleCancel = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', client: '', startDate: '', facility: 'AL' });
+    setFormData({ name: '', client: '', startDate: '', facility: 'AL', isHighProbability: false });
     setNumberOfWeeks(4);
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0 });
     setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '' });
@@ -597,8 +599,8 @@ export function ProjectsPage() {
                     </div>
                   </div>
 
-                  {/* Row 3: Project Manager + General visibility */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {/* Row 3: Project Manager + visibility + high probability */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.projectManager}</label>
                       <select
@@ -633,6 +635,25 @@ export function ProjectsPage() {
                         onChange={(e) => setShowInGeneral(e.target.checked)}
                         className="h-5 w-5 accent-indigo-600 cursor-pointer"
                         aria-label={language === 'es' ? 'Mostrar en pantalla general' : 'Show in General view'}
+                      />
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900">
+                          {language === 'es' ? 'Proyecto High Probability' : 'High Probability Project'}
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          {language === 'es'
+                            ? 'Si está activo, se resaltará con color especial en la barra del proyecto.'
+                            : 'When enabled, the project bar will be highlighted with a dedicated color.'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={!!formData.isHighProbability}
+                        onChange={(e) => setFormData({ ...formData, isHighProbability: e.target.checked })}
+                        className="h-5 w-5 accent-amber-600 cursor-pointer"
+                        aria-label={language === 'es' ? 'Proyecto High Probability' : 'High Probability Project'}
                       />
                     </div>
                   </div>

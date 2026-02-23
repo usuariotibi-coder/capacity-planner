@@ -559,6 +559,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     numberOfWeeks: '' as any,
     facility: 'AL' as 'AL' | 'MI' | 'MX',
     budgetHours: '' as any,
+    isHighProbability: false,
   });
 
   // Import existing project modal state
@@ -1992,6 +1993,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       endDate: endDateISO,
       numberOfWeeks: numberOfWeeks,
       facility: quickProjectForm.facility,
+      isHighProbability: !!quickProjectForm.isHighProbability,
       departmentStages: calculatedDepartmentStages,
       departmentHoursAllocated: {
         PM: 0,
@@ -2023,6 +2025,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       numberOfWeeks: '',
       facility: 'AL',
       budgetHours: '',
+      isHighProbability: false,
     });
   };
 
@@ -5783,6 +5786,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               const dept = departmentFilter as Department;
               const scopeKey = getProjectOrderScopeKey(departmentFilter);
               const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
+              const isHighProbabilityProject = !!proj.isHighProbability;
+              const projectHeaderClass = isHighProbabilityProject
+                ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 border-b border-amber-300'
+                : 'bg-gray-100 hover:bg-gray-200 border-b border-gray-300';
 
               return (
                 <div
@@ -5790,7 +5797,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   className={`capacity-project-card relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
-                      : 'border-gray-300'
+                      : (isHighProbabilityProject ? 'border-amber-400' : 'border-gray-300')
                   } ${
                     dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
                       ? 'opacity-75 shadow-lg'
@@ -5812,7 +5819,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       />
                     )}
                   {/* Project header - Includes metrics for department view */}
-                  <div className="capacity-project-header bg-gray-100 hover:bg-gray-200 cursor-pointer border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                  <div className={`capacity-project-header cursor-pointer ${projectHeaderClass}`} onClick={() => toggleProjectExpanded(proj.id)}>
                     {/* Row 1: Project info */}
                     <div className="p-1 flex items-center gap-1">
                       <button
@@ -5845,6 +5852,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
                             {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
+                          {isHighProbabilityProject && (
+                            <>
+                              <span className="text-gray-400">|</span>
+                              <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                {language === 'es' ? 'High Probability' : 'High Probability'}
+                              </span>
+                            </>
+                          )}
                           {proj.projectManagerId && (
                             <>
                               <span className="text-gray-400">|</span>
@@ -6454,13 +6469,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
               {orderedGeneralProjects.map((proj) => {
                 const scopeKey = getProjectOrderScopeKey('General');
+                const isHighProbabilityProject = !!proj.isHighProbability;
+                const projectHeaderClass = isHighProbabilityProject
+                  ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 border-b border-amber-300'
+                  : 'bg-gray-100 hover:bg-gray-200 border-b border-gray-300';
                 return (
                 <div
                   key={proj.id}
                   className={`capacity-project-card relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
                     dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
                       ? 'border-blue-500 ring-2 ring-blue-200'
-                      : 'border-gray-300'
+                      : (isHighProbabilityProject ? 'border-amber-400' : 'border-gray-300')
                   } ${
                     dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
                       ? 'opacity-75 shadow-lg'
@@ -6482,7 +6501,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       />
                     )}
                   {/* Project header */}
-                  <div className="capacity-project-header bg-gray-100 hover:bg-gray-200 cursor-pointer p-1 border-b border-gray-300" onClick={() => toggleProjectExpanded(proj.id)}>
+                  <div className={`capacity-project-header cursor-pointer p-1 ${projectHeaderClass}`} onClick={() => toggleProjectExpanded(proj.id)}>
                     <div className="flex items-center justify-between gap-1">
                       <button
                         type="button"
@@ -6514,6 +6533,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
                             {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
                           </span>
+                          {isHighProbabilityProject && (
+                            <>
+                              <span className="text-gray-400">|</span>
+                              <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                {language === 'es' ? 'High Probability' : 'High Probability'}
+                              </span>
+                            </>
+                          )}
                           {proj.projectManagerId && (
                             <>
                               <span className="text-gray-400">|</span>
@@ -7149,6 +7176,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     }}
                     className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
                     placeholder="0"
+                  />
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">
+                      {language === 'es' ? 'Proyecto High Probability' : 'High Probability Project'}
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      {language === 'es'
+                        ? 'Resalta este proyecto con color especial en la barra.'
+                        : 'Highlight this project with a dedicated bar color.'}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={quickProjectForm.isHighProbability}
+                    onChange={(e) => setQuickProjectForm({ ...quickProjectForm, isHighProbability: e.target.checked })}
+                    className="h-5 w-5 accent-amber-600 cursor-pointer"
+                    aria-label={language === 'es' ? 'Proyecto High Probability' : 'High Probability Project'}
                   />
                 </div>
 
