@@ -7161,7 +7161,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDate}</label>
+                  <label className="block text-sm font-bold mb-1.5 text-gray-700">
+                    {language === 'es' ? 'Fecha de inicio del departamento' : 'Department start date'}
+                  </label>
                   <WeekNumberDatePicker
                     value={quickProjectForm.startDate}
                     onChange={(date) => setQuickProjectForm({ ...quickProjectForm, startDate: date })}
