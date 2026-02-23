@@ -118,11 +118,11 @@ interface ScioCapacityFields {
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
-const CURRENT_WEEK_HEADER_CLASS = 'bg-stone-300 text-stone-900 border-stone-600';
-const CURRENT_WEEK_RING_CLASS = 'ring-2 ring-stone-600 shadow-md';
-const CURRENT_WEEK_EDITABLE_CLASS = 'ring-2 ring-stone-600 shadow-md border-stone-500 bg-gradient-to-b from-stone-100 to-zinc-100';
+const CURRENT_WEEK_HEADER_CLASS = 'bg-stone-300 text-stone-900 border-2 border-stone-700 ring-1 ring-inset ring-white/40 shadow-sm relative z-[2]';
+const CURRENT_WEEK_RING_CLASS = 'border-2 border-stone-700 ring-1 ring-inset ring-white/40 shadow-[inset_0_0_0_1px_rgba(28,25,23,0.18)] relative z-[2]';
+const CURRENT_WEEK_EDITABLE_CLASS = 'border-2 border-stone-700 ring-1 ring-inset ring-white/40 shadow-[inset_0_0_0_1px_rgba(28,25,23,0.2)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[2]';
 const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-stone-600 to-zinc-700 text-white border-2 border-zinc-800 shadow-lg ring-2 ring-stone-300';
-const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-zinc-600 border-2 shadow-md bg-gradient-to-b from-stone-100 to-zinc-100';
+const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-2 border-zinc-700 ring-1 ring-inset ring-white/40 shadow-[inset_0_0_0_1px_rgba(28,25,23,0.18)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[2]';
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
