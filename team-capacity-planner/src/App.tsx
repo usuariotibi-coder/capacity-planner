@@ -312,24 +312,6 @@ function MainApp() {
           </div>
         )}
 
-        <div className="p-1.5 md:p-3 border-t border-white/15 space-y-1">
-          <button
-            onClick={() => window.location.href = '/change-password'}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-[#d8d2e5] hover:bg-white/12 rounded-md transition border border-transparent hover:border-white/20"
-            title={t.changePassword}
-          >
-            <Lock size={12} className="md:w-3 md:h-3" />
-            <span className="hidden md:inline">{t.changePassword}</span>
-          </button>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center md:justify-start gap-1.5 px-1.5 md:px-2.5 py-1.5 md:py-1.5 text-[9px] md:text-[11px] text-[#d8d2e5] hover:bg-white/12 rounded-md transition border border-transparent hover:border-white/20"
-            title={t.logout}
-          >
-            <LogOut size={12} className="md:w-3 md:h-3" />
-            <span className="hidden md:inline">{t.logout}</span>
-          </button>
-        </div>
         </div>
       </div>
 
