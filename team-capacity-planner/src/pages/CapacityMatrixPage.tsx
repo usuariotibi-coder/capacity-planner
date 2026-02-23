@@ -258,6 +258,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const deleteAssignment = useAssignmentStore((state) => state.deleteAssignment);
   const addProject = useProjectStore((state) => state.addProject);
   const updateProject = useProjectStore((state) => state.updateProject);
+  const deleteProject = useProjectStore((state) => state.deleteProject);
 
   // Debug: Log when projects change
   useEffect(() => {
@@ -296,6 +297,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [highProbabilityConfirmProject, setHighProbabilityConfirmProject] = useState<Project | null>(null);
   const [isClearingHighProbability, setIsClearingHighProbability] = useState<boolean>(false);
+  const [isDeletingHighProbabilityProject, setIsDeletingHighProbabilityProject] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [selectedProjectCell, setSelectedProjectCell] = useState<ProjectCellSelectionState | null>(null);
   const [projectCellClipboard, setProjectCellClipboard] = useState<ProjectCellClipboardState | null>(null);
@@ -2155,10 +2157,26 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
   };
 
+  const confirmDeleteHighProbabilityProject = async () => {
+    if (!highProbabilityConfirmProject) return;
+
+    setIsDeletingHighProbabilityProject(true);
+    try {
+      await deleteProject(highProbabilityConfirmProject.id);
+      setHighProbabilityConfirmProject(null);
+    } finally {
+      setIsDeletingHighProbabilityProject(false);
+    }
+  };
+
   // Get projects that are not visible in the current department (available for import)
   const getAvailableProjectsForImport = (): Project[] => {
     const dept = departmentFilter as Department;
     return projects.filter(proj => {
+      // Exclude hidden/soft-deleted projects from import options.
+      if (proj.isHidden) {
+        return false;
+      }
       // Exclude projects that already have this department in visibleInDepartments
       if (isProjectVisibleInDepartment(proj, dept)) {
         return false;
@@ -7309,7 +7327,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <button
                   type="button"
                   onClick={() => setHighProbabilityConfirmProject(null)}
-                  disabled={isClearingHighProbability}
+                  disabled={isClearingHighProbability || isDeletingHighProbabilityProject}
                   className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 disabled:opacity-50 transition"
                 >
                   {t.cancel}
@@ -7317,11 +7335,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <button
                   type="button"
                   onClick={confirmClearHighProbabilityFromDepartment}
-                  disabled={isClearingHighProbability}
+                  disabled={isClearingHighProbability || isDeletingHighProbabilityProject}
                   className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-50 transition inline-flex items-center gap-2"
                 >
                   {isClearingHighProbability && <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />}
                   {language === 'es' ? 'Quitar etiqueta' : 'Remove label'}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteHighProbabilityProject}
+                  disabled={isDeletingHighProbabilityProject || isClearingHighProbability}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-red-700 rounded-lg hover:bg-red-800 disabled:opacity-50 transition inline-flex items-center gap-2"
+                >
+                  {isDeletingHighProbabilityProject && <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />}
+                  {language === 'es' ? 'Eliminar proyecto' : 'Delete project'}
                 </button>
               </div>
             </div>
