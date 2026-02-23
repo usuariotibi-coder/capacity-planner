@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG'];
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
+const DEFAULT_WEEKLY_CAPACITY = 45;
 
 export function ResourcesPage() {
   const { employees, addEmployee, deleteEmployee, updateEmployee } = useEmployeeStore();
@@ -52,7 +53,7 @@ export function ResourcesPage() {
     name: '',
     role: '',
     department: getDefaultDepartment(),
-    capacity: 40,
+    capacity: DEFAULT_WEEKLY_CAPACITY,
     isSubcontractedMaterial: false,
     subcontractCompany: '',
   });
@@ -148,6 +149,18 @@ export function ResourcesPage() {
       return rounded.toString();
     }
     return rounded.toFixed(2).replace(/\.?0+$/, '');
+  };
+
+  const getEmployeeCapacity = (employee?: Partial<Employee>): number => {
+    const capacityValue = employee?.capacity;
+    // Legacy records were initialized with 40h; current business rule is 45h/week.
+    if (typeof capacityValue === 'number' && capacityValue === 40) {
+      return DEFAULT_WEEKLY_CAPACITY;
+    }
+    if (typeof capacityValue === 'number' && Number.isFinite(capacityValue) && capacityValue > 0) {
+      return capacityValue;
+    }
+    return DEFAULT_WEEKLY_CAPACITY;
   };
 
   const handleExportDepartmentResources = async (department: Department, deptEmployees: Employee[]) => {
@@ -250,7 +263,7 @@ export function ResourcesPage() {
         summarySheet.addRow({
           resource: employee.name,
           role: employee.role,
-          capacity: employee.capacity || 0,
+          capacity: getEmployeeCapacity(employee),
           status: employee.isActive ? (language === 'es' ? 'Activo' : 'Active') : (language === 'es' ? 'Inactivo' : 'Inactive'),
           hours: Math.round(totalHours * 100) / 100,
           projects: uniqueProjects.size,
@@ -331,15 +344,16 @@ export function ResourcesPage() {
 
       const calendarWeeks = allWeeksData.filter((week) => !week.isNextYear);
       const calendarSheet = workbook.addWorksheet(language === 'es' ? 'Calendario Semanal' : 'Weekly Calendar');
-      const totalCalendarColumns = 2 + calendarWeeks.length;
-      calendarSheet.views = [{ state: 'frozen', xSplit: 2, ySplit: 3 }];
+      const totalCalendarColumns = 3 + calendarWeeks.length;
+      calendarSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 3 }];
       calendarSheet.columns = [
         { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
         { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 18 },
+        { header: language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk', key: 'capacity', width: 11 },
         ...calendarWeeks.map((week, index) => ({
           header: `CW${week.weekNum}\n${week.date}`,
           key: `cw_${index}`,
-          width: 16,
+          width: 20,
         })),
       ];
 
@@ -351,17 +365,24 @@ export function ResourcesPage() {
 
       calendarSheet.mergeCells(2, 1, 2, totalCalendarColumns);
       const calendarMeta = calendarSheet.getCell(2, 1);
-      calendarMeta.value = `${language === 'es' ? 'Ano' : 'Year'}: ${selectedYear} | ${language === 'es' ? 'Cada celda muestra proyecto(s) y horas de la semana' : 'Each cell shows project(s) and weekly hours'}`;
+      calendarMeta.value = language === 'es'
+        ? `Ano: ${selectedYear} | Formato de celda: Total semanal + proyectos | Colores: Azul (normal), Amarillo (>85%), Rojo (sobrecapacidad)`
+        : `Year: ${selectedYear} | Cell format: Weekly total + projects | Colors: Blue (normal), Yellow (>85%), Red (over capacity)`;
       applyBody(calendarMeta, ACCENT_FILL, 'left');
 
       const calendarHeaders = [
         language === 'es' ? 'Recurso' : 'Resource',
         language === 'es' ? 'Rol' : 'Role',
+        language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk',
         ...calendarWeeks.map((week) => `CW${week.weekNum}\n${week.date}`),
       ];
       calendarSheet.getRow(3).values = calendarHeaders;
       calendarSheet.getRow(3).height = 34;
       calendarSheet.getRow(3).eachCell((cell: any) => applyHeader(cell));
+      calendarSheet.autoFilter = {
+        from: { row: 3, column: 1 },
+        to: { row: 3, column: totalCalendarColumns },
+      };
 
       const employeeAssignmentsByWeek = new Map<string, Map<string, Assignment[]>>();
       departmentAssignments.forEach((assignment) => {
@@ -374,14 +395,25 @@ export function ResourcesPage() {
 
       deptEmployees.forEach((employee) => {
         const assignmentMap = employeeAssignmentsByWeek.get(employee.id) || new Map<string, Assignment[]>();
+        const weeklyCapacity = getEmployeeCapacity(employee);
+        const weeklyTotals = new Map<string, number>();
+        assignmentMap.forEach((weekAssignments, weekDate) => {
+          const weekTotal = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
+          weeklyTotals.set(weekDate, weekTotal);
+        });
         const rowValues = [
           employee.name,
           employee.role || '',
+          weeklyCapacity,
           ...calendarWeeks.map((week) => {
             const weekAssignments = assignmentMap.get(week.date) || [];
             if (weekAssignments.length === 0) return '';
+            const weekTotal = weeklyTotals.get(week.date) || 0;
+            const totalLabel = language === 'es'
+              ? `Total: ${formatHours(weekTotal)}h`
+              : `Total: ${formatHours(weekTotal)}h`;
 
-            return weekAssignments
+            const projectLines = weekAssignments
               .map((assignment) => {
                 const projectName =
                   projectById.get(assignment.projectId)?.name ||
@@ -395,15 +427,38 @@ export function ResourcesPage() {
                   : `${projectName} (${hours}h)`;
               })
               .join('\n');
+
+            return `${totalLabel}\n${projectLines}`;
           }),
         ];
 
         const row = calendarSheet.addRow(rowValues);
-        row.height = 42;
+        row.height = 50;
         row.eachCell((cell: any, colNumber: number) => {
-          const isScheduleCell = colNumber > 2;
-          const hasAssignment = isScheduleCell && Boolean(cell.value);
-          applyBody(cell, hasAssignment ? 'DBEAFE' : 'FFFFFF', isScheduleCell ? 'left' : 'left');
+          if (colNumber === 3) {
+            applyBody(cell, 'F3F4F6', 'center');
+            cell.font = { ...(cell.font || {}), bold: true };
+            return;
+          }
+
+          const isScheduleCell = colNumber > 3;
+          if (!isScheduleCell) {
+            applyBody(cell, 'FFFFFF', 'left');
+            return;
+          }
+
+          const weekIndex = colNumber - 4;
+          const weekDate = calendarWeeks[weekIndex]?.date;
+          const weekTotal = weekDate ? (weeklyTotals.get(weekDate) || 0) : 0;
+          const fill = weekTotal <= 0
+            ? 'FFFFFF'
+            : weekTotal > weeklyCapacity
+              ? 'FEE2E2'
+              : weekTotal >= (weeklyCapacity * 0.85)
+                ? 'FEF3C7'
+                : 'DBEAFE';
+
+          applyBody(cell, fill, 'left');
         });
       });
 
@@ -514,7 +569,7 @@ export function ResourcesPage() {
         name: formData.name,
         role: formData.role,
         department: effectiveDepartment,
-        capacity: formData.capacity || 40,
+        capacity: formData.capacity || DEFAULT_WEEKLY_CAPACITY,
         isActive: true,
         isSubcontractedMaterial: formData.isSubcontractedMaterial,
         subcontractCompany: formData.subcontractCompany,
@@ -522,13 +577,13 @@ export function ResourcesPage() {
       addEmployee(newEmployee);
     }
 
-    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: DEFAULT_WEEKLY_CAPACITY, isSubcontractedMaterial: false, subcontractCompany: '' });
     setIsFormOpen(false);
   };
 
   const handleEdit = (employee: Employee) => {
     if (!canEditEmployee(employee.department)) return;
-    setFormData(employee);
+    setFormData({ ...employee, capacity: getEmployeeCapacity(employee) });
     setEditingId(employee.id);
     setIsFormOpen(true);
   };
@@ -536,7 +591,7 @@ export function ResourcesPage() {
   const handleCancel = () => {
     setIsFormOpen(false);
     setEditingId(null);
-    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+    setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: DEFAULT_WEEKLY_CAPACITY, isSubcontractedMaterial: false, subcontractCompany: '' });
   };
 
   const getDepartmentColor = (dept: Department) => {
@@ -573,7 +628,7 @@ export function ResourcesPage() {
             <button
               onClick={() => {
                 if (!canCreateEmployee) return;
-                setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: 40, isSubcontractedMaterial: false, subcontractCompany: '' });
+                setFormData({ name: '', role: '', department: getDefaultDepartment(), capacity: DEFAULT_WEEKLY_CAPACITY, isSubcontractedMaterial: false, subcontractCompany: '' });
                 setEditingId(null);
                 setIsFormOpen(true);
               }}
@@ -746,7 +801,7 @@ export function ResourcesPage() {
                   <label className="block text-sm font-medium text-[#4f3a70] mb-2">{t.capacity}</label>
                   <input
                     type="number"
-                    value={formData.capacity || 40}
+                    value={formData.capacity || DEFAULT_WEEKLY_CAPACITY}
                     onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                     className="brand-input w-full px-3 py-2 text-[#2e1a47]"
                     min="1"
@@ -869,7 +924,7 @@ export function ResourcesPage() {
                               <div className="text-xs text-gray-500">{emp.role}</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-sm font-medium">{emp.capacity}h/{language === 'es' ? 'sem' : 'wk'}</div>
+                              <div className="text-sm font-medium">{getEmployeeCapacity(emp)}h/{language === 'es' ? 'sem' : 'wk'}</div>
                               <div className="text-xs text-gray-500">{t.capacity.split(' ')[0]}</div>
                             </div>
                             <div className="text-center">
