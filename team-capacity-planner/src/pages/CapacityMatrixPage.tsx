@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
@@ -294,6 +294,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [highProbabilityConfirmProject, setHighProbabilityConfirmProject] = useState<Project | null>(null);
+  const [isClearingHighProbability, setIsClearingHighProbability] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [selectedProjectCell, setSelectedProjectCell] = useState<ProjectCellSelectionState | null>(null);
   const [projectCellClipboard, setProjectCellClipboard] = useState<ProjectCellClipboardState | null>(null);
@@ -2121,7 +2123,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     });
   };
 
-  const handleClearHighProbabilityFromDepartment = async (project: Project) => {
+  const handleClearHighProbabilityFromDepartment = (project: Project) => {
     if (departmentFilter === 'General' || departmentFilter === 'PM') {
       return;
     }
@@ -2136,16 +2138,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return;
     }
 
-    const confirmed = window.confirm(
-      language === 'es'
-        ? `Quitar etiqueta High Probability del proyecto "${project.name}"?`
-        : `Remove High Probability label from project "${project.name}"?`
-    );
-    if (!confirmed) return;
+    setHighProbabilityConfirmProject(project);
+  };
 
-    await updateProject(project.id, {
+  const confirmClearHighProbabilityFromDepartment = async () => {
+    if (!highProbabilityConfirmProject) return;
+
+    setIsClearingHighProbability(true);
+    try {
+      await updateProject(highProbabilityConfirmProject.id, {
       isHighProbability: false,
-    });
+      });
+      setHighProbabilityConfirmProject(null);
+    } finally {
+      setIsClearingHighProbability(false);
+    }
   };
 
   // Get projects that are not visible in the current department (available for import)
@@ -7259,6 +7266,62 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* High Probability Clear Confirmation Modal */}
+        {highProbabilityConfirmProject && (
+          <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-[1px] flex items-center justify-center z-[88] p-4">
+            <div className="w-full max-w-md rounded-2xl border border-amber-300 bg-gradient-to-b from-white to-amber-50 shadow-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-amber-200 bg-gradient-to-r from-amber-100 to-orange-100">
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-300 bg-amber-200/70 text-amber-800">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-amber-900">
+                      {language === 'es' ? 'Quitar High Probability' : 'Remove High Probability'}
+                    </h3>
+                    <p className="text-xs text-amber-800">
+                      {language === 'es'
+                        ? 'Este cambio actualiza la etiqueta visual del proyecto.'
+                        : 'This will update the project visual label.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {language === 'es'
+                    ? 'Deseas quitar la etiqueta High Probability de:'
+                    : 'Do you want to remove the High Probability label from:'}
+                </p>
+                <p className="mt-2 inline-flex items-center rounded-lg border border-amber-200 bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-900">
+                  {highProbabilityConfirmProject.name}
+                </p>
+              </div>
+
+              <div className="px-5 pb-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setHighProbabilityConfirmProject(null)}
+                  disabled={isClearingHighProbability}
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 disabled:opacity-50 transition"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmClearHighProbabilityFromDepartment}
+                  disabled={isClearingHighProbability}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-50 transition inline-flex items-center gap-2"
+                >
+                  {isClearingHighProbability && <div className="h-4 w-4 rounded-full border-b-2 border-white animate-spin" />}
+                  {language === 'es' ? 'Quitar etiqueta' : 'Remove label'}
+                </button>
+              </div>
             </div>
           </div>
         )}
