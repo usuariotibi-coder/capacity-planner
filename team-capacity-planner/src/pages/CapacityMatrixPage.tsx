@@ -325,7 +325,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const { hasFullAccess, isReadOnly, currentUserDepartment, currentUserOtherDepartment } = useAuth();
   const t = useTranslation(language);
   const locale = language === 'es' ? 'es-ES' : 'en-US';
-  const isPmGeneralView = departmentFilter === 'General' && currentUserDepartment === 'PM';
+  const isTimingAuditGeneralView =
+    departmentFilter === 'General' &&
+    (
+      currentUserDepartment === 'PM' ||
+      (
+        currentUserDepartment === 'OTHER' &&
+        currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE'
+      )
+    );
 
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
@@ -677,11 +685,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   }, [formValidationPopup]);
 
   useEffect(() => {
-    if (isPmGeneralView) return;
+    if (isTimingAuditGeneralView) return;
     setShowTimingChangesModal(false);
     setTimingChangesLogs([]);
     setTimingChangesError(null);
-  }, [isPmGeneralView]);
+  }, [isTimingAuditGeneralView]);
 
   useEffect(() => {
     try {
@@ -5495,7 +5503,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </button>
           )}
 
-          {isPmGeneralView && (
+          {isTimingAuditGeneralView && (
             <button
               onClick={openTimingChangesModal}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-semibold rounded transition flex-shrink-0 border border-amber-600"
@@ -7391,7 +7399,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         </div>
       )}
 
-      {showTimingChangesModal && isPmGeneralView && (
+      {showTimingChangesModal && isTimingAuditGeneralView && (
         <div className="fixed inset-0 z-[92] bg-black/55 flex items-center justify-center p-3">
           <div className="w-full max-w-6xl max-h-[92vh] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col">
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white flex items-center justify-between gap-3">
