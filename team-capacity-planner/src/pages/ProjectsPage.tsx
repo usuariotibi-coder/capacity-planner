@@ -193,11 +193,22 @@ export function ProjectsPage() {
       PRG: [],
     };
 
+    const editingProject = editingId ? projects.find((p) => p.id === editingId) : undefined;
+
     DEPARTMENTS.forEach((dept) => {
       if (deptDurations[dept] > 0) {
         const departmentStartDate = deptStartDates[dept] || formData.startDate!;
-        // Calculate the relative week within the project (not global year week)
-        const weekStart = calculateRelativeWeek(departmentStartDate, formData.startDate!, selectedYear);
+
+        // Preserve the originally saved relative start week when editing.
+        // This keeps a stable baseline so CapacityMatrix can show "date shift"
+        // as original vs current start date.
+        const existingDeptStage = editingProject?.departmentStages?.[dept]?.[0];
+        const existingWeekStart = Number(existingDeptStage?.weekStart);
+        const hasExistingWeekStart = Number.isFinite(existingWeekStart) && existingWeekStart > 0;
+
+        const weekStart = hasExistingWeekStart
+          ? existingWeekStart
+          : calculateRelativeWeek(departmentStartDate, formData.startDate!, selectedYear);
         const weekEnd = weekStart + deptDurations[dept] - 1;
 
         calculatedDepartmentStages[dept] = [{

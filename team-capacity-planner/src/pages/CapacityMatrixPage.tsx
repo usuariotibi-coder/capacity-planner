@@ -1499,7 +1499,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     project: Project | undefined,
     department: Department,
     weekStart: string,
-    totalHours: number
+    totalHours: number,
+    projectDeptTotalHours: number
   ) => {
     if (!project) {
       return {
@@ -1543,9 +1544,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const outOfEstimatedRange = !isDeptWeekInRange;
     const isDisplacedByTimingShift = hasDepartmentTimingShift && isDateShiftDifferenceWeek;
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0;
+    const shouldShowShiftForCell =
+      totalHours > 0 ||
+      projectDeptTotalHours <= 0;
     const showSoftShiftIndicator =
       isDisplacedByTimingShift &&
-      totalHours > 0 &&
+      shouldShowShiftForCell &&
       !showHardOutOfRangeIndicator;
 
     return {
@@ -1652,6 +1656,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const byCell = new Map<string, { totalHours: number; assignments: Assignment[]; stage: Stage | null; comment?: string }>();
     const deptWeekTotals = new Map<string, number>();
     const deptWeekExternalTotals = new Map<string, number>();
+    const projectDeptTotals = new Map<string, number>();
 
     assignments.forEach((assignment) => {
       const dept = getAssignmentDepartment(assignment);
@@ -1673,6 +1678,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
       byCell.set(cellKey, cellEntry);
 
+      const projectDeptKey = `${assignment.projectId}|${dept}`;
+      projectDeptTotals.set(projectDeptKey, (projectDeptTotals.get(projectDeptKey) || 0) + assignmentHours);
+
       const deptWeekKey = `${dept}|${normalizedWeekStart}`;
       deptWeekTotals.set(deptWeekKey, (deptWeekTotals.get(deptWeekKey) || 0) + assignment.hours);
 
@@ -1684,7 +1692,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       }
     });
 
-    return { byCell, deptWeekTotals, deptWeekExternalTotals };
+    return { byCell, deptWeekTotals, deptWeekExternalTotals, projectDeptTotals };
   }, [assignments, employeeDeptMap]);
 
   const weekRange = useMemo(() => {
@@ -6209,10 +6217,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             selectedProjectCell?.weekStart === week;
                           const indicatorCellEntry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${week}`);
                           const indicatorTotalHours = indicatorCellEntry?.totalHours ?? 0;
+                          const indicatorProjectDeptTotalHours = assignmentIndex.projectDeptTotals.get(`${proj.id}|${dept}`) ?? 0;
                           const {
                             showHardOutOfRangeIndicator,
                             showSoftShiftIndicator,
-                          } = getCellShiftIndicators(proj, dept, week, indicatorTotalHours);
+                          } = getCellShiftIndicators(
+                            proj,
+                            dept,
+                            week,
+                            indicatorTotalHours,
+                            indicatorProjectDeptTotalHours
+                          );
                           const cellKey = getProjectCellKey(proj.id, dept, week);
                           return (
                             <td
@@ -6707,7 +6722,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const {
                                     showHardOutOfRangeIndicator,
                                     showSoftShiftIndicator,
-                                  } = getCellShiftIndicators(proj, dept, week, totalHours);
+                                  } = getCellShiftIndicators(
+                                    proj,
+                                    dept,
+                                    week,
+                                    totalHours,
+                                    assignmentIndex.projectDeptTotals.get(`${proj.id}|${dept}`) ?? 0
+                                  );
                                   const displacedCellBgClass = stageColor
                                     ? stageColor.bg
                                     : isDeptWeekInRange
