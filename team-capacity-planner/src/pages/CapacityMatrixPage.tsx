@@ -2121,6 +2121,33 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     });
   };
 
+  const handleClearHighProbabilityFromDepartment = async (project: Project) => {
+    if (departmentFilter === 'General' || departmentFilter === 'PM') {
+      return;
+    }
+
+    const dept = departmentFilter as Department;
+    if (!canEditDepartment(dept)) {
+      alert(
+        language === 'es'
+          ? 'No tienes permiso para modificar este proyecto en este departamento.'
+          : 'You do not have permission to update this project in this department.'
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      language === 'es'
+        ? `Quitar etiqueta High Probability del proyecto "${project.name}"?`
+        : `Remove High Probability label from project "${project.name}"?`
+    );
+    if (!confirmed) return;
+
+    await updateProject(project.id, {
+      isHighProbability: false,
+    });
+  };
+
   // Get projects that are not visible in the current department (available for import)
   const getAvailableProjectsForImport = (): Project[] => {
     const dept = departmentFilter as Department;
@@ -5858,6 +5885,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
                                 {language === 'es' ? 'High Probability' : 'High Probability'}
                               </span>
+                              {canEditDepartment(dept) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleClearHighProbabilityFromDepartment(proj);
+                                  }}
+                                  className="bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded text-[10px] font-semibold hover:bg-rose-200 transition"
+                                  title={language === 'es' ? 'Quitar etiqueta High Probability' : 'Remove High Probability label'}
+                                >
+                                  {language === 'es' ? 'Quitar HP' : 'Clear HP'}
+                                </button>
+                              )}
                             </>
                           )}
                           {proj.projectManagerId && (
@@ -7270,16 +7310,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <option value="">{t.selectAProject || '-- Select a project --'}</option>
                     {getAvailableProjectsForImport().map((proj) => (
                       <option key={proj.id} value={proj.id}>
-                        {proj.name} - {proj.client}
+                        {proj.name} - {proj.client}{proj.isHighProbability ? ` (${language === 'es' ? 'High Probability' : 'High Probability'})` : ''}
                       </option>
                     ))}
                   </select>
                   {importProjectForm.projectId && (() => {
                     const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
                     return selectedProject && (
-                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
+                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600 space-y-1">
                         <div><strong>{t.facility || 'Facility'}:</strong> {selectedProject.facility}</div>
                         <div><strong>{t.projectDates || 'Project Dates'}:</strong> {selectedProject.startDate}{' -> '}{selectedProject.endDate}</div>
+                        {selectedProject.isHighProbability && (
+                          <div className="rounded border border-amber-300 bg-amber-100 text-amber-900 px-2 py-1 text-[11px] font-semibold">
+                            {language === 'es'
+                              ? 'Este proyecto esta marcado como High Probability.'
+                              : 'This project is marked as High Probability.'}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
