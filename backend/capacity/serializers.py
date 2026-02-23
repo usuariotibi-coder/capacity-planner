@@ -2259,6 +2259,16 @@ class CaseInsensitiveTokenObtainPairSerializer(serializers.Serializer):
                     is_active=True
                 )
 
+                # Keep Django's last_login in sync with successful JWT logins.
+                try:
+                    User.objects.filter(id=user.id).update(last_login=timezone.now())
+                except Exception:
+                    logger.warning(
+                        "Could not update last_login for user_id=%s",
+                        user.id,
+                        exc_info=True,
+                    )
+
                 attrs['refresh'] = str(refresh)
                 attrs['access'] = str(refresh.access_token)
                 attrs['user_id'] = user.id

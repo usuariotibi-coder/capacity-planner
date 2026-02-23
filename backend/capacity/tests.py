@@ -327,6 +327,15 @@ class SessionControlTests(APITestCase):
         self.assertEqual(login_3.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(UserSession.objects.filter(user=self.user, is_active=True).count(), 2)
 
+    def test_successful_login_updates_last_login(self):
+        self.assertIsNone(self.user.last_login)
+
+        login_response = self._login('Device-LastLogin')
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.last_login)
+
     def test_session_status_is_checked_per_session_id(self):
         login_1 = self._login('Device-1')
         login_2 = self._login('Device-2')
