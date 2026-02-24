@@ -370,7 +370,8 @@ export function ResourcesPage() {
 
       forecastSheet.mergeCells(2, 1, 2, lastDayCol);
       const notesCell = forecastSheet.getCell(2, 1);
-      notesCell.value = `IND = unassigned time | MNG/ASSY/PTO = manual rows | Generated: ${generatedLabel}`;
+      const manualRowsLabel = department === 'HD' ? 'MNG/ASSY/PTO' : 'MNG/PTO';
+      notesCell.value = `IND = unassigned time (only when week has no assignments) | ${manualRowsLabel} = manual rows | Generated: ${generatedLabel}`;
       applyCellStyle(notesCell, { fill: 'EDE9FE', fontColor: '1F2937', bold: true, align: 'left' });
 
       forecastSheet.mergeCells(3, 1, 3, lastDayCol);
@@ -446,8 +447,6 @@ export function ResourcesPage() {
       let rowCursor = 7;
       sortedDepartmentEmployees.forEach((employee, employeeIndex) => {
         const employeeWeeks = assignmentByEmployeeWeek.get(employee.id) || new Map<string, Assignment[]>();
-        const employeeCapacity = getEmployeeCapacity(employee);
-
         const employeeProjects = new Map<string, { hours: number; changeOrders: Set<string> }>();
         employeeWeeks.forEach((weekAssignments) => {
           weekAssignments.forEach((assignment) => {
@@ -467,11 +466,12 @@ export function ResourcesPage() {
         const orderedProjects = [...employeeProjects.entries()]
           .sort((a, b) => b[1].hours - a[1].hours);
 
+        const includeAssyRow = department === 'HD';
         const indRow = rowCursor;
         const mngRow = rowCursor + 1;
-        const assyRow = rowCursor + 2;
-        const ptoRow = rowCursor + 3;
-        const projectStartRow = rowCursor + 4;
+        const assyRow = includeAssyRow ? rowCursor + 2 : null;
+        const ptoRow = includeAssyRow ? rowCursor + 3 : rowCursor + 2;
+        const projectStartRow = ptoRow + 1;
         const projectRowsCount = Math.max(1, orderedProjects.length);
         const blockEndRow = projectStartRow + projectRowsCount - 1;
 
@@ -496,7 +496,9 @@ export function ResourcesPage() {
 
         setupRowLabel(indRow, 'IND', 'FFF200', 'Indirect / unassigned hours (auto)');
         setupRowLabel(mngRow, 'MNG', 'F8CBAD', 'Management (manual)');
-        setupRowLabel(assyRow, 'ASSY', 'FFE699', 'Assembly (manual)');
+        if (assyRow !== null) {
+          setupRowLabel(assyRow, 'ASSY', 'FFE699', 'Assembly (manual)');
+        }
         setupRowLabel(ptoRow, 'PTO', 'CFE2F3', 'PTO (manual)');
 
         const projectRowById = new Map<string, number>();
@@ -532,13 +534,10 @@ export function ResourcesPage() {
           }
         }
 
-        let totalUnassignedHours = 0;
+        let weeksWithoutAssignments = 0;
 
         weeksForYear.forEach((week, weekIndex) => {
           const weekAssignments = employeeWeeks.get(week.weekStart) || [];
-          const weekTotalHours = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
-          const remainingWeekHours = Math.max(employeeCapacity - weekTotalHours, 0);
-          totalUnassignedHours += remainingWeekHours;
 
           const startCol = firstDayCol + (weekIndex * 7);
           const fillRowWeekdays = (row: number, value: string, fill: string, fontColor = '111827') => {
@@ -556,6 +555,7 @@ export function ResourcesPage() {
           };
 
           if (weekAssignments.length === 0) {
+            weeksWithoutAssignments += 1;
             fillRowWeekdays(indRow, 'IND', 'FFF200');
             return;
           }
@@ -572,14 +572,10 @@ export function ResourcesPage() {
             const projectCode = getProjectCode(projectId);
             fillRowWeekdays(row, projectCode, getProjectFill(projectId));
           });
-
-          if (remainingWeekHours > 0.1) {
-            fillRowWeekdays(indRow, 'IND', 'FFF2CC');
-          }
         });
 
         const indDetailsCell = forecastSheet.getCell(indRow, 3);
-        indDetailsCell.value = `Indirect / unassigned hours (auto) | ${formatHours(totalUnassignedHours)}h available`;
+        indDetailsCell.value = `Indirect / unassigned hours (auto) | ${weeksWithoutAssignments} weeks without assignments`;
         applyCellStyle(indDetailsCell, { fill: 'FFFFFF', align: 'left' });
 
         const separatorRow = blockEndRow + 1;
