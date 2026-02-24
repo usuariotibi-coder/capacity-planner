@@ -587,25 +587,6 @@ export function ResourcesPage() {
         rowCursor = separatorRow + 1;
       });
 
-      const dashboardSheet = workbook.addWorksheet('Dashboard');
-      dashboardSheet.columns = [
-        { width: 26 },
-        { width: 22 },
-        { width: 22 },
-        { width: 22 },
-        { width: 22 },
-      ];
-
-      dashboardSheet.mergeCells('A1:E1');
-      const dashTitle = dashboardSheet.getCell('A1');
-      dashTitle.value = `Dashboard - ${department} (${selectedYear})`;
-      applyCellStyle(dashTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
-
-      dashboardSheet.mergeCells('A2:E2');
-      const dashSubTitle = dashboardSheet.getCell('A2');
-      dashSubTitle.value = `Generated: ${generatedLabel}`;
-      applyCellStyle(dashSubTitle, { fill: 'EDE9FE', align: 'left', bold: true });
-
       const totalCapacityHours = sortedDepartmentEmployees.reduce(
         (sum, employee) => sum + (getEmployeeCapacity(employee) * weeksForYear.length),
         0
@@ -619,30 +600,6 @@ export function ResourcesPage() {
           .filter((changeOrderId): changeOrderId is string => Boolean(changeOrderId))
       ).size;
 
-      const kpiHeaders = ['Resources', 'Projects', 'Assigned Hours', 'Avg Utilization', 'Change Orders'];
-      const kpiValues = [
-        sortedDepartmentEmployees.length,
-        totalProjects,
-        `${formatHours(totalAssignedHours)}h`,
-        `${formatHours(avgUtilization)}%`,
-        totalCOs,
-      ];
-
-      for (let col = 1; col <= 5; col += 1) {
-        const headerCell = dashboardSheet.getCell(4, col);
-        headerCell.value = kpiHeaders[col - 1];
-        applyCellStyle(headerCell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true });
-
-        const valueCell = dashboardSheet.getCell(5, col);
-        valueCell.value = kpiValues[col - 1];
-        applyCellStyle(valueCell, { fill: 'F9FAFB', bold: true, size: 11 });
-      }
-
-      dashboardSheet.getCell('A7').value = 'Top Resources (assigned hours)';
-      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
-      dashboardSheet.mergeCells('A7:E7');
-      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
-
       const topResourceRows = sortedDepartmentEmployees
         .map((employee) => {
           const employeeHours = (assignmentByEmployeeWeek.get(employee.id) || new Map<string, Assignment[]>());
@@ -650,28 +607,191 @@ export function ResourcesPage() {
           employeeHours.forEach((rows) => {
             rows.forEach((assignment) => { totalHours += getAssignmentHours(assignment); });
           });
-          return { employee, totalHours };
+          return { employee, totalHours, activeWeeks: employeeHours.size };
         })
         .sort((a, b) => b.totalHours - a.totalHours)
-        .slice(0, 10);
+        .slice(0, 12);
 
-      dashboardSheet.getRow(8).values = ['Resource', 'Role', 'Assigned h', 'Capacity h', 'Utilization %'];
-      dashboardSheet.getRow(8).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
+      const sortedProjects = [...projectSummary.entries()].sort((a, b) => b[1].hours - a[1].hours);
+
+      const weeklyTotals = new Map<string, number>();
+      departmentAssignments.forEach((assignment) => {
+        const week = normalizeWeekStartDate(assignment.weekStartDate);
+        weeklyTotals.set(week, (weeklyTotals.get(week) || 0) + getAssignmentHours(assignment));
+      });
+
+      const dashboardSheet = workbook.addWorksheet('Dashboard');
+      dashboardSheet.columns = Array.from({ length: 16 }, () => ({ width: 14 }));
+      dashboardSheet.views = [{ state: 'frozen', ySplit: 10 }];
+
+      dashboardSheet.mergeCells(1, 1, 2, 16);
+      const dashTitle = dashboardSheet.getCell(1, 1);
+      dashTitle.value = `${department} Resources Dashboard ${selectedYear}`;
+      applyCellStyle(dashTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 18, align: 'left' });
+
+      dashboardSheet.mergeCells(3, 1, 3, 16);
+      const dashSubTitle = dashboardSheet.getCell(3, 1);
+      dashSubTitle.value = `Generated: ${generatedLabel} | View: weekly aggregation`;
+      applyCellStyle(dashSubTitle, { fill: 'EDE9FE', align: 'left', bold: true, size: 10 });
+
+      type KpiCard = {
+        title: string;
+        value: string;
+        titleRange: [number, number, number, number];
+        valueRange: [number, number, number, number];
+        accent: string;
+      };
+      const kpiCards: KpiCard[] = [
+        { title: 'Resources', value: `${sortedDepartmentEmployees.length}`, titleRange: [5, 1, 5, 3], valueRange: [6, 1, 8, 3], accent: 'DBEAFE' },
+        { title: 'Projects', value: `${totalProjects}`, titleRange: [5, 4, 5, 6], valueRange: [6, 4, 8, 6], accent: 'DCFCE7' },
+        { title: 'Assigned Hours', value: `${formatHours(totalAssignedHours)}h`, titleRange: [5, 7, 5, 9], valueRange: [6, 7, 8, 9], accent: 'FEF3C7' },
+        { title: 'Avg Utilization', value: `${formatHours(avgUtilization)}%`, titleRange: [5, 10, 5, 12], valueRange: [6, 10, 8, 12], accent: 'FEE2E2' },
+        { title: 'Change Orders', value: `${totalCOs}`, titleRange: [5, 13, 5, 16], valueRange: [6, 13, 8, 16], accent: 'EDE9FE' },
+      ];
+
+      kpiCards.forEach((card) => {
+        dashboardSheet.mergeCells(card.titleRange[0], card.titleRange[1], card.titleRange[2], card.titleRange[3]);
+        const titleCell = dashboardSheet.getCell(card.titleRange[0], card.titleRange[1]);
+        titleCell.value = card.title;
+        applyCellStyle(titleCell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 10 });
+
+        dashboardSheet.mergeCells(card.valueRange[0], card.valueRange[1], card.valueRange[2], card.valueRange[3]);
+        const valueCell = dashboardSheet.getCell(card.valueRange[0], card.valueRange[1]);
+        valueCell.value = card.value;
+        applyCellStyle(valueCell, { fill: card.accent, bold: true, size: 22 });
+      });
+
+      dashboardSheet.mergeCells(10, 1, 10, 8);
+      const topResourcesTitle = dashboardSheet.getCell(10, 1);
+      topResourcesTitle.value = 'Top Resources';
+      applyCellStyle(topResourcesTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 11, align: 'left' });
+
+      dashboardSheet.mergeCells(10, 9, 10, 16);
+      const topProjectsTitle = dashboardSheet.getCell(10, 9);
+      topProjectsTitle.value = 'Top Projects';
+      applyCellStyle(topProjectsTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 11, align: 'left' });
+
+      const resourceHeaderRow = 11;
+      const resourceHeaders = ['#', 'Resource', 'Role', 'Assigned h', 'Cap h', 'Util %', 'Active weeks', 'Avg h/wk'];
+      resourceHeaders.forEach((header, index) => {
+        const cell = dashboardSheet.getCell(resourceHeaderRow, index + 1);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 });
+      });
 
       topResourceRows.forEach((entry, index) => {
-        const rowNumber = 9 + index;
+        const rowNumber = resourceHeaderRow + 1 + index;
         const totalCapacity = getEmployeeCapacity(entry.employee) * weeksForYear.length;
         const util = totalCapacity > 0 ? (entry.totalHours / totalCapacity) * 100 : 0;
-        dashboardSheet.getRow(rowNumber).values = [
+        const avgPerWeek = entry.activeWeeks > 0 ? entry.totalHours / entry.activeWeeks : 0;
+        const values = [
+          index + 1,
           entry.employee.name,
           entry.employee.role || '',
           formatHours(entry.totalHours),
           formatHours(totalCapacity),
           formatHours(util),
+          entry.activeWeeks,
+          formatHours(avgPerWeek),
         ];
-        dashboardSheet.getRow(rowNumber).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: index % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 2 ? 'left' : 'center' })
-        );
+        values.forEach((value, colOffset) => {
+          const cell = dashboardSheet.getCell(rowNumber, colOffset + 1);
+          cell.value = value;
+          applyCellStyle(cell, {
+            fill: index % 2 === 0 ? 'FFFFFF' : 'F9FAFB',
+            align: colOffset <= 2 ? 'left' : 'center',
+            size: 9,
+          });
+        });
+      });
+
+      const projectHeaderRow = 11;
+      const projectHeaders = ['Code', 'Project', 'Client', 'Hours', 'Resources', 'COs', 'HP', 'Active weeks'];
+      projectHeaders.forEach((header, index) => {
+        const cell = dashboardSheet.getCell(projectHeaderRow, 9 + index);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 });
+      });
+
+      sortedProjects.slice(0, 12).forEach(([projectId, summary], index) => {
+        const project = projectById.get(projectId);
+        const rowNumber = projectHeaderRow + 1 + index;
+        const coCount = summary.changeOrders.size;
+        const values = [
+          getProjectCode(projectId),
+          project?.name || 'Deleted project',
+          project?.client || '',
+          formatHours(summary.hours),
+          summary.resources.size,
+          coCount,
+          project?.isHighProbability ? 'Yes' : 'No',
+          summary.weeks.size,
+        ];
+        values.forEach((value, colOffset) => {
+          const cell = dashboardSheet.getCell(rowNumber, 9 + colOffset);
+          cell.value = value;
+          applyCellStyle(cell, {
+            fill: index % 2 === 0 ? 'FFFFFF' : 'F9FAFB',
+            align: colOffset <= 2 ? 'left' : 'center',
+            size: 9,
+          });
+          if (colOffset === 6 && value === 'Yes') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+            cell.font = { bold: true, size: 9, color: { argb: '92400E' } };
+          }
+        });
+      });
+
+      const weeklySectionStart = 26;
+      dashboardSheet.mergeCells(weeklySectionStart, 1, weeklySectionStart, 16);
+      const weeklySectionTitle = dashboardSheet.getCell(weeklySectionStart, 1);
+      weeklySectionTitle.value = 'Weekly Load Snapshot';
+      applyCellStyle(weeklySectionTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 11, align: 'left' });
+
+      const weeklyHeaderRow = weeklySectionStart + 1;
+      const weeklyHeaders = ['CW', 'Week Start', 'Assigned h', 'Capacity h', 'Util %', 'Load bar'];
+      weeklyHeaders.forEach((header, idx) => {
+        const col = idx === 5 ? 6 : idx + 1;
+        if (idx === 5) {
+          dashboardSheet.mergeCells(weeklyHeaderRow, 6, weeklyHeaderRow, 16);
+        }
+        const cell = dashboardSheet.getCell(weeklyHeaderRow, col);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 });
+      });
+
+      const weeklyRows = weeksForYear.slice(0, 20).map((week) => {
+        const assigned = weeklyTotals.get(week.weekStart) || 0;
+        const capacity = sortedDepartmentEmployees.reduce((sum, employee) => sum + getEmployeeCapacity(employee), 0);
+        const util = capacity > 0 ? (assigned / capacity) * 100 : 0;
+        return { week, assigned, capacity, util };
+      });
+
+      weeklyRows.forEach((entry, index) => {
+        const row = weeklyHeaderRow + 1 + index;
+        const barUnits = Math.max(0, Math.min(20, Math.round((entry.util / 100) * 20)));
+        const bar = `${'█'.repeat(barUnits)}${'░'.repeat(20 - barUnits)} ${formatHours(entry.util)}%`;
+        const utilColor = entry.util > 100 ? 'FEE2E2' : entry.util >= 85 ? 'FEF3C7' : 'DCFCE7';
+        const values: Array<{ col: number; value: string | number; align?: 'left' | 'center' }> = [
+          { col: 1, value: entry.week.weekNum },
+          { col: 2, value: entry.week.weekStart },
+          { col: 3, value: formatHours(entry.assigned) },
+          { col: 4, value: formatHours(entry.capacity) },
+          { col: 5, value: formatHours(entry.util) },
+        ];
+        values.forEach((item) => {
+          const cell = dashboardSheet.getCell(row, item.col);
+          cell.value = item.value;
+          applyCellStyle(cell, {
+            fill: item.col === 5 ? utilColor : (index % 2 === 0 ? 'FFFFFF' : 'F9FAFB'),
+            align: item.align || (item.col <= 2 ? 'left' : 'center'),
+            size: 9,
+          });
+        });
+        dashboardSheet.mergeCells(row, 6, row, 16);
+        const barCell = dashboardSheet.getCell(row, 6);
+        barCell.value = bar;
+        applyCellStyle(barCell, { fill: utilColor, align: 'left', size: 9 });
       });
 
       const internalSheet = workbook.addWorksheet('Internal Dashboard');
@@ -686,16 +806,17 @@ export function ResourcesPage() {
         { width: 36 },
         { width: 12 },
       ];
+      internalSheet.views = [{ state: 'frozen', ySplit: 6 }];
 
       internalSheet.mergeCells('A1:I1');
       const internalTitle = internalSheet.getCell('A1');
       internalTitle.value = `Internal Dashboard - ${department} (${selectedYear})`;
-      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
+      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 14, align: 'left' });
 
       internalSheet.mergeCells('A2:I2');
       const internalSubTitle = internalSheet.getCell('A2');
-      internalSubTitle.value = `Generated: ${generatedLabel}`;
-      applyCellStyle(internalSubTitle, { fill: 'EDE9FE', bold: true, align: 'left' });
+      internalSubTitle.value = `Generated: ${generatedLabel} | Source: assignments + projects + change orders`;
+      applyCellStyle(internalSubTitle, { fill: 'EDE9FE', bold: true, align: 'left', size: 10 });
 
       internalSheet.getRow(4).values = [
         'Project Code',
@@ -708,9 +829,8 @@ export function ResourcesPage() {
         'Change Orders',
         'Weeks',
       ];
-      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true }));
+      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 10 }));
 
-      const sortedProjects = [...projectSummary.entries()].sort((a, b) => b[1].hours - a[1].hours);
       let internalRow = 5;
       sortedProjects.forEach(([projectId, summary], idx) => {
         const project = projectById.get(projectId);
@@ -726,7 +846,7 @@ export function ResourcesPage() {
           summary.weeks.size,
         ];
         internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center' })
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center', size: 9 })
         );
         internalRow += 1;
       });
@@ -735,11 +855,11 @@ export function ResourcesPage() {
       internalSheet.mergeCells(internalRow, 1, internalRow, 9);
       const detailTitle = internalSheet.getCell(internalRow, 1);
       detailTitle.value = 'Assignment Detail';
-      applyCellStyle(detailTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
+      applyCellStyle(detailTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left', size: 11 });
       internalRow += 1;
 
       internalSheet.getRow(internalRow).values = ['Week Start', 'CW', 'Resource', 'Project', 'Project Code', 'Hours', 'CO', 'Stage', 'Comment'];
-      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
+      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 }));
       internalRow += 1;
 
       const sortedAssignments = [...departmentAssignments].sort((a, b) => {
@@ -768,7 +888,7 @@ export function ResourcesPage() {
           assignment.comment || '',
         ];
         internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center' })
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center', size: 9 })
         );
         internalRow += 1;
       });
