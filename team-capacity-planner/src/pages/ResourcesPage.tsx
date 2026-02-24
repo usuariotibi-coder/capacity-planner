@@ -7,7 +7,7 @@ import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { changeOrdersApi } from '../services/api';
 import type { Assignment, Employee, Department, ProjectChangeOrder } from '../types';
 import { generateId } from '../utils/id';
-import { getAllWeeksWithNextYear } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, normalizeWeekStartDate, parseISODate, formatToISO } from '../utils/dateUtils';
 import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X, Download, FileSpreadsheet } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -201,484 +201,583 @@ export function ResourcesPage() {
       const dateStamp = generatedAt.toISOString().slice(0, 10);
       const generatedLabel = generatedAt.toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
 
-      const weekMap = new Map(allWeeksData.map((week) => [week.date, week.weekNum]));
-      const projectById = new Map(projects.map((project) => [project.id, project]));
+      const weeksForYear = allWeeksData
+        .filter((week) => !week.isNextYear)
+        .map((week) => {
+          const normalizedWeek = normalizeWeekStartDate(week.date);
+          const weekStartDate = parseISODate(normalizedWeek);
+          if (Number.isNaN(weekStartDate.getTime())) return null;
+
+          const days = Array.from({ length: 7 }, (_, offset) => {
+            const dayDate = new Date(weekStartDate);
+            dayDate.setDate(weekStartDate.getDate() + offset);
+            return {
+              offset,
+              iso: formatToISO(dayDate),
+              date: dayDate,
+            };
+          });
+
+          return {
+            weekStart: normalizedWeek,
+            weekNum: week.weekNum,
+            days,
+          };
+        })
+        .filter((week): week is { weekStart: string; weekNum: number; days: { offset: number; iso: string; date: Date }[] } => Boolean(week));
+
+      if (weeksForYear.length === 0) {
+        alert(language === 'es'
+          ? 'No se encontraron semanas para el año seleccionado.'
+          : 'No weeks were found for the selected year.');
+        return;
+      }
+
+      const dayColumns = weeksForYear.flatMap((week, weekIndex) =>
+        week.days.map((day) => ({
+          ...day,
+          weekIndex,
+          weekNum: week.weekNum,
+          weekStart: week.weekStart,
+        }))
+      );
+      const weekStartSet = new Set(weeksForYear.map((week) => week.weekStart));
+
       const departmentEmployeeIds = new Set(deptEmployees.map((employee) => employee.id));
       const departmentAssignments = assignments.filter((assignment) =>
-        departmentEmployeeIds.has(assignment.employeeId) && hasWorkHours(assignment)
+        departmentEmployeeIds.has(assignment.employeeId) &&
+        hasWorkHours(assignment) &&
+        weekStartSet.has(normalizeWeekStartDate(assignment.weekStartDate))
       );
+
+      const projectById = new Map(projects.map((project) => [project.id, project]));
+      const projectIndexById = new Map(projects.map((project, index) => [project.id, index]));
 
       let allChangeOrders: ProjectChangeOrder[] = [];
       try {
         const changeOrderRows = await changeOrdersApi.getAll();
-        allChangeOrders = (Array.isArray(changeOrderRows) ? changeOrderRows : []).filter((order) => order?.department === department);
+        allChangeOrders = (Array.isArray(changeOrderRows) ? changeOrderRows : [])
+          .filter((order) => order?.department === department);
       } catch (changeOrderError) {
         console.error('[ResourcesPage] Failed to load change orders for export:', changeOrderError);
       }
       const changeOrderById = new Map(allChangeOrders.map((order) => [order.id, order]));
 
-      const HEADER_FILL = '2E1A47';
-      const HEADER_TEXT = 'FFFFFF';
-      const ACCENT_FILL = 'EDE9FE';
-      const BODY_BORDER = 'D6D3E1';
+      const assignmentByEmployeeWeek = new Map<string, Map<string, Assignment[]>>();
+      departmentAssignments.forEach((assignment) => {
+        const normalizedWeek = normalizeWeekStartDate(assignment.weekStartDate);
+        const employeeWeeks = assignmentByEmployeeWeek.get(assignment.employeeId) || new Map<string, Assignment[]>();
+        const currentWeekAssignments = employeeWeeks.get(normalizedWeek) || [];
+        currentWeekAssignments.push(assignment);
+        employeeWeeks.set(normalizedWeek, currentWeekAssignments);
+        assignmentByEmployeeWeek.set(assignment.employeeId, employeeWeeks);
+      });
 
-      const applyHeader = (cell: any) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } };
-        cell.font = { bold: true, color: { argb: HEADER_TEXT }, size: 10 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: BODY_BORDER } },
-          left: { style: 'thin', color: { argb: BODY_BORDER } },
-          bottom: { style: 'thin', color: { argb: BODY_BORDER } },
-          right: { style: 'thin', color: { argb: BODY_BORDER } },
+      const projectSummary = new Map<string, { hours: number; resources: Set<string>; changeOrders: Set<string>; weeks: Set<string> }>();
+      departmentAssignments.forEach((assignment) => {
+        const entry = projectSummary.get(assignment.projectId) || {
+          hours: 0,
+          resources: new Set<string>(),
+          changeOrders: new Set<string>(),
+          weeks: new Set<string>(),
         };
-      };
+        entry.hours += getAssignmentHours(assignment);
+        entry.resources.add(assignment.employeeId);
+        entry.weeks.add(normalizeWeekStartDate(assignment.weekStartDate));
+        if (assignment.changeOrderId) {
+          const changeOrderName = changeOrderById.get(assignment.changeOrderId)?.name;
+          if (changeOrderName) entry.changeOrders.add(changeOrderName);
+        }
+        projectSummary.set(assignment.projectId, entry);
+      });
 
-      const applyBody = (cell: any, fill = 'FFFFFF', align: 'left' | 'center' | 'right' = 'left') => {
+      const BRAND_PURPLE = '2E1A47';
+      const BRAND_PURPLE_ALT = '46236A';
+      const BRAND_YELLOW = 'F6DD4E';
+      const BORDER = '9CA3AF';
+      const WHITE = 'FFFFFF';
+      const WEEKEND_BG = 'D1D5DB';
+      const PROJECT_COLORS = ['9FE7B8', 'F9D7A9', 'A5BFF3', 'F7CF68', 'DAB6EB', 'B8E8F2', 'F7B1B3', 'B2E0CE'];
+
+      const applyCellStyle = (
+        cell: any,
+        options: {
+          fill?: string;
+          fontColor?: string;
+          bold?: boolean;
+          size?: number;
+          align?: 'left' | 'center' | 'right';
+          vertical?: 'top' | 'middle' | 'bottom';
+          wrap?: boolean;
+        } = {}
+      ) => {
+        const {
+          fill = WHITE,
+          fontColor = '111827',
+          bold = false,
+          size = 9,
+          align = 'center',
+          vertical = 'middle',
+          wrap = true,
+        } = options;
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-        cell.font = { color: { argb: '1F2937' }, size: 9 };
-        cell.alignment = { vertical: 'middle', horizontal: align, wrapText: true };
+        cell.font = { bold, size, color: { argb: fontColor } };
+        cell.alignment = { horizontal: align, vertical, wrapText: wrap };
         cell.border = {
-          top: { style: 'thin', color: { argb: BODY_BORDER } },
-          left: { style: 'thin', color: { argb: BODY_BORDER } },
-          bottom: { style: 'thin', color: { argb: BODY_BORDER } },
-          right: { style: 'thin', color: { argb: BODY_BORDER } },
+          top: { style: 'thin', color: { argb: BORDER } },
+          left: { style: 'thin', color: { argb: BORDER } },
+          bottom: { style: 'thin', color: { argb: BORDER } },
+          right: { style: 'thin', color: { argb: BORDER } },
         };
       };
 
-      const summarySheet = workbook.addWorksheet(language === 'es' ? 'Resumen Recursos' : 'Resource Summary');
-      summarySheet.columns = [
-        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 28 },
-        { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 24 },
-        { header: language === 'es' ? 'Capacidad h/sem' : 'Capacity h/wk', key: 'capacity', width: 14 },
-        { header: language === 'es' ? 'Estado' : 'Status', key: 'status', width: 12 },
-        { header: language === 'es' ? 'Horas Asignadas' : 'Assigned Hours', key: 'hours', width: 15 },
-        { header: language === 'es' ? 'Proyectos' : 'Projects', key: 'projects', width: 12 },
-        { header: language === 'es' ? 'Change Orders' : 'Change Orders', key: 'changeOrders', width: 14 },
-        { header: language === 'es' ? 'Promedio h/sem' : 'Avg h/week', key: 'avg', width: 14 },
-      ];
+      const getProjectCode = (projectId: string): string => {
+        const project = projectById.get(projectId);
+        if (!project?.name) return 'N/A';
+        const numberMatch = project.name.match(/\b\d{3,5}\b/);
+        if (numberMatch) return numberMatch[0];
+        const token = project.name.split('-')[0].trim();
+        return token.slice(0, 12).toUpperCase();
+      };
 
-      summarySheet.mergeCells('A1:H1');
-      const summaryTitle = summarySheet.getCell('A1');
-      summaryTitle.value = `${language === 'es' ? 'Exportacion de Recursos' : 'Resources Export'} - ${department}`;
-      applyHeader(summaryTitle);
-      summaryTitle.font = { ...summaryTitle.font, size: 13 };
+      const getProjectFill = (projectId: string): string => {
+        const project = projectById.get(projectId);
+        if (project?.isHighProbability) return 'FFD966';
+        const projectIndex = projectIndexById.get(projectId);
+        if (typeof projectIndex !== 'number') return 'E5E7EB';
+        return PROJECT_COLORS[projectIndex % PROJECT_COLORS.length];
+      };
 
-      summarySheet.mergeCells('A2:H2');
-      const summaryMeta = summarySheet.getCell('A2');
-      summaryMeta.value = `${language === 'es' ? 'Ano' : 'Year'}: ${selectedYear} | ${language === 'es' ? 'Generado' : 'Generated'}: ${generatedLabel}`;
-      applyBody(summaryMeta, ACCENT_FILL, 'left');
+      const weekNumByStart = new Map(weeksForYear.map((week) => [week.weekStart, week.weekNum]));
 
-      summarySheet.getRow(3).values = summarySheet.columns.map((column) => column.header as string);
-      summarySheet.getRow(3).eachCell((cell: any) => applyHeader(cell));
-
-      deptEmployees.forEach((employee) => {
-        const employeeAssignments = departmentAssignments.filter((assignment) => assignment.employeeId === employee.id);
-        const totalHours = employeeAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
-        const uniqueProjects = new Set(employeeAssignments.map((assignment) => assignment.projectId));
-        const employeeChangeOrders = new Set(
-          employeeAssignments
-            .map((assignment) => assignment.changeOrderId)
-            .filter((changeOrderId): changeOrderId is string => Boolean(changeOrderId))
-        );
-        const avgPerWeek = allWeeksData.length > 0 ? totalHours / allWeeksData.length : totalHours;
-
-        summarySheet.addRow({
-          resource: employee.name,
-          role: employee.role,
-          capacity: getEmployeeCapacity(employee),
-          status: employee.isActive ? (language === 'es' ? 'Activo' : 'Active') : (language === 'es' ? 'Inactivo' : 'Inactive'),
-          hours: Math.round(totalHours * 100) / 100,
-          projects: uniqueProjects.size,
-          changeOrders: employeeChangeOrders.size,
-          avg: Math.round(avgPerWeek * 100) / 100,
-        });
-      });
-
-      for (let row = 4; row <= summarySheet.rowCount; row += 1) {
-        const current = summarySheet.getRow(row);
-        current.eachCell((cell: any, colNumber: number) => {
-          const isNumeric = [3, 5, 6, 7, 8].includes(colNumber);
-          applyBody(cell, 'FFFFFF', isNumeric ? 'center' : 'left');
-        });
+      const forecastSheetName = `${department} Forecast ${selectedYear}`;
+      const forecastSheet = workbook.addWorksheet(forecastSheetName);
+      const firstDayCol = 4;
+      const lastDayCol = firstDayCol + dayColumns.length - 1;
+      forecastSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 6 }];
+      forecastSheet.properties.defaultRowHeight = 18;
+      forecastSheet.getColumn(1).width = 13;
+      forecastSheet.getColumn(2).width = 13;
+      forecastSheet.getColumn(3).width = 24;
+      for (let col = firstDayCol; col <= lastDayCol; col += 1) {
+        forecastSheet.getColumn(col).width = 5;
       }
 
-      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Asignaciones' : 'Assignments');
-      detailSheet.columns = [
-        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
-        { header: language === 'es' ? 'Semana' : 'Week', key: 'week', width: 12 },
-        { header: 'CW', key: 'cw', width: 8 },
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
-        { header: language === 'es' ? 'Cliente' : 'Client', key: 'client', width: 20 },
-        { header: language === 'es' ? 'Horas Totales' : 'Total Hours', key: 'hours', width: 12 },
-        { header: language === 'es' ? 'Horas SCIO' : 'SCIO Hours', key: 'scio', width: 12 },
-        { header: language === 'es' ? 'Horas Externas' : 'External Hours', key: 'external', width: 14 },
-        { header: language === 'es' ? 'Etapa' : 'Stage', key: 'stage', width: 24 },
-        { header: language === 'es' ? 'Change Order' : 'Change Order', key: 'co', width: 18 },
-        { header: language === 'es' ? 'CO Cotizado (h)' : 'CO Quoted (h)', key: 'coQuoted', width: 14 },
-        { header: language === 'es' ? 'Comentario' : 'Comment', key: 'comment', width: 36 },
-      ];
-      detailSheet.getRow(1).values = detailSheet.columns.map((column) => column.header as string);
-      detailSheet.getRow(1).eachCell((cell: any) => applyHeader(cell));
+      forecastSheet.mergeCells(1, 1, 1, lastDayCol);
+      const titleCell = forecastSheet.getCell(1, 1);
+      titleCell.value = `${forecastSheetName} | Capacity base: ${DEFAULT_WEEKLY_CAPACITY}h/week`;
+      applyCellStyle(titleCell, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
 
-      const sortedAssignments = [...departmentAssignments].sort((a, b) => {
-        const employeeA = employees.find((employee) => employee.id === a.employeeId)?.name || '';
-        const employeeB = employees.find((employee) => employee.id === b.employeeId)?.name || '';
-        if (employeeA !== employeeB) return employeeA.localeCompare(employeeB);
-        return a.weekStartDate.localeCompare(b.weekStartDate);
-      });
+      forecastSheet.mergeCells(2, 1, 2, lastDayCol);
+      const notesCell = forecastSheet.getCell(2, 1);
+      notesCell.value = `IND = unassigned time | MNG/ASSY/PTO = manual rows | Generated: ${generatedLabel}`;
+      applyCellStyle(notesCell, { fill: 'EDE9FE', fontColor: '1F2937', bold: true, align: 'left' });
 
-      sortedAssignments.forEach((assignment) => {
-        const employee = employees.find((item) => item.id === assignment.employeeId);
-        const project = projectById.get(assignment.projectId);
-        const changeOrder = assignment.changeOrderId ? changeOrderById.get(assignment.changeOrderId) : undefined;
-        const scioHours = typeof assignment.scioHours === 'number' ? assignment.scioHours : 0;
-        const externalHours = typeof assignment.externalHours === 'number' ? assignment.externalHours : 0;
+      forecastSheet.mergeCells(3, 1, 3, lastDayCol);
+      const legendCell = forecastSheet.getCell(3, 1);
+      legendCell.value = 'Dashboard tabs included: Dashboard, Internal Dashboard';
+      applyCellStyle(legendCell, { fill: 'F3F4F6', fontColor: '374151', align: 'left' });
 
-        detailSheet.addRow({
-          resource: employee?.name || (language === 'es' ? 'Recurso eliminado' : 'Deleted resource'),
-          week: assignment.weekStartDate,
-          cw: weekMap.get(assignment.weekStartDate) || '',
-          project: project?.name || (language === 'es' ? 'Proyecto eliminado' : 'Deleted project'),
-          client: project?.client || '',
-          hours: Math.round(getAssignmentHours(assignment) * 100) / 100,
-          scio: Math.round(scioHours * 100) / 100,
-          external: Math.round(externalHours * 100) / 100,
-          stage: assignment.stage || '',
-          co: changeOrder?.name || '',
-          coQuoted: changeOrder?.hoursQuoted || 0,
-          comment: assignment.comment || '',
-        });
-      });
+      forecastSheet.mergeCells(4, 1, 6, 1);
+      const resourceHeader = forecastSheet.getCell(4, 1);
+      resourceHeader.value = 'Resource';
+      applyCellStyle(resourceHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
 
-      if (detailSheet.rowCount === 1) {
-        detailSheet.addRow({
-          resource: language === 'es' ? 'Sin asignaciones para este departamento en el ano seleccionado.' : 'No assignments for this department in the selected year.',
-        });
-      }
+      forecastSheet.mergeCells(4, 2, 6, 2);
+      const typeHeader = forecastSheet.getCell(4, 2);
+      typeHeader.value = 'Type';
+      applyCellStyle(typeHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
 
-      for (let row = 2; row <= detailSheet.rowCount; row += 1) {
-        const current = detailSheet.getRow(row);
-        current.eachCell((cell: any, colNumber: number) => {
-          const isNumeric = [2, 3, 6, 7, 8, 11].includes(colNumber);
-          applyBody(cell, row % 2 === 0 ? 'FFFFFF' : 'FAFAFF', isNumeric ? 'center' : 'left');
-        });
-      }
+      forecastSheet.mergeCells(4, 3, 6, 3);
+      const detailHeader = forecastSheet.getCell(4, 3);
+      detailHeader.value = 'Details';
+      applyCellStyle(detailHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
 
-      const calendarWeeks = allWeeksData.filter((week) => !week.isNextYear);
-      const calendarSheet = workbook.addWorksheet(language === 'es' ? 'Calendario Semanal' : 'Weekly Calendar');
-      const totalCalendarColumns = 3 + calendarWeeks.length;
-      calendarSheet.properties.defaultRowHeight = 22;
-      calendarSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 5 }];
-      calendarSheet.columns = [
-        { header: language === 'es' ? 'Recurso' : 'Resource', key: 'resource', width: 24 },
-        { header: language === 'es' ? 'Rol' : 'Role', key: 'role', width: 18 },
-        { header: language === 'es' ? 'Cap. h/sem' : 'Cap. h/wk', key: 'capacity', width: 10 },
-        ...calendarWeeks.map((_, index) => ({
-          header: `CW_${index}`,
-          key: `cw_${index}`,
-          width: 22,
-        })),
-      ];
-
-      const weekDateFormatter = new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', {
-        month: 'short',
-        day: '2-digit',
-      });
-      const monthFormatter = new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', {
-        month: 'long',
-        year: 'numeric',
-      });
-
-      calendarSheet.mergeCells(1, 1, 1, totalCalendarColumns);
-      const calendarTitle = calendarSheet.getCell(1, 1);
-      calendarTitle.value = `${language === 'es' ? 'Calendario Semanal por Recurso' : 'Weekly Resource Calendar'} - ${department}`;
-      applyHeader(calendarTitle);
-      calendarTitle.font = { ...calendarTitle.font, size: 14 };
-
-      calendarSheet.mergeCells(2, 1, 2, totalCalendarColumns);
-      const calendarMeta = calendarSheet.getCell(2, 1);
-      calendarMeta.value = language === 'es'
-        ? `Ano: ${selectedYear} | Vista por semana: Total + % ocupacion + proyectos`
-        : `Year: ${selectedYear} | Weekly view: Total + % utilization + projects`;
-      applyBody(calendarMeta, ACCENT_FILL, 'left');
-
-      // Legend row
-      calendarSheet.mergeCells(3, 1, 3, 2);
-      const legendLabel = calendarSheet.getCell(3, 1);
-      legendLabel.value = language === 'es' ? 'Leyenda de colores' : 'Color legend';
-      applyBody(legendLabel, 'EEF2FF', 'left');
-      legendLabel.font = { ...(legendLabel.font || {}), bold: true, color: { argb: '312E81' } };
-
-      const legendCapacity = calendarSheet.getCell(3, 3);
-      legendCapacity.value = language === 'es' ? `Capacidad base: ${DEFAULT_WEEKLY_CAPACITY}h` : `Base capacity: ${DEFAULT_WEEKLY_CAPACITY}h`;
-      applyBody(legendCapacity, 'F3F4F6', 'center');
-      legendCapacity.font = { ...(legendCapacity.font || {}), bold: true };
-
-      const legendStartCol = 4;
-      const legendSpans = Math.max(1, Math.floor((totalCalendarColumns - legendStartCol + 1) / 3));
-      const normalEnd = Math.min(totalCalendarColumns, legendStartCol + legendSpans - 1);
-      const warningEnd = Math.min(totalCalendarColumns, normalEnd + legendSpans);
-
-      calendarSheet.mergeCells(3, legendStartCol, 3, normalEnd);
-      const normalLegend = calendarSheet.getCell(3, legendStartCol);
-      normalLegend.value = language === 'es' ? 'Normal (0% - 84%)' : 'Normal (0% - 84%)';
-      applyBody(normalLegend, 'DBEAFE', 'center');
-      normalLegend.font = { ...(normalLegend.font || {}), bold: true };
-
-      if (normalEnd + 1 <= warningEnd) {
-        calendarSheet.mergeCells(3, normalEnd + 1, 3, warningEnd);
-        const warningLegend = calendarSheet.getCell(3, normalEnd + 1);
-        warningLegend.value = language === 'es' ? 'Atencion (85% - 100%)' : 'Warning (85% - 100%)';
-        applyBody(warningLegend, 'FEF3C7', 'center');
-        warningLegend.font = { ...(warningLegend.font || {}), bold: true };
-      }
-
-      if (warningEnd + 1 <= totalCalendarColumns) {
-        calendarSheet.mergeCells(3, warningEnd + 1, 3, totalCalendarColumns);
-        const overLegend = calendarSheet.getCell(3, warningEnd + 1);
-        overLegend.value = language === 'es' ? 'Sobrecapacidad (>100%)' : 'Over capacity (>100%)';
-        applyBody(overLegend, 'FEE2E2', 'center');
-        overLegend.font = { ...(overLegend.font || {}), bold: true };
-      }
-
-      // Month band row + week header row
-      const monthBandRow = 4;
-      const weekHeaderRow = 5;
-      const firstWeekColumn = 4;
-
-      const staticHeaders = [
-        language === 'es' ? 'Recurso' : 'Resource',
-        language === 'es' ? 'Rol' : 'Role',
-        language === 'es' ? 'Cap.\nh/sem' : 'Cap.\nh/wk',
-      ];
-
-      staticHeaders.forEach((header, idx) => {
-        const col = idx + 1;
-        calendarSheet.mergeCells(monthBandRow, col, weekHeaderRow, col);
-        const headerCell = calendarSheet.getCell(monthBandRow, col);
-        headerCell.value = header;
-        applyHeader(headerCell);
-      });
-
-      type MonthGroup = { label: string; startCol: number; endCol: number };
-      const monthGroups: MonthGroup[] = [];
-      calendarWeeks.forEach((week, weekIndex) => {
-        const weekDate = new Date(`${week.date}T00:00:00`);
-        const monthLabel = monthFormatter.format(weekDate);
-        const col = firstWeekColumn + weekIndex;
+      type HeaderGroup = { label: string; start: number; end: number };
+      const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+      const monthGroups: HeaderGroup[] = [];
+      dayColumns.forEach((day, index) => {
+        const label = monthFormatter.format(day.date);
+        const col = firstDayCol + index;
         const lastGroup = monthGroups[monthGroups.length - 1];
-        if (!lastGroup || lastGroup.label !== monthLabel) {
-          monthGroups.push({ label: monthLabel, startCol: col, endCol: col });
+        if (!lastGroup || lastGroup.label !== label) {
+          monthGroups.push({ label, start: col, end: col });
         } else {
-          lastGroup.endCol = col;
+          lastGroup.end = col;
         }
       });
 
-      monthGroups.forEach((group, index) => {
-        calendarSheet.mergeCells(monthBandRow, group.startCol, monthBandRow, group.endCol);
-        const groupCell = calendarSheet.getCell(monthBandRow, group.startCol);
-        groupCell.value = group.label;
-        applyHeader(groupCell);
-        groupCell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: index % 2 === 0 ? '3D2460' : '4C1D95' },
-        };
-        groupCell.font = { ...(groupCell.font || {}), bold: true, size: 10, color: { argb: HEADER_TEXT } };
-      });
-
-      calendarWeeks.forEach((week, weekIndex) => {
-        const weekDate = new Date(`${week.date}T00:00:00`);
-        const col = firstWeekColumn + weekIndex;
-        const weekHeaderCell = calendarSheet.getCell(weekHeaderRow, col);
-        weekHeaderCell.value = `CW${week.weekNum}\n${weekDateFormatter.format(weekDate)}`;
-        applyHeader(weekHeaderCell);
-        weekHeaderCell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: '2E1A47' },
-        };
-      });
-
-      calendarSheet.getRow(monthBandRow).height = 24;
-      calendarSheet.getRow(weekHeaderRow).height = 36;
-      calendarSheet.autoFilter = {
-        from: { row: weekHeaderRow, column: 1 },
-        to: { row: weekHeaderRow, column: totalCalendarColumns },
-      };
-
-      const employeeAssignmentsByWeek = new Map<string, Map<string, Assignment[]>>();
-      departmentAssignments.forEach((assignment) => {
-        const byWeek = employeeAssignmentsByWeek.get(assignment.employeeId) || new Map<string, Assignment[]>();
-        const currentAssignments = byWeek.get(assignment.weekStartDate) || [];
-        currentAssignments.push(assignment);
-        byWeek.set(assignment.weekStartDate, currentAssignments);
-        employeeAssignmentsByWeek.set(assignment.employeeId, byWeek);
-      });
-
-      deptEmployees.forEach((employee) => {
-        const assignmentMap = employeeAssignmentsByWeek.get(employee.id) || new Map<string, Assignment[]>();
-        const weeklyCapacity = getEmployeeCapacity(employee);
-        const weeklyTotals = new Map<string, number>();
-        assignmentMap.forEach((weekAssignments, weekDate) => {
-          const weekTotal = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
-          weeklyTotals.set(weekDate, weekTotal);
+      monthGroups.forEach((group, idx) => {
+        forecastSheet.mergeCells(4, group.start, 4, group.end);
+        const cell = forecastSheet.getCell(4, group.start);
+        const useYellow = idx % 2 === 1;
+        applyCellStyle(cell, {
+          fill: useYellow ? BRAND_YELLOW : BRAND_PURPLE_ALT,
+          fontColor: useYellow ? BRAND_PURPLE : WHITE,
+          bold: true,
         });
+        cell.value = group.label;
+      });
 
-        const rowValues = [
-          employee.name,
-          employee.role || '',
-          weeklyCapacity,
-          ...calendarWeeks.map((week) => {
-            const weekAssignments = assignmentMap.get(week.date) || [];
-            if (weekAssignments.length === 0) return '';
+      weeksForYear.forEach((week, index) => {
+        const startCol = firstDayCol + (index * 7);
+        const endCol = startCol + 6;
+        forecastSheet.mergeCells(5, startCol, 5, endCol);
+        const weekCell = forecastSheet.getCell(5, startCol);
+        weekCell.value = `CW${week.weekNum}`;
+        applyCellStyle(weekCell, { fill: 'DDD6FE', fontColor: '1F2937', bold: true });
+      });
 
-            const weekTotal = weeklyTotals.get(week.date) || 0;
-            const utilization = weeklyCapacity > 0 ? Math.round((weekTotal / weeklyCapacity) * 100) : 0;
+      dayColumns.forEach((day, index) => {
+        const col = firstDayCol + index;
+        const dayCell = forecastSheet.getCell(6, col);
+        dayCell.value = day.date.getDate();
+        applyCellStyle(dayCell, {
+          fill: day.offset >= 5 ? WEEKEND_BG : WHITE,
+          fontColor: '111827',
+          bold: true,
+        });
+      });
 
-            const projectHours = new Map<string, { hours: number; changeOrders: Set<string> }>();
-            weekAssignments.forEach((assignment) => {
-              const projectName =
-                projectById.get(assignment.projectId)?.name ||
-                (language === 'es' ? 'Proyecto eliminado' : 'Deleted project');
-              const existing = projectHours.get(projectName) || { hours: 0, changeOrders: new Set<string>() };
-              existing.hours += getAssignmentHours(assignment);
-              if (assignment.changeOrderId) {
-                const coName = changeOrderById.get(assignment.changeOrderId)?.name;
-                if (coName) existing.changeOrders.add(coName);
-              }
-              projectHours.set(projectName, existing);
-            });
+      const sortedDepartmentEmployees = [...deptEmployees]
+        .filter((employee) => employee.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-            const projectLines = [...projectHours.entries()]
-              .sort((a, b) => b[1].hours - a[1].hours)
-              .map(([projectName, info]) => {
-                const coSuffix = info.changeOrders.size > 0
-                  ? ` | CO: ${[...info.changeOrders].join(', ')}`
-                  : '';
-                return `${projectName} (${formatHours(info.hours)}h)${coSuffix}`;
-              });
+      let rowCursor = 7;
+      sortedDepartmentEmployees.forEach((employee, employeeIndex) => {
+        const employeeWeeks = assignmentByEmployeeWeek.get(employee.id) || new Map<string, Assignment[]>();
+        const employeeCapacity = getEmployeeCapacity(employee);
 
-            const summaryLine = language === 'es'
-              ? `Total ${formatHours(weekTotal)}h | ${utilization}% ocup.`
-              : `Total ${formatHours(weekTotal)}h | ${utilization}% util.`;
-
-            return `${summaryLine}\n${projectLines.join('\n')}`;
-          }),
-        ];
-
-        const row = calendarSheet.addRow(rowValues);
-        const detailLineCount = rowValues
-          .slice(3)
-          .reduce<number>((max, value) => {
-            if (typeof value !== 'string' || value.length === 0) return max;
-            return Math.max(max, value.split('\n').length);
-          }, 1);
-        row.height = Math.max(64, Math.min(220, 18 + (detailLineCount * 13)));
-        const rowStripe = row.number % 2 === 0 ? 'FFFFFF' : 'FCFCFF';
-
-        row.eachCell((cell: any, colNumber: number) => {
-          if (colNumber <= 2) {
-            applyBody(cell, rowStripe, 'left');
-            if (colNumber === 1) {
-              cell.font = { ...(cell.font || {}), bold: true };
-            }
-            return;
-          }
-
-          if (colNumber === 3) {
-            applyBody(cell, 'F3F4F6', 'center');
-            cell.font = { ...(cell.font || {}), bold: true };
-            return;
-          }
-
-          const weekIndex = colNumber - firstWeekColumn;
-          const weekDate = calendarWeeks[weekIndex]?.date;
-          const weekTotal = weekDate ? (weeklyTotals.get(weekDate) || 0) : 0;
-          const utilization = weeklyCapacity > 0 ? weekTotal / weeklyCapacity : 0;
-          const fill = weekTotal <= 0
-            ? rowStripe
-            : utilization > 1
-              ? 'FEE2E2'
-              : utilization >= 0.85
-                ? 'FEF3C7'
-                : 'DBEAFE';
-
-          applyBody(cell, fill, 'left');
-          cell.alignment = { ...(cell.alignment || {}), vertical: 'top', wrapText: true };
-
-          if (weekIndex % 4 === 0) {
-            cell.border = {
-              ...(cell.border || {}),
-              left: { style: 'medium', color: { argb: 'C4B5FD' } },
+        const employeeProjects = new Map<string, { hours: number; changeOrders: Set<string> }>();
+        employeeWeeks.forEach((weekAssignments) => {
+          weekAssignments.forEach((assignment) => {
+            const current = employeeProjects.get(assignment.projectId) || {
+              hours: 0,
+              changeOrders: new Set<string>(),
             };
+            current.hours += getAssignmentHours(assignment);
+            if (assignment.changeOrderId) {
+              const coName = changeOrderById.get(assignment.changeOrderId)?.name;
+              if (coName) current.changeOrders.add(coName);
+            }
+            employeeProjects.set(assignment.projectId, current);
+          });
+        });
+
+        const orderedProjects = [...employeeProjects.entries()]
+          .sort((a, b) => b[1].hours - a[1].hours);
+
+        const indRow = rowCursor;
+        const mngRow = rowCursor + 1;
+        const assyRow = rowCursor + 2;
+        const ptoRow = rowCursor + 3;
+        const projectStartRow = rowCursor + 4;
+        const projectRowsCount = Math.max(1, orderedProjects.length);
+        const blockEndRow = projectStartRow + projectRowsCount - 1;
+
+        forecastSheet.mergeCells(indRow, 1, blockEndRow, 1);
+        const nameCell = forecastSheet.getCell(indRow, 1);
+        nameCell.value = `${employee.name}\n${employee.role || ''}`;
+        applyCellStyle(nameCell, {
+          fill: employeeIndex % 2 === 0 ? 'F9FAFB' : 'F3F4F6',
+          bold: true,
+          align: 'center',
+        });
+        nameCell.alignment = { vertical: 'middle', horizontal: 'center', textRotation: 90, wrapText: true };
+
+        const setupRowLabel = (row: number, label: string, fill: string, details: string) => {
+          const labelCell = forecastSheet.getCell(row, 2);
+          labelCell.value = label;
+          applyCellStyle(labelCell, { fill, bold: true });
+          const detailsCell = forecastSheet.getCell(row, 3);
+          detailsCell.value = details;
+          applyCellStyle(detailsCell, { fill: 'FFFFFF', align: 'left' });
+        };
+
+        setupRowLabel(indRow, 'IND', 'FFF200', 'Indirect / unassigned hours (auto)');
+        setupRowLabel(mngRow, 'MNG', 'F8CBAD', 'Management (manual)');
+        setupRowLabel(assyRow, 'ASSY', 'FFE699', 'Assembly (manual)');
+        setupRowLabel(ptoRow, 'PTO', 'CFE2F3', 'PTO (manual)');
+
+        const projectRowById = new Map<string, number>();
+        if (orderedProjects.length === 0) {
+          setupRowLabel(projectStartRow, '-', 'E5E7EB', 'No project assignment in selected year');
+        } else {
+          orderedProjects.forEach(([projectId, info], index) => {
+            const row = projectStartRow + index;
+            const project = projectById.get(projectId);
+            const projectCode = getProjectCode(projectId);
+            const highProbabilitySuffix = project?.isHighProbability ? ' (HP)' : '';
+            const coList = [...info.changeOrders].join(', ');
+            setupRowLabel(
+              row,
+              `${projectCode}${highProbabilitySuffix}`,
+              getProjectFill(projectId),
+              `${project?.name || 'Deleted project'} | ${formatHours(info.hours)}h${coList ? ` | CO: ${coList}` : ''}`
+            );
+            projectRowById.set(projectId, row);
+          });
+        }
+
+        for (let row = indRow; row <= blockEndRow; row += 1) {
+          for (let col = firstDayCol; col <= lastDayCol; col += 1) {
+            const dayOffset = dayColumns[col - firstDayCol].offset;
+            const cell = forecastSheet.getCell(row, col);
+            applyCellStyle(cell, {
+              fill: dayOffset >= 5 ? WEEKEND_BG : WHITE,
+              fontColor: '111827',
+              align: 'center',
+              wrap: false,
+            });
+          }
+        }
+
+        let totalUnassignedHours = 0;
+
+        weeksForYear.forEach((week, weekIndex) => {
+          const weekAssignments = employeeWeeks.get(week.weekStart) || [];
+          const weekTotalHours = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
+          const remainingWeekHours = Math.max(employeeCapacity - weekTotalHours, 0);
+          totalUnassignedHours += remainingWeekHours;
+
+          const startCol = firstDayCol + (weekIndex * 7);
+          const fillRowWeekdays = (row: number, value: string, fill: string, fontColor = '111827') => {
+            for (let offset = 0; offset < 5; offset += 1) {
+              const cell = forecastSheet.getCell(row, startCol + offset);
+              cell.value = value;
+              applyCellStyle(cell, {
+                fill,
+                fontColor,
+                bold: true,
+                align: 'center',
+                wrap: false,
+              });
+            }
+          };
+
+          if (weekAssignments.length === 0) {
+            fillRowWeekdays(indRow, 'IND', 'FFF200');
+            return;
+          }
+
+          const projectHoursForWeek = new Map<string, number>();
+          weekAssignments.forEach((assignment) => {
+            const current = projectHoursForWeek.get(assignment.projectId) || 0;
+            projectHoursForWeek.set(assignment.projectId, current + getAssignmentHours(assignment));
+          });
+
+          projectHoursForWeek.forEach((_hours, projectId) => {
+            const row = projectRowById.get(projectId);
+            if (!row) return;
+            const projectCode = getProjectCode(projectId);
+            fillRowWeekdays(row, projectCode, getProjectFill(projectId));
+          });
+
+          if (remainingWeekHours > 0.1) {
+            fillRowWeekdays(indRow, 'IND', 'FFF2CC');
           }
         });
+
+        const indDetailsCell = forecastSheet.getCell(indRow, 3);
+        indDetailsCell.value = `Indirect / unassigned hours (auto) | ${formatHours(totalUnassignedHours)}h available`;
+        applyCellStyle(indDetailsCell, { fill: 'FFFFFF', align: 'left' });
+
+        const separatorRow = blockEndRow + 1;
+        forecastSheet.mergeCells(separatorRow, 1, separatorRow, lastDayCol);
+        const separatorCell = forecastSheet.getCell(separatorRow, 1);
+        separatorCell.value = '';
+        applyCellStyle(separatorCell, { fill: 'EDE9FE' });
+
+        rowCursor = separatorRow + 1;
       });
 
-      if (calendarSheet.rowCount === weekHeaderRow) {
-        const noDataRow = calendarSheet.addRow([
-          language === 'es'
-            ? 'Sin asignaciones semanales para este departamento.'
-            : 'No weekly assignments for this department.',
-        ]);
-        noDataRow.eachCell((cell: any) => applyBody(cell, 'FFFFFF', 'left'));
-      }
-
-      const projectSheet = workbook.addWorksheet(language === 'es' ? 'Proyectos y CO' : 'Projects and CO');
-      projectSheet.columns = [
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 32 },
-        { header: language === 'es' ? 'Cliente' : 'Client', key: 'client', width: 20 },
-        { header: language === 'es' ? 'Horas Departamento' : 'Department Hours', key: 'hours', width: 16 },
-        { header: language === 'es' ? '# Recursos' : '# Resources', key: 'resources', width: 12 },
-        { header: language === 'es' ? 'Change Orders' : 'Change Orders', key: 'coList', width: 46 },
+      const dashboardSheet = workbook.addWorksheet('Dashboard');
+      dashboardSheet.columns = [
+        { width: 26 },
+        { width: 22 },
+        { width: 22 },
+        { width: 22 },
+        { width: 22 },
       ];
-      projectSheet.getRow(1).values = projectSheet.columns.map((column) => column.header as string);
-      projectSheet.getRow(1).eachCell((cell: any) => applyHeader(cell));
 
-      const projectAccumulator = new Map<string, { hours: number; resources: Set<string> }>();
-      departmentAssignments.forEach((assignment) => {
-        const entry = projectAccumulator.get(assignment.projectId) || { hours: 0, resources: new Set<string>() };
-        entry.hours += getAssignmentHours(assignment);
-        entry.resources.add(assignment.employeeId);
-        projectAccumulator.set(assignment.projectId, entry);
+      dashboardSheet.mergeCells('A1:E1');
+      const dashTitle = dashboardSheet.getCell('A1');
+      dashTitle.value = `Dashboard - ${department} (${selectedYear})`;
+      applyCellStyle(dashTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
+
+      dashboardSheet.mergeCells('A2:E2');
+      const dashSubTitle = dashboardSheet.getCell('A2');
+      dashSubTitle.value = `Generated: ${generatedLabel}`;
+      applyCellStyle(dashSubTitle, { fill: 'EDE9FE', align: 'left', bold: true });
+
+      const totalCapacityHours = sortedDepartmentEmployees.reduce(
+        (sum, employee) => sum + (getEmployeeCapacity(employee) * weeksForYear.length),
+        0
+      );
+      const totalAssignedHours = departmentAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
+      const avgUtilization = totalCapacityHours > 0 ? (totalAssignedHours / totalCapacityHours) * 100 : 0;
+      const totalProjects = projectSummary.size;
+      const totalCOs = new Set(
+        departmentAssignments
+          .map((assignment) => assignment.changeOrderId)
+          .filter((changeOrderId): changeOrderId is string => Boolean(changeOrderId))
+      ).size;
+
+      const kpiHeaders = ['Resources', 'Projects', 'Assigned Hours', 'Avg Utilization', 'Change Orders'];
+      const kpiValues = [
+        sortedDepartmentEmployees.length,
+        totalProjects,
+        `${formatHours(totalAssignedHours)}h`,
+        `${formatHours(avgUtilization)}%`,
+        totalCOs,
+      ];
+
+      for (let col = 1; col <= 5; col += 1) {
+        const headerCell = dashboardSheet.getCell(4, col);
+        headerCell.value = kpiHeaders[col - 1];
+        applyCellStyle(headerCell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true });
+
+        const valueCell = dashboardSheet.getCell(5, col);
+        valueCell.value = kpiValues[col - 1];
+        applyCellStyle(valueCell, { fill: 'F9FAFB', bold: true, size: 11 });
+      }
+
+      dashboardSheet.getCell('A7').value = 'Top Resources (assigned hours)';
+      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
+      dashboardSheet.mergeCells('A7:E7');
+      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
+
+      const topResourceRows = sortedDepartmentEmployees
+        .map((employee) => {
+          const employeeHours = (assignmentByEmployeeWeek.get(employee.id) || new Map<string, Assignment[]>());
+          let totalHours = 0;
+          employeeHours.forEach((rows) => {
+            rows.forEach((assignment) => { totalHours += getAssignmentHours(assignment); });
+          });
+          return { employee, totalHours };
+        })
+        .sort((a, b) => b.totalHours - a.totalHours)
+        .slice(0, 10);
+
+      dashboardSheet.getRow(8).values = ['Resource', 'Role', 'Assigned h', 'Capacity h', 'Utilization %'];
+      dashboardSheet.getRow(8).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
+
+      topResourceRows.forEach((entry, index) => {
+        const rowNumber = 9 + index;
+        const totalCapacity = getEmployeeCapacity(entry.employee) * weeksForYear.length;
+        const util = totalCapacity > 0 ? (entry.totalHours / totalCapacity) * 100 : 0;
+        dashboardSheet.getRow(rowNumber).values = [
+          entry.employee.name,
+          entry.employee.role || '',
+          formatHours(entry.totalHours),
+          formatHours(totalCapacity),
+          formatHours(util),
+        ];
+        dashboardSheet.getRow(rowNumber).eachCell((cell: any, col: number) =>
+          applyCellStyle(cell, { fill: index % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 2 ? 'left' : 'center' })
+        );
       });
 
-      const projectRows = [...projectAccumulator.entries()]
-        .sort((a, b) => b[1].hours - a[1].hours);
+      const internalSheet = workbook.addWorksheet('Internal Dashboard');
+      internalSheet.columns = [
+        { width: 14 },
+        { width: 28 },
+        { width: 20 },
+        { width: 14 },
+        { width: 12 },
+        { width: 12 },
+        { width: 14 },
+        { width: 36 },
+        { width: 12 },
+      ];
 
-      projectRows.forEach(([projectId, data]) => {
+      internalSheet.mergeCells('A1:I1');
+      const internalTitle = internalSheet.getCell('A1');
+      internalTitle.value = `Internal Dashboard - ${department} (${selectedYear})`;
+      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
+
+      internalSheet.mergeCells('A2:I2');
+      const internalSubTitle = internalSheet.getCell('A2');
+      internalSubTitle.value = `Generated: ${generatedLabel}`;
+      applyCellStyle(internalSubTitle, { fill: 'EDE9FE', bold: true, align: 'left' });
+
+      internalSheet.getRow(4).values = [
+        'Project Code',
+        'Project',
+        'Client',
+        'High Probability',
+        'Hours',
+        'Resources',
+        'CO count',
+        'Change Orders',
+        'Weeks',
+      ];
+      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true }));
+
+      const sortedProjects = [...projectSummary.entries()].sort((a, b) => b[1].hours - a[1].hours);
+      let internalRow = 5;
+      sortedProjects.forEach(([projectId, summary], idx) => {
         const project = projectById.get(projectId);
-        const projectChangeOrders = allChangeOrders
-          .filter((order) => order.projectId === projectId)
-          .map((order) => `${order.name} (${formatHours(order.hoursQuoted || 0)}h)`)
-          .join(', ');
-
-        projectSheet.addRow({
-          project: project?.name || (language === 'es' ? 'Proyecto eliminado' : 'Deleted project'),
-          client: project?.client || '',
-          hours: Math.round(data.hours * 100) / 100,
-          resources: data.resources.size,
-          coList: projectChangeOrders || (language === 'es' ? 'Sin change orders' : 'No change orders'),
-        });
+        internalSheet.getRow(internalRow).values = [
+          getProjectCode(projectId),
+          project?.name || 'Deleted project',
+          project?.client || '',
+          project?.isHighProbability ? 'Yes' : 'No',
+          formatHours(summary.hours),
+          summary.resources.size,
+          summary.changeOrders.size,
+          [...summary.changeOrders].join(', '),
+          summary.weeks.size,
+        ];
+        internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center' })
+        );
+        internalRow += 1;
       });
 
-      if (projectSheet.rowCount === 1) {
-        projectSheet.addRow({
-          project: language === 'es' ? 'Sin datos de proyectos para este departamento.' : 'No project data for this department.',
-        });
-      }
+      internalRow += 1;
+      internalSheet.mergeCells(internalRow, 1, internalRow, 9);
+      const detailTitle = internalSheet.getCell(internalRow, 1);
+      detailTitle.value = 'Assignment Detail';
+      applyCellStyle(detailTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
+      internalRow += 1;
 
-      for (let row = 2; row <= projectSheet.rowCount; row += 1) {
-        const current = projectSheet.getRow(row);
-        current.eachCell((cell: any, colNumber: number) => {
-          const isNumeric = [3, 4].includes(colNumber);
-          applyBody(cell, row % 2 === 0 ? 'FFFFFF' : 'FAFAFF', isNumeric ? 'center' : 'left');
-        });
-      }
+      internalSheet.getRow(internalRow).values = ['Week Start', 'CW', 'Resource', 'Project', 'Project Code', 'Hours', 'CO', 'Stage', 'Comment'];
+      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
+      internalRow += 1;
 
-      const fileName = `resources-${department.toLowerCase()}-${selectedYear}-${dateStamp}.xlsx`;
+      const sortedAssignments = [...departmentAssignments].sort((a, b) => {
+        const aWeek = normalizeWeekStartDate(a.weekStartDate);
+        const bWeek = normalizeWeekStartDate(b.weekStartDate);
+        if (aWeek !== bWeek) return aWeek.localeCompare(bWeek);
+        const aEmployee = employees.find((employee) => employee.id === a.employeeId)?.name || '';
+        const bEmployee = employees.find((employee) => employee.id === b.employeeId)?.name || '';
+        return aEmployee.localeCompare(bEmployee);
+      });
+
+      sortedAssignments.forEach((assignment, idx) => {
+        const normalizedWeek = normalizeWeekStartDate(assignment.weekStartDate);
+        const employeeName = employees.find((employee) => employee.id === assignment.employeeId)?.name || 'Deleted resource';
+        const project = projectById.get(assignment.projectId);
+        const coName = assignment.changeOrderId ? (changeOrderById.get(assignment.changeOrderId)?.name || '') : '';
+        internalSheet.getRow(internalRow).values = [
+          normalizedWeek,
+          weekNumByStart.get(normalizedWeek) || '',
+          employeeName,
+          project?.name || 'Deleted project',
+          getProjectCode(assignment.projectId),
+          formatHours(getAssignmentHours(assignment)),
+          coName,
+          assignment.stage || '',
+          assignment.comment || '',
+        ];
+        internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center' })
+        );
+        internalRow += 1;
+      });
+
+      const fileName = `${department.toLowerCase()}-forecast-${selectedYear}-${dateStamp}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob(
         [buffer],
