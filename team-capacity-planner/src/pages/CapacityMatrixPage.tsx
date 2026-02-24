@@ -7074,7 +7074,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             <div
                               key={`${dept}-${weekData.date}`}
                               className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded-none border text-[7px] font-semibold ${bgColor} ${
-                                isCurrentWeek ? 'ring-1 ring-slate-500 shadow-sm' : ''
+                                isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
                               }`}
                               title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
