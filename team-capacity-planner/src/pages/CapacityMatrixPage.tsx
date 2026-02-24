@@ -7070,6 +7070,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             textColor = 'text-green-900';
                           }
 
+                          const displayTextColor = isCurrentWeek ? 'text-black' : textColor;
+
                           return (
                             <div
                               key={`${dept}-${weekData.date}`}
@@ -7079,11 +7081,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                             >
                               {totalCapacity > 0 ? (
-                                <div className={`${textColor} font-bold text-[7px]`}>
+                                <div className={`${displayTextColor} font-bold text-[7px]`}>
                                   {availableCapacity.toFixed(2)}
                                 </div>
                               ) : (
-                                <div className={`${textColor} text-[6px]`}>—</div>
+                                <div className={`${displayTextColor} font-bold text-[6px]`}>—</div>
                               )}
                             </div>
                           );

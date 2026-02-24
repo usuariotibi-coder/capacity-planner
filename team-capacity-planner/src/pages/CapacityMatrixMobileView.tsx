@@ -156,7 +156,7 @@ export function CapacityMatrixMobileView({
                           return (
                             <div key={`total-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                               <div className={`text-[8px] font-bold ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                              <div className="bg-orange-300 text-orange-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
+                              <div className={`bg-orange-300 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px] ${isCurrentWeek ? 'text-black' : 'text-orange-900'}`}>
                                 {displayValue.toFixed(1)}
                               </div>
                             </div>
@@ -181,7 +181,7 @@ export function CapacityMatrixMobileView({
                           return (
                             <div key={`scio-${d}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                               <div className={`text-[8px] font-bold ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                              <div className="bg-purple-100 text-purple-900 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px]">
+                              <div className={`bg-purple-100 rounded text-[8px] font-bold px-1 py-0.5 min-w-[28px] ${isCurrentWeek ? 'text-black' : 'text-purple-900'}`}>
                                 {capacity.toFixed(1)}
                               </div>
                             </div>
@@ -215,7 +215,7 @@ export function CapacityMatrixMobileView({
                     return (
                       <div key={`total-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                         <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                        <div className="bg-orange-300 text-orange-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
+                        <div className={`bg-orange-300 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px] ${isCurrentWeek ? 'text-black' : 'text-orange-900'}`}>
                           {displayValue.toFixed(1)}
                         </div>
                       </div>
@@ -240,7 +240,7 @@ export function CapacityMatrixMobileView({
                     return (
                       <div key={`scio-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                         <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                        <div className="bg-purple-100 text-purple-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
+                        <div className={`bg-purple-100 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px] ${isCurrentWeek ? 'text-black' : 'text-purple-900'}`}>
                           {capacity.toFixed(1)}
                         </div>
                       </div>
@@ -268,7 +268,7 @@ export function CapacityMatrixMobileView({
                         return (
                           <div key={`${company}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                             <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                            <div className="bg-violet-100 text-violet-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
+                            <div className={`bg-violet-100 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px] ${isCurrentWeek ? 'text-black' : 'text-violet-900'}`}>
                               {count.toFixed(0)}
                             </div>
                           </div>
@@ -297,7 +297,7 @@ export function CapacityMatrixMobileView({
                         return (
                           <div key={`${team}-${weekData.date}`} className="flex flex-col items-center flex-shrink-0 text-center">
                             <div className={`text-[9px] font-bold mb-0.5 ${isCurrentWeek ? 'text-slate-900 bg-slate-200 border border-slate-400 rounded px-1' : 'text-gray-700'}`}>CW{weekData.weekNum}</div>
-                            <div className="bg-cyan-100 text-cyan-900 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px]">
+                            <div className={`bg-cyan-100 rounded text-[9px] font-bold px-1.5 py-1 min-w-[32px] ${isCurrentWeek ? 'text-black' : 'text-cyan-900'}`}>
                               {count.toFixed(0)}
                             </div>
                           </div>
