@@ -141,11 +141,11 @@ interface TimingProjectGroup {
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
-const CURRENT_WEEK_HEADER_CLASS = 'bg-stone-200 text-stone-950 border-2 border-stone-900 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55),0_0_0_1px_rgba(28,25,23,0.45)] relative z-[4]';
-const CURRENT_WEEK_RING_CLASS = 'border-2 border-stone-900 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.5),0_0_0_1px_rgba(28,25,23,0.35)] relative z-[3]';
-const CURRENT_WEEK_EDITABLE_CLASS = 'border-2 border-stone-900 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.5),0_0_0_1px_rgba(28,25,23,0.35)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[3]';
+const CURRENT_WEEK_HEADER_CLASS = 'bg-stone-200 text-stone-950 border-2 border-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.98),inset_0_0_0_3px_rgba(17,24,39,0.95)] relative z-[6]';
+const CURRENT_WEEK_RING_CLASS = 'border-2 border-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.98),inset_0_0_0_3px_rgba(17,24,39,0.95)] relative z-[5]';
+const CURRENT_WEEK_EDITABLE_CLASS = 'border-2 border-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.98),inset_0_0_0_3px_rgba(17,24,39,0.95)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[5]';
 const CURRENT_WEEK_STRONG_HEADER_CLASS = 'bg-gradient-to-b from-stone-500 via-stone-600 to-zinc-700 text-white border-2 border-zinc-800 shadow-lg ring-2 ring-stone-300';
-const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-2 border-stone-900 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.5),0_0_0_1px_rgba(28,25,23,0.35)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[3]';
+const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-2 border-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.98),inset_0_0_0_3px_rgba(17,24,39,0.95)] bg-gradient-to-b from-stone-100 to-zinc-100 relative z-[5]';
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
