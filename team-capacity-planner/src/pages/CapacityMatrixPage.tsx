@@ -1746,7 +1746,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
     const outOfEstimatedRange = !isDeptWeekInRange;
     const isDisplacedByTimingShift = hasDepartmentTimingShift && isDateShiftDifferenceWeek;
-    const showShiftGapBackground = isDisplacedByTimingShift;
+    // For timing-shift gaps:
+    // - show light-blue background only when there are no assigned hours
+    // - show dashed indicator only when hours are assigned
+    const showShiftGapBackground = isDisplacedByTimingShift && totalHours <= 0;
     const showShiftDashedIndicator = isDisplacedByTimingShift && totalHours > 0;
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0 && !isDisplacedByTimingShift;
 
