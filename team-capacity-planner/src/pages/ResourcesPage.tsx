@@ -795,46 +795,125 @@ export function ResourcesPage() {
       });
 
       const internalSheet = workbook.addWorksheet('Internal Dashboard');
-      internalSheet.columns = [
-        { width: 14 },
-        { width: 28 },
-        { width: 20 },
-        { width: 14 },
-        { width: 12 },
-        { width: 12 },
-        { width: 14 },
-        { width: 36 },
-        { width: 12 },
-      ];
-      internalSheet.views = [{ state: 'frozen', ySplit: 6 }];
+      internalSheet.columns = Array.from({ length: 16 }, () => ({ width: 14 }));
+      internalSheet.views = [{ state: 'frozen', ySplit: 14 }];
 
-      internalSheet.mergeCells('A1:I1');
-      const internalTitle = internalSheet.getCell('A1');
-      internalTitle.value = `Internal Dashboard - ${department} (${selectedYear})`;
-      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 14, align: 'left' });
+      const totalWeeklyCapacity = sortedDepartmentEmployees.reduce((sum, employee) => sum + getEmployeeCapacity(employee), 0);
+      const allWeekUtilData = weeksForYear.map((week) => {
+        const assigned = weeklyTotals.get(week.weekStart) || 0;
+        const util = totalWeeklyCapacity > 0 ? (assigned / totalWeeklyCapacity) * 100 : 0;
+        return { week, assigned, util };
+      });
+      const peakWeek = allWeekUtilData.reduce(
+        (max, row) => (row.util > max.util ? row : max),
+        { week: weeksForYear[0], assigned: 0, util: 0 }
+      );
+      const overCapacityWeeks = allWeekUtilData.filter((row) => row.util > 100).length;
+      const highProbabilityProjects = sortedProjects.filter(([projectId]) => projectById.get(projectId)?.isHighProbability).length;
+      const avgProjectHours = sortedProjects.length > 0
+        ? sortedProjects.reduce((sum, [, summary]) => sum + summary.hours, 0) / sortedProjects.length
+        : 0;
+      const averageResourcesPerProject = sortedProjects.length > 0
+        ? sortedProjects.reduce((sum, [, summary]) => sum + summary.resources.size, 0) / sortedProjects.length
+        : 0;
 
-      internalSheet.mergeCells('A2:I2');
-      const internalSubTitle = internalSheet.getCell('A2');
-      internalSubTitle.value = `Generated: ${generatedLabel} | Source: assignments + projects + change orders`;
+      internalSheet.mergeCells(1, 1, 2, 16);
+      const internalTitle = internalSheet.getCell(1, 1);
+      internalTitle.value = `${department} Internal Dashboard ${selectedYear}`;
+      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 18, align: 'left' });
+
+      internalSheet.mergeCells(3, 1, 3, 16);
+      const internalSubTitle = internalSheet.getCell(3, 1);
+      internalSubTitle.value = `Generated: ${generatedLabel} | Internal analytics: load, risks, and portfolio health`;
       applyCellStyle(internalSubTitle, { fill: 'EDE9FE', bold: true, align: 'left', size: 10 });
 
-      internalSheet.getRow(4).values = [
-        'Project Code',
-        'Project',
-        'Client',
-        'High Probability',
-        'Hours',
-        'Resources',
-        'CO count',
-        'Change Orders',
-        'Weeks',
+      type InternalCard = {
+        title: string;
+        value: string;
+        note: string;
+        titleRange: [number, number, number, number];
+        valueRange: [number, number, number, number];
+        noteRange: [number, number, number, number];
+        accent: string;
+      };
+      const internalCards: InternalCard[] = [
+        {
+          title: 'High Probability Projects',
+          value: `${highProbabilityProjects}`,
+          note: `${sortedProjects.length} total projects`,
+          titleRange: [5, 1, 5, 4],
+          valueRange: [6, 1, 7, 4],
+          noteRange: [8, 1, 8, 4],
+          accent: 'FEF3C7',
+        },
+        {
+          title: 'Over-Capacity Weeks',
+          value: `${overCapacityWeeks}`,
+          note: `${weeksForYear.length} tracked weeks`,
+          titleRange: [5, 5, 5, 8],
+          valueRange: [6, 5, 7, 8],
+          noteRange: [8, 5, 8, 8],
+          accent: overCapacityWeeks > 0 ? 'FEE2E2' : 'DCFCE7',
+        },
+        {
+          title: 'Average Project Hours',
+          value: `${formatHours(avgProjectHours)}h`,
+          note: 'per project',
+          titleRange: [5, 9, 5, 12],
+          valueRange: [6, 9, 7, 12],
+          noteRange: [8, 9, 8, 12],
+          accent: 'DBEAFE',
+        },
+        {
+          title: 'Avg Resources / Project',
+          value: `${formatHours(averageResourcesPerProject)}`,
+          note: 'portfolio mix',
+          titleRange: [5, 13, 5, 16],
+          valueRange: [6, 13, 7, 16],
+          noteRange: [8, 13, 8, 16],
+          accent: 'EDE9FE',
+        },
       ];
-      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 10 }));
 
-      let internalRow = 5;
-      sortedProjects.forEach(([projectId, summary], idx) => {
+      internalCards.forEach((card) => {
+        internalSheet.mergeCells(card.titleRange[0], card.titleRange[1], card.titleRange[2], card.titleRange[3]);
+        const titleCell = internalSheet.getCell(card.titleRange[0], card.titleRange[1]);
+        titleCell.value = card.title;
+        applyCellStyle(titleCell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 10 });
+
+        internalSheet.mergeCells(card.valueRange[0], card.valueRange[1], card.valueRange[2], card.valueRange[3]);
+        const valueCell = internalSheet.getCell(card.valueRange[0], card.valueRange[1]);
+        valueCell.value = card.value;
+        applyCellStyle(valueCell, { fill: card.accent, bold: true, size: 20 });
+
+        internalSheet.mergeCells(card.noteRange[0], card.noteRange[1], card.noteRange[2], card.noteRange[3]);
+        const noteCell = internalSheet.getCell(card.noteRange[0], card.noteRange[1]);
+        noteCell.value = card.note;
+        applyCellStyle(noteCell, { fill: 'F9FAFB', size: 9, align: 'center' });
+      });
+
+      internalSheet.mergeCells(10, 1, 10, 9);
+      const portfolioTitle = internalSheet.getCell(10, 1);
+      portfolioTitle.value = 'Portfolio Health';
+      applyCellStyle(portfolioTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 11, align: 'left' });
+
+      internalSheet.mergeCells(10, 10, 10, 16);
+      const riskTitle = internalSheet.getCell(10, 10);
+      riskTitle.value = 'Risk Snapshot';
+      applyCellStyle(riskTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, size: 11, align: 'left' });
+
+      const portfolioHeaderRow = 11;
+      const portfolioHeaders = ['Project Code', 'Project', 'Client', 'HP', 'Hours', 'Resources', 'COs', 'Weeks', 'CO Names'];
+      portfolioHeaders.forEach((header, index) => {
+        const cell = internalSheet.getCell(portfolioHeaderRow, index + 1);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 9 });
+      });
+
+      sortedProjects.slice(0, 12).forEach(([projectId, summary], idx) => {
         const project = projectById.get(projectId);
-        internalSheet.getRow(internalRow).values = [
+        const row = portfolioHeaderRow + 1 + idx;
+        const values = [
           getProjectCode(projectId),
           project?.name || 'Deleted project',
           project?.client || '',
@@ -842,24 +921,80 @@ export function ResourcesPage() {
           formatHours(summary.hours),
           summary.resources.size,
           summary.changeOrders.size,
-          [...summary.changeOrders].join(', '),
           summary.weeks.size,
+          [...summary.changeOrders].join(', '),
         ];
-        internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center', size: 9 })
-        );
-        internalRow += 1;
+        values.forEach((value, colOffset) => {
+          const cell = internalSheet.getCell(row, colOffset + 1);
+          cell.value = value;
+          applyCellStyle(cell, {
+            fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB',
+            align: colOffset <= 2 || colOffset === 8 ? 'left' : 'center',
+            size: 9,
+          });
+          if (colOffset === 3 && value === 'Yes') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+            cell.font = { bold: true, size: 9, color: { argb: '92400E' } };
+          }
+        });
       });
 
-      internalRow += 1;
-      internalSheet.mergeCells(internalRow, 1, internalRow, 9);
+      const riskHeaderRow = 11;
+      const riskHeaders = ['CW', 'Week Start', 'Assigned h', 'Capacity h', 'Util %', 'Status', 'Trend'];
+      riskHeaders.forEach((header, idx) => {
+        const cell = internalSheet.getCell(riskHeaderRow, 10 + idx);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 9 });
+      });
+
+      allWeekUtilData
+        .sort((a, b) => b.util - a.util)
+        .slice(0, 12)
+        .forEach((entry, idx) => {
+          const row = riskHeaderRow + 1 + idx;
+          const status = entry.util > 100 ? 'Over' : entry.util >= 85 ? 'Warning' : 'Normal';
+          const statusColor = entry.util > 100 ? 'FEE2E2' : entry.util >= 85 ? 'FEF3C7' : 'DCFCE7';
+          const trendSize = Math.max(0, Math.min(16, Math.round((entry.util / 100) * 16)));
+          const trend = `${'#'.repeat(trendSize)}${'-'.repeat(16 - trendSize)}`;
+          const values = [
+            entry.week.weekNum,
+            entry.week.weekStart,
+            formatHours(entry.assigned),
+            formatHours(totalWeeklyCapacity),
+            `${formatHours(entry.util)}%`,
+            status,
+            trend,
+          ];
+          values.forEach((value, colOffset) => {
+            const cell = internalSheet.getCell(row, 10 + colOffset);
+            cell.value = value;
+            applyCellStyle(cell, {
+              fill: colOffset === 5 ? statusColor : (idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB'),
+              align: colOffset <= 1 || colOffset === 6 ? 'left' : 'center',
+              size: 9,
+            });
+          });
+        });
+
+      const peakRow = 25;
+      internalSheet.mergeCells(peakRow, 10, peakRow, 16);
+      const peakCell = internalSheet.getCell(peakRow, 10);
+      peakCell.value = `Peak week: CW${peakWeek.week?.weekNum ?? '-'} (${peakWeek.week?.weekStart ?? '-'}) at ${formatHours(peakWeek.util)}%`;
+      applyCellStyle(peakCell, { fill: peakWeek.util > 100 ? 'FEE2E2' : 'EDE9FE', bold: true, align: 'left', size: 10 });
+
+      let internalRow = 27;
+      internalSheet.mergeCells(internalRow, 1, internalRow, 16);
       const detailTitle = internalSheet.getCell(internalRow, 1);
       detailTitle.value = 'Assignment Detail';
       applyCellStyle(detailTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left', size: 11 });
       internalRow += 1;
 
-      internalSheet.getRow(internalRow).values = ['Week Start', 'CW', 'Resource', 'Project', 'Project Code', 'Hours', 'CO', 'Stage', 'Comment'];
-      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 }));
+      const detailHeaders = ['Week Start', 'CW', 'Resource', 'Project', 'Project Code', 'Hours', 'CO', 'Stage', 'Comment'];
+      detailHeaders.forEach((header, idx) => {
+        const cell = internalSheet.getCell(internalRow, idx + 1);
+        cell.value = header;
+        applyCellStyle(cell, { fill: 'DDD6FE', bold: true, size: 10 });
+      });
       internalRow += 1;
 
       const sortedAssignments = [...departmentAssignments].sort((a, b) => {
@@ -876,7 +1011,7 @@ export function ResourcesPage() {
         const employeeName = employees.find((employee) => employee.id === assignment.employeeId)?.name || 'Deleted resource';
         const project = projectById.get(assignment.projectId);
         const coName = assignment.changeOrderId ? (changeOrderById.get(assignment.changeOrderId)?.name || '') : '';
-        internalSheet.getRow(internalRow).values = [
+        const values = [
           normalizedWeek,
           weekNumByStart.get(normalizedWeek) || '',
           employeeName,
@@ -887,9 +1022,15 @@ export function ResourcesPage() {
           assignment.stage || '',
           assignment.comment || '',
         ];
-        internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center', size: 9 })
-        );
+        values.forEach((value, colOffset) => {
+          const cell = internalSheet.getCell(internalRow, colOffset + 1);
+          cell.value = value;
+          applyCellStyle(cell, {
+            fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB',
+            align: colOffset <= 4 || colOffset >= 7 ? 'left' : 'center',
+            size: 9,
+          });
+        });
         internalRow += 1;
       });
 
