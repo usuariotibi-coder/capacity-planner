@@ -7,7 +7,7 @@ import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { changeOrdersApi } from '../services/api';
 import type { Assignment, Employee, Department, ProjectChangeOrder } from '../types';
 import { generateId } from '../utils/id';
-import { getAllWeeksWithNextYear, normalizeWeekStartDate, getWeekStart, formatToISO } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, normalizeWeekStartDate, parseISODate, formatToISO } from '../utils/dateUtils';
 import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Calendar, X, Download, FileSpreadsheet } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -196,90 +196,52 @@ export function ResourcesPage() {
     setExportingDepartment(department);
     try {
       const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
       const generatedAt = new Date();
       const dateStamp = generatedAt.toISOString().slice(0, 10);
       const generatedLabel = generatedAt.toLocaleString(language === 'es' ? 'es-ES' : 'en-US');
-      const workbook = new ExcelJS.Workbook();
 
-      const templateResponse = await fetch('/templates/resources-export-template.xlsx', { cache: 'no-store' });
-      if (!templateResponse.ok) {
-        throw new Error(`Template download failed: ${templateResponse.status}`);
+      const weeksForYear = allWeeksData
+        .filter((week) => !week.isNextYear)
+        .map((week) => {
+          const normalizedWeek = normalizeWeekStartDate(week.date);
+          const weekStartDate = parseISODate(normalizedWeek);
+          if (Number.isNaN(weekStartDate.getTime())) return null;
+
+          const days = Array.from({ length: 7 }, (_, offset) => {
+            const dayDate = new Date(weekStartDate);
+            dayDate.setDate(weekStartDate.getDate() + offset);
+            return {
+              offset,
+              iso: formatToISO(dayDate),
+              date: dayDate,
+            };
+          });
+
+          return {
+            weekStart: normalizedWeek,
+            weekNum: week.weekNum,
+            days,
+          };
+        })
+        .filter((week): week is { weekStart: string; weekNum: number; days: { offset: number; iso: string; date: Date }[] } => Boolean(week));
+
+      if (weeksForYear.length === 0) {
+        alert(language === 'es'
+          ? 'No se encontraron semanas para el año seleccionado.'
+          : 'No weeks were found for the selected year.');
+        return;
       }
-      const templateBuffer = await templateResponse.arrayBuffer();
-      await workbook.xlsx.load(templateBuffer);
 
-      const forecastTemplateNameCandidates = [
-        `HD Forecast ${selectedYear}`,
-        'HD Forecast 2026',
-        'HD Forecast 2025',
-      ];
-      const forecastTemplate =
-        forecastTemplateNameCandidates
-          .map((name) => workbook.getWorksheet(name))
-          .find((sheet): sheet is NonNullable<typeof sheet> => Boolean(sheet)) ||
-        workbook.worksheets.find((sheet) => /forecast/i.test(sheet.name));
-
-      if (!forecastTemplate) {
-        throw new Error('Forecast template sheet was not found.');
-      }
-
-      const dashboardTemplate = workbook.getWorksheet('Dashboard') || workbook.addWorksheet('Dashboard');
-      const internalDashboardTemplate = workbook.getWorksheet('Internal Dashboard') || workbook.addWorksheet('Internal Dashboard');
-
-      const keepSheetNames = new Set([
-        forecastTemplate.name,
-        dashboardTemplate.name,
-        internalDashboardTemplate.name,
-      ]);
-      [...workbook.worksheets].forEach((sheet) => {
-        if (!keepSheetNames.has(sheet.name)) {
-          workbook.removeWorksheet(sheet.id);
-        }
-      });
-
-      const forecastSheetName = `${department} Forecast ${selectedYear}`;
-      const forecastSheet = workbook.getWorksheet(forecastTemplate.name)!;
-      forecastSheet.name = forecastSheetName;
-      const dashboardSheet = workbook.getWorksheet(dashboardTemplate.name)!;
-      const internalSheet = workbook.getWorksheet(internalDashboardTemplate.name)!;
-
-      const firstDayCol = 3; // C
-      const dayEntries: Array<{
-        col: number;
-        date: Date;
-        day: number;
-        month: number;
-        year: number;
-        weekNumber: number;
-        weekStart: string;
-        isWeekend: boolean;
-      }> = [];
-
-      const yearStart = new Date(selectedYear, 0, 1);
-      const yearEnd = new Date(selectedYear, 11, 31);
-      let current = new Date(yearStart);
-      let weekNumber = 1;
-      let dayIdx = 0;
-      while (current <= yearEnd) {
-        if (dayIdx > 0 && current.getDay() === 1) {
-          weekNumber += 1;
-        }
-        const weekStartDate = getWeekStart(current);
-        dayEntries.push({
-          col: firstDayCol + dayIdx,
-          date: new Date(current),
-          day: current.getDate(),
-          month: current.getMonth(),
-          year: current.getFullYear(),
-          weekNumber,
-          weekStart: formatToISO(weekStartDate),
-          isWeekend: current.getDay() === 0 || current.getDay() === 6,
-        });
-        current.setDate(current.getDate() + 1);
-        dayIdx += 1;
-      }
-      const lastDayCol = firstDayCol + dayEntries.length - 1;
-      const weekStartSet = new Set(dayEntries.map((entry) => entry.weekStart));
+      const dayColumns = weeksForYear.flatMap((week, weekIndex) =>
+        week.days.map((day) => ({
+          ...day,
+          weekIndex,
+          weekNum: week.weekNum,
+          weekStart: week.weekStart,
+        }))
+      );
+      const weekStartSet = new Set(weeksForYear.map((week) => week.weekStart));
 
       const departmentEmployeeIds = new Set(deptEmployees.map((employee) => employee.id));
       const departmentAssignments = assignments.filter((assignment) =>
@@ -329,17 +291,13 @@ export function ResourcesPage() {
         projectSummary.set(assignment.projectId, entry);
       });
 
-      const PALETTE = {
-        purpleDark: '2E1A47',
-        purpleSoft: 'D9D2E9',
-        yellow: 'F6DD4E',
-        gridWeekday: 'BFBFBF',
-        gridWeekend: 'A6A6A6',
-        white: 'FFFFFF',
-        black: '111111',
-        border: '6B7280',
-      };
-      const PROJECT_COLORS = ['E31A1C', 'FF4D4F', 'E08F2A', '8CC152', '3BAFDA', '4A89DC', '8E44AD', '1ABC9C', 'D35400', 'C0392B'];
+      const BRAND_PURPLE = '2E1A47';
+      const BRAND_PURPLE_ALT = '46236A';
+      const BRAND_YELLOW = 'F6DD4E';
+      const BORDER = '9CA3AF';
+      const WHITE = 'FFFFFF';
+      const WEEKEND_BG = 'D1D5DB';
+      const PROJECT_COLORS = ['9FE7B8', 'F9D7A9', 'A5BFF3', 'F7CF68', 'DAB6EB', 'B8E8F2', 'F7B1B3', 'B2E0CE'];
 
       const applyCellStyle = (
         cell: any,
@@ -354,8 +312,8 @@ export function ResourcesPage() {
         } = {}
       ) => {
         const {
-          fill = PALETTE.white,
-          fontColor = PALETTE.black,
+          fill = WHITE,
+          fontColor = '111827',
           bold = false,
           size = 9,
           align = 'center',
@@ -366,10 +324,10 @@ export function ResourcesPage() {
         cell.font = { bold, size, color: { argb: fontColor } };
         cell.alignment = { horizontal: align, vertical, wrapText: wrap };
         cell.border = {
-          top: { style: 'thin', color: { argb: PALETTE.border } },
-          left: { style: 'thin', color: { argb: PALETTE.border } },
-          bottom: { style: 'thin', color: { argb: PALETTE.border } },
-          right: { style: 'thin', color: { argb: PALETTE.border } },
+          top: { style: 'thin', color: { argb: BORDER } },
+          left: { style: 'thin', color: { argb: BORDER } },
+          bottom: { style: 'thin', color: { argb: BORDER } },
+          right: { style: 'thin', color: { argb: BORDER } },
         };
       };
 
@@ -386,95 +344,98 @@ export function ResourcesPage() {
         const project = projectById.get(projectId);
         if (project?.isHighProbability) return 'FFD966';
         const projectIndex = projectIndexById.get(projectId);
-        if (typeof projectIndex !== 'number') return 'D9D9D9';
+        if (typeof projectIndex !== 'number') return 'E5E7EB';
         return PROJECT_COLORS[projectIndex % PROJECT_COLORS.length];
       };
 
-      const weekNumByStart = new Map<string, number>();
-      dayEntries.forEach((day) => {
-        if (!weekNumByStart.has(day.weekStart)) {
-          weekNumByStart.set(day.weekStart, day.weekNumber);
-        }
-      });
+      const weekNumByStart = new Map(weeksForYear.map((week) => [week.weekStart, week.weekNum]));
 
-      const currentMerges = Object.keys((forecastSheet as any)._merges || {});
-      currentMerges.forEach((range) => forecastSheet.unMergeCells(range));
-
-      const clearMaxRow = Math.max(forecastSheet.rowCount, 500);
-      const clearMaxCol = Math.max(forecastSheet.columnCount, lastDayCol + 4);
-      for (let row = 1; row <= clearMaxRow; row += 1) {
-        for (let col = 1; col <= clearMaxCol; col += 1) {
-          const cell = forecastSheet.getCell(row, col);
-          cell.value = null;
-        }
-      }
-
-      forecastSheet.views = [{ state: 'frozen', xSplit: 2, ySplit: 3 }];
+      const forecastSheetName = `${department} Forecast ${selectedYear}`;
+      const forecastSheet = workbook.addWorksheet(forecastSheetName);
+      const firstDayCol = 4;
+      const lastDayCol = firstDayCol + dayColumns.length - 1;
+      forecastSheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 6 }];
       forecastSheet.properties.defaultRowHeight = 18;
-      forecastSheet.getColumn(1).width = 8;
-      forecastSheet.getColumn(2).width = 11;
+      forecastSheet.getColumn(1).width = 13;
+      forecastSheet.getColumn(2).width = 13;
+      forecastSheet.getColumn(3).width = 24;
       for (let col = firstDayCol; col <= lastDayCol; col += 1) {
-        forecastSheet.getColumn(col).width = 4;
+        forecastSheet.getColumn(col).width = 5;
       }
 
-      forecastSheet.getCell('A1').value = 'SCIO';
-      applyCellStyle(forecastSheet.getCell('A1'), { fill: PALETTE.white, fontColor: PALETTE.purpleDark, bold: true, size: 14 });
-      forecastSheet.getCell('B1').value = 'Month';
-      forecastSheet.getCell('B2').value = 'Week';
-      forecastSheet.getCell('B3').value = 'Day';
-      applyCellStyle(forecastSheet.getCell('B1'), { fill: PALETTE.white, bold: true, align: 'left', size: 12 });
-      applyCellStyle(forecastSheet.getCell('B2'), { fill: PALETTE.white, bold: true, align: 'left', size: 12 });
-      applyCellStyle(forecastSheet.getCell('B3'), { fill: PALETTE.white, bold: true, align: 'left', size: 12 });
+      forecastSheet.mergeCells(1, 1, 1, lastDayCol);
+      const titleCell = forecastSheet.getCell(1, 1);
+      titleCell.value = `${forecastSheetName} | Capacity base: ${DEFAULT_WEEKLY_CAPACITY}h/week`;
+      applyCellStyle(titleCell, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
 
-      type Group = { startCol: number; endCol: number; label: string };
-      const monthGroups: Group[] = [];
-      dayEntries.forEach((day) => {
-        const label = day.date.toLocaleString('en-US', { month: 'long' });
+      forecastSheet.mergeCells(2, 1, 2, lastDayCol);
+      const notesCell = forecastSheet.getCell(2, 1);
+      notesCell.value = `IND = unassigned time | MNG/ASSY/PTO = manual rows | Generated: ${generatedLabel}`;
+      applyCellStyle(notesCell, { fill: 'EDE9FE', fontColor: '1F2937', bold: true, align: 'left' });
+
+      forecastSheet.mergeCells(3, 1, 3, lastDayCol);
+      const legendCell = forecastSheet.getCell(3, 1);
+      legendCell.value = 'Dashboard tabs included: Dashboard, Internal Dashboard';
+      applyCellStyle(legendCell, { fill: 'F3F4F6', fontColor: '374151', align: 'left' });
+
+      forecastSheet.mergeCells(4, 1, 6, 1);
+      const resourceHeader = forecastSheet.getCell(4, 1);
+      resourceHeader.value = 'Resource';
+      applyCellStyle(resourceHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
+
+      forecastSheet.mergeCells(4, 2, 6, 2);
+      const typeHeader = forecastSheet.getCell(4, 2);
+      typeHeader.value = 'Type';
+      applyCellStyle(typeHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
+
+      forecastSheet.mergeCells(4, 3, 6, 3);
+      const detailHeader = forecastSheet.getCell(4, 3);
+      detailHeader.value = 'Details';
+      applyCellStyle(detailHeader, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true });
+
+      type HeaderGroup = { label: string; start: number; end: number };
+      const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+      const monthGroups: HeaderGroup[] = [];
+      dayColumns.forEach((day, index) => {
+        const label = monthFormatter.format(day.date);
+        const col = firstDayCol + index;
         const lastGroup = monthGroups[monthGroups.length - 1];
         if (!lastGroup || lastGroup.label !== label) {
-          monthGroups.push({ startCol: day.col, endCol: day.col, label });
+          monthGroups.push({ label, start: col, end: col });
         } else {
-          lastGroup.endCol = day.col;
-        }
-      });
-
-      const weekGroups: Group[] = [];
-      dayEntries.forEach((day) => {
-        const label = String(day.weekNumber);
-        const lastGroup = weekGroups[weekGroups.length - 1];
-        if (!lastGroup || lastGroup.label !== label) {
-          weekGroups.push({ startCol: day.col, endCol: day.col, label });
-        } else {
-          lastGroup.endCol = day.col;
+          lastGroup.end = col;
         }
       });
 
       monthGroups.forEach((group, idx) => {
-        forecastSheet.mergeCells(1, group.startCol, 1, group.endCol);
-        const monthCell = forecastSheet.getCell(1, group.startCol);
-        monthCell.value = `${group.label} ${selectedYear}`;
-        applyCellStyle(monthCell, {
-          fill: idx % 2 === 0 ? PALETTE.purpleDark : PALETTE.yellow,
-          fontColor: idx % 2 === 0 ? PALETTE.white : PALETTE.black,
+        forecastSheet.mergeCells(4, group.start, 4, group.end);
+        const cell = forecastSheet.getCell(4, group.start);
+        const useYellow = idx % 2 === 1;
+        applyCellStyle(cell, {
+          fill: useYellow ? BRAND_YELLOW : BRAND_PURPLE_ALT,
+          fontColor: useYellow ? BRAND_PURPLE : WHITE,
           bold: true,
-          size: 10,
         });
+        cell.value = group.label;
       });
 
-      weekGroups.forEach((group) => {
-        forecastSheet.mergeCells(2, group.startCol, 2, group.endCol);
-        const weekCell = forecastSheet.getCell(2, group.startCol);
-        weekCell.value = group.label;
-        applyCellStyle(weekCell, { fill: PALETTE.white, bold: true, size: 18 });
+      weeksForYear.forEach((week, index) => {
+        const startCol = firstDayCol + (index * 7);
+        const endCol = startCol + 6;
+        forecastSheet.mergeCells(5, startCol, 5, endCol);
+        const weekCell = forecastSheet.getCell(5, startCol);
+        weekCell.value = `CW${week.weekNum}`;
+        applyCellStyle(weekCell, { fill: 'DDD6FE', fontColor: '1F2937', bold: true });
       });
 
-      dayEntries.forEach((day) => {
-        const dayCell = forecastSheet.getCell(3, day.col);
-        dayCell.value = day.day;
+      dayColumns.forEach((day, index) => {
+        const col = firstDayCol + index;
+        const dayCell = forecastSheet.getCell(6, col);
+        dayCell.value = day.date.getDate();
         applyCellStyle(dayCell, {
-          fill: PALETTE.white,
+          fill: day.offset >= 5 ? WEEKEND_BG : WHITE,
+          fontColor: '111827',
           bold: true,
-          size: 12,
         });
       });
 
@@ -482,30 +443,24 @@ export function ResourcesPage() {
         .filter((employee) => employee.isActive)
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      const dayColumnsByWeekStart = new Map<string, number[]>();
-      dayEntries.forEach((day) => {
-        const columns = dayColumnsByWeekStart.get(day.weekStart) || [];
-        columns.push(day.col);
-        dayColumnsByWeekStart.set(day.weekStart, columns);
-      });
-
-      let rowCursor = 4;
-      sortedDepartmentEmployees.forEach((employee) => {
+      let rowCursor = 7;
+      sortedDepartmentEmployees.forEach((employee, employeeIndex) => {
         const employeeWeeks = assignmentByEmployeeWeek.get(employee.id) || new Map<string, Assignment[]>();
+        const employeeCapacity = getEmployeeCapacity(employee);
 
         const employeeProjects = new Map<string, { hours: number; changeOrders: Set<string> }>();
         employeeWeeks.forEach((weekAssignments) => {
           weekAssignments.forEach((assignment) => {
-            const currentProject = employeeProjects.get(assignment.projectId) || {
+            const current = employeeProjects.get(assignment.projectId) || {
               hours: 0,
               changeOrders: new Set<string>(),
             };
-            currentProject.hours += getAssignmentHours(assignment);
+            current.hours += getAssignmentHours(assignment);
             if (assignment.changeOrderId) {
               const coName = changeOrderById.get(assignment.changeOrderId)?.name;
-              if (coName) currentProject.changeOrders.add(coName);
+              if (coName) current.changeOrders.add(coName);
             }
-            employeeProjects.set(assignment.projectId, currentProject);
+            employeeProjects.set(assignment.projectId, current);
           });
         });
 
@@ -517,131 +472,126 @@ export function ResourcesPage() {
         const assyRow = rowCursor + 2;
         const ptoRow = rowCursor + 3;
         const projectStartRow = rowCursor + 4;
-        const projectRowsCount = Math.max(8, orderedProjects.length || 1);
+        const projectRowsCount = Math.max(1, orderedProjects.length);
         const blockEndRow = projectStartRow + projectRowsCount - 1;
 
-        forecastSheet.mergeCells(indRow, 2, blockEndRow, 2);
-        const resourceCell = forecastSheet.getCell(indRow, 2);
-        resourceCell.value = employee.name;
-        applyCellStyle(resourceCell, {
-          fill: PALETTE.white,
+        forecastSheet.mergeCells(indRow, 1, blockEndRow, 1);
+        const nameCell = forecastSheet.getCell(indRow, 1);
+        nameCell.value = `${employee.name}\n${employee.role || ''}`;
+        applyCellStyle(nameCell, {
+          fill: employeeIndex % 2 === 0 ? 'F9FAFB' : 'F3F4F6',
           bold: true,
-          align: 'center'
+          align: 'center',
         });
-        resourceCell.alignment = { vertical: 'middle', horizontal: 'center', textRotation: 90, wrapText: true };
+        nameCell.alignment = { vertical: 'middle', horizontal: 'center', textRotation: 90, wrapText: true };
 
-        const setupRowLabel = (row: number, label: string, fill: string) => {
+        const setupRowLabel = (row: number, label: string, fill: string, details: string) => {
           const labelCell = forecastSheet.getCell(row, 2);
           labelCell.value = label;
           applyCellStyle(labelCell, { fill, bold: true });
-          const projectCodeCell = forecastSheet.getCell(row, 1);
-          projectCodeCell.value = label;
-          applyCellStyle(projectCodeCell, {
-            fill,
-            bold: true,
-            fontColor: '101010',
-          });
+          const detailsCell = forecastSheet.getCell(row, 3);
+          detailsCell.value = details;
+          applyCellStyle(detailsCell, { fill: 'FFFFFF', align: 'left' });
         };
 
-        setupRowLabel(indRow, 'IND', 'FFF200');
-        setupRowLabel(mngRow, 'MNG', 'FFD966');
-        setupRowLabel(assyRow, 'ASSY', 'F4B183');
-        setupRowLabel(ptoRow, 'PTO', 'BDD7EE');
+        setupRowLabel(indRow, 'IND', 'FFF200', 'Indirect / unassigned hours (auto)');
+        setupRowLabel(mngRow, 'MNG', 'F8CBAD', 'Management (manual)');
+        setupRowLabel(assyRow, 'ASSY', 'FFE699', 'Assembly (manual)');
+        setupRowLabel(ptoRow, 'PTO', 'CFE2F3', 'PTO (manual)');
 
         const projectRowById = new Map<string, number>();
-        orderedProjects.forEach(([projectId], index) => {
-          const row = projectStartRow + index;
-          const projectCode = getProjectCode(projectId);
-          const fill = getProjectFill(projectId);
-          const labelCell = forecastSheet.getCell(row, 1);
-          labelCell.value = projectCode;
-          applyCellStyle(labelCell, {
-            fill,
-            bold: true,
-            fontColor: PALETTE.black,
+        if (orderedProjects.length === 0) {
+          setupRowLabel(projectStartRow, '-', 'E5E7EB', 'No project assignment in selected year');
+        } else {
+          orderedProjects.forEach(([projectId, info], index) => {
+            const row = projectStartRow + index;
+            const project = projectById.get(projectId);
+            const projectCode = getProjectCode(projectId);
+            const highProbabilitySuffix = project?.isHighProbability ? ' (HP)' : '';
+            const coList = [...info.changeOrders].join(', ');
+            setupRowLabel(
+              row,
+              `${projectCode}${highProbabilitySuffix}`,
+              getProjectFill(projectId),
+              `${project?.name || 'Deleted project'} | ${formatHours(info.hours)}h${coList ? ` | CO: ${coList}` : ''}`
+            );
+            projectRowById.set(projectId, row);
           });
-          const leftCell = forecastSheet.getCell(row, 2);
-          leftCell.value = '';
-          applyCellStyle(leftCell, { fill: PALETTE.white });
-          projectRowById.set(projectId, row);
-        });
-
-        for (let extraIndex = orderedProjects.length; extraIndex < projectRowsCount; extraIndex += 1) {
-          const row = projectStartRow + extraIndex;
-          const labelCell = forecastSheet.getCell(row, 1);
-          labelCell.value = '';
-          applyCellStyle(labelCell, { fill: PALETTE.white });
-          const leftCell = forecastSheet.getCell(row, 2);
-          leftCell.value = '';
-          applyCellStyle(leftCell, { fill: PALETTE.white });
         }
 
         for (let row = indRow; row <= blockEndRow; row += 1) {
           for (let col = firstDayCol; col <= lastDayCol; col += 1) {
-            const dayEntry = dayEntries[col - firstDayCol];
+            const dayOffset = dayColumns[col - firstDayCol].offset;
             const cell = forecastSheet.getCell(row, col);
             applyCellStyle(cell, {
-              fill: dayEntry.isWeekend ? PALETTE.gridWeekend : PALETTE.gridWeekday,
-              fontColor: PALETTE.black,
+              fill: dayOffset >= 5 ? WEEKEND_BG : WHITE,
+              fontColor: '111827',
               align: 'center',
               wrap: false,
             });
           }
         }
 
-        dayColumnsByWeekStart.forEach((weekColumns, weekStart) => {
-          const weekdayColumns = weekColumns.filter((column) => {
-            const dayEntry = dayEntries[column - firstDayCol];
-            return !dayEntry.isWeekend;
-          });
-          const weekAssignments = employeeWeeks.get(weekStart) || [];
-          if (weekAssignments.length === 0) {
-            weekdayColumns.forEach((column) => {
-              const cell = forecastSheet.getCell(indRow, column);
-              cell.value = 'IND';
+        let totalUnassignedHours = 0;
+
+        weeksForYear.forEach((week, weekIndex) => {
+          const weekAssignments = employeeWeeks.get(week.weekStart) || [];
+          const weekTotalHours = weekAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
+          const remainingWeekHours = Math.max(employeeCapacity - weekTotalHours, 0);
+          totalUnassignedHours += remainingWeekHours;
+
+          const startCol = firstDayCol + (weekIndex * 7);
+          const fillRowWeekdays = (row: number, value: string, fill: string, fontColor = '111827') => {
+            for (let offset = 0; offset < 5; offset += 1) {
+              const cell = forecastSheet.getCell(row, startCol + offset);
+              cell.value = value;
               applyCellStyle(cell, {
-                fill: 'FFF200',
+                fill,
+                fontColor,
                 bold: true,
+                align: 'center',
                 wrap: false,
               });
-            });
+            }
+          };
+
+          if (weekAssignments.length === 0) {
+            fillRowWeekdays(indRow, 'IND', 'FFF200');
             return;
           }
 
-          const projectHoursForWeek = new Map<string, { hours: number; code: string; fill: string }>();
+          const projectHoursForWeek = new Map<string, number>();
           weekAssignments.forEach((assignment) => {
-            const existing = projectHoursForWeek.get(assignment.projectId) || {
-              hours: 0,
-              code: getProjectCode(assignment.projectId),
-              fill: getProjectFill(assignment.projectId),
-            };
-            existing.hours += getAssignmentHours(assignment);
-            projectHoursForWeek.set(assignment.projectId, existing);
+            const current = projectHoursForWeek.get(assignment.projectId) || 0;
+            projectHoursForWeek.set(assignment.projectId, current + getAssignmentHours(assignment));
           });
 
-          projectHoursForWeek.forEach((entry, projectId) => {
+          projectHoursForWeek.forEach((_hours, projectId) => {
             const row = projectRowById.get(projectId);
             if (!row) return;
-            weekdayColumns.forEach((column) => {
-              const cell = forecastSheet.getCell(row, column);
-              cell.value = entry.code;
-              applyCellStyle(cell, {
-                fill: entry.fill,
-                bold: true,
-                wrap: false,
-              });
-            });
+            const projectCode = getProjectCode(projectId);
+            fillRowWeekdays(row, projectCode, getProjectFill(projectId));
           });
+
+          if (remainingWeekHours > 0.1) {
+            fillRowWeekdays(indRow, 'IND', 'FFF2CC');
+          }
         });
 
+        const indDetailsCell = forecastSheet.getCell(indRow, 3);
+        indDetailsCell.value = `Indirect / unassigned hours (auto) | ${formatHours(totalUnassignedHours)}h available`;
+        applyCellStyle(indDetailsCell, { fill: 'FFFFFF', align: 'left' });
+
         const separatorRow = blockEndRow + 1;
-        for (let col = 1; col <= lastDayCol; col += 1) {
-          applyCellStyle(forecastSheet.getCell(separatorRow, col), { fill: PALETTE.white });
-        }
+        forecastSheet.mergeCells(separatorRow, 1, separatorRow, lastDayCol);
+        const separatorCell = forecastSheet.getCell(separatorRow, 1);
+        separatorCell.value = '';
+        applyCellStyle(separatorCell, { fill: 'EDE9FE' });
 
         rowCursor = separatorRow + 1;
       });
 
+      const dashboardSheet = workbook.addWorksheet('Dashboard');
       dashboardSheet.columns = [
         { width: 26 },
         { width: 22 },
@@ -650,23 +600,18 @@ export function ResourcesPage() {
         { width: 22 },
       ];
 
-      dashboardSheet.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.value = null;
-        });
-      });
       dashboardSheet.mergeCells('A1:E1');
       const dashTitle = dashboardSheet.getCell('A1');
       dashTitle.value = `Dashboard - ${department} (${selectedYear})`;
-      applyCellStyle(dashTitle, { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true, size: 12, align: 'left' });
+      applyCellStyle(dashTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
 
       dashboardSheet.mergeCells('A2:E2');
       const dashSubTitle = dashboardSheet.getCell('A2');
       dashSubTitle.value = `Generated: ${generatedLabel}`;
-      applyCellStyle(dashSubTitle, { fill: PALETTE.purpleSoft, align: 'left', bold: true });
+      applyCellStyle(dashSubTitle, { fill: 'EDE9FE', align: 'left', bold: true });
 
       const totalCapacityHours = sortedDepartmentEmployees.reduce(
-        (sum, employee) => sum + (getEmployeeCapacity(employee) * Math.max(1, weekNumByStart.size)),
+        (sum, employee) => sum + (getEmployeeCapacity(employee) * weeksForYear.length),
         0
       );
       const totalAssignedHours = departmentAssignments.reduce((sum, assignment) => sum + getAssignmentHours(assignment), 0);
@@ -690,17 +635,17 @@ export function ResourcesPage() {
       for (let col = 1; col <= 5; col += 1) {
         const headerCell = dashboardSheet.getCell(4, col);
         headerCell.value = kpiHeaders[col - 1];
-        applyCellStyle(headerCell, { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true });
+        applyCellStyle(headerCell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true });
 
         const valueCell = dashboardSheet.getCell(5, col);
         valueCell.value = kpiValues[col - 1];
-        applyCellStyle(valueCell, { fill: PALETTE.white, bold: true, size: 11 });
+        applyCellStyle(valueCell, { fill: 'F9FAFB', bold: true, size: 11 });
       }
 
       dashboardSheet.getCell('A7').value = 'Top Resources (assigned hours)';
-      applyCellStyle(dashboardSheet.getCell('A7'), { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true, align: 'left' });
+      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
       dashboardSheet.mergeCells('A7:E7');
-      applyCellStyle(dashboardSheet.getCell('A7'), { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true, align: 'left' });
+      applyCellStyle(dashboardSheet.getCell('A7'), { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
 
       const topResourceRows = sortedDepartmentEmployees
         .map((employee) => {
@@ -715,11 +660,11 @@ export function ResourcesPage() {
         .slice(0, 10);
 
       dashboardSheet.getRow(8).values = ['Resource', 'Role', 'Assigned h', 'Capacity h', 'Utilization %'];
-      dashboardSheet.getRow(8).eachCell((cell: any) => applyCellStyle(cell, { fill: PALETTE.purpleSoft, bold: true }));
+      dashboardSheet.getRow(8).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
 
       topResourceRows.forEach((entry, index) => {
         const rowNumber = 9 + index;
-        const totalCapacity = getEmployeeCapacity(entry.employee) * Math.max(1, weekNumByStart.size);
+        const totalCapacity = getEmployeeCapacity(entry.employee) * weeksForYear.length;
         const util = totalCapacity > 0 ? (entry.totalHours / totalCapacity) * 100 : 0;
         dashboardSheet.getRow(rowNumber).values = [
           entry.employee.name,
@@ -729,10 +674,11 @@ export function ResourcesPage() {
           formatHours(util),
         ];
         dashboardSheet.getRow(rowNumber).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: index % 2 === 0 ? PALETTE.white : 'F9FAFB', align: col <= 2 ? 'left' : 'center' })
+          applyCellStyle(cell, { fill: index % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 2 ? 'left' : 'center' })
         );
       });
 
+      const internalSheet = workbook.addWorksheet('Internal Dashboard');
       internalSheet.columns = [
         { width: 14 },
         { width: 28 },
@@ -745,20 +691,15 @@ export function ResourcesPage() {
         { width: 12 },
       ];
 
-      internalSheet.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.value = null;
-        });
-      });
       internalSheet.mergeCells('A1:I1');
       const internalTitle = internalSheet.getCell('A1');
       internalTitle.value = `Internal Dashboard - ${department} (${selectedYear})`;
-      applyCellStyle(internalTitle, { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true, size: 12, align: 'left' });
+      applyCellStyle(internalTitle, { fill: BRAND_PURPLE, fontColor: WHITE, bold: true, size: 12, align: 'left' });
 
       internalSheet.mergeCells('A2:I2');
       const internalSubTitle = internalSheet.getCell('A2');
       internalSubTitle.value = `Generated: ${generatedLabel}`;
-      applyCellStyle(internalSubTitle, { fill: PALETTE.purpleSoft, bold: true, align: 'left' });
+      applyCellStyle(internalSubTitle, { fill: 'EDE9FE', bold: true, align: 'left' });
 
       internalSheet.getRow(4).values = [
         'Project Code',
@@ -771,7 +712,7 @@ export function ResourcesPage() {
         'Change Orders',
         'Weeks',
       ];
-      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true }));
+      internalSheet.getRow(4).eachCell((cell: any) => applyCellStyle(cell, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true }));
 
       const sortedProjects = [...projectSummary.entries()].sort((a, b) => b[1].hours - a[1].hours);
       let internalRow = 5;
@@ -789,7 +730,7 @@ export function ResourcesPage() {
           summary.weeks.size,
         ];
         internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? PALETTE.white : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center' })
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 3 || col === 8 ? 'left' : 'center' })
         );
         internalRow += 1;
       });
@@ -798,11 +739,11 @@ export function ResourcesPage() {
       internalSheet.mergeCells(internalRow, 1, internalRow, 9);
       const detailTitle = internalSheet.getCell(internalRow, 1);
       detailTitle.value = 'Assignment Detail';
-      applyCellStyle(detailTitle, { fill: PALETTE.purpleDark, fontColor: PALETTE.white, bold: true, align: 'left' });
+      applyCellStyle(detailTitle, { fill: BRAND_PURPLE_ALT, fontColor: WHITE, bold: true, align: 'left' });
       internalRow += 1;
 
       internalSheet.getRow(internalRow).values = ['Week Start', 'CW', 'Resource', 'Project', 'Project Code', 'Hours', 'CO', 'Stage', 'Comment'];
-      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: PALETTE.purpleSoft, bold: true }));
+      internalSheet.getRow(internalRow).eachCell((cell: any) => applyCellStyle(cell, { fill: 'DDD6FE', bold: true }));
       internalRow += 1;
 
       const sortedAssignments = [...departmentAssignments].sort((a, b) => {
@@ -831,7 +772,7 @@ export function ResourcesPage() {
           assignment.comment || '',
         ];
         internalSheet.getRow(internalRow).eachCell((cell: any, col: number) =>
-          applyCellStyle(cell, { fill: idx % 2 === 0 ? PALETTE.white : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center' })
+          applyCellStyle(cell, { fill: idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB', align: col <= 4 || col >= 7 ? 'left' : 'center' })
         );
         internalRow += 1;
       });
@@ -859,6 +800,7 @@ export function ResourcesPage() {
       setExportingDepartment(null);
     }
   };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveDepartment = (lockedDepartment || formData.department) as Department | undefined;
