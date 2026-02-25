@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, ArrowLeft, Languages } from 'lucide-react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation, type Language } from '../utils/translations';
 import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
 import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
-import { API_BASE_URL } from '../utils/apiUrl';
-
-const BASE_URL = API_BASE_URL;
-const API_URL = `${BASE_URL}/api`;
+import { authApi } from '../services/api';
 
 export const ChangePasswordPage = () => {
   const navigate = useNavigate();
@@ -63,20 +59,10 @@ export const ChangePasswordPage = () => {
         return;
       }
 
-      const token = localStorage.getItem('access_token');
-
-      await axios.post(
-        `${API_URL}/change-password/`,
-        {
-          current_password: currentPassword,
-          new_password: newPassword,
-          confirm_password: confirmPassword,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      await authApi.changePassword(
+        currentPassword,
+        newPassword,
+        confirmPassword
       );
 
       setSuccess(t.changePasswordSuccessMessage || 'Password updated successfully. Please sign in again.');
@@ -91,7 +77,9 @@ export const ChangePasswordPage = () => {
         navigate('/login');
       }, 2000);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || t.changePasswordError || 'Error changing password';
+      const errorMessage = err instanceof Error
+        ? err.message
+        : (t.changePasswordError || 'Error changing password');
       setError(errorMessage);
     } finally {
       setIsLoading(false);

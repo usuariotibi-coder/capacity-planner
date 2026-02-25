@@ -1,11 +1,9 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../utils/apiUrl';
+import { sessionApi } from '../services/api';
 
 const INACTIVITY_TIMEOUT = 90 * 60 * 1000; // 90 minutes in milliseconds
 const SESSION_CHECK_INTERVAL = 60 * 1000; // Check session status every 1 minute
-const BASE_URL = API_BASE_URL;
-const API_URL = `${BASE_URL}/api`;
 
 export const useInactivityLogout = () => {
   const { logout, isLoggedIn } = useAuth();
@@ -40,12 +38,7 @@ export const useInactivityLogout = () => {
           return;
         }
 
-        const response = await fetch(`${API_URL}/session-status/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: 'no-store',
-        });
+        const response = await sessionApi.getStatusResponse();
 
         // Some deployments don't expose this endpoint. Don't treat that as an inactive session.
         if (response.status === 404) {

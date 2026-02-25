@@ -10,6 +10,7 @@ import logging
 import json
 import secrets
 import threading
+import re
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 import uuid
@@ -43,6 +44,31 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_other_department_value(value):
+    """
+    Normalize incoming sub-department values to canonical enum format.
+    Accepts forms like "Head Engineering", "head_engineering", etc.
+    """
+    if value is None:
+        return None
+
+    raw = str(value).strip()
+    if not raw:
+        return ''
+
+    canonical = re.sub(r'[^A-Za-z0-9 _-]', '', raw).strip().upper()
+    canonical = canonical.replace('-', '_').replace(' ', '_')
+    canonical = re.sub(r'_+', '_', canonical).strip('_')
+
+    aliases = {
+        'HR': 'HUMAN_RESOURCES',
+        'HUMANRESOURCES': 'HUMAN_RESOURCES',
+        'BUSINESSINTELLIGENCE': 'BUSINESS_INTELLIGENCE',
+        'HEADENGINEERING': 'HEAD_ENGINEERING',
+    }
+    return aliases.get(canonical, canonical)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -145,6 +171,11 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
                     'password': 'Password is required.'
                 })
 
+        if isinstance(department, str):
+            department = department.strip().upper()
+        if isinstance(other_department, str) or other_department is not None:
+            other_department = _normalize_other_department_value(other_department)
+
         if email:
             normalized_email = email.strip().lower()
             email_query = Q(email__iexact=normalized_email) | Q(username__iexact=normalized_email)
@@ -173,12 +204,16 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'other_department': 'Invalid sub-department value.'
                 })
+            attrs['other_department'] = other_department
         elif department:
             attrs['other_department'] = None
         elif other_department:
             raise serializers.ValidationError({
                 'department': 'Department is required when setting sub-department.'
             })
+
+        if department is not None:
+            attrs['department'] = department
 
         if self.instance is None:
             attrs.setdefault('is_active', True)
@@ -339,12 +374,22 @@ class UserRegistrationSerializer(serializers.Serializer):
             })
 
         department = data.get('department')
-        other_department = data.get('other_department')
+        if isinstance(department, str):
+            department = department.strip().upper()
+            data['department'] = department
+
+        other_department = _normalize_other_department_value(data.get('other_department'))
+        valid_other_departments = {choice[0] for choice in OtherDepartment.choices}
         if department == UserDepartment.OTHER:
             if not other_department:
                 raise serializers.ValidationError({
                     "other_department": "Please select a sub-department."
                 })
+            if other_department not in valid_other_departments:
+                raise serializers.ValidationError({
+                    "other_department": "Invalid sub-department value."
+                })
+            data['other_department'] = other_department
         else:
             data['other_department'] = None
 

@@ -500,6 +500,41 @@ class RegisteredUsersPasswordResetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class RegisteredUsersDepartmentNormalizationTests(APITestCase):
+    def setUp(self):
+        self.bi_manager = User.objects.create_user(
+            username='bi.normalizer',
+            email='bi.normalizer@na.scio-automation.com',
+            password='manager-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(
+            user=self.bi_manager,
+            department=UserDepartment.OTHER,
+            other_department=OtherDepartment.BUSINESS_INTELLIGENCE,
+        )
+        self.client.force_authenticate(user=self.bi_manager)
+
+    def test_registered_users_create_accepts_human_readable_head_engineering(self):
+        response = self.client.post(
+            reverse('registered-user-list'),
+            {
+                'first_name': 'Head',
+                'last_name': 'Engineering',
+                'email': 'head.eng.normalized@na.scio-automation.com',
+                'password': 'StrongPass123!',
+                'department': 'OTHER',
+                'other_department': 'Head Engineering',
+                'is_active': True,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        created = User.objects.get(email='head.eng.normalized@na.scio-automation.com')
+        self.assertEqual(created.profile.other_department, OtherDepartment.HEAD_ENGINEERING)
+
+
 class RegistrationVerificationTests(APITestCase):
     def _registration_payload(self, email='new.user@na.scio-automation.com'):
         return {

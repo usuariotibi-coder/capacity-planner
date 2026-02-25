@@ -488,6 +488,47 @@ export const authApi = {
 
     return response.json();
   },
+
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    return apiFetch('/api/change-password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      }),
+    });
+  },
+};
+
+// Session API
+export const sessionApi = {
+  getStatusResponse: async (): Promise<Response> => {
+    let accessToken = getAccessToken();
+
+    const makeRequest = async (token: string | null): Promise<Response> => {
+      const headers: HeadersInit = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const { response } = await fetchWithApiFallback('/api/session-status/', {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+      });
+      return response;
+    };
+
+    let response = await makeRequest(accessToken);
+
+    if (response.status === 401 && accessToken) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await makeRequest(newToken);
+      }
+    }
+
+    return response;
+  },
 };
 
 // Registered Users API (Business Intelligence only)
