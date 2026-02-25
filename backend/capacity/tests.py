@@ -375,6 +375,51 @@ class SessionControlTests(APITestCase):
         self.assertFalse(UserSession.objects.get(id=session_id).is_active)
 
 
+class RegisteredUsersLastLoginTests(APITestCase):
+    @staticmethod
+    def _extract_results(response):
+        if isinstance(response.data, dict) and 'results' in response.data:
+            return response.data['results']
+        return response.data
+
+    def setUp(self):
+        self.bi_manager = User.objects.create_user(
+            username='bi.manager',
+            email='bi.manager@na.scio-automation.com',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(
+            user=self.bi_manager,
+            department=UserDepartment.OTHER,
+            other_department=OtherDepartment.BUSINESS_INTELLIGENCE,
+        )
+        self.client.force_authenticate(user=self.bi_manager)
+
+        self.target_user = User.objects.create_user(
+            username='target.user',
+            email='target.user@na.scio-automation.com',
+            password='test-password',
+            is_active=True,
+        )
+        self.assertIsNone(self.target_user.last_login)
+        UserSession.objects.create(
+            user=self.target_user,
+            refresh_token='registered-users-last-login-token',
+            device_info={},
+            is_active=True,
+        )
+
+    def test_registered_users_uses_last_session_when_last_login_is_null(self):
+        response = self.client.get(reverse('registered-user-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        rows = self._extract_results(response)
+        target_row = next((item for item in rows if item['id'] == self.target_user.id), None)
+        self.assertIsNotNone(target_row)
+        self.assertIsNotNone(target_row.get('last_login'))
+
+
 class RegistrationVerificationTests(APITestCase):
     def _registration_payload(self, email='new.user@na.scio-automation.com'):
         return {

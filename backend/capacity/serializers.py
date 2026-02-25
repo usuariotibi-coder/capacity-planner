@@ -59,6 +59,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisteredUserSerializer(serializers.ModelSerializer):
     """Serializer for BI-only user management view."""
+    last_login = serializers.SerializerMethodField()
     department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     other_department = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     password = serializers.CharField(
@@ -85,6 +86,27 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
             'password',
         )
         read_only_fields = ('id', 'username', 'date_joined', 'last_login')
+
+    def get_last_login(self, instance):
+        """
+        Return Django `last_login` when available; otherwise fallback to
+        the latest session creation timestamp so BI can still see recent access.
+        """
+        model_last_login = getattr(instance, 'last_login', None)
+        if model_last_login:
+            return model_last_login
+
+        annotated_last_session_login = getattr(instance, 'last_session_login', None)
+        if annotated_last_session_login:
+            return annotated_last_session_login
+
+        latest_session_login = (
+            instance.sessions
+            .order_by('-created_at')
+            .values_list('created_at', flat=True)
+            .first()
+        )
+        return latest_session_login
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

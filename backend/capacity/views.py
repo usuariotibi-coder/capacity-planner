@@ -2242,6 +2242,7 @@ class RegisteredUserViewSet(viewsets.ModelViewSet):
         User.objects
         .filter(is_staff=False, is_superuser=False)
         .select_related('profile')
+        .annotate(last_session_login=Max('sessions__created_at'))
         .order_by('-date_joined')
     )
     serializer_class = RegisteredUserSerializer
