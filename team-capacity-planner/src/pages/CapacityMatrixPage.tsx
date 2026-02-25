@@ -2667,7 +2667,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const forecastedHoursValue = getForecastedHours(dept, projectId);
     const utilizationPercent = getUtilizationPercent(dept, projectId);
     const utilizationColorInfo = getUtilizationColor(utilizationPercent);
-    const deptInfo = getDepartmentIcon(dept);
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
@@ -2687,8 +2686,7 @@ ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
         <div className="flex items-center gap-1 min-w-0">
-          <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1.5 py-1 shrink-0 min-w-[60px]">
-            <span className={`inline-flex items-center justify-center scale-[0.78] leading-none ${deptInfo.color}`}>{deptInfo.icon}</span>
+          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[50px]">
             <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
