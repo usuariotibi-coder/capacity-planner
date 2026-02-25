@@ -63,15 +63,122 @@ export function ActivityLogPage() {
   const uniqueActions = Array.from(new Set(logs.map(log => log.action).filter(Boolean)));
   const uniqueModels = Array.from(new Set(logs.map(log => log.modelName).filter(Boolean)));
 
+  const extractProjectContext = (log: Pick<ActivityLog, 'changes' | 'modelName' | 'objectId'>) => {
+    let projectName: string | null = null;
+    let projectId: string | null = null;
+    const visited = new WeakSet<object>();
+    const projectNameKeys = new Set(['projectname', 'project_name', 'projecttitle', 'project_title']);
+    const projectIdKeys = new Set(['projectid', 'project_id', 'projectuuid', 'project_uuid']);
+
+    const setProjectName = (value: unknown) => {
+      if (projectName) return;
+      if (typeof value !== 'string' && typeof value !== 'number') return;
+      const normalized = String(value).trim();
+      if (!normalized || normalized.toLowerCase() === 'null' || normalized.toLowerCase() === 'undefined') return;
+      projectName = normalized;
+    };
+
+    const setProjectId = (value: unknown) => {
+      if (projectId) return;
+      if (typeof value !== 'string' && typeof value !== 'number') return;
+      const normalized = String(value).trim();
+      if (!normalized || normalized.toLowerCase() === 'null' || normalized.toLowerCase() === 'undefined') return;
+      projectId = normalized;
+    };
+
+    const inspectProjectObject = (value: unknown) => {
+      if (!value || typeof value !== 'object') return;
+      if (visited.has(value as object)) return;
+      visited.add(value as object);
+      const obj = value as Record<string, unknown>;
+      setProjectName(obj.projectName);
+      setProjectName(obj.project_name);
+      setProjectName(obj.name);
+      setProjectName(obj.title);
+      setProjectId(obj.projectId);
+      setProjectId(obj.project_id);
+      setProjectId(obj.id);
+      setProjectId(obj.uuid);
+    };
+
+    const walk = (node: unknown, parentKey = '') => {
+      if (!node || typeof node !== 'object') return;
+      if (visited.has(node as object)) return;
+      visited.add(node as object);
+
+      if (Array.isArray(node)) {
+        node.forEach(item => walk(item, parentKey));
+        return;
+      }
+
+      Object.entries(node as Record<string, unknown>).forEach(([rawKey, rawValue]) => {
+        const key = rawKey.toLowerCase();
+
+        if (projectNameKeys.has(key)) {
+          setProjectName(rawValue);
+        }
+        if (projectIdKeys.has(key)) {
+          setProjectId(rawValue);
+        }
+
+        if (key === 'project') {
+          if (typeof rawValue === 'string' || typeof rawValue === 'number') {
+            setProjectName(rawValue);
+          } else {
+            inspectProjectObject(rawValue);
+          }
+        }
+
+        if (parentKey === 'project') {
+          if (key === 'name' || key === 'title') setProjectName(rawValue);
+          if (key === 'id' || key === 'uuid') setProjectId(rawValue);
+        }
+
+        if (rawValue && typeof rawValue === 'object') {
+          walk(rawValue, key);
+        }
+      });
+    };
+
+    walk(log.changes);
+
+    if ((log.modelName || '').toLowerCase() === 'project') {
+      setProjectId(log.objectId);
+      const rawChanges = log.changes && typeof log.changes === 'object' ? log.changes as Record<string, unknown> : {};
+      const updates = rawChanges.updates && typeof rawChanges.updates === 'object'
+        ? rawChanges.updates as Record<string, unknown>
+        : rawChanges;
+      setProjectName(updates.name);
+      setProjectName(updates.projectName);
+      setProjectName(updates.project_name);
+    }
+
+    return { projectName, projectId };
+  };
+
   // Filter logs
   const filteredLogs = logs.filter(log => {
     const actionValue = log.action || '';
     const modelValue = log.modelName || '';
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const projectContext = extractProjectContext(log);
+    const searchableText = [
+      log.user?.username,
+      log.user?.firstName,
+      log.user?.lastName,
+      log.user?.email,
+      actionValue,
+      modelValue,
+      projectContext.projectName,
+      projectContext.projectId,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
     const matchesSearch =
-      searchTerm === '' ||
-      (log.user?.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      actionValue.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      modelValue.toLowerCase().includes(searchTerm.toLowerCase());
+      normalizedSearch === '' ||
+      searchableText.includes(normalizedSearch);
 
     const matchesAction = filterAction === 'all' || actionValue === filterAction;
     const matchesModel = filterModel === 'all' || modelValue === filterModel;
@@ -305,11 +412,13 @@ export function ActivityLogPage() {
   };
 
   // Extract important summary information from changes
-  const extractSummaryInfo = (changes: any, modelName: string) => {
+  const extractSummaryInfo = (log: ActivityLog) => {
+    const { changes, modelName } = log;
     if (!changes || typeof changes !== 'object') return null;
 
     const mainObj = extractMainObject(changes);
     const data = mainObj ? mainObj.data : changes;
+    const projectContext = extractProjectContext(log);
 
     const summary: any = {
       hours: null,
@@ -338,6 +447,10 @@ export function ActivityLogPage() {
       summary.week = data.weekStartDate || data.week_start_date;
     }
 
+    if (!summary.project) {
+      summary.project = projectContext.projectName || projectContext.projectId;
+    }
+
     return summary;
   };
 
@@ -357,7 +470,7 @@ export function ActivityLogPage() {
             <Search size={16} className="absolute left-3 top-3 text-[#8a8298]" />
             <input
               type="text"
-              placeholder={t.search || 'Search...'}
+              placeholder={language === 'es' ? 'Buscar por usuario, accion, modelo o proyecto...' : 'Search by user, action, model, or project...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="brand-input w-full pl-9 pr-3 py-2 text-sm"
@@ -425,7 +538,7 @@ export function ActivityLogPage() {
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {filteredLogs.map((log) => {
-                const summary = extractSummaryInfo(log.changes, log.modelName);
+                const summary = extractSummaryInfo(log);
                 const tone = getActionTone(log.action);
                 const actionLabel = getActionLabel(log.action);
                 const modelLabel = log.modelName || (language === 'es' ? 'Registro' : 'Record');
