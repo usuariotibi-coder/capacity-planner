@@ -5,7 +5,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber, getWeeksInRange } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
@@ -2812,6 +2812,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       return;
     }
 
+    const weeklyRange = getWeeksInRange(startDate, endDate)
+      .map((week) => normalizeWeekStartDate(week))
+      .filter((week, idx, arr) => week && arr.indexOf(week) === idx);
+
+    if (weeklyRange.length === 0) {
+      alert(language === 'es'
+        ? 'No hay semanas validas en el rango seleccionado.'
+        : 'There are no valid weeks in the selected range.');
+      return;
+    }
+
     try {
       setIsTimingRangeExcelExporting(true);
 
@@ -2819,7 +2830,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         modelName: 'Assignment',
         endDate,
         ordering: 'created_at',
-        pageSize: 1500,
+        pageSize: 3000,
       });
 
       interface AssignmentSnapshot {
@@ -2829,18 +2840,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         weekStartDate: string;
         hours: number;
         employeeId: string;
-      }
-
-      interface HoursBucket {
-        projectId: string;
-        projectName: string;
-        department: string;
-        weekStartDate: string;
-        addedHours: number;
-        removedHours: number;
-        changedHours: number;
-        netHours: number;
-        movements: number;
       }
 
       interface DetailRow {
@@ -2855,6 +2854,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         beforeHours: number;
         afterHours: number;
         deltaHours: number;
+      }
+
+      interface VisualRow {
+        key: string;
+        projectId: string;
+        projectName: string;
+        department: string;
+        responsibles: Set<string>;
+        beforeByWeek: Record<string, number>;
+        afterByWeek: Record<string, number>;
+        beforeTotal: number;
+        afterTotal: number;
+        addedHours: number;
+        removedHours: number;
+        changedHours: number;
+        netHours: number;
+        changedWeeks: number;
       }
 
       const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
@@ -2946,6 +2962,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           employeeId: employeeId || previous?.employeeId || '',
         };
       };
+      const normalizeAction = (rawAction: string): 'created' | 'updated' | 'deleted' | 'other' => {
+        const action = (rawAction || '').toLowerCase();
+        if (action === 'created' || action === 'create') return 'created';
+        if (action === 'updated' || action === 'update') return 'updated';
+        if (action === 'deleted' || action === 'delete') return 'deleted';
+        return 'other';
+      };
       const actionToLabel = (action: string): string => {
         if (action === 'created') return language === 'es' ? 'Creado' : 'Created';
         if (action === 'deleted') return language === 'es' ? 'Eliminado' : 'Deleted';
@@ -2964,35 +2987,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         if (fallback) return fallback;
         return language === 'es' ? 'Proyecto sin nombre' : 'Unnamed project';
       };
-      const addToBucket = (
-        map: Map<string, HoursBucket>,
-        key: string,
-        base: Pick<HoursBucket, 'projectId' | 'projectName' | 'department' | 'weekStartDate'>,
-        metrics: { added: number; removed: number; changed: number; net: number }
-      ) => {
-        const existing = map.get(key) || {
-          ...base,
-          addedHours: 0,
-          removedHours: 0,
-          changedHours: 0,
-          netHours: 0,
-          movements: 0,
-        };
-
-        existing.addedHours = roundValue(existing.addedHours + metrics.added);
-        existing.removedHours = roundValue(existing.removedHours + metrics.removed);
-        existing.changedHours = roundValue(existing.changedHours + metrics.changed);
-        existing.netHours = roundValue(existing.netHours + metrics.net);
-        existing.movements += 1;
-        map.set(key, existing);
-      };
 
       const filteredRows = (Array.isArray(response) ? response as ActivityLogEntry[] : [])
-        .filter((row) => {
-          if (!row || row.modelName !== 'Assignment') return false;
-          const action = (row.action || '').toLowerCase();
-          return action === 'created' || action === 'create' || action === 'updated' || action === 'update' || action === 'deleted' || action === 'delete';
-        })
+        .filter((row) => row && row.modelName === 'Assignment' && normalizeAction(row.action) !== 'other')
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
       if (filteredRows.length === 0) {
@@ -3007,19 +3004,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return day >= startDate && day <= endDate;
       };
 
-      const summaryByProjectDept = new Map<string, HoursBucket>();
-      const summaryByProjectDeptWeek = new Map<string, HoursBucket>();
+      const weekSet = new Set(weeklyRange);
       const detailRows: DetailRow[] = [];
+      const responsiblesByProjectDept = new Map<string, Set<string>>();
       const assignmentStateById = new Map<string, AssignmentSnapshot>();
+      let snapshotAtStart: Map<string, AssignmentSnapshot> | null = null;
 
       filteredRows.forEach((log) => {
-        const normalizedAction = (() => {
-          const action = (log.action || '').toLowerCase();
-          if (action === 'create') return 'created';
-          if (action === 'update') return 'updated';
-          if (action === 'delete') return 'deleted';
-          return action;
-        })();
+        const action = normalizeAction(log.action);
+        if (action === 'other') return;
+
+        const logDay = (log.createdAt || '').slice(0, 10);
+        if (snapshotAtStart === null && logDay >= startDate) {
+          snapshotAtStart = new Map(assignmentStateById);
+        }
 
         const changesObj = asObject(log.changes);
         const payload = changesObj
@@ -3027,12 +3025,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           : null;
 
         const existingPrev = assignmentStateById.get(log.objectId) || null;
-        const fallbackPrev = normalizedAction === 'deleted' && !existingPrev
+        const fallbackPrev = action === 'deleted' && !existingPrev
           ? buildSnapshot(payload, null)
           : existingPrev;
 
         let nextSnapshot: AssignmentSnapshot | null = null;
-        if (normalizedAction !== 'deleted') {
+        if (action !== 'deleted') {
           nextSnapshot = buildSnapshot(payload, fallbackPrev);
         }
 
@@ -3042,38 +3040,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const delta = roundValue(afterHours - beforeHours);
 
           let movement: 'added' | 'removed' | 'changed' | null = null;
-          let added = 0;
-          let removed = 0;
-          let changed = 0;
-          let net = 0;
-
-          if (normalizedAction === 'created') {
-            if (afterHours > 0) {
+          if (action === 'created' && afterHours > 0) {
+            movement = 'added';
+          } else if (action === 'deleted' && beforeHours > 0) {
+            movement = 'removed';
+          } else if (action === 'updated' && beforeHours !== afterHours) {
+            if (beforeHours <= 0 && afterHours > 0) {
               movement = 'added';
-              added = afterHours;
-              net = afterHours;
-            }
-          } else if (normalizedAction === 'deleted') {
-            if (beforeHours > 0) {
+            } else if (beforeHours > 0 && afterHours <= 0) {
               movement = 'removed';
-              removed = beforeHours;
-              net = -beforeHours;
-            }
-          } else if (normalizedAction === 'updated') {
-            if (beforeHours !== afterHours) {
-              if (beforeHours <= 0 && afterHours > 0) {
-                movement = 'added';
-                added = afterHours;
-                net = afterHours;
-              } else if (beforeHours > 0 && afterHours <= 0) {
-                movement = 'removed';
-                removed = beforeHours;
-                net = -beforeHours;
-              } else {
-                movement = 'changed';
-                changed = Math.abs(delta);
-                net = delta;
-              }
+            } else {
+              movement = 'changed';
             }
           }
 
@@ -3083,42 +3060,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             const projectName = getProjectDisplayName(projectId, effectiveSnapshot?.projectNameHint || '');
             const department = effectiveSnapshot?.department || (language === 'es' ? 'SIN_DEPTO' : 'NO_DEPT');
             const weekStartDate = effectiveSnapshot?.weekStartDate || '';
+            const changedBy = formatTimingUserName(log.user);
 
-            const summaryKey = `${projectId || '__no_project__'}|${department}`;
-            const weeklyKey = `${projectId || '__no_project__'}|${department}|${weekStartDate || '__no_week__'}`;
-
-            addToBucket(
-              summaryByProjectDept,
-              summaryKey,
-              {
-                projectId,
-                projectName,
-                department,
-                weekStartDate: '',
-              },
-              { added, removed, changed, net }
-            );
-
-            addToBucket(
-              summaryByProjectDeptWeek,
-              weeklyKey,
-              {
-                projectId,
-                projectName,
-                department,
-                weekStartDate,
-              },
-              { added, removed, changed, net }
-            );
+            const projectDeptKey = `${projectId || '__no_project__'}|${department}`;
+            const responsibleSet = responsiblesByProjectDept.get(projectDeptKey) || new Set<string>();
+            responsibleSet.add(changedBy);
+            responsiblesByProjectDept.set(projectDeptKey, responsibleSet);
 
             detailRows.push({
               changedAt: formatTimingDateTime(log.createdAt),
-              changedBy: formatTimingUserName(log.user),
+              changedBy,
               project: projectName,
               department,
               weekStart: weekStartDate || '-',
               cw: weekStartDate ? `CW${getWeekNumber(weekStartDate)}` : '-',
-              action: actionToLabel(normalizedAction),
+              action: actionToLabel(action),
               movementType: movementToLabel(movement),
               beforeHours,
               afterHours,
@@ -3127,33 +3083,158 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           }
         }
 
-        if (normalizedAction === 'deleted') {
+        if (action === 'deleted') {
           assignmentStateById.delete(log.objectId);
         } else if (nextSnapshot) {
           assignmentStateById.set(log.objectId, nextSnapshot);
         }
       });
 
-      const summaryRows = Array.from(summaryByProjectDept.values())
+      if (snapshotAtStart === null) {
+        snapshotAtStart = new Map(assignmentStateById);
+      }
+      const snapshotAtEnd = new Map(assignmentStateById);
+
+      const aggregateSnapshotByWeek = (stateMap: Map<string, AssignmentSnapshot>) => {
+        const map = new Map<string, {
+          projectId: string;
+          projectName: string;
+          department: string;
+          weekStartDate: string;
+          hours: number;
+        }>();
+
+        stateMap.forEach((snapshot) => {
+          const weekStartDate = normalizeWeekStartDate(snapshot.weekStartDate || '');
+          if (!weekStartDate || !weekSet.has(weekStartDate)) return;
+          const hours = roundValue(Math.max(0, snapshot.hours || 0));
+          if (hours <= 0) return;
+
+          const projectId = snapshot.projectId || '';
+          const projectName = getProjectDisplayName(projectId, snapshot.projectNameHint || '');
+          const department = snapshot.department || (language === 'es' ? 'SIN_DEPTO' : 'NO_DEPT');
+          const key = `${projectId || '__no_project__'}|${department}|${weekStartDate}`;
+          const existing = map.get(key);
+
+          if (existing) {
+            existing.hours = roundValue(existing.hours + hours);
+          } else {
+            map.set(key, {
+              projectId,
+              projectName,
+              department,
+              weekStartDate,
+              hours,
+            });
+          }
+        });
+
+        return map;
+      };
+
+      const beforeWeekMap = aggregateSnapshotByWeek(snapshotAtStart);
+      const afterWeekMap = aggregateSnapshotByWeek(snapshotAtEnd);
+
+      const visualByProjectDept = new Map<string, VisualRow>();
+      const ensureVisualRow = (projectId: string, projectName: string, department: string): VisualRow => {
+        const key = `${projectId || '__no_project__'}|${department}`;
+        const existing = visualByProjectDept.get(key);
+        if (existing) return existing;
+
+        const row: VisualRow = {
+          key,
+          projectId,
+          projectName,
+          department,
+          responsibles: new Set<string>(),
+          beforeByWeek: {},
+          afterByWeek: {},
+          beforeTotal: 0,
+          afterTotal: 0,
+          addedHours: 0,
+          removedHours: 0,
+          changedHours: 0,
+          netHours: 0,
+          changedWeeks: 0,
+        };
+        visualByProjectDept.set(key, row);
+        return row;
+      };
+
+      beforeWeekMap.forEach((entry) => {
+        const row = ensureVisualRow(entry.projectId, entry.projectName, entry.department);
+        row.beforeByWeek[entry.weekStartDate] = roundValue((row.beforeByWeek[entry.weekStartDate] || 0) + entry.hours);
+      });
+      afterWeekMap.forEach((entry) => {
+        const row = ensureVisualRow(entry.projectId, entry.projectName, entry.department);
+        row.afterByWeek[entry.weekStartDate] = roundValue((row.afterByWeek[entry.weekStartDate] || 0) + entry.hours);
+      });
+
+      responsiblesByProjectDept.forEach((users, key) => {
+        const [projectIdRaw, departmentRaw] = key.split('|');
+        const projectId = projectIdRaw === '__no_project__' ? '' : projectIdRaw;
+        const department = departmentRaw || (language === 'es' ? 'SIN_DEPTO' : 'NO_DEPT');
+        const projectName = getProjectDisplayName(projectId, '');
+        const row = ensureVisualRow(projectId, projectName, department);
+        users.forEach((name) => row.responsibles.add(name));
+      });
+
+      const visualRows = Array.from(visualByProjectDept.values())
+        .map((row) => {
+          let beforeTotal = 0;
+          let afterTotal = 0;
+          let addedHours = 0;
+          let removedHours = 0;
+          let changedHours = 0;
+          let netHours = 0;
+          let changedWeeks = 0;
+
+          weeklyRange.forEach((week) => {
+            const before = roundValue(row.beforeByWeek[week] || 0);
+            const after = roundValue(row.afterByWeek[week] || 0);
+            const delta = roundValue(after - before);
+
+            beforeTotal = roundValue(beforeTotal + before);
+            afterTotal = roundValue(afterTotal + after);
+            netHours = roundValue(netHours + delta);
+
+            if (before !== after) {
+              changedWeeks += 1;
+              if (before <= 0 && after > 0) {
+                addedHours = roundValue(addedHours + after);
+              } else if (before > 0 && after <= 0) {
+                removedHours = roundValue(removedHours + before);
+              } else {
+                changedHours = roundValue(changedHours + Math.abs(delta));
+              }
+            }
+          });
+
+          return {
+            ...row,
+            beforeTotal,
+            afterTotal,
+            addedHours,
+            removedHours,
+            changedHours,
+            netHours,
+            changedWeeks,
+          };
+        })
+        .filter((row) => row.changedWeeks > 0 || row.responsibles.size > 0)
         .sort((a, b) => {
+          const scoreA = Math.abs(a.netHours) + a.changedHours + a.addedHours + a.removedHours;
+          const scoreB = Math.abs(b.netHours) + b.changedHours + b.addedHours + b.removedHours;
+          if (scoreB !== scoreA) return scoreB - scoreA;
           const byProject = a.projectName.localeCompare(b.projectName);
           if (byProject !== 0) return byProject;
           return a.department.localeCompare(b.department);
         });
 
-      const weeklyRows = Array.from(summaryByProjectDeptWeek.values())
-        .sort((a, b) => {
-          const byProject = a.projectName.localeCompare(b.projectName);
-          if (byProject !== 0) return byProject;
-          const byDepartment = a.department.localeCompare(b.department);
-          if (byDepartment !== 0) return byDepartment;
-          return (a.weekStartDate || '').localeCompare(b.weekStartDate || '');
-        });
-
-      if (summaryRows.length === 0) {
+      if (visualRows.length === 0 && detailRows.length === 0) {
         alert(language === 'es'
-          ? 'No se detectaron movimientos de horas (agregadas, eliminadas o cambiadas) en el rango seleccionado.'
-          : 'No hour movements (added, removed or changed) were detected in the selected range.');
+          ? 'No se detectaron movimientos de horas en el rango seleccionado.'
+          : 'No hour movements were detected in the selected range.');
         return;
       }
 
@@ -3163,106 +3244,190 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const HEADER_BG = '2E1A47';
       const HEADER_TEXT = 'FFFFFF';
       const WHITE = 'FFFFFF';
+      const SOFT_BG = 'F6F3FB';
+      const BEFORE_BG = 'F3F4F6';
+      const AFTER_BG = 'E0F2FE';
+      const DELTA_POS_BG = 'DCFCE7';
+      const DELTA_NEG_BG = 'FEE2E2';
+      const DELTA_NEU_BG = 'F3F4F6';
 
-      const styleHeaderRow = (sheet: any) => {
-        const headerRow = sheet.getRow(1);
+      const applyCellBorder = (cell: any) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: BORDER } },
+          left: { style: 'thin', color: { argb: BORDER } },
+          bottom: { style: 'thin', color: { argb: BORDER } },
+          right: { style: 'thin', color: { argb: BORDER } },
+        };
+      };
+
+      const styleHeaderRow = (sheet: any, rowNumber = 1) => {
+        const headerRow = sheet.getRow(rowNumber);
         headerRow.font = { bold: true, color: { argb: HEADER_TEXT } };
         headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         headerRow.eachCell((cell: any) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
-          cell.border = {
-            top: { style: 'thin', color: { argb: BORDER } },
-            left: { style: 'thin', color: { argb: BORDER } },
-            bottom: { style: 'thin', color: { argb: BORDER } },
-            right: { style: 'thin', color: { argb: BORDER } },
-          };
+          applyCellBorder(cell);
         });
         headerRow.height = 24;
       };
 
-      const styleDataRows = (sheet: any) => {
+      const styleBody = (sheet: any, startRow = 2) => {
         sheet.eachRow((excelRow: any, rowNumber: number) => {
-          if (rowNumber === 1) return;
+          if (rowNumber < startRow) return;
           excelRow.eachCell((cell: any) => {
             cell.fill = cell.fill || { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
-            cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-            cell.border = {
-              top: { style: 'thin', color: { argb: BORDER } },
-              left: { style: 'thin', color: { argb: BORDER } },
-              bottom: { style: 'thin', color: { argb: BORDER } },
-              right: { style: 'thin', color: { argb: BORDER } },
-            };
+            cell.alignment = cell.alignment || { vertical: 'middle', horizontal: 'left', wrapText: true };
+            applyCellBorder(cell);
           });
         });
       };
 
-      const summarySheet = workbook.addWorksheet(language === 'es' ? 'Resumen Horas' : 'Hours Summary');
-      summarySheet.columns = [
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 32 },
+      const executiveSheet = workbook.addWorksheet(language === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary');
+      executiveSheet.columns = [
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 30 },
         { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
-        { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 16 },
-        { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 16 },
-        { header: language === 'es' ? 'Horas Cambiadas' : 'Changed Hours', key: 'changedHours', width: 16 },
-        { header: language === 'es' ? 'Cambio Neto' : 'Net Change', key: 'netHours', width: 14 },
-        { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 12 },
+        { header: language === 'es' ? 'Responsable(s)' : 'Responsible User(s)', key: 'responsibles', width: 30 },
+        { header: language === 'es' ? 'Horas Antes' : 'Hours Before', key: 'beforeTotal', width: 14 },
+        { header: language === 'es' ? 'Horas Ahora' : 'Hours Now', key: 'afterTotal', width: 14 },
+        { header: language === 'es' ? 'Agregadas' : 'Added', key: 'addedHours', width: 12 },
+        { header: language === 'es' ? 'Eliminadas' : 'Removed', key: 'removedHours', width: 12 },
+        { header: language === 'es' ? 'Cambiadas' : 'Changed', key: 'changedHours', width: 12 },
+        { header: language === 'es' ? 'Delta Neto' : 'Net Delta', key: 'netHours', width: 12 },
+        { header: language === 'es' ? 'Semanas con Cambio' : 'Changed Weeks', key: 'changedWeeks', width: 14 },
       ];
 
-      summaryRows.forEach((row) => {
-        summarySheet.addRow({
+      visualRows.forEach((row) => {
+        const excelRow = executiveSheet.addRow({
           projectName: row.projectName,
           department: row.department,
-          addedHours: roundValue(row.addedHours),
-          removedHours: roundValue(row.removedHours),
-          changedHours: roundValue(row.changedHours),
-          netHours: roundValue(row.netHours),
-          movements: row.movements,
+          responsibles: row.responsibles.size > 0 ? Array.from(row.responsibles).sort().join(', ') : '-',
+          beforeTotal: row.beforeTotal,
+          afterTotal: row.afterTotal,
+          addedHours: row.addedHours,
+          removedHours: row.removedHours,
+          changedHours: row.changedHours,
+          netHours: row.netHours,
+          changedWeeks: row.changedWeeks,
         });
+
+        [4, 5, 6, 7, 8, 9].forEach((idx) => {
+          excelRow.getCell(idx).numFmt = '0.00';
+        });
+
+        excelRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_POS_BG } };
+        excelRow.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_NEG_BG } };
+        excelRow.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF9C3' } };
+
+        const netCell = excelRow.getCell(9);
+        if (row.netHours > 0) {
+          netCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_POS_BG } };
+          netCell.font = { bold: true, color: { argb: '166534' } };
+        } else if (row.netHours < 0) {
+          netCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_NEG_BG } };
+          netCell.font = { bold: true, color: { argb: '991B1B' } };
+        } else {
+          netCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_NEU_BG } };
+          netCell.font = { bold: true, color: { argb: '374151' } };
+        }
       });
 
-      styleHeaderRow(summarySheet);
-      styleDataRows(summarySheet);
-      summarySheet.views = [{ state: 'frozen', ySplit: 1 }];
-      summarySheet.autoFilter = {
+      styleHeaderRow(executiveSheet);
+      styleBody(executiveSheet);
+      executiveSheet.views = [{ state: 'frozen', ySplit: 1 }];
+      executiveSheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: 1, column: summarySheet.columnCount },
+        to: { row: 1, column: executiveSheet.columnCount },
       };
 
-      const weeklySheet = workbook.addWorksheet(language === 'es' ? 'Comparativo Semanal Horas' : 'Weekly Hours Comparison');
-      weeklySheet.columns = [
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 32 },
+      const visualSheet = workbook.addWorksheet(language === 'es' ? 'Comparativo Visual' : 'Visual Weekly Comparison');
+      const weekColumns = weeklyRange.map((week) => ({
+        header: `CW${getWeekNumber(week)}\n${week}`,
+        key: `week_${week}`,
+        width: 11,
+      }));
+
+      visualSheet.columns = [
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 28 },
         { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
-        { header: language === 'es' ? 'Semana Inicio' : 'Week Start', key: 'weekStartDate', width: 14 },
-        { header: 'CW', key: 'cw', width: 9 },
-        { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 16 },
-        { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 16 },
-        { header: language === 'es' ? 'Horas Cambiadas' : 'Changed Hours', key: 'changedHours', width: 16 },
-        { header: language === 'es' ? 'Cambio Neto' : 'Net Change', key: 'netHours', width: 14 },
-        { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 12 },
+        { header: language === 'es' ? 'Responsable(s)' : 'Responsible User(s)', key: 'responsibles', width: 28 },
+        { header: language === 'es' ? 'Vista' : 'View', key: 'viewType', width: 10 },
+        ...weekColumns,
       ];
 
-      weeklyRows.forEach((row) => {
-        weeklySheet.addRow({
+      styleHeaderRow(visualSheet);
+
+      let visualRowPointer = 2;
+      visualRows.forEach((row) => {
+        const baseInfo = {
           projectName: row.projectName,
           department: row.department,
-          weekStartDate: row.weekStartDate || '-',
-          cw: row.weekStartDate ? `CW${getWeekNumber(row.weekStartDate)}` : '-',
-          addedHours: roundValue(row.addedHours),
-          removedHours: roundValue(row.removedHours),
-          changedHours: roundValue(row.changedHours),
-          netHours: roundValue(row.netHours),
-          movements: row.movements,
+          responsibles: row.responsibles.size > 0 ? Array.from(row.responsibles).sort().join(', ') : '-',
+        };
+
+        const beforeRow = visualSheet.addRow({ ...baseInfo, viewType: language === 'es' ? 'ANTES' : 'BEFORE' });
+        const afterRow = visualSheet.addRow({ ...baseInfo, viewType: language === 'es' ? 'AHORA' : 'NOW' });
+        const deltaRow = visualSheet.addRow({ ...baseInfo, viewType: 'DELTA' });
+
+        // Merge static business columns for block readability.
+        [1, 2, 3].forEach((column) => {
+          visualSheet.mergeCells(visualRowPointer, column, visualRowPointer + 2, column);
         });
+
+        const beforeLabelCell = beforeRow.getCell(4);
+        const afterLabelCell = afterRow.getCell(4);
+        const deltaLabelCell = deltaRow.getCell(4);
+        beforeLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BEFORE_BG } };
+        afterLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AFTER_BG } };
+        deltaLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: SOFT_BG } };
+        beforeLabelCell.font = { bold: true, color: { argb: '374151' } };
+        afterLabelCell.font = { bold: true, color: { argb: '0C4A6E' } };
+        deltaLabelCell.font = { bold: true, color: { argb: '111827' } };
+
+        weeklyRange.forEach((week, idx) => {
+          const col = idx + 5;
+          const before = roundValue(row.beforeByWeek[week] || 0);
+          const after = roundValue(row.afterByWeek[week] || 0);
+          const delta = roundValue(after - before);
+
+          const beforeCell = beforeRow.getCell(col);
+          const afterCell = afterRow.getCell(col);
+          const deltaCell = deltaRow.getCell(col);
+
+          beforeCell.value = before > 0 ? before : '';
+          afterCell.value = after > 0 ? after : '';
+          deltaCell.value = delta !== 0 ? delta : '';
+
+          beforeCell.numFmt = '0.00';
+          afterCell.numFmt = '0.00';
+          deltaCell.numFmt = '0.00';
+
+          beforeCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          afterCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          deltaCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+          beforeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BEFORE_BG } };
+          afterCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AFTER_BG } };
+
+          if (delta > 0) {
+            deltaCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_POS_BG } };
+            deltaCell.font = { bold: true, color: { argb: '166534' } };
+          } else if (delta < 0) {
+            deltaCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_NEG_BG } };
+            deltaCell.font = { bold: true, color: { argb: '991B1B' } };
+          } else {
+            deltaCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DELTA_NEU_BG } };
+            deltaCell.font = { bold: false, color: { argb: '6B7280' } };
+          }
+        });
+
+        visualSheet.addRow({});
+        visualRowPointer += 4;
       });
 
-      styleHeaderRow(weeklySheet);
-      styleDataRows(weeklySheet);
-      weeklySheet.views = [{ state: 'frozen', ySplit: 1 }];
-      weeklySheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: weeklySheet.columnCount },
-      };
+      styleBody(visualSheet);
+      visualSheet.views = [{ state: 'frozen', ySplit: 1, xSplit: 4 }];
 
-      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Detalle Cambios Horas' : 'Hour Changes Detail');
+      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Detalle Movimientos' : 'Movement Detail');
       detailSheet.columns = [
         { header: language === 'es' ? 'Fecha' : 'Date', key: 'changedAt', width: 22 },
         { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
@@ -3279,10 +3444,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       detailRows
         .sort((a, b) => a.changedAt.localeCompare(b.changedAt))
-        .forEach((row) => detailSheet.addRow(row));
+        .forEach((row) => {
+          const excelRow = detailSheet.addRow(row);
+          [9, 10, 11].forEach((idx) => {
+            excelRow.getCell(idx).numFmt = '0.00';
+          });
+        });
 
       styleHeaderRow(detailSheet);
-      styleDataRows(detailSheet);
+      styleBody(detailSheet);
       detailSheet.views = [{ state: 'frozen', ySplit: 1 }];
       detailSheet.autoFilter = {
         from: { row: 1, column: 1 },
@@ -3290,7 +3460,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       };
 
       const dateStamp = new Date().toISOString().slice(0, 10);
-      const fileName = `hours-comparison-${startDate}-to-${endDate}-${dateStamp}.xlsx`;
+      const fileName = `comparativo-visual-horas-${startDate}-a-${endDate}-${dateStamp}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob(
         [buffer],
@@ -3307,8 +3477,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting timing range Excel:', error);
       alert(language === 'es'
-        ? 'Ocurrio un error al exportar el comparativo de horas.'
-        : 'An error occurred while exporting the hour comparison.');
+        ? 'Ocurrio un error al exportar el comparativo visual de horas.'
+        : 'An error occurred while exporting the visual hours comparison.');
     } finally {
       setIsTimingRangeExcelExporting(false);
     }
@@ -7996,7 +8166,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span>
                     {isTimingRangeExcelExporting
                       ? (language === 'es' ? 'Exportando...' : 'Exporting...')
-                      : (language === 'es' ? 'Exportar comparativo horas' : 'Export hours comparison')}
+                      : (language === 'es' ? 'Exportar comparativo visual' : 'Export visual comparison')}
                   </span>
                 </button>
                 <div className="text-[11px] text-[#6f5b80]">
