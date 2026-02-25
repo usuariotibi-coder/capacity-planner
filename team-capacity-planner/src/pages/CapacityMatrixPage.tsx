@@ -2686,27 +2686,28 @@ ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
         <div className="flex items-center gap-1 min-w-0">
-          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[50px]">
+          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[50px] min-h-[38px]">
             <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
-          <div className="flex items-center gap-1 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
-              <span className="text-[10px] font-semibold">{quotedCompactLabel}</span>
-              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(totalQuotedHoursValue)}</span>
+          <div className="flex items-stretch gap-1 min-w-0 flex-1">
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
+              <span className="text-[9px] font-semibold leading-none">{quotedCompactLabel}</span>
+              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
-              <span className="text-[10px] font-semibold">{usedCompactLabel}</span>
-              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(utilizedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
+              <span className="text-[9px] font-semibold leading-none">{usedCompactLabel}</span>
+              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
-              <span className="text-[10px] font-semibold">{forecastCompactLabel}</span>
-              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(forecastedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
+              <span className="text-[9px] font-semibold leading-none">{forecastCompactLabel}</span>
+              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</span>
             </div>
           </div>
 
-          <div className={`rounded px-1.5 py-1 text-[11px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[52px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
-            {utilizationPercent}%
+          <div className={`rounded px-1.5 py-1 text-center flex flex-col items-center justify-center shrink-0 min-w-[58px] min-h-[38px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+            <span className="text-[9px] font-semibold leading-none opacity-80">Util</span>
+            <span className="mt-0.5 text-[12px] font-black leading-none">{utilizationPercent}%</span>
           </div>
         </div>
       </div>
