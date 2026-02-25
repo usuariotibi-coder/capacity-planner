@@ -2686,29 +2686,29 @@ ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center justify-between gap-1 min-w-0">
-          <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1 py-0.5 shrink-0 min-w-[56px]">
-            <span className={`inline-flex items-center justify-center scale-[0.72] leading-none ${deptInfo.color}`}>{deptInfo.icon}</span>
-            <span className="text-[10px] font-bold text-gray-800 leading-none">{dept}</span>
+        <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1.5 py-1 shrink-0 min-w-[60px]">
+            <span className={`inline-flex items-center justify-center scale-[0.78] leading-none ${deptInfo.color}`}>{deptInfo.icon}</span>
+            <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
-          <div className={`rounded px-1.5 py-1 text-[10px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[46px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
+              <span className="text-[10px] font-semibold">{quotedCompactLabel}</span>
+              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(totalQuotedHoursValue)}</span>
+            </div>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
+              <span className="text-[10px] font-semibold">{usedCompactLabel}</span>
+              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(utilizedHoursValue)}</span>
+            </div>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 leading-none min-w-0 basis-0 flex-1 text-center whitespace-nowrap">
+              <span className="text-[10px] font-semibold">{forecastCompactLabel}</span>
+              <span className="ml-1 text-[12px] font-bold">{formatSummaryHours(forecastedHoursValue)}</span>
+            </div>
+          </div>
+
+          <div className={`rounded px-1.5 py-1 text-[11px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[52px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
             {utilizationPercent}%
-          </div>
-        </div>
-
-        <div className="mt-1 grid grid-cols-3 gap-1 min-w-0">
-          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
-            <div className="text-[8px] font-semibold">{quotedCompactLabel}</div>
-            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(totalQuotedHoursValue)}</div>
-          </div>
-          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
-            <div className="text-[8px] font-semibold">{usedCompactLabel}</div>
-            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(utilizedHoursValue)}</div>
-          </div>
-          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
-            <div className="text-[8px] font-semibold">{forecastCompactLabel}</div>
-            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(forecastedHoursValue)}</div>
           </div>
         </div>
       </div>
