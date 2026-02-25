@@ -3,12 +3,11 @@ PYTHONUNBUFFERED = "1"
 PIP_NO_CACHE_DIR = "1"
 
 [phases.setup]
-nixPkgs = ["python311"]
+nixPkgs = ["python311", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
-  "python -m pip install --upgrade pip",
-  "pip install -r requirements.txt"
+  "python -m pip install -r requirements.txt"
 ]
 
 [phases.build]
