@@ -2843,6 +2843,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       }
 
       interface DetailRow {
+        changedAtRaw: string;
         changedAt: string;
         changedBy: string;
         weekStart: string;
@@ -2850,6 +2851,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         projectWeek: string;
         project: string;
         department: string;
+        movementCode: 'added' | 'modified' | 'removed';
         movementType: string;
         beforeHours: number;
         afterHours: number;
@@ -2868,21 +2870,50 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         movements: number;
       }
 
-      interface WeekProjectSummary {
+      interface WeekProjectComparison {
         weekStart: string;
         yearWeek: string;
-        projectId: string;
-        projectName: string;
+        project: string;
         department: string;
-        projectWeeksAdded: Set<string>;
-        projectWeeksModified: Set<string>;
-        projectWeeksRemoved: Set<string>;
+        projectWeek: string;
+        openingHoursByAssignment: Map<string, number>;
+        closingHoursByAssignment: Map<string, number>;
         addedHours: number;
         modifiedHours: number;
         removedHours: number;
         netHours: number;
         users: Set<string>;
         movements: number;
+        lastChangedAt: string;
+      }
+
+      interface WeekProjectComparisonRow {
+        weekStart: string;
+        yearWeek: string;
+        project: string;
+        department: string;
+        projectWeek: string;
+        openingHours: number;
+        closingHours: number;
+        addedHours: number;
+        modifiedHours: number;
+        removedHours: number;
+        netHours: number;
+        users: string;
+        movements: number;
+        lastChangedAt: string;
+      }
+
+      interface WeeklyWrittenSummaryRow {
+        weekStart: string;
+        yearWeek: string;
+        summary: string;
+        addedHours: number;
+        modifiedHours: number;
+        removedHours: number;
+        netHours: number;
+        movements: number;
+        users: string;
       }
 
       const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
@@ -3029,7 +3060,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const weekSet = new Set(weeklyRange);
       const detailRows: DetailRow[] = [];
       const yearWeekMap = new Map<string, YearWeekSummary>();
-      const weekProjectMap = new Map<string, WeekProjectSummary>();
+      const weekProjectComparisonMap = new Map<string, WeekProjectComparison>();
       const assignmentStateById = new Map<string, AssignmentSnapshot>();
 
       const ensureYearWeekSummary = (weekStartDate: string): YearWeekSummary => {
@@ -3053,34 +3084,34 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return created;
       };
 
-      const ensureWeekProjectSummary = (
+      const ensureWeekProjectComparison = (
         weekStartDate: string,
-        projectId: string,
-        projectName: string,
-        department: string
-      ): WeekProjectSummary => {
+        project: string,
+        department: string,
+        projectWeek: string
+      ): WeekProjectComparison => {
         const yearWeek = getYearWeekLabel(weekStartDate);
-        const key = `${weekStartDate}|${projectId || '__no_project__'}|${department}`;
-        const existing = weekProjectMap.get(key);
+        const key = `${weekStartDate}|${project || '__no_project__'}|${department}|${projectWeek}`;
+        const existing = weekProjectComparisonMap.get(key);
         if (existing) return existing;
 
-        const created: WeekProjectSummary = {
+        const created: WeekProjectComparison = {
           weekStart: weekStartDate,
           yearWeek,
-          projectId,
-          projectName,
+          project,
           department,
-          projectWeeksAdded: new Set<string>(),
-          projectWeeksModified: new Set<string>(),
-          projectWeeksRemoved: new Set<string>(),
+          projectWeek,
+          openingHoursByAssignment: new Map<string, number>(),
+          closingHoursByAssignment: new Map<string, number>(),
           addedHours: 0,
           modifiedHours: 0,
           removedHours: 0,
           netHours: 0,
           users: new Set<string>(),
           movements: 0,
+          lastChangedAt: '',
         };
-        weekProjectMap.set(key, created);
+        weekProjectComparisonMap.set(key, created);
         return created;
       };
 
@@ -3155,6 +3186,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 : (language === 'es' ? 'Horas modificadas' : 'Hours modified');
 
             detailRows.push({
+              changedAtRaw: log.createdAt,
               changedAt: formatTimingDateTime(log.createdAt),
               changedBy,
               weekStart: validWeek,
@@ -3162,6 +3194,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               projectWeek,
               project: projectName,
               department,
+              movementCode: movement,
               movementType: movementLabel,
               beforeHours,
               afterHours,
@@ -3177,17 +3210,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             weekSummary.users.add(changedBy);
             weekSummary.movements += 1;
 
-            const wpSummary = ensureWeekProjectSummary(validWeek, projectId, projectName, department);
-            wpSummary.addedHours = roundValue(wpSummary.addedHours + added);
-            wpSummary.modifiedHours = roundValue(wpSummary.modifiedHours + modified);
-            wpSummary.removedHours = roundValue(wpSummary.removedHours + removed);
-            wpSummary.netHours = roundValue(wpSummary.netHours + delta);
-            wpSummary.users.add(changedBy);
-            wpSummary.movements += 1;
+            const wpComparison = ensureWeekProjectComparison(validWeek, projectName, department, projectWeek);
+            wpComparison.addedHours = roundValue(wpComparison.addedHours + added);
+            wpComparison.modifiedHours = roundValue(wpComparison.modifiedHours + modified);
+            wpComparison.removedHours = roundValue(wpComparison.removedHours + removed);
+            wpComparison.netHours = roundValue(wpComparison.netHours + delta);
+            wpComparison.users.add(changedBy);
+            wpComparison.movements += 1;
+            wpComparison.lastChangedAt = log.createdAt;
 
-            if (movement === 'added') wpSummary.projectWeeksAdded.add(projectWeek);
-            if (movement === 'modified') wpSummary.projectWeeksModified.add(projectWeek);
-            if (movement === 'removed') wpSummary.projectWeeksRemoved.add(projectWeek);
+            if (!wpComparison.openingHoursByAssignment.has(log.objectId)) {
+              wpComparison.openingHoursByAssignment.set(log.objectId, beforeHours);
+            }
+            wpComparison.closingHoursByAssignment.set(log.objectId, afterHours);
           }
         }
 
@@ -3208,14 +3243,83 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const yearWeekRows = Array.from(yearWeekMap.values())
         .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 
-      const weekProjectRows = Array.from(weekProjectMap.values())
+      const sumMapValues = (map: Map<string, number>) => {
+        let total = 0;
+        map.forEach((value) => {
+          total += value;
+        });
+        return roundValue(total);
+      };
+      const formatSignedHours = (value: number) => `${value >= 0 ? '+' : ''}${roundValue(value).toFixed(2)}`;
+
+      const weekProjectComparisonRows: WeekProjectComparisonRow[] = Array.from(weekProjectComparisonMap.values())
+        .map((row) => ({
+          weekStart: row.weekStart,
+          yearWeek: row.yearWeek,
+          project: row.project,
+          department: row.department,
+          projectWeek: row.projectWeek,
+          openingHours: sumMapValues(row.openingHoursByAssignment),
+          closingHours: sumMapValues(row.closingHoursByAssignment),
+          addedHours: row.addedHours,
+          modifiedHours: row.modifiedHours,
+          removedHours: row.removedHours,
+          netHours: row.netHours,
+          users: Array.from(row.users).sort().join(', '),
+          movements: row.movements,
+          lastChangedAt: row.lastChangedAt,
+        }))
         .sort((a, b) => {
           const byWeek = a.weekStart.localeCompare(b.weekStart);
           if (byWeek !== 0) return byWeek;
-          const byProject = a.projectName.localeCompare(b.projectName);
+          const byProject = a.project.localeCompare(b.project);
           if (byProject !== 0) return byProject;
-          return a.department.localeCompare(b.department);
+          const byDepartment = a.department.localeCompare(b.department);
+          if (byDepartment !== 0) return byDepartment;
+          return a.projectWeek.localeCompare(b.projectWeek);
         });
+
+      const weeklyWrittenSummaryRows: WeeklyWrittenSummaryRow[] = yearWeekRows.map((row) => {
+        const matchedRows = weekProjectComparisonRows
+          .filter((entry) => entry.weekStart === row.weekStart)
+          .sort((a, b) => {
+            const byImpact = Math.abs(b.netHours) - Math.abs(a.netHours);
+            if (byImpact !== 0) return byImpact;
+            return b.movements - a.movements;
+          });
+
+        const topChangesText = matchedRows
+          .slice(0, 3)
+          .map((entry) => (
+            `${entry.project} [${entry.department} ${entry.projectWeek}]: `
+            + `${entry.openingHours.toFixed(2)}h -> ${entry.closingHours.toFixed(2)}h `
+            + `(D ${formatSignedHours(entry.netHours)}h)`
+          ))
+          .join(' | ');
+
+        const users = Array.from(row.users).sort().join(', ');
+        const summary = language === 'es'
+          ? `${row.yearWeek}: ${row.movements} movimientos por ${row.users.size} usuario(s). `
+            + `Agregadas ${row.addedHours.toFixed(2)}h, modificadas ${row.modifiedHours.toFixed(2)}h, `
+            + `eliminadas ${row.removedHours.toFixed(2)}h, neto ${formatSignedHours(row.netHours)}h. `
+            + `Cambios clave: ${topChangesText || 'Sin cambios clave para mostrar.'}`
+          : `${row.yearWeek}: ${row.movements} movements by ${row.users.size} user(s). `
+            + `${row.addedHours.toFixed(2)}h added, ${row.modifiedHours.toFixed(2)}h modified, `
+            + `${row.removedHours.toFixed(2)}h removed, net ${formatSignedHours(row.netHours)}h. `
+            + `Key changes: ${topChangesText || 'No key changes to display.'}`;
+
+        return {
+          weekStart: row.weekStart,
+          yearWeek: row.yearWeek,
+          summary,
+          addedHours: row.addedHours,
+          modifiedHours: row.modifiedHours,
+          removedHours: row.removedHours,
+          netHours: row.netHours,
+          movements: row.movements,
+          users,
+        };
+      });
 
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
@@ -3262,90 +3366,75 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         });
       };
 
-      const yearWeekSheet = workbook.addWorksheet(language === 'es' ? 'Semanas del Ano' : 'Year Weeks');
-      yearWeekSheet.columns = [
+      const executiveSheet = workbook.addWorksheet(language === 'es' ? 'Resumen Semanal Ejecutivo' : 'Weekly Executive Summary');
+      executiveSheet.columns = [
         { header: language === 'es' ? 'Semana Inicio' : 'Week Start', key: 'weekStart', width: 13 },
         { header: language === 'es' ? 'Semana del Ano' : 'Year Week', key: 'yearWeek', width: 15 },
+        { header: language === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary', key: 'summary', width: 110 },
         { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 14 },
         { header: language === 'es' ? 'Horas Modificadas' : 'Modified Hours', key: 'modifiedHours', width: 15 },
         { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 14 },
         { header: language === 'es' ? 'Delta Neto' : 'Net Delta', key: 'netHours', width: 12 },
-        { header: language === 'es' ? 'Proyectos Afectados' : 'Impacted Projects', key: 'projects', width: 30 },
-        { header: language === 'es' ? 'Usuarios' : 'Users', key: 'users', width: 24 },
         { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 11 },
+        { header: language === 'es' ? 'Usuarios' : 'Users', key: 'users', width: 24 },
       ];
 
-      yearWeekRows.forEach((row) => {
-        const excelRow = yearWeekSheet.addRow({
-          weekStart: row.weekStart,
-          yearWeek: row.yearWeek,
-          addedHours: row.addedHours,
-          modifiedHours: row.modifiedHours,
-          removedHours: row.removedHours,
-          netHours: row.netHours,
-          projects: Array.from(row.projects).sort().join(', '),
-          users: Array.from(row.users).sort().join(', '),
-          movements: row.movements,
-        });
+      weeklyWrittenSummaryRows.forEach((row) => {
+        const excelRow = executiveSheet.addRow(row);
 
-        [3, 4, 5, 6].forEach((idx) => {
+        [4, 5, 6, 7].forEach((idx) => {
           excelRow.getCell(idx).numFmt = '0.00';
         });
 
-        excelRow.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: POS_BG } };
-        excelRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MOD_BG } };
-        excelRow.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NEG_BG } };
+        excelRow.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: POS_BG } };
+        excelRow.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MOD_BG } };
+        excelRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NEG_BG } };
       });
 
-      styleHeader(yearWeekSheet);
-      styleRows(yearWeekSheet);
-      yearWeekSheet.views = [{ state: 'frozen', ySplit: 1 }];
-      yearWeekSheet.autoFilter = {
+      styleHeader(executiveSheet);
+      styleRows(executiveSheet);
+      executiveSheet.views = [{ state: 'frozen', ySplit: 1 }];
+      executiveSheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: 1, column: yearWeekSheet.columnCount },
+        to: { row: 1, column: executiveSheet.columnCount },
       };
 
-      const weekProjectSheet = workbook.addWorksheet(language === 'es' ? 'Semana Proyecto Depto' : 'Week Project Dept');
+      const weekProjectSheet = workbook.addWorksheet(language === 'es' ? 'Comparativo Semanal' : 'Weekly Comparison');
       weekProjectSheet.columns = [
         { header: language === 'es' ? 'Semana Inicio' : 'Week Start', key: 'weekStart', width: 13 },
         { header: language === 'es' ? 'Semana del Ano' : 'Year Week', key: 'yearWeek', width: 15 },
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 30 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
         { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 13 },
-        { header: language === 'es' ? 'Semanas Proyecto Agregadas' : 'Project Weeks Added', key: 'projectWeeksAdded', width: 20 },
-        { header: language === 'es' ? 'Semanas Proyecto Modificadas' : 'Project Weeks Modified', key: 'projectWeeksModified', width: 22 },
-        { header: language === 'es' ? 'Semanas Proyecto Eliminadas' : 'Project Weeks Removed', key: 'projectWeeksRemoved', width: 20 },
+        { header: language === 'es' ? 'Semana Proyecto' : 'Project Week', key: 'projectWeek', width: 15 },
+        { header: language === 'es' ? 'Horas Antes' : 'Before Hours', key: 'openingHours', width: 12 },
+        { header: language === 'es' ? 'Horas Ahora' : 'Now Hours', key: 'closingHours', width: 12 },
         { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 14 },
         { header: language === 'es' ? 'Horas Modificadas' : 'Modified Hours', key: 'modifiedHours', width: 15 },
         { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 14 },
         { header: language === 'es' ? 'Delta Neto' : 'Net Delta', key: 'netHours', width: 12 },
         { header: language === 'es' ? 'Usuarios' : 'Users', key: 'users', width: 24 },
         { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 11 },
+        { header: language === 'es' ? 'Ultimo Cambio' : 'Last Change', key: 'lastChangedAt', width: 22 },
       ];
 
-      weekProjectRows.forEach((row) => {
+      weekProjectComparisonRows.forEach((row) => {
         const excelRow = weekProjectSheet.addRow({
-          weekStart: row.weekStart,
-          yearWeek: row.yearWeek,
-          projectName: row.projectName,
-          department: row.department,
-          projectWeeksAdded: Array.from(row.projectWeeksAdded).sort().join(', ') || '-',
-          projectWeeksModified: Array.from(row.projectWeeksModified).sort().join(', ') || '-',
-          projectWeeksRemoved: Array.from(row.projectWeeksRemoved).sort().join(', ') || '-',
-          addedHours: row.addedHours,
-          modifiedHours: row.modifiedHours,
-          removedHours: row.removedHours,
-          netHours: row.netHours,
-          users: Array.from(row.users).sort().join(', '),
-          movements: row.movements,
+          ...row,
+          lastChangedAt: formatTimingDateTime(row.lastChangedAt),
         });
 
-        [8, 9, 10, 11].forEach((idx) => {
+        [6, 7, 8, 9, 10, 11].forEach((idx) => {
           excelRow.getCell(idx).numFmt = '0.00';
         });
 
         excelRow.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: POS_BG } };
         excelRow.getCell(9).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MOD_BG } };
         excelRow.getCell(10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NEG_BG } };
+        if (row.netHours > 0) {
+          excelRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: POS_BG } };
+        } else if (row.netHours < 0) {
+          excelRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NEG_BG } };
+        }
       });
 
       styleHeader(weekProjectSheet);
@@ -3356,7 +3445,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         to: { row: 1, column: weekProjectSheet.columnCount },
       };
 
-      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Detalle Explicito' : 'Explicit Detail');
+      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Movimientos Detalle' : 'Detailed Movements');
       detailSheet.columns = [
         { header: language === 'es' ? 'Fecha Cambio' : 'Change Date', key: 'changedAt', width: 22 },
         { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
@@ -3375,13 +3464,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         .sort((a, b) => {
           const byWeek = a.weekStart.localeCompare(b.weekStart);
           if (byWeek !== 0) return byWeek;
-          return a.changedAt.localeCompare(b.changedAt);
+          return a.changedAtRaw.localeCompare(b.changedAtRaw);
         })
         .forEach((row) => {
-          const excelRow = detailSheet.addRow(row);
+          const excelRow = detailSheet.addRow({
+            changedAt: row.changedAt,
+            changedBy: row.changedBy,
+            weekStart: row.weekStart,
+            yearWeek: row.yearWeek,
+            projectWeek: row.projectWeek,
+            project: row.project,
+            department: row.department,
+            movementType: row.movementType,
+            beforeHours: row.beforeHours,
+            afterHours: row.afterHours,
+            deltaHours: row.deltaHours,
+          });
           [9, 10, 11].forEach((idx) => {
             excelRow.getCell(idx).numFmt = '0.00';
           });
+
+          if (row.movementCode === 'added') {
+            excelRow.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: POS_BG } };
+          } else if (row.movementCode === 'removed') {
+            excelRow.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NEG_BG } };
+          } else {
+            excelRow.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MOD_BG } };
+          }
         });
 
       styleHeader(detailSheet);
