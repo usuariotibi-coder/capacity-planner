@@ -131,6 +131,29 @@ export function RegisteredUsersPage() {
   const hasResetConfirmPassword = (resetPasswordState?.confirmPassword || '').length > 0;
   const resetPasswordsMatch = hasResetConfirmPassword
     && (resetPasswordState?.password || '') === (resetPasswordState?.confirmPassword || '');
+  const resetPasswordMissingRules = useMemo(() => {
+    const missing: string[] = [];
+    if (!resetPasswordCriteria.minLength) missing.push(t.passwordRuleMinLength || 'At least 8 characters');
+    if (!resetPasswordCriteria.uppercase) missing.push(t.passwordRuleUppercase || 'At least one uppercase letter');
+    if (!resetPasswordCriteria.lowercase) missing.push(t.passwordRuleLowercase || 'At least one lowercase letter');
+    if (!resetPasswordCriteria.number) missing.push(t.passwordRuleNumber || 'At least one number');
+    if (!resetPasswordCriteria.special) missing.push(t.passwordRuleSpecial || 'At least one special character');
+    return missing;
+  }, [resetPasswordCriteria, t]);
+  const resetPasswordSecurityHint = useMemo(() => {
+    if (!hasResetPassword) {
+      return language === 'es'
+        ? 'Escribe una contrasena para ver los requisitos de seguridad.'
+        : 'Type a password to see the security requirements.';
+    }
+    if (resetPasswordMissingRules.length > 0) {
+      const prefix = language === 'es' ? 'Te falta cumplir:' : 'Still missing:';
+      return `${prefix} ${resetPasswordMissingRules.join(', ')}.`;
+    }
+    return language === 'es'
+      ? 'Requisitos de seguridad completos.'
+      : 'Security requirements complete.';
+  }, [hasResetPassword, language, resetPasswordMissingRules]);
 
   const loadUsers = async (withSpinner = true) => {
     if (!canManageRegisteredUsers) return;
@@ -822,12 +845,12 @@ export function RegisteredUsersPage() {
                 </div>
               </div>
 
-              {hasResetPassword && (
-                <div className="rounded-xl border border-[#ddd9e5] bg-[#f8f7fb] p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-[#6f6782]">
-                      {t.passwordStrength || 'Password strength'}
-                    </span>
+              <div className="rounded-xl border border-[#ddd9e5] bg-[#f8f7fb] p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-[#6f6782]">
+                    {t.passwordStrength || 'Password strength'}
+                  </span>
+                  {hasResetPassword ? (
                     <span
                       className={`text-xs font-semibold ${
                         resetPasswordStrength === 'weak'
@@ -841,30 +864,49 @@ export function RegisteredUsersPage() {
                       {resetPasswordStrength === 'medium' && (t.medium || 'Medium')}
                       {resetPasswordStrength === 'strong' && (t.strong || 'Strong')}
                     </span>
-                  </div>
+                  ) : (
+                    <span className="text-xs font-semibold text-[#8a8498]">
+                      {language === 'es' ? 'Pendiente' : 'Pending'}
+                    </span>
+                  )}
+                </div>
 
-                  <div className="h-1.5 w-full rounded-full bg-[#ded8e8] overflow-hidden">
-                    <div
-                      className={`h-full w-full rounded-full transition-all duration-500 ${
-                        resetPasswordStrength === 'weak'
-                          ? 'bg-red-500'
-                          : resetPasswordStrength === 'medium'
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                      }`}
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-[#6f6782] mt-2">
-                    {t.passwordRequirements || 'Password requirements'}
-                  </p>
-                  <PasswordRequirementsChecklist
-                    criteria={resetPasswordCriteria}
-                    t={t}
-                    variant="light"
+                <div className="h-1.5 w-full rounded-full bg-[#ded8e8] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      !hasResetPassword
+                        ? 'w-0'
+                        : `w-full ${
+                          resetPasswordStrength === 'weak'
+                            ? 'bg-red-500'
+                            : resetPasswordStrength === 'medium'
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                        }`
+                    }`}
                   />
                 </div>
-              )}
+
+                <p className="text-[11px] text-[#6f6782] mt-2">
+                  {t.passwordRequirements || 'Password requirements'}
+                </p>
+                <PasswordRequirementsChecklist
+                  criteria={resetPasswordCriteria}
+                  t={t}
+                  variant="light"
+                />
+                <p
+                  className={`text-[11px] mt-2 ${
+                    !hasResetPassword
+                      ? 'text-[#7d7690]'
+                      : resetPasswordMissingRules.length > 0
+                        ? 'text-amber-700'
+                        : 'text-emerald-700'
+                  }`}
+                >
+                  {resetPasswordSecurityHint}
+                </p>
+              </div>
             </div>
 
             <div className="px-5 py-4 border-t border-[#e4e1e8] flex items-center justify-end gap-2 bg-white">

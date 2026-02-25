@@ -2648,6 +2648,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return rounded.toFixed(3).replace(/\.?0+$/, '');
   };
 
+  const formatSummaryHours = (value: number): string => {
+    if (!Number.isFinite(value)) return '0h';
+    const absValue = Math.abs(value);
+    if (absValue >= 1000) return `${Math.round(value)}h`;
+    if (absValue >= 100) {
+      const roundedOneDecimal = Math.round(value * 10) / 10;
+      return `${roundedOneDecimal.toFixed(1).replace(/\.0$/, '')}h`;
+    }
+    return `${formatHours(value)}h`;
+  };
+
   const renderProjectDepartmentSummaryCard = (projectId: string, dept: Department, isMobile = false) => {
     const quotedHoursValue = getQuotedHours(dept, projectId);
     const quotedChangeOrdersValue = getQuotedChangeOrders(dept, projectId);
@@ -2660,7 +2671,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
-    const cardWidthClass = isMobile ? 'w-[268px]' : 'w-full';
+    const cardWidthClass = isMobile ? 'w-[292px] sm:w-[304px]' : 'w-full';
     const quotedCompactLabel = language === 'es' ? 'Cot' : 'Qtd';
     const usedCompactLabel = language === 'es' ? 'Usa' : 'Used';
     const forecastCompactLabel = language === 'es' ? 'Pron' : 'Fcst';
@@ -2668,35 +2679,35 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return (
       <div
         key={dept}
-        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-1.5 py-1 border border-gray-200`}
+        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2 py-1.5 border border-gray-200`}
         title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center gap-0.5 min-w-0">
-          <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1 py-0.5 shrink-0 min-w-[52px]">
+        <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1 py-0.5 shrink-0 min-w-[56px]">
             <span className={`inline-flex items-center justify-center scale-[0.72] leading-none ${deptInfo.color}`}>{deptInfo.icon}</span>
-            <span className="text-[9px] font-bold text-gray-800 leading-none">{dept}</span>
+            <span className="text-[10px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
-          <div className="flex items-center gap-0.5 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[54px] text-center leading-none">
-              <div className="text-[7px] font-semibold">{quotedCompactLabel}</div>
-              <div className="text-[9px] font-bold mt-0.5">{formatHours(totalQuotedHoursValue)}h</div>
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
+              <div className="text-[8px] font-semibold">{quotedCompactLabel}</div>
+              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</div>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[54px] text-center leading-none">
-              <div className="text-[7px] font-semibold">{usedCompactLabel}</div>
-              <div className="text-[9px] font-bold mt-0.5">{formatHours(utilizedHoursValue)}h</div>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
+              <div className="text-[8px] font-semibold">{usedCompactLabel}</div>
+              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</div>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[54px] text-center leading-none">
-              <div className="text-[7px] font-semibold">{forecastCompactLabel}</div>
-              <div className="text-[9px] font-bold mt-0.5">{formatHours(forecastedHoursValue)}h</div>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
+              <div className="text-[8px] font-semibold">{forecastCompactLabel}</div>
+              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</div>
             </div>
           </div>
 
-          <div className={`rounded px-1 py-1 text-[9px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[42px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+          <div className={`rounded px-1.5 py-1 text-[10px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[46px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
             {utilizationPercent}%
           </div>
         </div>
@@ -7678,11 +7689,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
                       <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
-                        <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}`, display: 'inline-block', minWidth: '100%' }}>
+                        <div style={{ zoom: `${Math.max(90, getEffectiveProjectZoom(proj.id)) / 100}`, display: 'inline-block', minWidth: '100%' }}>
                           <div className="flex md:hidden gap-1 min-w-max">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
                           </div>
-                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1">
+                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-1.5">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                           </div>
                         </div>
