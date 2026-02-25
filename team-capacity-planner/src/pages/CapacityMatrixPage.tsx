@@ -2812,265 +2812,565 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       return;
     }
 
-    const normalizedStart = normalizeWeekStartDate(startDate);
-    const normalizedEnd = normalizeWeekStartDate(endDate);
-    const weeklyRange = getWeeksInRange(normalizedStart, normalizedEnd)
-      .map((week) => normalizeWeekStartDate(week))
-      .filter((week, idx, arr) => arr.indexOf(week) === idx);
-
-    if (weeklyRange.length === 0) {
-      alert(language === 'es'
-        ? 'No hay semanas válidas en el rango seleccionado.'
-        : 'There are no valid weeks in the selected range.');
-      return;
-    }
-
-    const weekSet = new Set(weeklyRange);
-    const assignmentProjectsInRange = new Set<string>();
-    assignments.forEach((assignment) => {
-      const week = normalizeWeekStartDate(assignment.weekStartDate);
-      if (weekSet.has(week)) {
-        assignmentProjectsInRange.add(assignment.projectId);
-      }
-    });
-
-    const generalScopeProjects = projects.filter((proj) => isProjectVisibleInGeneral(proj));
-    const orderedGeneralProjectIds = buildOrderedProjectIds(generalScopeProjects, 'GENERAL');
-    const projectByIdMap = new Map(generalScopeProjects.map((proj) => [proj.id, proj]));
-    const orderedGeneralProjects = orderedGeneralProjectIds
-      .map((projectId) => projectByIdMap.get(projectId))
-      .filter((proj): proj is Project => Boolean(proj));
-
-    const rangeStart = weeklyRange[0];
-    const rangeEnd = weeklyRange[weeklyRange.length - 1];
-
-    const projectsForRange = orderedGeneralProjects.filter((proj) => {
-      const projectStart = proj.startDate || '';
-      const projectEnd = proj.endDate || proj.startDate || '';
-      const projectOverlapsRange = projectStart && projectEnd
-        ? projectStart <= rangeEnd && projectEnd >= rangeStart
-        : false;
-      const hasAssignmentsInRange = assignmentProjectsInRange.has(proj.id);
-      const hasDepartmentOverlapInRange = projectHasDepartmentRangeOverlap(proj, rangeStart, rangeEnd);
-      return projectOverlapsRange || hasAssignmentsInRange || hasDepartmentOverlapInRange;
-    });
-
-    if (projectsForRange.length === 0) {
-      alert(language === 'es'
-        ? 'No hay proyectos en el rango seleccionado para exportar.'
-        : 'There are no projects in the selected range to export.');
-      return;
-    }
-
     try {
       setIsTimingRangeExcelExporting(true);
-      const ExcelJS = await import('exceljs');
-      const workbook = new ExcelJS.Workbook();
 
-      const getColName = (colNumber: number): string => {
-        let dividend = colNumber;
-        let colName = '';
-        while (dividend > 0) {
-          const modulo = (dividend - 1) % 26;
-          colName = String.fromCharCode(65 + modulo) + colName;
-          dividend = Math.floor((dividend - modulo) / 26);
-        }
-        return colName;
+      const response = await activityLogApi.getFiltered({
+        modelName: 'Project',
+        action: 'updated',
+        endDate,
+        ordering: 'created_at',
+        pageSize: 1000,
+      });
+
+      const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
+      const toIsoDate = (value: unknown): string => {
+        if (typeof value !== 'string') return '';
+        return value.slice(0, 10);
+      };
+      const toPositiveInt = (value: unknown): number | null => {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) return null;
+        return Math.round(num);
+      };
+      const addDays = (isoDate: string, days: number): string => {
+        if (!isoDate) return '';
+        const date = parseISODate(isoDate);
+        if (Number.isNaN(date.getTime())) return '';
+        date.setDate(date.getDate() + days);
+        return formatToISO(date);
+      };
+      const diffWeeksBetween = (startIso: string, endIso: string): number | null => {
+        if (!startIso || !endIso) return null;
+        const start = parseISODate(startIso);
+        const end = parseISODate(endIso);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null;
+        const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.floor(diffDays / 7) + 1;
       };
 
-      const BORDER = 'D5D1DA';
-      const WHITE = 'FFFFFF';
-      const PURPLE = '2E1A47';
-      const PURPLE_SOFT = '827691';
-      const LIGHT_BG = 'F6F3FB';
+      interface TimingRange {
+        startDate: string;
+        endDate: string;
+        startWeek: number | null;
+        endWeek: number | null;
+        durationWeeks: number | null;
+      }
 
-      const setCellStyle = (
-        cell: any,
-        fill = WHITE,
-        fontColor = '1F2937',
-        bold = false,
-        align: 'center' | 'left' = 'center'
-      ) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-        cell.font = { color: { argb: fontColor }, size: 9, bold };
-        cell.alignment = { vertical: 'middle', horizontal: align, wrapText: true };
-        cell.border = {
-          top: { style: 'thin', color: { argb: BORDER } },
-          left: { style: 'thin', color: { argb: BORDER } },
-          bottom: { style: 'thin', color: { argb: BORDER } },
-          right: { style: 'thin', color: { argb: BORDER } },
+      interface TimingState {
+        projectRange: TimingRange | null;
+        departmentRanges: Partial<Record<Department, TimingRange | null>>;
+      }
+
+      interface ChangeExportRow {
+        changedAt: string;
+        changedBy: string;
+        project: string;
+        scope: string;
+        beforeRange: string;
+        afterRange: string;
+        weeklyImpact: string;
+      }
+
+      interface WeeklyExportRow {
+        changedAt: string;
+        changedBy: string;
+        project: string;
+        scope: string;
+        weekStart: string;
+        cw: string;
+        relativeWeek: string;
+        beforeStatus: string;
+        afterStatus: string;
+        movement: string;
+      }
+
+      const rows = Array.isArray(response) ? response as ActivityLogEntry[] : [];
+      const timingRows = rows
+        .filter((row) => {
+          if (!row || row.modelName !== 'Project') return false;
+          const action = (row.action || '').toLowerCase();
+          if (action !== 'updated' && action !== 'update') return false;
+          const updates = extractProjectUpdatePayload(row.changes);
+          return !!updates && hasTimingDataDeep(updates);
+        })
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      if (timingRows.length === 0) {
+        alert(language === 'es'
+          ? 'No hay cambios de timing para exportar.'
+          : 'There are no timing changes to export.');
+        return;
+      }
+
+      const rangeInSelectedWindow = (createdAt: string) => {
+        const day = (createdAt || '').slice(0, 10);
+        return day >= startDate && day <= endDate;
+      };
+
+      const formatRangeLabel = (range: TimingRange | null): string => {
+        if (!range) return language === 'es' ? 'Sin timing' : 'No timing';
+        const parts: string[] = [];
+        if (range.startDate || range.endDate) {
+          parts.push(`${range.startDate || '-'} -> ${range.endDate || '-'}`);
+        }
+        if (range.startWeek !== null || range.endWeek !== null) {
+          parts.push(`W${range.startWeek ?? '?'}-W${range.endWeek ?? '?'}`);
+        }
+        if (range.durationWeeks && range.durationWeeks > 0) {
+          parts.push(`${range.durationWeeks} ${language === 'es' ? 'sem' : 'wk'}`);
+        }
+        return parts.length > 0 ? parts.join(' | ') : (language === 'es' ? 'Sin timing' : 'No timing');
+      };
+
+      const isSameRange = (left: TimingRange | null, right: TimingRange | null): boolean => {
+        if (!left && !right) return true;
+        if (!left || !right) return false;
+        return (
+          (left.startDate || '') === (right.startDate || '')
+          && (left.endDate || '') === (right.endDate || '')
+          && (left.startWeek ?? null) === (right.startWeek ?? null)
+          && (left.endWeek ?? null) === (right.endWeek ?? null)
+        );
+      };
+
+      const rangeContainsWeekStart = (range: TimingRange | null, weekStart: string): boolean => {
+        if (!range || !range.startDate || !range.endDate || !weekStart) return false;
+        const normalizedRangeStart = normalizeWeekStartDate(range.startDate);
+        const normalizedRangeEnd = normalizeWeekStartDate(range.endDate);
+        if (!normalizedRangeStart || !normalizedRangeEnd) return false;
+        return weekStart >= normalizedRangeStart && weekStart <= normalizedRangeEnd;
+      };
+
+      const rangeContainsRelativeWeek = (range: TimingRange | null, relativeWeek: number): boolean => {
+        if (!range) return false;
+        if (!Number.isFinite(relativeWeek)) return false;
+        if (range.startWeek === null || range.endWeek === null) return false;
+        return relativeWeek >= range.startWeek && relativeWeek <= range.endWeek;
+      };
+
+      const collectWeekStartsFromRange = (range: TimingRange | null): string[] => {
+        if (!range || !range.startDate || !range.endDate) return [];
+        const normalizedStart = normalizeWeekStartDate(range.startDate);
+        const normalizedEnd = normalizeWeekStartDate(range.endDate);
+        if (!normalizedStart || !normalizedEnd || normalizedStart > normalizedEnd) return [];
+        return getWeeksInRange(normalizedStart, normalizedEnd)
+          .map((week) => normalizeWeekStartDate(week))
+          .filter((week, idx, list) => week && list.indexOf(week) === idx);
+      };
+
+      const extractDepartmentRange = (
+        stageEntriesRaw: unknown,
+        projectStartDate: string
+      ): TimingRange | null => {
+        if (!Array.isArray(stageEntriesRaw) || stageEntriesRaw.length === 0) return null;
+
+        let minStartDate = '';
+        let maxEndDate = '';
+        let minWeekStart: number | null = null;
+        let maxWeekEnd: number | null = null;
+
+        stageEntriesRaw.forEach((entryRaw) => {
+          const entry = asObject(entryRaw);
+          if (!entry) return;
+
+          const weekStartNum = toPositiveInt(entry.weekStart);
+          const explicitWeekEnd = toPositiveInt(entry.weekEnd);
+          let durationWeeks = toPositiveInt(entry.durationWeeks);
+          if (!durationWeeks && weekStartNum && explicitWeekEnd && explicitWeekEnd >= weekStartNum) {
+            durationWeeks = explicitWeekEnd - weekStartNum + 1;
+          }
+
+          const inferredWeekEnd = explicitWeekEnd
+            ?? ((weekStartNum && durationWeeks) ? (weekStartNum + durationWeeks - 1) : null);
+
+          if (weekStartNum !== null && (minWeekStart === null || weekStartNum < minWeekStart)) {
+            minWeekStart = weekStartNum;
+          }
+          if (inferredWeekEnd !== null && (maxWeekEnd === null || inferredWeekEnd > maxWeekEnd)) {
+            maxWeekEnd = inferredWeekEnd;
+          }
+
+          let start = toIsoDate(entry.departmentStartDate);
+          if (!start && projectStartDate && weekStartNum !== null) {
+            start = addDays(projectStartDate, (weekStartNum - 1) * 7);
+          }
+
+          const effectiveDuration = durationWeeks
+            ?? ((weekStartNum !== null && inferredWeekEnd !== null && inferredWeekEnd >= weekStartNum)
+              ? (inferredWeekEnd - weekStartNum + 1)
+              : null);
+
+          if (!start || !effectiveDuration || effectiveDuration <= 0) return;
+
+          const end = addDays(start, (effectiveDuration * 7) - 1);
+          if (!end) return;
+
+          if (!minStartDate || start < minStartDate) minStartDate = start;
+          if (!maxEndDate || end > maxEndDate) maxEndDate = end;
+        });
+
+        if ((!minStartDate || !maxEndDate) && projectStartDate && minWeekStart !== null && maxWeekEnd !== null) {
+          minStartDate = addDays(projectStartDate, (minWeekStart - 1) * 7);
+          maxEndDate = addDays(projectStartDate, (maxWeekEnd * 7) - 1);
+        }
+
+        const durationFromDates = diffWeeksBetween(minStartDate, maxEndDate);
+        const durationFromWeeks = (minWeekStart !== null && maxWeekEnd !== null)
+          ? (maxWeekEnd - minWeekStart + 1)
+          : null;
+
+        return {
+          startDate: minStartDate || '',
+          endDate: maxEndDate || '',
+          startWeek: minWeekStart,
+          endWeek: maxWeekEnd,
+          durationWeeks: durationFromDates ?? durationFromWeeks,
         };
       };
 
-      const sheet = workbook.addWorksheet(
-        language === 'es' ? 'Timing Semanal General' : 'General Weekly Timing',
-        { views: [{ state: 'frozen', ySplit: 5, xSplit: 6 }] }
-      );
+      const projectStates = new Map<string, TimingState>();
+      const changeRows: ChangeExportRow[] = [];
+      const weeklyRows: WeeklyExportRow[] = [];
+      const projectScopeLabel = language === 'es' ? 'PROYECTO' : 'PROJECT';
 
-      sheet.columns = [
-        { width: 30 }, // Project
-        { width: 24 }, // Client
-        { width: 20 }, // PM
-        { width: 10 }, // Dept
-        { width: 12 }, // Dept Start
-        { width: 12 }, // Dept End
-        ...weeklyRange.map(() => ({ width: 11 })),
-      ];
+      const buildWeeklyComparison = (
+        changedAt: string,
+        changedBy: string,
+        projectName: string,
+        scope: string,
+        beforeRange: TimingRange | null,
+        afterRange: TimingRange | null
+      ): { added: number; removed: number } => {
+        let added = 0;
+        let removed = 0;
 
-      const weekColStart = 7;
-      const weekColEnd = weekColStart + weeklyRange.length - 1;
-      const fullEndCol = getColName(weekColEnd);
+        const unionWeekStarts = new Set<string>();
+        collectWeekStartsFromRange(beforeRange).forEach((week) => unionWeekStarts.add(week));
+        collectWeekStartsFromRange(afterRange).forEach((week) => unionWeekStarts.add(week));
 
-      sheet.mergeCells(`A1:${fullEndCol}1`);
-      const titleCell = sheet.getCell('A1');
-      titleCell.value = language === 'es'
-        ? 'TIMING GENERAL POR SEMANA'
-        : 'GENERAL TIMING BY WEEK';
-      setCellStyle(titleCell, PURPLE, WHITE, true, 'left');
-      titleCell.font = { ...titleCell.font, size: 14, bold: true };
+        if (unionWeekStarts.size > 0) {
+          Array.from(unionWeekStarts)
+            .sort((a, b) => a.localeCompare(b))
+            .forEach((weekStart) => {
+              const beforeActive = rangeContainsWeekStart(beforeRange, weekStart);
+              const afterActive = rangeContainsWeekStart(afterRange, weekStart);
+              if (beforeActive === afterActive) return;
 
-      sheet.mergeCells(`A2:${fullEndCol}2`);
-      const metaCell = sheet.getCell('A2');
-      metaCell.value = `${language === 'es' ? 'Rango' : 'Range'}: ${rangeStart} -> ${rangeEnd} | ${language === 'es' ? 'Semanas' : 'Weeks'}: ${weeklyRange.length}`;
-      setCellStyle(metaCell, LIGHT_BG, PURPLE, true, 'left');
+              const movement = !beforeActive && afterActive
+                ? (language === 'es' ? 'Semana agregada' : 'Week added')
+                : (language === 'es' ? 'Semana removida' : 'Week removed');
 
-      sheet.mergeCells(`A3:${fullEndCol}3`);
-      const legendCell = sheet.getCell('A3');
-      legendCell.value = language === 'es'
-        ? 'Leyenda: Azul = timing activo | Verde = timing activo con horas | Amarillo = horas fuera de timing'
-        : 'Legend: Blue = active timing | Green = active timing with hours | Yellow = hours outside timing';
-      setCellStyle(legendCell, 'EEF2FF', '1E3A8A', false, 'left');
+              if (!beforeActive && afterActive) added += 1;
+              if (beforeActive && !afterActive) removed += 1;
 
-      const monthSpansForRange: Array<{ month: string; startIdx: number; endIdx: number }> = [];
-      let currentMonth = '';
-      let startIdx = 0;
-      weeklyRange.forEach((weekStart, idx) => {
-        const date = parseISODate(weekStart);
-        const monthLabelDate = new Date(date);
-        monthLabelDate.setDate(monthLabelDate.getDate() + 3);
-        let monthName = monthLabelDate.toLocaleString(locale, { month: 'short', year: 'numeric' });
-        monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+              weeklyRows.push({
+                changedAt,
+                changedBy,
+                project: projectName,
+                scope,
+                weekStart,
+                cw: `CW${getWeekNumber(weekStart)}`,
+                relativeWeek: '',
+                beforeStatus: beforeActive
+                  ? (language === 'es' ? 'En timing' : 'In timing')
+                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
+                afterStatus: afterActive
+                  ? (language === 'es' ? 'En timing' : 'In timing')
+                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
+                movement,
+              });
+            });
+        } else {
+          const weekCandidates = [
+            beforeRange?.startWeek,
+            beforeRange?.endWeek,
+            afterRange?.startWeek,
+            afterRange?.endWeek,
+          ]
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value) && value > 0);
 
-        if (monthName !== currentMonth) {
-          if (currentMonth) {
-            monthSpansForRange.push({ month: currentMonth, startIdx, endIdx: idx - 1 });
+          if (weekCandidates.length > 0) {
+            const minWeek = Math.min(...weekCandidates);
+            const maxWeek = Math.max(...weekCandidates);
+
+            for (let relativeWeek = minWeek; relativeWeek <= maxWeek; relativeWeek += 1) {
+              const beforeActive = rangeContainsRelativeWeek(beforeRange, relativeWeek);
+              const afterActive = rangeContainsRelativeWeek(afterRange, relativeWeek);
+              if (beforeActive === afterActive) continue;
+
+              const movement = !beforeActive && afterActive
+                ? (language === 'es' ? 'Semana agregada' : 'Week added')
+                : (language === 'es' ? 'Semana removida' : 'Week removed');
+
+              if (!beforeActive && afterActive) added += 1;
+              if (beforeActive && !afterActive) removed += 1;
+
+              weeklyRows.push({
+                changedAt,
+                changedBy,
+                project: projectName,
+                scope,
+                weekStart: '',
+                cw: '',
+                relativeWeek: `W${relativeWeek}`,
+                beforeStatus: beforeActive
+                  ? (language === 'es' ? 'En timing' : 'In timing')
+                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
+                afterStatus: afterActive
+                  ? (language === 'es' ? 'En timing' : 'In timing')
+                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
+                movement,
+              });
+            }
           }
-          currentMonth = monthName;
-          startIdx = idx;
         }
-        if (idx === weeklyRange.length - 1) {
-          monthSpansForRange.push({ month: currentMonth, startIdx, endIdx: idx });
+
+        return { added, removed };
+      };
+
+      timingRows.forEach((row) => {
+        const updates = extractProjectUpdatePayload(row.changes);
+        if (!updates) return;
+
+        const projectId = row.objectId;
+        const projectFromStore = projectById.get(projectId);
+        const fallbackName = typeof updates.name === 'string' ? updates.name : '';
+        const projectName = projectFromStore?.name
+          || fallbackName
+          || `${language === 'es' ? 'Proyecto' : 'Project'} ${projectId.slice(0, 8)}`;
+
+        const previousState = projectStates.get(projectId) || {
+          projectRange: null,
+          departmentRanges: {},
+        };
+
+        const nextState: TimingState = {
+          projectRange: previousState.projectRange ? { ...previousState.projectRange } : null,
+          departmentRanges: { ...previousState.departmentRanges },
+        };
+
+        const projectFieldPresent =
+          hasOwn(updates, 'startDate') || hasOwn(updates, 'endDate') || hasOwn(updates, 'numberOfWeeks');
+
+        if (projectFieldPresent) {
+          const fallbackStart = previousState.projectRange?.startDate || projectFromStore?.startDate || '';
+          const fallbackEnd = previousState.projectRange?.endDate || projectFromStore?.endDate || '';
+          const fallbackWeeks = previousState.projectRange?.durationWeeks
+            ?? toPositiveInt(projectFromStore?.numberOfWeeks)
+            ?? null;
+
+          const nextStart = hasOwn(updates, 'startDate') ? toIsoDate(updates.startDate) : fallbackStart;
+          let nextEnd = hasOwn(updates, 'endDate') ? toIsoDate(updates.endDate) : fallbackEnd;
+          let nextWeeks = hasOwn(updates, 'numberOfWeeks') ? toPositiveInt(updates.numberOfWeeks) : fallbackWeeks;
+
+          if (!nextEnd && nextStart && nextWeeks && nextWeeks > 0) {
+            nextEnd = addDays(nextStart, (nextWeeks * 7) - 1);
+          }
+          if (!nextWeeks) {
+            nextWeeks = diffWeeksBetween(nextStart, nextEnd);
+          }
+
+          nextState.projectRange = {
+            startDate: nextStart || '',
+            endDate: nextEnd || '',
+            startWeek: nextWeeks ? 1 : null,
+            endWeek: nextWeeks,
+            durationWeeks: nextWeeks,
+          };
         }
-      });
 
-      monthSpansForRange.forEach((monthInfo, idx) => {
-        const startCol = weekColStart + monthInfo.startIdx;
-        const endCol = weekColStart + monthInfo.endIdx;
-        const startRef = `${getColName(startCol)}4`;
-        const endRef = `${getColName(endCol)}4`;
-        sheet.mergeCells(`${startRef}:${endRef}`);
-        const monthCell = sheet.getCell(startRef);
-        monthCell.value = monthInfo.month;
-        setCellStyle(monthCell, idx % 2 === 0 ? PURPLE : 'FACC15', idx % 2 === 0 ? WHITE : '1F2937', true);
-      });
+        const departmentUpdates: Partial<Record<Department, TimingRange | null>> = {};
+        if (hasOwn(updates, 'departmentStages')) {
+          const departmentStagesObj = asObject(updates.departmentStages);
+          const projectStartForDepartment =
+            nextState.projectRange?.startDate
+            || previousState.projectRange?.startDate
+            || projectFromStore?.startDate
+            || '';
 
-      const headers = [
-        language === 'es' ? 'Proyecto' : 'Project',
-        language === 'es' ? 'Cliente' : 'Client',
-        'PM',
-        language === 'es' ? 'Depto' : 'Dept',
-        language === 'es' ? 'Inicio Dpto' : 'Dept Start',
-        language === 'es' ? 'Fin Dpto' : 'Dept End',
-      ];
+          if (!departmentStagesObj) {
+            DEPARTMENTS.forEach((dept) => {
+              departmentUpdates[dept] = null;
+            });
+          } else {
+            DEPARTMENTS.forEach((dept) => {
+              if (!hasOwn(departmentStagesObj, dept)) return;
+              const deptEntries = departmentStagesObj[dept];
+              if (!Array.isArray(deptEntries) || deptEntries.length === 0) {
+                departmentUpdates[dept] = null;
+                return;
+              }
+              departmentUpdates[dept] = extractDepartmentRange(deptEntries, projectStartForDepartment);
+            });
+          }
+        }
 
-      headers.forEach((label, idx) => {
-        const cell = sheet.getCell(5, idx + 1);
-        cell.value = label;
-        setCellStyle(cell, PURPLE_SOFT, WHITE, true);
-      });
-
-      weeklyRange.forEach((weekStart, idx) => {
-        const cell = sheet.getCell(5, weekColStart + idx);
-        const cw = getWeekNumber(weekStart);
-        cell.value = `CW${cw}\n${weekStart}`;
-        setCellStyle(cell, PURPLE_SOFT, WHITE, true);
-      });
-      sheet.getRow(5).height = 30;
-
-      let row = 6;
-      projectsForRange.forEach((proj) => {
-        sheet.mergeCells(`A${row}:${fullEndCol}${row}`);
-        const projectHeaderCell = sheet.getCell(`A${row}`);
-        const pmName = projectManagerNameById.get(proj.id) || '-';
-        const weeks = projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks ?? 0;
-        projectHeaderCell.value = `${proj.name} | ${weeks} ${language === 'es' ? 'semanas' : 'weeks'} | PM: ${pmName}`;
-        setCellStyle(projectHeaderCell, LIGHT_BG, PURPLE, true, 'left');
-        row += 1;
-
-        DEPARTMENTS.forEach((dept) => {
-          const deptMeta = projectDeptMetaByKey.get(`${proj.id}|${dept}`);
-          const deptStart = (deptMeta?.effectiveStartDate || (dept === 'PM' ? proj.startDate : '') || '').slice(0, 10);
-          const deptEnd = (deptMeta?.effectiveEndDate || (dept === 'PM' ? (proj.endDate || proj.startDate) : '') || '').slice(0, 10);
-          const hasTimingOverlap = !!deptStart && !!deptEnd && deptStart <= rangeEnd && deptEnd >= rangeStart;
-          const hasHoursInRange = weeklyRange.some((weekStart) => {
-            const entry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${weekStart}`);
-            return (entry?.totalHours ?? 0) > 0;
-          });
-          if (!hasTimingOverlap && !hasHoursInRange) return;
-
-          const staticValues = [
-            proj.name,
-            proj.client || '-',
-            projectManagerNameById.get(proj.id) || '-',
-            dept,
-            deptStart || '-',
-            deptEnd || '-',
-          ];
-          staticValues.forEach((value, idx) => {
-            const cell = sheet.getCell(row, idx + 1);
-            cell.value = value;
-            setCellStyle(cell, idx <= 2 ? 'FAF8FF' : 'F4F1F8', PURPLE, idx === 3, idx === 0 ? 'left' : 'center');
-          });
-
-          weeklyRange.forEach((weekStart, idx) => {
-            const inTiming = !!deptStart && !!deptEnd && weekStart >= deptStart && weekStart <= deptEnd;
-            const entry = assignmentIndex.byCell.get(`${proj.id}|${dept}|${weekStart}`);
-            const totalHours = entry?.totalHours ?? 0;
-            const cell = sheet.getCell(row, weekColStart + idx);
-
-            if (totalHours > 0) {
-              cell.value = Math.round(totalHours * 100) / 100;
-              cell.numFmt = '0.##';
-            } else if (inTiming) {
-              cell.value = '•';
-            } else {
-              cell.value = '';
-            }
-
-            if (inTiming && totalHours > 0) {
-              setCellStyle(cell, 'BBF7D0', '14532D', true);
-            } else if (inTiming) {
-              setCellStyle(cell, 'DBEAFE', '1E3A8A', true);
-            } else if (totalHours > 0) {
-              setCellStyle(cell, 'FDE68A', '92400E', true);
-            } else {
-              setCellStyle(cell, WHITE, '4B5563');
-            }
-          });
-
-          row += 1;
+        (Object.entries(departmentUpdates) as Array<[Department, TimingRange | null]>).forEach(([dept, range]) => {
+          nextState.departmentRanges[dept] = range;
         });
 
-        row += 1;
+        if (rangeInSelectedWindow(row.createdAt)) {
+          const changedAt = formatTimingDateTime(row.createdAt);
+          const changedBy = formatTimingUserName(row.user);
+
+          if (projectFieldPresent && !isSameRange(previousState.projectRange, nextState.projectRange)) {
+            const impact = buildWeeklyComparison(
+              changedAt,
+              changedBy,
+              projectName,
+              projectScopeLabel,
+              previousState.projectRange,
+              nextState.projectRange
+            );
+            const weeklyImpactText = impact.added === 0 && impact.removed === 0
+              ? (language === 'es' ? 'Sin cambio semanal' : 'No weekly shift')
+              : `${impact.added > 0 ? `+${impact.added} ${language === 'es' ? 'sem' : 'wk'}` : ''}${impact.added > 0 && impact.removed > 0 ? ' | ' : ''}${impact.removed > 0 ? `-${impact.removed} ${language === 'es' ? 'sem' : 'wk'}` : ''}`;
+
+            changeRows.push({
+              changedAt,
+              changedBy,
+              project: projectName,
+              scope: projectScopeLabel,
+              beforeRange: formatRangeLabel(previousState.projectRange),
+              afterRange: formatRangeLabel(nextState.projectRange),
+              weeklyImpact: weeklyImpactText,
+            });
+          }
+
+          (Object.entries(departmentUpdates) as Array<[Department, TimingRange | null]>).forEach(([dept, nextRange]) => {
+            const previousRange = previousState.departmentRanges[dept] ?? null;
+            if (isSameRange(previousRange, nextRange)) return;
+
+            const impact = buildWeeklyComparison(
+              changedAt,
+              changedBy,
+              projectName,
+              dept,
+              previousRange,
+              nextRange
+            );
+            const weeklyImpactText = impact.added === 0 && impact.removed === 0
+              ? (language === 'es' ? 'Sin cambio semanal' : 'No weekly shift')
+              : `${impact.added > 0 ? `+${impact.added} ${language === 'es' ? 'sem' : 'wk'}` : ''}${impact.added > 0 && impact.removed > 0 ? ' | ' : ''}${impact.removed > 0 ? `-${impact.removed} ${language === 'es' ? 'sem' : 'wk'}` : ''}`;
+
+            changeRows.push({
+              changedAt,
+              changedBy,
+              project: projectName,
+              scope: dept,
+              beforeRange: formatRangeLabel(previousRange),
+              afterRange: formatRangeLabel(nextRange),
+              weeklyImpact: weeklyImpactText,
+            });
+          });
+        }
+
+        projectStates.set(projectId, nextState);
       });
 
-      sheet.autoFilter = {
-        from: { row: 5, column: 1 },
-        to: { row: 5, column: weekColEnd },
+      if (changeRows.length === 0) {
+        alert(language === 'es'
+          ? 'No se detectaron cambios de timing dentro del rango seleccionado.'
+          : 'No timing changes were detected in the selected range.');
+        return;
+      }
+
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const BORDER = 'D5D1DA';
+      const HEADER_BG = '2E1A47';
+      const HEADER_TEXT = 'FFFFFF';
+      const NOTE_BG = 'F6F3FB';
+      const WHITE = 'FFFFFF';
+
+      const styleHeaderRow = (sheet: any) => {
+        const headerRow = sheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: HEADER_TEXT } };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        headerRow.eachCell((cell: any) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: BORDER } },
+            left: { style: 'thin', color: { argb: BORDER } },
+            bottom: { style: 'thin', color: { argb: BORDER } },
+            right: { style: 'thin', color: { argb: BORDER } },
+          };
+        });
+        headerRow.height = 24;
+      };
+
+      const styleDataRows = (sheet: any) => {
+        sheet.eachRow((excelRow: any, rowNumber: number) => {
+          if (rowNumber === 1) return;
+          excelRow.eachCell((cell: any) => {
+            cell.fill = cell.fill || { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
+            cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+            cell.border = {
+              top: { style: 'thin', color: { argb: BORDER } },
+              left: { style: 'thin', color: { argb: BORDER } },
+              bottom: { style: 'thin', color: { argb: BORDER } },
+              right: { style: 'thin', color: { argb: BORDER } },
+            };
+          });
+        });
+      };
+
+      const changesSheet = workbook.addWorksheet(language === 'es' ? 'Cambios' : 'Changes');
+      changesSheet.columns = [
+        { header: language === 'es' ? 'Fecha' : 'Date', key: 'changedAt', width: 22 },
+        { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
+        { header: language === 'es' ? 'Ambito' : 'Scope', key: 'scope', width: 12 },
+        { header: language === 'es' ? 'Rango Anterior' : 'Previous Range', key: 'beforeRange', width: 34 },
+        { header: language === 'es' ? 'Rango Nuevo' : 'New Range', key: 'afterRange', width: 34 },
+        { header: language === 'es' ? 'Impacto Semanal' : 'Weekly Impact', key: 'weeklyImpact', width: 20 },
+      ];
+      changeRows.forEach((row) => changesSheet.addRow(row));
+      styleHeaderRow(changesSheet);
+      styleDataRows(changesSheet);
+      changesSheet.views = [{ state: 'frozen', ySplit: 1 }];
+      changesSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: changesSheet.columnCount },
+      };
+
+      const weeklySheet = workbook.addWorksheet(language === 'es' ? 'Comparativa Semanal' : 'Weekly Comparison');
+      weeklySheet.columns = [
+        { header: language === 'es' ? 'Fecha Cambio' : 'Change Date', key: 'changedAt', width: 22 },
+        { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
+        { header: language === 'es' ? 'Ambito' : 'Scope', key: 'scope', width: 12 },
+        { header: language === 'es' ? 'Semana' : 'Week Start', key: 'weekStart', width: 15 },
+        { header: 'CW', key: 'cw', width: 10 },
+        { header: language === 'es' ? 'Semana Relativa' : 'Relative Week', key: 'relativeWeek', width: 15 },
+        { header: language === 'es' ? 'Antes' : 'Before', key: 'beforeStatus', width: 16 },
+        { header: language === 'es' ? 'Despues' : 'After', key: 'afterStatus', width: 16 },
+        { header: language === 'es' ? 'Movimiento' : 'Movement', key: 'movement', width: 18 },
+      ];
+
+      if (weeklyRows.length > 0) {
+        weeklyRows.forEach((row) => weeklySheet.addRow(row));
+      } else {
+        const noteRow = weeklySheet.addRow({
+          changedAt: language === 'es'
+            ? 'No hubo cambios semanales detectables en este rango.'
+            : 'No detectable weekly changes were found in this range.',
+        });
+        noteRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NOTE_BG } };
+      }
+
+      styleHeaderRow(weeklySheet);
+      styleDataRows(weeklySheet);
+      weeklySheet.views = [{ state: 'frozen', ySplit: 1 }];
+      weeklySheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: weeklySheet.columnCount },
       };
 
       const dateStamp = new Date().toISOString().slice(0, 10);
-      const fileName = `timing-general-semanal-${rangeStart}-to-${rangeEnd}-${dateStamp}.xlsx`;
+      const fileName = `timing-changes-weekly-${startDate}-to-${endDate}-${dateStamp}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob(
         [buffer],
@@ -3087,8 +3387,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting timing range Excel:', error);
       alert(language === 'es'
-        ? 'Ocurrio un error al exportar el timing semanal.'
-        : 'An error occurred while exporting weekly timing.');
+        ? 'Ocurrio un error al exportar el resumen de cambios de timing.'
+        : 'An error occurred while exporting timing changes.');
     } finally {
       setIsTimingRangeExcelExporting(false);
     }
