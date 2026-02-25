@@ -2,6 +2,7 @@
 Middleware for session management and inactivity tracking.
 """
 from django.utils import timezone
+from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import UntypedToken
@@ -9,7 +10,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from .models import UserSession
 
 
-class SessionActivityMiddleware:
+class SessionActivityMiddleware(MiddlewareMixin):
     """
     Middleware that:
     1. Updates last_activity timestamp for active sessions
@@ -17,7 +18,7 @@ class SessionActivityMiddleware:
     """
 
     def __init__(self, get_response):
-        self.get_response = get_response
+        super().__init__(get_response)
         inactivity_minutes = max(
             1,
             int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 20)),
@@ -34,8 +35,15 @@ class SessionActivityMiddleware:
         Called just before the view is called.
         Updates session activity and checks for inactive sessions.
         """
-        # Skip auth/registration endpoints that don't represent user activity for existing sessions
-        if request.path in ['/api/token/', '/api/token/refresh/', '/api/register/', '/api/verify-email/', '/api/verify-code/']:
+        # Skip endpoints that shouldn't count as real activity for extending session lifetime.
+        if request.path in [
+            '/api/token/',
+            '/api/token/refresh/',
+            '/api/register/',
+            '/api/verify-email/',
+            '/api/verify-code/',
+            '/api/session-status/',
+        ]:
             return None
 
         # Get the auth header

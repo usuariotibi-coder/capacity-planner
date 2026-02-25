@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
@@ -356,6 +357,27 @@ class SessionControlTests(APITestCase):
         self.assertEqual(status_1.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(status_2.status_code, status.HTTP_200_OK)
 
+    def test_authenticated_request_updates_session_last_activity(self):
+        login_response = self._login('Activity-Refresh-Device')
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+
+        access = login_response.data['access']
+        session_id = UntypedToken(access).get('session_id')
+        self.assertIsNotNone(session_id)
+
+        stale_time = timezone.now() - timedelta(minutes=10)
+        UserSession.objects.filter(id=session_id, user=self.user).update(
+            is_active=True,
+            last_activity=stale_time,
+        )
+
+        response = self.client.get(reverse('project-list'), **self._auth_headers(access))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        refreshed_session = UserSession.objects.get(id=session_id, user=self.user)
+        self.assertTrue(refreshed_session.is_active)
+        self.assertGreater(refreshed_session.last_activity, stale_time)
+
     def test_inactive_session_is_forced_closed_after_timeout(self):
         login_response = self._login('Inactivity-Device')
         self.assertEqual(login_response.status_code, status.HTTP_200_OK)
@@ -364,7 +386,8 @@ class SessionControlTests(APITestCase):
         session_id = UntypedToken(access).get('session_id')
         self.assertIsNotNone(session_id)
 
-        stale_time = timezone.now() - timedelta(minutes=21)
+        timeout_minutes = max(1, int(getattr(settings, 'SESSION_INACTIVITY_TIMEOUT_MINUTES', 90)))
+        stale_time = timezone.now() - timedelta(minutes=timeout_minutes + 1)
         UserSession.objects.filter(id=session_id, user=self.user).update(
             is_active=True,
             last_activity=stale_time,
