@@ -5,7 +5,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { usePRGTeamsStore } from '../stores/prgTeamsStore';
 import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeeksInRange, getWeekNumber } from '../utils/dateUtils';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
@@ -2816,464 +2816,344 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       setIsTimingRangeExcelExporting(true);
 
       const response = await activityLogApi.getFiltered({
-        modelName: 'Project',
-        action: 'updated',
+        modelName: 'Assignment',
         endDate,
         ordering: 'created_at',
-        pageSize: 1000,
+        pageSize: 1500,
       });
 
-      const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
-      const toIsoDate = (value: unknown): string => {
-        if (typeof value !== 'string') return '';
-        return value.slice(0, 10);
-      };
-      const toPositiveInt = (value: unknown): number | null => {
-        const num = Number(value);
-        if (!Number.isFinite(num) || num <= 0) return null;
-        return Math.round(num);
-      };
-      const addDays = (isoDate: string, days: number): string => {
-        if (!isoDate) return '';
-        const date = parseISODate(isoDate);
-        if (Number.isNaN(date.getTime())) return '';
-        date.setDate(date.getDate() + days);
-        return formatToISO(date);
-      };
-      const diffWeeksBetween = (startIso: string, endIso: string): number | null => {
-        if (!startIso || !endIso) return null;
-        const start = parseISODate(startIso);
-        const end = parseISODate(endIso);
-        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null;
-        const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        return Math.floor(diffDays / 7) + 1;
-      };
-
-      interface TimingRange {
-        startDate: string;
-        endDate: string;
-        startWeek: number | null;
-        endWeek: number | null;
-        durationWeeks: number | null;
+      interface AssignmentSnapshot {
+        projectId: string;
+        projectNameHint: string;
+        department: Department | '';
+        weekStartDate: string;
+        hours: number;
+        employeeId: string;
       }
 
-      interface TimingState {
-        projectRange: TimingRange | null;
-        departmentRanges: Partial<Record<Department, TimingRange | null>>;
+      interface HoursBucket {
+        projectId: string;
+        projectName: string;
+        department: string;
+        weekStartDate: string;
+        addedHours: number;
+        removedHours: number;
+        changedHours: number;
+        netHours: number;
+        movements: number;
       }
 
-      interface ChangeExportRow {
+      interface DetailRow {
         changedAt: string;
         changedBy: string;
         project: string;
-        scope: string;
-        beforeRange: string;
-        afterRange: string;
-        weeklyImpact: string;
-      }
-
-      interface WeeklyExportRow {
-        changedAt: string;
-        changedBy: string;
-        project: string;
-        scope: string;
+        department: string;
         weekStart: string;
         cw: string;
-        relativeWeek: string;
-        beforeStatus: string;
-        afterStatus: string;
-        movement: string;
+        action: string;
+        movementType: string;
+        beforeHours: number;
+        afterHours: number;
+        deltaHours: number;
       }
 
-      const rows = Array.isArray(response) ? response as ActivityLogEntry[] : [];
-      const timingRows = rows
+      const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
+      const roundValue = (value: number) => Math.round((value || 0) * 100) / 100;
+      const asNumber = (value: unknown): number | null => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return null;
+        return numeric;
+      };
+      const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
+      const normalizeDepartment = (value: unknown): Department | '' => {
+        const raw = asString(value).trim().toUpperCase();
+        if (!raw) return '';
+        return DEPARTMENT_SET.has(raw as Department) ? (raw as Department) : '';
+      };
+      const resolveHoursFromPayload = (payload: Record<string, any>, fallbackHours: number): number => {
+        const hasSplitFields =
+          hasOwn(payload, 'scioHours')
+          || hasOwn(payload, 'externalHours')
+          || hasOwn(payload, 'scio_hours')
+          || hasOwn(payload, 'external_hours');
+
+        if (hasSplitFields) {
+          const scio = asNumber(payload.scioHours ?? payload.scio_hours) ?? 0;
+          const external = asNumber(payload.externalHours ?? payload.external_hours) ?? 0;
+          return roundValue(Math.max(0, scio + external));
+        }
+
+        const totalCandidate = asNumber(payload.totalHours ?? payload.total_hours);
+        if (totalCandidate !== null) return roundValue(Math.max(0, totalCandidate));
+
+        const hoursCandidate = asNumber(payload.hours);
+        if (hoursCandidate !== null) return roundValue(Math.max(0, hoursCandidate));
+
+        return roundValue(Math.max(0, fallbackHours));
+      };
+      const resolveProjectId = (payload: Record<string, any>, fallbackProjectId: string): string => {
+        const projectObj = asObject(payload.project);
+        const candidate =
+          payload.projectId
+          ?? payload.project_id
+          ?? projectObj?.id
+          ?? (typeof payload.project === 'string' ? payload.project : '')
+          ?? fallbackProjectId;
+        return asString(candidate);
+      };
+      const resolveProjectNameHint = (payload: Record<string, any>, fallbackName: string): string => {
+        const projectObj = asObject(payload.project);
+        const candidate =
+          payload.projectName
+          ?? payload.project_name
+          ?? projectObj?.name
+          ?? fallbackName;
+        return asString(candidate);
+      };
+      const resolveWeekStart = (payload: Record<string, any>, fallbackWeek: string): string => {
+        const raw = asString(payload.weekStartDate ?? payload.week_start_date ?? fallbackWeek);
+        return raw ? normalizeWeekStartDate(raw) : '';
+      };
+      const buildSnapshot = (
+        payload: Record<string, any> | null,
+        previous: AssignmentSnapshot | null
+      ): AssignmentSnapshot | null => {
+        if (!payload && !previous) return null;
+
+        const current = payload || {};
+        const employeeId = asString(current.employeeId ?? current.employee_id ?? previous?.employeeId ?? '');
+        const employeeDepartment = employeeId ? employeeById.get(employeeId)?.department : '';
+
+        const department =
+          normalizeDepartment(current.department)
+          || normalizeDepartment(current.dept)
+          || normalizeDepartment(asObject(current.employee)?.department)
+          || normalizeDepartment(employeeDepartment)
+          || previous?.department
+          || '';
+
+        const projectId = resolveProjectId(current, previous?.projectId || '');
+        const projectNameHint = resolveProjectNameHint(current, previous?.projectNameHint || '');
+        const weekStartDate = resolveWeekStart(current, previous?.weekStartDate || '');
+        const hours = resolveHoursFromPayload(current, previous?.hours ?? 0);
+
+        return {
+          projectId,
+          projectNameHint,
+          department,
+          weekStartDate,
+          hours,
+          employeeId: employeeId || previous?.employeeId || '',
+        };
+      };
+      const actionToLabel = (action: string): string => {
+        if (action === 'created') return language === 'es' ? 'Creado' : 'Created';
+        if (action === 'deleted') return language === 'es' ? 'Eliminado' : 'Deleted';
+        return language === 'es' ? 'Actualizado' : 'Updated';
+      };
+      const movementToLabel = (movement: 'added' | 'removed' | 'changed'): string => {
+        if (movement === 'added') return language === 'es' ? 'Horas agregadas' : 'Hours added';
+        if (movement === 'removed') return language === 'es' ? 'Horas eliminadas' : 'Hours removed';
+        return language === 'es' ? 'Horas cambiadas' : 'Hours changed';
+      };
+      const getProjectDisplayName = (projectId: string, fallback: string) => {
+        if (projectId) {
+          const fromStore = projectById.get(projectId)?.name;
+          if (fromStore) return fromStore;
+        }
+        if (fallback) return fallback;
+        return language === 'es' ? 'Proyecto sin nombre' : 'Unnamed project';
+      };
+      const addToBucket = (
+        map: Map<string, HoursBucket>,
+        key: string,
+        base: Pick<HoursBucket, 'projectId' | 'projectName' | 'department' | 'weekStartDate'>,
+        metrics: { added: number; removed: number; changed: number; net: number }
+      ) => {
+        const existing = map.get(key) || {
+          ...base,
+          addedHours: 0,
+          removedHours: 0,
+          changedHours: 0,
+          netHours: 0,
+          movements: 0,
+        };
+
+        existing.addedHours = roundValue(existing.addedHours + metrics.added);
+        existing.removedHours = roundValue(existing.removedHours + metrics.removed);
+        existing.changedHours = roundValue(existing.changedHours + metrics.changed);
+        existing.netHours = roundValue(existing.netHours + metrics.net);
+        existing.movements += 1;
+        map.set(key, existing);
+      };
+
+      const filteredRows = (Array.isArray(response) ? response as ActivityLogEntry[] : [])
         .filter((row) => {
-          if (!row || row.modelName !== 'Project') return false;
+          if (!row || row.modelName !== 'Assignment') return false;
           const action = (row.action || '').toLowerCase();
-          if (action !== 'updated' && action !== 'update') return false;
-          const updates = extractProjectUpdatePayload(row.changes);
-          return !!updates && hasTimingDataDeep(updates);
+          return action === 'created' || action === 'create' || action === 'updated' || action === 'update' || action === 'deleted' || action === 'delete';
         })
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-      if (timingRows.length === 0) {
+      if (filteredRows.length === 0) {
         alert(language === 'es'
-          ? 'No hay cambios de timing para exportar.'
-          : 'There are no timing changes to export.');
+          ? 'No hay cambios de horas para exportar en el rango seleccionado.'
+          : 'There are no hour changes to export in the selected range.');
         return;
       }
 
-      const rangeInSelectedWindow = (createdAt: string) => {
+      const rangeContains = (createdAt: string) => {
         const day = (createdAt || '').slice(0, 10);
         return day >= startDate && day <= endDate;
       };
 
-      const formatRangeLabel = (range: TimingRange | null): string => {
-        if (!range) return language === 'es' ? 'Sin timing' : 'No timing';
-        const parts: string[] = [];
-        if (range.startDate || range.endDate) {
-          parts.push(`${range.startDate || '-'} -> ${range.endDate || '-'}`);
-        }
-        if (range.startWeek !== null || range.endWeek !== null) {
-          parts.push(`W${range.startWeek ?? '?'}-W${range.endWeek ?? '?'}`);
-        }
-        if (range.durationWeeks && range.durationWeeks > 0) {
-          parts.push(`${range.durationWeeks} ${language === 'es' ? 'sem' : 'wk'}`);
-        }
-        return parts.length > 0 ? parts.join(' | ') : (language === 'es' ? 'Sin timing' : 'No timing');
-      };
+      const summaryByProjectDept = new Map<string, HoursBucket>();
+      const summaryByProjectDeptWeek = new Map<string, HoursBucket>();
+      const detailRows: DetailRow[] = [];
+      const assignmentStateById = new Map<string, AssignmentSnapshot>();
 
-      const isSameRange = (left: TimingRange | null, right: TimingRange | null): boolean => {
-        if (!left && !right) return true;
-        if (!left || !right) return false;
-        return (
-          (left.startDate || '') === (right.startDate || '')
-          && (left.endDate || '') === (right.endDate || '')
-          && (left.startWeek ?? null) === (right.startWeek ?? null)
-          && (left.endWeek ?? null) === (right.endWeek ?? null)
-        );
-      };
+      filteredRows.forEach((log) => {
+        const normalizedAction = (() => {
+          const action = (log.action || '').toLowerCase();
+          if (action === 'create') return 'created';
+          if (action === 'update') return 'updated';
+          if (action === 'delete') return 'deleted';
+          return action;
+        })();
 
-      const rangeContainsWeekStart = (range: TimingRange | null, weekStart: string): boolean => {
-        if (!range || !range.startDate || !range.endDate || !weekStart) return false;
-        const normalizedRangeStart = normalizeWeekStartDate(range.startDate);
-        const normalizedRangeEnd = normalizeWeekStartDate(range.endDate);
-        if (!normalizedRangeStart || !normalizedRangeEnd) return false;
-        return weekStart >= normalizedRangeStart && weekStart <= normalizedRangeEnd;
-      };
-
-      const rangeContainsRelativeWeek = (range: TimingRange | null, relativeWeek: number): boolean => {
-        if (!range) return false;
-        if (!Number.isFinite(relativeWeek)) return false;
-        if (range.startWeek === null || range.endWeek === null) return false;
-        return relativeWeek >= range.startWeek && relativeWeek <= range.endWeek;
-      };
-
-      const collectWeekStartsFromRange = (range: TimingRange | null): string[] => {
-        if (!range || !range.startDate || !range.endDate) return [];
-        const normalizedStart = normalizeWeekStartDate(range.startDate);
-        const normalizedEnd = normalizeWeekStartDate(range.endDate);
-        if (!normalizedStart || !normalizedEnd || normalizedStart > normalizedEnd) return [];
-        return getWeeksInRange(normalizedStart, normalizedEnd)
-          .map((week) => normalizeWeekStartDate(week))
-          .filter((week, idx, list) => week && list.indexOf(week) === idx);
-      };
-
-      const extractDepartmentRange = (
-        stageEntriesRaw: unknown,
-        projectStartDate: string
-      ): TimingRange | null => {
-        if (!Array.isArray(stageEntriesRaw) || stageEntriesRaw.length === 0) return null;
-
-        let minStartDate = '';
-        let maxEndDate = '';
-        let minWeekStart: number | null = null;
-        let maxWeekEnd: number | null = null;
-
-        stageEntriesRaw.forEach((entryRaw) => {
-          const entry = asObject(entryRaw);
-          if (!entry) return;
-
-          const weekStartNum = toPositiveInt(entry.weekStart);
-          const explicitWeekEnd = toPositiveInt(entry.weekEnd);
-          let durationWeeks = toPositiveInt(entry.durationWeeks);
-          if (!durationWeeks && weekStartNum && explicitWeekEnd && explicitWeekEnd >= weekStartNum) {
-            durationWeeks = explicitWeekEnd - weekStartNum + 1;
-          }
-
-          const inferredWeekEnd = explicitWeekEnd
-            ?? ((weekStartNum && durationWeeks) ? (weekStartNum + durationWeeks - 1) : null);
-
-          if (weekStartNum !== null && (minWeekStart === null || weekStartNum < minWeekStart)) {
-            minWeekStart = weekStartNum;
-          }
-          if (inferredWeekEnd !== null && (maxWeekEnd === null || inferredWeekEnd > maxWeekEnd)) {
-            maxWeekEnd = inferredWeekEnd;
-          }
-
-          let start = toIsoDate(entry.departmentStartDate);
-          if (!start && projectStartDate && weekStartNum !== null) {
-            start = addDays(projectStartDate, (weekStartNum - 1) * 7);
-          }
-
-          const effectiveDuration = durationWeeks
-            ?? ((weekStartNum !== null && inferredWeekEnd !== null && inferredWeekEnd >= weekStartNum)
-              ? (inferredWeekEnd - weekStartNum + 1)
-              : null);
-
-          if (!start || !effectiveDuration || effectiveDuration <= 0) return;
-
-          const end = addDays(start, (effectiveDuration * 7) - 1);
-          if (!end) return;
-
-          if (!minStartDate || start < minStartDate) minStartDate = start;
-          if (!maxEndDate || end > maxEndDate) maxEndDate = end;
-        });
-
-        if ((!minStartDate || !maxEndDate) && projectStartDate && minWeekStart !== null && maxWeekEnd !== null) {
-          minStartDate = addDays(projectStartDate, (minWeekStart - 1) * 7);
-          maxEndDate = addDays(projectStartDate, (maxWeekEnd * 7) - 1);
-        }
-
-        const durationFromDates = diffWeeksBetween(minStartDate, maxEndDate);
-        const durationFromWeeks = (minWeekStart !== null && maxWeekEnd !== null)
-          ? (maxWeekEnd - minWeekStart + 1)
+        const changesObj = asObject(log.changes);
+        const payload = changesObj
+          ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
           : null;
 
-        return {
-          startDate: minStartDate || '',
-          endDate: maxEndDate || '',
-          startWeek: minWeekStart,
-          endWeek: maxWeekEnd,
-          durationWeeks: durationFromDates ?? durationFromWeeks,
-        };
-      };
+        const existingPrev = assignmentStateById.get(log.objectId) || null;
+        const fallbackPrev = normalizedAction === 'deleted' && !existingPrev
+          ? buildSnapshot(payload, null)
+          : existingPrev;
 
-      const projectStates = new Map<string, TimingState>();
-      const changeRows: ChangeExportRow[] = [];
-      const weeklyRows: WeeklyExportRow[] = [];
-      const projectScopeLabel = language === 'es' ? 'PROYECTO' : 'PROJECT';
+        let nextSnapshot: AssignmentSnapshot | null = null;
+        if (normalizedAction !== 'deleted') {
+          nextSnapshot = buildSnapshot(payload, fallbackPrev);
+        }
 
-      const buildWeeklyComparison = (
-        changedAt: string,
-        changedBy: string,
-        projectName: string,
-        scope: string,
-        beforeRange: TimingRange | null,
-        afterRange: TimingRange | null
-      ): { added: number; removed: number } => {
-        let added = 0;
-        let removed = 0;
+        if (rangeContains(log.createdAt)) {
+          const beforeHours = roundValue(fallbackPrev?.hours ?? 0);
+          const afterHours = roundValue(nextSnapshot?.hours ?? 0);
+          const delta = roundValue(afterHours - beforeHours);
 
-        const unionWeekStarts = new Set<string>();
-        collectWeekStartsFromRange(beforeRange).forEach((week) => unionWeekStarts.add(week));
-        collectWeekStartsFromRange(afterRange).forEach((week) => unionWeekStarts.add(week));
+          let movement: 'added' | 'removed' | 'changed' | null = null;
+          let added = 0;
+          let removed = 0;
+          let changed = 0;
+          let net = 0;
 
-        if (unionWeekStarts.size > 0) {
-          Array.from(unionWeekStarts)
-            .sort((a, b) => a.localeCompare(b))
-            .forEach((weekStart) => {
-              const beforeActive = rangeContainsWeekStart(beforeRange, weekStart);
-              const afterActive = rangeContainsWeekStart(afterRange, weekStart);
-              if (beforeActive === afterActive) return;
-
-              const movement = !beforeActive && afterActive
-                ? (language === 'es' ? 'Semana agregada' : 'Week added')
-                : (language === 'es' ? 'Semana removida' : 'Week removed');
-
-              if (!beforeActive && afterActive) added += 1;
-              if (beforeActive && !afterActive) removed += 1;
-
-              weeklyRows.push({
-                changedAt,
-                changedBy,
-                project: projectName,
-                scope,
-                weekStart,
-                cw: `CW${getWeekNumber(weekStart)}`,
-                relativeWeek: '',
-                beforeStatus: beforeActive
-                  ? (language === 'es' ? 'En timing' : 'In timing')
-                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
-                afterStatus: afterActive
-                  ? (language === 'es' ? 'En timing' : 'In timing')
-                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
-                movement,
-              });
-            });
-        } else {
-          const weekCandidates = [
-            beforeRange?.startWeek,
-            beforeRange?.endWeek,
-            afterRange?.startWeek,
-            afterRange?.endWeek,
-          ]
-            .map((value) => Number(value))
-            .filter((value) => Number.isFinite(value) && value > 0);
-
-          if (weekCandidates.length > 0) {
-            const minWeek = Math.min(...weekCandidates);
-            const maxWeek = Math.max(...weekCandidates);
-
-            for (let relativeWeek = minWeek; relativeWeek <= maxWeek; relativeWeek += 1) {
-              const beforeActive = rangeContainsRelativeWeek(beforeRange, relativeWeek);
-              const afterActive = rangeContainsRelativeWeek(afterRange, relativeWeek);
-              if (beforeActive === afterActive) continue;
-
-              const movement = !beforeActive && afterActive
-                ? (language === 'es' ? 'Semana agregada' : 'Week added')
-                : (language === 'es' ? 'Semana removida' : 'Week removed');
-
-              if (!beforeActive && afterActive) added += 1;
-              if (beforeActive && !afterActive) removed += 1;
-
-              weeklyRows.push({
-                changedAt,
-                changedBy,
-                project: projectName,
-                scope,
-                weekStart: '',
-                cw: '',
-                relativeWeek: `W${relativeWeek}`,
-                beforeStatus: beforeActive
-                  ? (language === 'es' ? 'En timing' : 'In timing')
-                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
-                afterStatus: afterActive
-                  ? (language === 'es' ? 'En timing' : 'In timing')
-                  : (language === 'es' ? 'Fuera de timing' : 'Out of timing'),
-                movement,
-              });
+          if (normalizedAction === 'created') {
+            if (afterHours > 0) {
+              movement = 'added';
+              added = afterHours;
+              net = afterHours;
+            }
+          } else if (normalizedAction === 'deleted') {
+            if (beforeHours > 0) {
+              movement = 'removed';
+              removed = beforeHours;
+              net = -beforeHours;
+            }
+          } else if (normalizedAction === 'updated') {
+            if (beforeHours !== afterHours) {
+              if (beforeHours <= 0 && afterHours > 0) {
+                movement = 'added';
+                added = afterHours;
+                net = afterHours;
+              } else if (beforeHours > 0 && afterHours <= 0) {
+                movement = 'removed';
+                removed = beforeHours;
+                net = -beforeHours;
+              } else {
+                movement = 'changed';
+                changed = Math.abs(delta);
+                net = delta;
+              }
             }
           }
-        }
 
-        return { added, removed };
-      };
+          if (movement) {
+            const effectiveSnapshot = nextSnapshot || fallbackPrev;
+            const projectId = effectiveSnapshot?.projectId || '';
+            const projectName = getProjectDisplayName(projectId, effectiveSnapshot?.projectNameHint || '');
+            const department = effectiveSnapshot?.department || (language === 'es' ? 'SIN_DEPTO' : 'NO_DEPT');
+            const weekStartDate = effectiveSnapshot?.weekStartDate || '';
 
-      timingRows.forEach((row) => {
-        const updates = extractProjectUpdatePayload(row.changes);
-        if (!updates) return;
+            const summaryKey = `${projectId || '__no_project__'}|${department}`;
+            const weeklyKey = `${projectId || '__no_project__'}|${department}|${weekStartDate || '__no_week__'}`;
 
-        const projectId = row.objectId;
-        const projectFromStore = projectById.get(projectId);
-        const fallbackName = typeof updates.name === 'string' ? updates.name : '';
-        const projectName = projectFromStore?.name
-          || fallbackName
-          || `${language === 'es' ? 'Proyecto' : 'Project'} ${projectId.slice(0, 8)}`;
-
-        const previousState = projectStates.get(projectId) || {
-          projectRange: null,
-          departmentRanges: {},
-        };
-
-        const nextState: TimingState = {
-          projectRange: previousState.projectRange ? { ...previousState.projectRange } : null,
-          departmentRanges: { ...previousState.departmentRanges },
-        };
-
-        const projectFieldPresent =
-          hasOwn(updates, 'startDate') || hasOwn(updates, 'endDate') || hasOwn(updates, 'numberOfWeeks');
-
-        if (projectFieldPresent) {
-          const fallbackStart = previousState.projectRange?.startDate || projectFromStore?.startDate || '';
-          const fallbackEnd = previousState.projectRange?.endDate || projectFromStore?.endDate || '';
-          const fallbackWeeks = previousState.projectRange?.durationWeeks
-            ?? toPositiveInt(projectFromStore?.numberOfWeeks)
-            ?? null;
-
-          const nextStart = hasOwn(updates, 'startDate') ? toIsoDate(updates.startDate) : fallbackStart;
-          let nextEnd = hasOwn(updates, 'endDate') ? toIsoDate(updates.endDate) : fallbackEnd;
-          let nextWeeks = hasOwn(updates, 'numberOfWeeks') ? toPositiveInt(updates.numberOfWeeks) : fallbackWeeks;
-
-          if (!nextEnd && nextStart && nextWeeks && nextWeeks > 0) {
-            nextEnd = addDays(nextStart, (nextWeeks * 7) - 1);
-          }
-          if (!nextWeeks) {
-            nextWeeks = diffWeeksBetween(nextStart, nextEnd);
-          }
-
-          nextState.projectRange = {
-            startDate: nextStart || '',
-            endDate: nextEnd || '',
-            startWeek: nextWeeks ? 1 : null,
-            endWeek: nextWeeks,
-            durationWeeks: nextWeeks,
-          };
-        }
-
-        const departmentUpdates: Partial<Record<Department, TimingRange | null>> = {};
-        if (hasOwn(updates, 'departmentStages')) {
-          const departmentStagesObj = asObject(updates.departmentStages);
-          const projectStartForDepartment =
-            nextState.projectRange?.startDate
-            || previousState.projectRange?.startDate
-            || projectFromStore?.startDate
-            || '';
-
-          if (!departmentStagesObj) {
-            DEPARTMENTS.forEach((dept) => {
-              departmentUpdates[dept] = null;
-            });
-          } else {
-            DEPARTMENTS.forEach((dept) => {
-              if (!hasOwn(departmentStagesObj, dept)) return;
-              const deptEntries = departmentStagesObj[dept];
-              if (!Array.isArray(deptEntries) || deptEntries.length === 0) {
-                departmentUpdates[dept] = null;
-                return;
-              }
-              departmentUpdates[dept] = extractDepartmentRange(deptEntries, projectStartForDepartment);
-            });
-          }
-        }
-
-        (Object.entries(departmentUpdates) as Array<[Department, TimingRange | null]>).forEach(([dept, range]) => {
-          nextState.departmentRanges[dept] = range;
-        });
-
-        if (rangeInSelectedWindow(row.createdAt)) {
-          const changedAt = formatTimingDateTime(row.createdAt);
-          const changedBy = formatTimingUserName(row.user);
-
-          if (projectFieldPresent && !isSameRange(previousState.projectRange, nextState.projectRange)) {
-            const impact = buildWeeklyComparison(
-              changedAt,
-              changedBy,
-              projectName,
-              projectScopeLabel,
-              previousState.projectRange,
-              nextState.projectRange
+            addToBucket(
+              summaryByProjectDept,
+              summaryKey,
+              {
+                projectId,
+                projectName,
+                department,
+                weekStartDate: '',
+              },
+              { added, removed, changed, net }
             );
-            const weeklyImpactText = impact.added === 0 && impact.removed === 0
-              ? (language === 'es' ? 'Sin cambio semanal' : 'No weekly shift')
-              : `${impact.added > 0 ? `+${impact.added} ${language === 'es' ? 'sem' : 'wk'}` : ''}${impact.added > 0 && impact.removed > 0 ? ' | ' : ''}${impact.removed > 0 ? `-${impact.removed} ${language === 'es' ? 'sem' : 'wk'}` : ''}`;
 
-            changeRows.push({
-              changedAt,
-              changedBy,
+            addToBucket(
+              summaryByProjectDeptWeek,
+              weeklyKey,
+              {
+                projectId,
+                projectName,
+                department,
+                weekStartDate,
+              },
+              { added, removed, changed, net }
+            );
+
+            detailRows.push({
+              changedAt: formatTimingDateTime(log.createdAt),
+              changedBy: formatTimingUserName(log.user),
               project: projectName,
-              scope: projectScopeLabel,
-              beforeRange: formatRangeLabel(previousState.projectRange),
-              afterRange: formatRangeLabel(nextState.projectRange),
-              weeklyImpact: weeklyImpactText,
+              department,
+              weekStart: weekStartDate || '-',
+              cw: weekStartDate ? `CW${getWeekNumber(weekStartDate)}` : '-',
+              action: actionToLabel(normalizedAction),
+              movementType: movementToLabel(movement),
+              beforeHours,
+              afterHours,
+              deltaHours: delta,
             });
           }
-
-          (Object.entries(departmentUpdates) as Array<[Department, TimingRange | null]>).forEach(([dept, nextRange]) => {
-            const previousRange = previousState.departmentRanges[dept] ?? null;
-            if (isSameRange(previousRange, nextRange)) return;
-
-            const impact = buildWeeklyComparison(
-              changedAt,
-              changedBy,
-              projectName,
-              dept,
-              previousRange,
-              nextRange
-            );
-            const weeklyImpactText = impact.added === 0 && impact.removed === 0
-              ? (language === 'es' ? 'Sin cambio semanal' : 'No weekly shift')
-              : `${impact.added > 0 ? `+${impact.added} ${language === 'es' ? 'sem' : 'wk'}` : ''}${impact.added > 0 && impact.removed > 0 ? ' | ' : ''}${impact.removed > 0 ? `-${impact.removed} ${language === 'es' ? 'sem' : 'wk'}` : ''}`;
-
-            changeRows.push({
-              changedAt,
-              changedBy,
-              project: projectName,
-              scope: dept,
-              beforeRange: formatRangeLabel(previousRange),
-              afterRange: formatRangeLabel(nextRange),
-              weeklyImpact: weeklyImpactText,
-            });
-          });
         }
 
-        projectStates.set(projectId, nextState);
+        if (normalizedAction === 'deleted') {
+          assignmentStateById.delete(log.objectId);
+        } else if (nextSnapshot) {
+          assignmentStateById.set(log.objectId, nextSnapshot);
+        }
       });
 
-      if (changeRows.length === 0) {
+      const summaryRows = Array.from(summaryByProjectDept.values())
+        .sort((a, b) => {
+          const byProject = a.projectName.localeCompare(b.projectName);
+          if (byProject !== 0) return byProject;
+          return a.department.localeCompare(b.department);
+        });
+
+      const weeklyRows = Array.from(summaryByProjectDeptWeek.values())
+        .sort((a, b) => {
+          const byProject = a.projectName.localeCompare(b.projectName);
+          if (byProject !== 0) return byProject;
+          const byDepartment = a.department.localeCompare(b.department);
+          if (byDepartment !== 0) return byDepartment;
+          return (a.weekStartDate || '').localeCompare(b.weekStartDate || '');
+        });
+
+      if (summaryRows.length === 0) {
         alert(language === 'es'
-          ? 'No se detectaron cambios de timing dentro del rango seleccionado.'
-          : 'No timing changes were detected in the selected range.');
+          ? 'No se detectaron movimientos de horas (agregadas, eliminadas o cambiadas) en el rango seleccionado.'
+          : 'No hour movements (added, removed or changed) were detected in the selected range.');
         return;
       }
 
@@ -3282,7 +3162,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const BORDER = 'D5D1DA';
       const HEADER_BG = '2E1A47';
       const HEADER_TEXT = 'FFFFFF';
-      const NOTE_BG = 'F6F3FB';
       const WHITE = 'FFFFFF';
 
       const styleHeaderRow = (sheet: any) => {
@@ -3317,49 +3196,63 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         });
       };
 
-      const changesSheet = workbook.addWorksheet(language === 'es' ? 'Cambios' : 'Changes');
-      changesSheet.columns = [
-        { header: language === 'es' ? 'Fecha' : 'Date', key: 'changedAt', width: 22 },
-        { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
-        { header: language === 'es' ? 'Ambito' : 'Scope', key: 'scope', width: 12 },
-        { header: language === 'es' ? 'Rango Anterior' : 'Previous Range', key: 'beforeRange', width: 34 },
-        { header: language === 'es' ? 'Rango Nuevo' : 'New Range', key: 'afterRange', width: 34 },
-        { header: language === 'es' ? 'Impacto Semanal' : 'Weekly Impact', key: 'weeklyImpact', width: 20 },
+      const summarySheet = workbook.addWorksheet(language === 'es' ? 'Resumen Horas' : 'Hours Summary');
+      summarySheet.columns = [
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 32 },
+        { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
+        { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 16 },
+        { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 16 },
+        { header: language === 'es' ? 'Horas Cambiadas' : 'Changed Hours', key: 'changedHours', width: 16 },
+        { header: language === 'es' ? 'Cambio Neto' : 'Net Change', key: 'netHours', width: 14 },
+        { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 12 },
       ];
-      changeRows.forEach((row) => changesSheet.addRow(row));
-      styleHeaderRow(changesSheet);
-      styleDataRows(changesSheet);
-      changesSheet.views = [{ state: 'frozen', ySplit: 1 }];
-      changesSheet.autoFilter = {
+
+      summaryRows.forEach((row) => {
+        summarySheet.addRow({
+          projectName: row.projectName,
+          department: row.department,
+          addedHours: roundValue(row.addedHours),
+          removedHours: roundValue(row.removedHours),
+          changedHours: roundValue(row.changedHours),
+          netHours: roundValue(row.netHours),
+          movements: row.movements,
+        });
+      });
+
+      styleHeaderRow(summarySheet);
+      styleDataRows(summarySheet);
+      summarySheet.views = [{ state: 'frozen', ySplit: 1 }];
+      summarySheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: 1, column: changesSheet.columnCount },
+        to: { row: 1, column: summarySheet.columnCount },
       };
 
-      const weeklySheet = workbook.addWorksheet(language === 'es' ? 'Comparativa Semanal' : 'Weekly Comparison');
+      const weeklySheet = workbook.addWorksheet(language === 'es' ? 'Comparativo Semanal Horas' : 'Weekly Hours Comparison');
       weeklySheet.columns = [
-        { header: language === 'es' ? 'Fecha Cambio' : 'Change Date', key: 'changedAt', width: 22 },
-        { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
-        { header: language === 'es' ? 'Ambito' : 'Scope', key: 'scope', width: 12 },
-        { header: language === 'es' ? 'Semana' : 'Week Start', key: 'weekStart', width: 15 },
-        { header: 'CW', key: 'cw', width: 10 },
-        { header: language === 'es' ? 'Semana Relativa' : 'Relative Week', key: 'relativeWeek', width: 15 },
-        { header: language === 'es' ? 'Antes' : 'Before', key: 'beforeStatus', width: 16 },
-        { header: language === 'es' ? 'Despues' : 'After', key: 'afterStatus', width: 16 },
-        { header: language === 'es' ? 'Movimiento' : 'Movement', key: 'movement', width: 18 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'projectName', width: 32 },
+        { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
+        { header: language === 'es' ? 'Semana Inicio' : 'Week Start', key: 'weekStartDate', width: 14 },
+        { header: 'CW', key: 'cw', width: 9 },
+        { header: language === 'es' ? 'Horas Agregadas' : 'Added Hours', key: 'addedHours', width: 16 },
+        { header: language === 'es' ? 'Horas Eliminadas' : 'Removed Hours', key: 'removedHours', width: 16 },
+        { header: language === 'es' ? 'Horas Cambiadas' : 'Changed Hours', key: 'changedHours', width: 16 },
+        { header: language === 'es' ? 'Cambio Neto' : 'Net Change', key: 'netHours', width: 14 },
+        { header: language === 'es' ? 'Movimientos' : 'Movements', key: 'movements', width: 12 },
       ];
 
-      if (weeklyRows.length > 0) {
-        weeklyRows.forEach((row) => weeklySheet.addRow(row));
-      } else {
-        const noteRow = weeklySheet.addRow({
-          changedAt: language === 'es'
-            ? 'No hubo cambios semanales detectables en este rango.'
-            : 'No detectable weekly changes were found in this range.',
+      weeklyRows.forEach((row) => {
+        weeklySheet.addRow({
+          projectName: row.projectName,
+          department: row.department,
+          weekStartDate: row.weekStartDate || '-',
+          cw: row.weekStartDate ? `CW${getWeekNumber(row.weekStartDate)}` : '-',
+          addedHours: roundValue(row.addedHours),
+          removedHours: roundValue(row.removedHours),
+          changedHours: roundValue(row.changedHours),
+          netHours: roundValue(row.netHours),
+          movements: row.movements,
         });
-        noteRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NOTE_BG } };
-      }
+      });
 
       styleHeaderRow(weeklySheet);
       styleDataRows(weeklySheet);
@@ -3369,8 +3262,35 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         to: { row: 1, column: weeklySheet.columnCount },
       };
 
+      const detailSheet = workbook.addWorksheet(language === 'es' ? 'Detalle Cambios Horas' : 'Hour Changes Detail');
+      detailSheet.columns = [
+        { header: language === 'es' ? 'Fecha' : 'Date', key: 'changedAt', width: 22 },
+        { header: language === 'es' ? 'Usuario' : 'User', key: 'changedBy', width: 24 },
+        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 30 },
+        { header: language === 'es' ? 'Departamento' : 'Department', key: 'department', width: 14 },
+        { header: language === 'es' ? 'Semana' : 'Week', key: 'weekStart', width: 13 },
+        { header: 'CW', key: 'cw', width: 9 },
+        { header: language === 'es' ? 'Accion' : 'Action', key: 'action', width: 14 },
+        { header: language === 'es' ? 'Tipo Cambio' : 'Change Type', key: 'movementType', width: 18 },
+        { header: language === 'es' ? 'Horas Antes' : 'Before Hours', key: 'beforeHours', width: 12 },
+        { header: language === 'es' ? 'Horas Despues' : 'After Hours', key: 'afterHours', width: 12 },
+        { header: language === 'es' ? 'Delta Horas' : 'Hours Delta', key: 'deltaHours', width: 12 },
+      ];
+
+      detailRows
+        .sort((a, b) => a.changedAt.localeCompare(b.changedAt))
+        .forEach((row) => detailSheet.addRow(row));
+
+      styleHeaderRow(detailSheet);
+      styleDataRows(detailSheet);
+      detailSheet.views = [{ state: 'frozen', ySplit: 1 }];
+      detailSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: detailSheet.columnCount },
+      };
+
       const dateStamp = new Date().toISOString().slice(0, 10);
-      const fileName = `timing-changes-weekly-${startDate}-to-${endDate}-${dateStamp}.xlsx`;
+      const fileName = `hours-comparison-${startDate}-to-${endDate}-${dateStamp}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob(
         [buffer],
@@ -3387,8 +3307,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     } catch (error) {
       console.error('[CapacityMatrix] Error exporting timing range Excel:', error);
       alert(language === 'es'
-        ? 'Ocurrio un error al exportar el resumen de cambios de timing.'
-        : 'An error occurred while exporting timing changes.');
+        ? 'Ocurrio un error al exportar el comparativo de horas.'
+        : 'An error occurred while exporting the hour comparison.');
     } finally {
       setIsTimingRangeExcelExporting(false);
     }
@@ -8076,7 +7996,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   <span>
                     {isTimingRangeExcelExporting
                       ? (language === 'es' ? 'Exportando...' : 'Exporting...')
-                      : (language === 'es' ? 'Exportar timing' : 'Export timing')}
+                      : (language === 'es' ? 'Exportar comparativo horas' : 'Export hours comparison')}
                   </span>
                 </button>
                 <div className="text-[11px] text-[#6f5b80]">
