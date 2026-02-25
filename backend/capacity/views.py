@@ -2888,6 +2888,8 @@ class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from django.contrib.auth.password_validation import validate_password
+
         try:
             current_password = request.data.get('current_password')
             new_password = request.data.get('new_password')
@@ -2917,10 +2919,13 @@ class ChangePasswordView(APIView):
                     'detail': 'La contraseña actual es incorrecta.'
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Validate new password strength (minimum 8 characters)
-            if len(new_password) < 8:
+            # Validate full password policy (length, complexity, similarity, common password, etc.)
+            try:
+                validate_password(new_password, user=request.user)
+            except DjangoValidationError as exc:
                 return Response({
-                    'detail': 'La nueva contraseña debe tener al menos 8 caracteres.'
+                    'detail': ' '.join(exc.messages),
+                    'errors': list(exc.messages),
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             # Change password

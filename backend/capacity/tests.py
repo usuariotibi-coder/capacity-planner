@@ -398,6 +398,64 @@ class SessionControlTests(APITestCase):
         self.assertFalse(UserSession.objects.get(id=session_id).is_active)
 
 
+class ChangePasswordPolicyTests(APITestCase):
+    def setUp(self):
+        self.current_password = 'CurrentPass1!'
+        self.user = User.objects.create_user(
+            username='password.policy.user',
+            email='password.policy.user@na.scio-automation.com',
+            password=self.current_password,
+            is_active=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_change_password_rejects_password_without_special_character(self):
+        response = self.client.post(
+            reverse('change_password'),
+            {
+                'current_password': self.current_password,
+                'new_password': 'NoSpecial123',
+                'confirm_password': 'NoSpecial123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        detail = str(response.data.get('detail', '')).lower()
+        self.assertIn('special', detail)
+
+    def test_change_password_rejects_password_similar_to_username(self):
+        response = self.client.post(
+            reverse('change_password'),
+            {
+                'current_password': self.current_password,
+                'new_password': 'password.policy.user',
+                'confirm_password': 'password.policy.user',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        detail = str(response.data.get('detail', '')).lower()
+        self.assertIn('similar', detail)
+
+    def test_change_password_accepts_compliant_password(self):
+        new_password = 'CompliantPass2#'
+        response = self.client.post(
+            reverse('change_password'),
+            {
+                'current_password': self.current_password,
+                'new_password': new_password,
+                'confirm_password': new_password,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+
+
 class RegisteredUsersLastLoginTests(APITestCase):
     @staticmethod
     def _extract_results(response):

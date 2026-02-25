@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation, type Language } from '../utils/translations';
 import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
-import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
+import { getPasswordCriteria, getPasswordStrength, meetsPasswordSecurityRequirements } from '../utils/passwordValidation';
 import { authApi } from '../services/api';
 
 export const ChangePasswordPage = () => {
@@ -55,6 +55,12 @@ export const ChangePasswordPage = () => {
 
       if (newPassword.length < 8) {
         setError(t.passwordTooShort);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!meetsPasswordSecurityRequirements(newPassword)) {
+        setError(t.passwordRequirements || 'Password must include uppercase, lowercase, numbers and special characters');
         setIsLoading(false);
         return;
       }

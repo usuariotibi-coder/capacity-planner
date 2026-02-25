@@ -18,6 +18,17 @@ export const getPasswordCriteria = (password: string): PasswordCriteria => {
   };
 };
 
+export const meetsPasswordSecurityRequirements = (password: string): boolean => {
+  const criteria = getPasswordCriteria(password);
+  return (
+    criteria.minLength &&
+    criteria.uppercase &&
+    criteria.lowercase &&
+    criteria.number &&
+    criteria.special
+  );
+};
+
 export const getPasswordStrength = (password: string): PasswordStrength => {
   if (password.length < 8) return 'weak';
 

@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
 import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
-import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
+import { getPasswordCriteria, getPasswordStrength, meetsPasswordSecurityRequirements } from '../utils/passwordValidation';
 import type { OtherDepartment, RegisteredUser, UserDepartment } from '../types';
 
 const USER_DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
@@ -241,6 +241,10 @@ export function RegisteredUsersPage() {
       setError(t.passwordsDoNotMatch);
       return;
     }
+    if (!meetsPasswordSecurityRequirements(createState.password)) {
+      setError(t.passwordRequirements || 'Password must include uppercase, lowercase, numbers and special characters');
+      return;
+    }
 
     setIsCreating(true);
     setError(null);
@@ -331,9 +335,8 @@ export function RegisteredUsersPage() {
       return;
     }
 
-    const strength = getPasswordStrength(resetPasswordState.password);
-    if (strength === 'weak') {
-      setResetPasswordError(t.passwordMustBeStrong || 'Password must be strong or medium');
+    if (!meetsPasswordSecurityRequirements(resetPasswordState.password)) {
+      setResetPasswordError(t.passwordRequirements || 'Password must include uppercase, lowercase, numbers and special characters');
       return;
     }
 

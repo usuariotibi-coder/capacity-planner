@@ -19,6 +19,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from .models import (
@@ -140,6 +141,18 @@ class RegisteredUserSerializer(serializers.ModelSerializer):
         data['department'] = getattr(profile, 'department', None)
         data['other_department'] = getattr(profile, 'other_department', None)
         return data
+
+    def validate_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+
+        if not value:
+            return value
+
+        try:
+            validate_password(value, user=self.instance)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
 
     def validate(self, attrs):
         department = attrs.get('department')
@@ -360,8 +373,8 @@ class UserRegistrationSerializer(serializers.Serializer):
         # Use Django's built-in validators (configured in settings.py)
         try:
             validate_password(value)
-        except serializers.ValidationError as e:
-            raise serializers.ValidationError(str(e))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
         return value
 
     def validate(self, data):

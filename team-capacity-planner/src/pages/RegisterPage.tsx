@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { authApi } from '../services/api';
 import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
-import { getPasswordCriteria, getPasswordStrength } from '../utils/passwordValidation';
+import { getPasswordCriteria, getPasswordStrength, meetsPasswordSecurityRequirements } from '../utils/passwordValidation';
 import type { Language, UserDepartment, OtherDepartment } from '../types';
 
 const DEPARTMENTS: UserDepartment[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'OTHER'];
@@ -159,9 +159,8 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    const strength = getPasswordStrength(formData.password);
-    if (strength === 'weak') {
-      setError(t.passwordMustBeStrong || 'Password must be strong');
+    if (!meetsPasswordSecurityRequirements(formData.password)) {
+      setError(t.passwordRequirements || 'Password must include uppercase, lowercase, numbers and special characters');
       return;
     }
 
