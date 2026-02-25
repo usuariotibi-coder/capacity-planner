@@ -7693,7 +7693,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           <div className="flex md:hidden gap-1 min-w-max">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
                           </div>
-                          <div className="hidden md:grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
+                          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1.5 w-full">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                           </div>
                         </div>
