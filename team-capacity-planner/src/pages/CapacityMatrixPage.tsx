@@ -2671,7 +2671,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
-    const cardWidthClass = isMobile ? 'w-[292px] sm:w-[304px]' : 'w-full';
+    const cardWidthClass = isMobile ? 'w-[292px] sm:w-[304px]' : 'w-full min-w-0';
     const quotedCompactLabel = language === 'es' ? 'Cot' : 'Qtd';
     const usedCompactLabel = language === 'es' ? 'Usa' : 'Used';
     const forecastCompactLabel = language === 'es' ? 'Pron' : 'Fcst';
@@ -2686,29 +2686,29 @@ ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-center justify-between gap-1 min-w-0">
           <div className="flex items-center justify-center gap-0.5 rounded bg-white/80 border border-slate-300 px-1 py-0.5 shrink-0 min-w-[56px]">
             <span className={`inline-flex items-center justify-center scale-[0.72] leading-none ${deptInfo.color}`}>{deptInfo.icon}</span>
             <span className="text-[10px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
-          <div className="flex items-center gap-1 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
-              <div className="text-[8px] font-semibold">{quotedCompactLabel}</div>
-              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</div>
-            </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
-              <div className="text-[8px] font-semibold">{usedCompactLabel}</div>
-              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</div>
-            </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 min-w-[66px] text-center leading-none">
-              <div className="text-[8px] font-semibold">{forecastCompactLabel}</div>
-              <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</div>
-            </div>
-          </div>
-
           <div className={`rounded px-1.5 py-1 text-[10px] font-black leading-none text-center flex items-center justify-center shrink-0 min-w-[46px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
             {utilizationPercent}%
+          </div>
+        </div>
+
+        <div className="mt-1 grid grid-cols-3 gap-1 min-w-0">
+          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
+            <div className="text-[8px] font-semibold">{quotedCompactLabel}</div>
+            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(totalQuotedHoursValue)}</div>
+          </div>
+          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
+            <div className="text-[8px] font-semibold">{usedCompactLabel}</div>
+            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(utilizedHoursValue)}</div>
+          </div>
+          <div className="rounded bg-slate-100 border border-slate-300 px-1 py-0.5 text-slate-700 text-center leading-none min-w-0">
+            <div className="text-[8px] font-semibold">{forecastCompactLabel}</div>
+            <div className="text-[10px] font-bold mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{formatSummaryHours(forecastedHoursValue)}</div>
           </div>
         </div>
       </div>
@@ -7693,7 +7693,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                           <div className="flex md:hidden gap-1 min-w-max">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
                           </div>
-                          <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-1.5">
+                          <div className="hidden md:grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
                             {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                           </div>
                         </div>
