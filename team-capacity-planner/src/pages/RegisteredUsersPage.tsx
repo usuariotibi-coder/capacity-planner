@@ -69,6 +69,7 @@ export function RegisteredUsersPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [resetPasswordState, setResetPasswordState] = useState<ResetPasswordState | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
 
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -209,6 +210,7 @@ export function RegisteredUsersPage() {
 
   const openResetPasswordModal = (user: RegisteredUser) => {
     setError(null);
+    setResetPasswordError(null);
     setResetPasswordState({
       user,
       password: '',
@@ -218,6 +220,7 @@ export function RegisteredUsersPage() {
 
   const closeResetPasswordModal = () => {
     if (isResettingPassword) return;
+    setResetPasswordError(null);
     setResetPasswordState(null);
   };
 
@@ -317,32 +320,34 @@ export function RegisteredUsersPage() {
 
   const handleResetPassword = async () => {
     if (!resetPasswordState) return;
+    setResetPasswordError(null);
+
     if (!resetPasswordState.password || !resetPasswordState.confirmPassword) {
-      setError(t.completeAllFields);
+      setResetPasswordError(t.completeAllFields);
       return;
     }
     if (resetPasswordState.password !== resetPasswordState.confirmPassword) {
-      setError(t.passwordsDoNotMatch);
+      setResetPasswordError(t.passwordsDoNotMatch);
       return;
     }
 
     const strength = getPasswordStrength(resetPasswordState.password);
     if (strength === 'weak') {
-      setError(t.passwordMustBeStrong || 'Password must be strong or medium');
+      setResetPasswordError(t.passwordMustBeStrong || 'Password must be strong or medium');
       return;
     }
 
     setIsResettingPassword(true);
-    setError(null);
     try {
       await registeredUsersApi.resetPassword(
         resetPasswordState.user.id,
         resetPasswordState.password,
         resetPasswordState.confirmPassword
       );
+      setResetPasswordError(null);
       setResetPasswordState(null);
     } catch (err) {
-      setError(
+      setResetPasswordError(
         err instanceof Error
           ? err.message
           : (t.registeredUsersResetPasswordError || 'Error resetting user password')
@@ -815,13 +820,22 @@ export function RegisteredUsersPage() {
                 </p>
               </div>
 
+              {resetPasswordError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {resetPasswordError}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.newPasswordLabel || 'New Password'}</label>
                   <input
                     type="password"
                     value={resetPasswordState.password}
-                    onChange={(e) => setResetPasswordState((prev) => prev ? { ...prev, password: e.target.value } : null)}
+                    onChange={(e) => {
+                      setResetPasswordError(null);
+                      setResetPasswordState((prev) => prev ? { ...prev, password: e.target.value } : null);
+                    }}
                     className="brand-input px-3 py-2 text-sm w-full"
                     placeholder={t.newPasswordPlaceholder || 'Enter new password'}
                   />
@@ -831,7 +845,10 @@ export function RegisteredUsersPage() {
                   <input
                     type="password"
                     value={resetPasswordState.confirmPassword}
-                    onChange={(e) => setResetPasswordState((prev) => prev ? { ...prev, confirmPassword: e.target.value } : null)}
+                    onChange={(e) => {
+                      setResetPasswordError(null);
+                      setResetPasswordState((prev) => prev ? { ...prev, confirmPassword: e.target.value } : null);
+                    }}
                     className="brand-input px-3 py-2 text-sm w-full"
                     placeholder={t.confirmNewPasswordPlaceholder || 'Confirm password'}
                   />
