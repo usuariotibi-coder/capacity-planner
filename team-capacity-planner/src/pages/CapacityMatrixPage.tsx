@@ -351,7 +351,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [zoom, setZoom] = useState<number>(100);
+  const [zoom, setZoom] = useState<number>(110);
   const [projectCellViewMode, setProjectCellViewMode] = useState<'detailed' | 'compact'>('detailed');
   const [showLegend, setShowLegend] = useState<boolean>(false);
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
