@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
+import { KeyRound, Pencil, Plus, RefreshCw, Save, Trash2, User, X } from 'lucide-react';
 import { registeredUsersApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
@@ -38,6 +38,12 @@ interface CreateState {
   isActive: boolean;
 }
 
+interface ResetPasswordState {
+  user: RegisteredUser;
+  password: string;
+  confirmPassword: string;
+}
+
 const INITIAL_CREATE_STATE: CreateState = {
   firstName: '',
   lastName: '',
@@ -61,6 +67,8 @@ export function RegisteredUsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createState, setCreateState] = useState<CreateState>(INITIAL_CREATE_STATE);
   const [isCreating, setIsCreating] = useState(false);
+  const [resetPasswordState, setResetPasswordState] = useState<ResetPasswordState | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const { language } = useLanguage();
   const t = useTranslation(language);
@@ -111,6 +119,18 @@ export function RegisteredUsersPage() {
   );
   const hasCreateConfirmPassword = createState.confirmPassword.length > 0;
   const createPasswordsMatch = hasCreateConfirmPassword && createState.password === createState.confirmPassword;
+  const hasResetPassword = (resetPasswordState?.password || '').length > 0;
+  const resetPasswordStrength = useMemo(
+    () => (hasResetPassword ? getPasswordStrength(resetPasswordState?.password || '') : null),
+    [hasResetPassword, resetPasswordState?.password]
+  );
+  const resetPasswordCriteria = useMemo(
+    () => getPasswordCriteria(resetPasswordState?.password || ''),
+    [resetPasswordState?.password]
+  );
+  const hasResetConfirmPassword = (resetPasswordState?.confirmPassword || '').length > 0;
+  const resetPasswordsMatch = hasResetConfirmPassword
+    && (resetPasswordState?.password || '') === (resetPasswordState?.confirmPassword || '');
 
   const loadUsers = async (withSpinner = true) => {
     if (!canManageRegisteredUsers) return;
@@ -162,6 +182,20 @@ export function RegisteredUsersPage() {
     if (isCreating) return;
     setIsCreateOpen(false);
     setCreateState(INITIAL_CREATE_STATE);
+  };
+
+  const openResetPasswordModal = (user: RegisteredUser) => {
+    setError(null);
+    setResetPasswordState({
+      user,
+      password: '',
+      confirmPassword: '',
+    });
+  };
+
+  const closeResetPasswordModal = () => {
+    if (isResettingPassword) return;
+    setResetPasswordState(null);
   };
 
   const handleCreate = async () => {
@@ -255,6 +289,43 @@ export function RegisteredUsersPage() {
       setError(err instanceof Error ? err.message : (t.registeredUsersDeleteError || 'Error deleting user'));
     } finally {
       setIsDeletingId(null);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordState) return;
+    if (!resetPasswordState.password || !resetPasswordState.confirmPassword) {
+      setError(t.completeAllFields);
+      return;
+    }
+    if (resetPasswordState.password !== resetPasswordState.confirmPassword) {
+      setError(t.passwordsDoNotMatch);
+      return;
+    }
+
+    const strength = getPasswordStrength(resetPasswordState.password);
+    if (strength === 'weak') {
+      setError(t.passwordMustBeStrong || 'Password must be strong or medium');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setError(null);
+    try {
+      await registeredUsersApi.resetPassword(
+        resetPasswordState.user.id,
+        resetPasswordState.password,
+        resetPasswordState.confirmPassword
+      );
+      setResetPasswordState(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : (t.registeredUsersResetPasswordError || 'Error resetting user password')
+      );
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -457,6 +528,14 @@ export function RegisteredUsersPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openResetPasswordModal(user)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold"
+                              title={t.registeredUsersResetPasswordAction || 'Reset password'}
+                            >
+                              <KeyRound size={14} />
+                              {t.registeredUsersResetPasswordAction || 'Reset pass'}
+                            </button>
                             <button
                               onClick={() => startEdit(user)}
                               className="inline-flex items-center gap-1 rounded px-2 py-1 brand-btn-primary text-white text-xs font-semibold"
@@ -680,6 +759,130 @@ export function RegisteredUsersPage() {
               >
                 {isCreating ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
                 {language === 'es' ? 'Registrar usuario' : 'Register user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-4">
+          <div
+            className="absolute inset-0"
+            onClick={closeResetPasswordModal}
+          />
+          <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-[#d5d1da] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e4e1e8] bg-gradient-to-r from-[#fff7ed] to-white">
+              <h3 className="text-lg font-bold text-[#2e1a47]">
+                {t.registeredUsersResetPasswordTitle || 'Reset password'}
+              </h3>
+              <p className="text-sm text-[#6c6480]">
+                {t.registeredUsersResetPasswordSubtitle || 'Set a new password for this user.'}
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="rounded-lg border border-[#e7e1d6] bg-[#fffaf3] p-3">
+                <p className="text-sm font-semibold text-[#433055]">
+                  {`${resetPasswordState.user.firstName || ''} ${resetPasswordState.user.lastName || ''}`.trim() || '-'}
+                </p>
+                <p className="text-xs text-[#6f6782]">{resetPasswordState.user.email}</p>
+                <p className="text-xs text-amber-700 mt-2">
+                  {t.registeredUsersResetPasswordWarning || 'Active sessions for this user will be closed and they will need to sign in again.'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.newPasswordLabel || 'New Password'}</label>
+                  <input
+                    type="password"
+                    value={resetPasswordState.password}
+                    onChange={(e) => setResetPasswordState((prev) => prev ? { ...prev, password: e.target.value } : null)}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.newPasswordPlaceholder || 'Enter new password'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-[#4f3a70]">{t.confirmNewPasswordLabel || 'Confirm New Password'}</label>
+                  <input
+                    type="password"
+                    value={resetPasswordState.confirmPassword}
+                    onChange={(e) => setResetPasswordState((prev) => prev ? { ...prev, confirmPassword: e.target.value } : null)}
+                    className="brand-input px-3 py-2 text-sm w-full"
+                    placeholder={t.confirmNewPasswordPlaceholder || 'Confirm password'}
+                  />
+                  {hasResetConfirmPassword && (
+                    <p className={`text-[11px] mt-1 ${resetPasswordsMatch ? 'text-green-700' : 'text-red-600'}`}>
+                      {resetPasswordsMatch
+                        ? (t.passwordsMatch || 'Passwords match')
+                        : t.passwordsDoNotMatch}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {hasResetPassword && (
+                <div className="rounded-xl border border-[#ddd9e5] bg-[#f8f7fb] p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-[#6f6782]">
+                      {t.passwordStrength || 'Password strength'}
+                    </span>
+                    <span
+                      className={`text-xs font-semibold ${
+                        resetPasswordStrength === 'weak'
+                          ? 'text-red-600'
+                          : resetPasswordStrength === 'medium'
+                            ? 'text-amber-600'
+                            : 'text-emerald-700'
+                      }`}
+                    >
+                      {resetPasswordStrength === 'weak' && (t.weak || 'Weak')}
+                      {resetPasswordStrength === 'medium' && (t.medium || 'Medium')}
+                      {resetPasswordStrength === 'strong' && (t.strong || 'Strong')}
+                    </span>
+                  </div>
+
+                  <div className="h-1.5 w-full rounded-full bg-[#ded8e8] overflow-hidden">
+                    <div
+                      className={`h-full w-full rounded-full transition-all duration-500 ${
+                        resetPasswordStrength === 'weak'
+                          ? 'bg-red-500'
+                          : resetPasswordStrength === 'medium'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                      }`}
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-[#6f6782] mt-2">
+                    {t.passwordRequirements || 'Password requirements'}
+                  </p>
+                  <PasswordRequirementsChecklist
+                    criteria={resetPasswordCriteria}
+                    t={t}
+                    variant="light"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-[#e4e1e8] flex items-center justify-end gap-2 bg-white">
+              <button
+                onClick={closeResetPasswordModal}
+                disabled={isResettingPassword}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold disabled:opacity-60"
+              >
+                <X size={14} />
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleResetPassword}
+                disabled={isResettingPassword}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-70"
+              >
+                {isResettingPassword ? <RefreshCw size={14} className="animate-spin" /> : <KeyRound size={14} />}
+                {t.registeredUsersResetPasswordAction || 'Reset pass'}
               </button>
             </div>
           </div>

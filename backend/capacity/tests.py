@@ -420,6 +420,86 @@ class RegisteredUsersLastLoginTests(APITestCase):
         self.assertIsNotNone(target_row.get('last_login'))
 
 
+class RegisteredUsersPasswordResetTests(APITestCase):
+    def setUp(self):
+        self.bi_manager = User.objects.create_user(
+            username='bi.reset.manager',
+            email='bi.reset.manager@na.scio-automation.com',
+            password='manager-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(
+            user=self.bi_manager,
+            department=UserDepartment.OTHER,
+            other_department=OtherDepartment.BUSINESS_INTELLIGENCE,
+        )
+
+        self.target_user = User.objects.create_user(
+            username='forgotten.user',
+            email='forgotten.user@na.scio-automation.com',
+            password='OldPass123!',
+            is_active=True,
+        )
+        UserSession.objects.create(
+            user=self.target_user,
+            refresh_token='reset-password-active-session-token',
+            device_info={'user_agent': 'test-agent'},
+            is_active=True,
+        )
+
+    def test_bi_can_reset_user_password_and_invalidate_sessions(self):
+        self.client.force_authenticate(user=self.bi_manager)
+
+        payload = {
+            'password': 'NewPass456!',
+            'confirm_password': 'NewPass456!',
+        }
+        response = self.client.post(
+            reverse('registered-user-reset-password', args=[self.target_user.id]),
+            payload,
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.target_user.refresh_from_db()
+        self.assertTrue(self.target_user.check_password('NewPass456!'))
+        self.assertFalse(
+            UserSession.objects.filter(user=self.target_user, is_active=True).exists()
+        )
+
+        old_login = self.client.post(
+            reverse('token_obtain_pair'),
+            {'username': self.target_user.username, 'password': 'OldPass123!'},
+            format='json',
+        )
+        self.assertEqual(old_login.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        new_login = self.client.post(
+            reverse('token_obtain_pair'),
+            {'username': self.target_user.username, 'password': 'NewPass456!'},
+            format='json',
+        )
+        self.assertEqual(new_login.status_code, status.HTTP_200_OK)
+
+    def test_non_bi_user_cannot_reset_password(self):
+        non_bi_user = User.objects.create_user(
+            username='prg.user',
+            email='prg.user@na.scio-automation.com',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(user=non_bi_user, department=UserDepartment.PRG)
+        self.client.force_authenticate(user=non_bi_user)
+
+        response = self.client.post(
+            reverse('registered-user-reset-password', args=[self.target_user.id]),
+            {'password': 'AnotherPass789!', 'confirm_password': 'AnotherPass789!'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class RegistrationVerificationTests(APITestCase):
     def _registration_payload(self, email='new.user@na.scio-automation.com'):
         return {

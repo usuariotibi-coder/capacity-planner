@@ -34,6 +34,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import (
@@ -2252,6 +2253,65 @@ class RegisteredUserViewSet(viewsets.ModelViewSet):
     search_fields = ['username', 'email', 'first_name', 'last_name', 'profile__department', 'profile__other_department']
     ordering_fields = ['date_joined', 'email', 'first_name', 'last_name', 'is_active']
     ordering = ['-date_joined']
+
+    @action(detail=True, methods=['post'], url_path='reset-password')
+    def reset_password(self, request, pk=None):
+        """
+        BI-only password reset for registered users.
+
+        Request body:
+            {
+                "password": "NewStrongPass123!",
+                "confirm_password": "NewStrongPass123!"
+            }
+        """
+        from django.contrib.auth.password_validation import validate_password
+        from .models import UserSession
+
+        user = self.get_object()
+        password = request.data.get('password')
+        confirm_password = request.data.get('confirm_password')
+
+        if not password or not confirm_password:
+            raise ValidationError({'detail': 'Both password and confirm_password are required.'})
+
+        if password != confirm_password:
+            raise ValidationError({'confirm_password': 'Passwords do not match.'})
+
+        try:
+            validate_password(password, user=user)
+        except DjangoValidationError as exc:
+            raise ValidationError({'password': list(exc.messages)})
+
+        user.set_password(password)
+        user.save(update_fields=['password'])
+
+        sessions_updated = UserSession.objects.filter(
+            user=user,
+            is_active=True
+        ).update(
+            is_active=False,
+            last_activity=timezone.now(),
+        )
+
+        ActivityLog.objects.create(
+            user=request.user,
+            action='password_reset',
+            model_name='User',
+            object_id=str(user.id),
+            changes={
+                'target_email': user.email,
+                'forced_session_logout_count': sessions_updated,
+            }
+        )
+
+        return Response(
+            {
+                'detail': 'Password updated successfully.',
+                'forced_session_logout_count': sessions_updated,
+            },
+            status=status.HTTP_200_OK
+        )
 
     def perform_destroy(self, instance):
         if instance.id == self.request.user.id:

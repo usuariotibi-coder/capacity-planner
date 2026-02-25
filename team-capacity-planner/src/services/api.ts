@@ -520,6 +520,16 @@ export const registeredUsersApi = {
       method: 'DELETE',
     });
   },
+
+  resetPassword: async (id: string, password: string, confirmPassword: string) => {
+    return apiFetch(`/api/registered-users/${id}/reset-password/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        password,
+        confirm_password: confirmPassword,
+      }),
+    });
+  },
 };
 
 // Employees API
