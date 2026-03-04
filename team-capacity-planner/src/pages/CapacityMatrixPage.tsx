@@ -4264,23 +4264,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         );
       });
 
+      const compactBlockRanges: Array<{ startRow: number; endRow: number; outlineColor: string }> = [];
+      const compactDiffCells: Array<{ row: number; column: number }> = [];
+
       const renderCompactSnapshotRows = (
-        projectName: string,
         snapshot: CompactProjectSnapshot,
         viewLabel: string,
-        viewFill: string
+        viewFill: string,
+        rowFill: string,
+        viewFontColor: string
       ) => {
+        const blockStartRow = compactRow;
+        const rowByDepartment = {} as Record<Department, number>;
+
         DEPARTMENTS.forEach((dept, deptIndex) => {
           const row = compactSheet.getRow(compactRow);
-          row.getCell(1).value = deptIndex === 0 ? projectName : '';
-          row.getCell(2).value = viewLabel;
+          row.getCell(1).value = '';
+          row.getCell(2).value = '';
           row.getCell(3).value = dept;
+          row.height = 20;
           row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-          row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
           row.getCell(1).font = deptIndex === 0 ? { bold: true } : { bold: false };
-          row.getCell(2).font = { size: 9, bold: true, color: { argb: '1E3A8A' } };
-          row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: viewFill } };
+          row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
+          row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
           row.getCell(3).font = { bold: true, color: { argb: '2E1A47' } };
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
@@ -4297,11 +4304,29 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 pattern: 'solid',
                 fgColor: { argb: compactCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
               };
+            } else {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
             }
           });
 
+          rowByDepartment[dept] = compactRow;
           compactRow += 1;
         });
+
+        const blockEndRow = compactRow - 1;
+        compactSheet.mergeCells(blockStartRow, 2, blockEndRow, 2);
+        const viewCell = compactSheet.getCell(blockStartRow, 2);
+        viewCell.value = viewLabel;
+        viewCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        viewCell.font = { size: 9, bold: true, color: { argb: viewFontColor } };
+        viewCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: viewFill } };
+        applyBorder(viewCell);
+
+        return {
+          startRow: blockStartRow,
+          endRow: blockEndRow,
+          rowByDepartment,
+        };
       };
 
       let compactRow = 4;
@@ -4318,8 +4343,58 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           : `${language === 'es' ? 'Referencia' : 'Reference'} (${previousWeekLabel})`;
         const projectName = currentSnapshot.projectName || projectSnapshot.projectName;
 
-        renderCompactSnapshotRows(projectName, currentSnapshot, currentViewLabel, 'ECFDF5');
-        renderCompactSnapshotRows(projectName, previousSnapshot, previousViewLabel, 'EFF6FF');
+        const projectStartRow = compactRow;
+        const currentBlock = renderCompactSnapshotRows(
+          currentSnapshot,
+          currentViewLabel,
+          'DBEAFE',
+          'F0F9FF',
+          '1D4ED8'
+        );
+        const previousBlock = renderCompactSnapshotRows(
+          previousSnapshot,
+          previousViewLabel,
+          'E5E7EB',
+          'F9FAFB',
+          '374151'
+        );
+
+        compactSheet.mergeCells(projectStartRow, 1, compactRow - 1, 1);
+        const projectCell = compactSheet.getCell(projectStartRow, 1);
+        projectCell.value = projectName;
+        projectCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        projectCell.font = { bold: true, color: { argb: '111827' } };
+        projectCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EEF2FF' } };
+        applyBorder(projectCell);
+
+        DEPARTMENTS.forEach((dept) => {
+          const currentRow = currentBlock.rowByDepartment[dept];
+          const previousRow = previousBlock.rowByDepartment[dept];
+          weeklyRange.forEach((weekStartDate, weekIndex) => {
+            const currentCellState = resolveCompactCellState(currentSnapshot, dept, weekStartDate);
+            const previousCellState = resolveCompactCellState(previousSnapshot, dept, weekStartDate);
+            if (currentCellState.value === previousCellState.value) return;
+            const column = compactMatrixStartColumn + weekIndex;
+            compactDiffCells.push({ row: currentRow, column });
+            compactDiffCells.push({ row: previousRow, column });
+          });
+        });
+
+        compactBlockRanges.push({
+          startRow: currentBlock.startRow,
+          endRow: currentBlock.endRow,
+          outlineColor: '2563EB',
+        });
+        compactBlockRanges.push({
+          startRow: previousBlock.startRow,
+          endRow: previousBlock.endRow,
+          outlineColor: '6B7280',
+        });
+        compactBlockRanges.push({
+          startRow: projectStartRow,
+          endRow: compactRow - 1,
+          outlineColor: '4338CA',
+        });
 
         const separator = compactSheet.getRow(compactRow);
         separator.height = 6;
@@ -4331,6 +4406,53 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       });
 
       styleRows(compactSheet, 4);
+
+      const setBorderEdge = (
+        cell: any,
+        edge: 'top' | 'right' | 'bottom' | 'left',
+        color: string
+      ) => {
+        const thin = { style: 'thin', color: { argb: BORDER } };
+        const border = cell.border || {};
+        const nextBorder: any = {
+          top: border.top || thin,
+          right: border.right || thin,
+          bottom: border.bottom || thin,
+          left: border.left || thin,
+        };
+        nextBorder[edge] = { style: 'medium', color: { argb: color } };
+        cell.border = nextBorder;
+      };
+
+      const outlineRange = (
+        startRow: number,
+        endRow: number,
+        startColumn: number,
+        endColumn: number,
+        color: string
+      ) => {
+        for (let column = startColumn; column <= endColumn; column += 1) {
+          setBorderEdge(compactSheet.getRow(startRow).getCell(column), 'top', color);
+          setBorderEdge(compactSheet.getRow(endRow).getCell(column), 'bottom', color);
+        }
+        for (let row = startRow; row <= endRow; row += 1) {
+          setBorderEdge(compactSheet.getRow(row).getCell(startColumn), 'left', color);
+          setBorderEdge(compactSheet.getRow(row).getCell(endColumn), 'right', color);
+        }
+      };
+
+      compactBlockRanges.forEach((range) => {
+        outlineRange(range.startRow, range.endRow, 1, compactHeaderEndColumn, range.outlineColor);
+      });
+
+      compactDiffCells.forEach(({ row, column }) => {
+        const cell = compactSheet.getRow(row).getCell(column);
+        const fillArgb = (cell.fill as any)?.fgColor?.argb;
+        if (!fillArgb || fillArgb === WHITE) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7ED' } };
+        }
+        cell.font = { ...(cell.font || {}), bold: true, color: { argb: '9A3412' } };
+      });
 
       const dateStamp = new Date().toISOString().slice(0, 10);
       const fileName = language === 'es'
