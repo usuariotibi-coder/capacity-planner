@@ -4042,42 +4042,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         compactLogsByProject.set(entry.objectId, bucket);
       });
 
-      const compactStateByProject = new Map<string, CompactProjectSnapshot>();
-      const compactLogIndexByProject = new Map<string, number>();
-      compactProjects.forEach((projectSnapshot) => {
-        compactStateByProject.set(projectSnapshot.projectId, projectSnapshot);
-        compactLogIndexByProject.set(projectSnapshot.projectId, 0);
-      });
-
-      const compactGrid = new Map<string, CompactCellState>();
-      weeklyRange.forEach((weekStartDate) => {
-        compactProjects.forEach((projectSnapshot) => {
-          const projectId = projectSnapshot.projectId;
-          const projectLogs = compactLogsByProject.get(projectId) || [];
-          let logIndex = compactLogIndexByProject.get(projectId) || 0;
-          const snapshot = compactStateByProject.get(projectId);
-          if (!snapshot) return;
-
-          while (logIndex < projectLogs.length) {
-            const log = projectLogs[logIndex];
-            const logDay = (log.createdAt || '').slice(0, 10);
-            if (!logDay || logDay > weekStartDate) break;
-            const updates = extractProjectUpdatePayload(log.changes);
-            if (updates) {
-              applyTimingUpdateToCompactSnapshot(snapshot, updates);
-            }
-            logIndex += 1;
+      const buildCompactSnapshotByWeekStart = (
+        projectId: string,
+        weekStartDate: string
+      ): CompactProjectSnapshot => {
+        const snapshot = createProjectCompactSnapshot(projectId);
+        if (!weekStartDate) return snapshot;
+        const projectLogs = compactLogsByProject.get(projectId) || [];
+        for (const log of projectLogs) {
+          const logDay = (log.createdAt || '').slice(0, 10);
+          if (!logDay || logDay > weekStartDate) break;
+          const updates = extractProjectUpdatePayload(log.changes);
+          if (updates) {
+            applyTimingUpdateToCompactSnapshot(snapshot, updates);
           }
-          compactLogIndexByProject.set(projectId, logIndex);
-
-          DEPARTMENTS.forEach((dept) => {
-            compactGrid.set(
-              `${projectId}|${dept}|${weekStartDate}`,
-              resolveCompactCellState(snapshot, dept, weekStartDate)
-            );
-          });
-        });
-      });
+        }
+        return snapshot;
+      };
 
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
@@ -4180,24 +4161,18 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactSheet = workbook.addWorksheet(language === 'es' ? 'Timing Compacto Semanal' : 'Weekly Compact Timing');
       compactSheet.columns = [
         { width: 32 },
+        { width: 16 },
         { width: 10 },
         ...weeklyRange.map(() => ({ width: 8 })),
-        { width: 13 },
-        { width: 13 },
-        { width: 24 },
       ];
 
-      const compactMatrixStartColumn = 3;
-      const compactComparisonStartColumn = compactMatrixStartColumn + weeklyRange.length;
-      const compactPreviousColumn = compactComparisonStartColumn;
-      const compactCurrentColumn = compactComparisonStartColumn + 1;
-      const compactChangeColumn = compactComparisonStartColumn + 2;
-      const compactHeaderEndColumn = compactChangeColumn;
+      const compactMatrixStartColumn = 4;
+      const compactHeaderEndColumn = compactMatrixStartColumn + weeklyRange.length - 1;
       compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
       const compactTitle = compactSheet.getCell(1, 1);
       compactTitle.value = language === 'es'
-        ? 'Timing Compacto Semanal (estado mas reciente por lunes + comparativa semanal)'
-        : 'Weekly Compact Timing (latest state by Monday + weekly comparison)';
+        ? 'Timing Compacto Semanal (comparativa: estado actual vs semana pasada)'
+        : 'Weekly Compact Timing (comparison: current state vs previous week)';
       compactTitle.font = { bold: true, size: 12, color: { argb: HEADER_TEXT } };
       compactTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
       compactTitle.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -4210,9 +4185,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getRow(1).height = 24;
 
       compactSheet.getCell(2, 1).value = language === 'es' ? 'Proyecto' : 'Project';
-      compactSheet.getCell(2, 2).value = 'DPTO';
+      compactSheet.getCell(2, 2).value = language === 'es' ? 'Vista' : 'View';
+      compactSheet.getCell(2, 3).value = 'DPTO';
       compactSheet.getCell(3, 1).value = '';
       compactSheet.getCell(3, 2).value = '';
+      compactSheet.getCell(3, 3).value = '';
 
       weeklyRange.forEach((weekStartDate, index) => {
         const column = compactMatrixStartColumn + index;
@@ -4245,18 +4222,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         ? `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')}`
         : '-';
 
-      compactSheet.getCell(2, compactPreviousColumn).value = language === 'es' ? 'Semana Pasada' : 'Previous Week';
-      compactSheet.getCell(2, compactCurrentColumn).value = language === 'es' ? 'Semana Actual' : 'Current Week';
-      compactSheet.getCell(2, compactChangeColumn).value = language === 'es' ? 'Cambio' : 'Change';
-      compactSheet.getCell(3, compactPreviousColumn).value = previousWeekLabel;
-      compactSheet.getCell(3, compactCurrentColumn).value = currentWeekLabel;
-      compactSheet.getCell(3, compactChangeColumn).value = '';
+      compactSheet.getCell(3, 2).value = hasWeekOverWeekRange
+        ? `${previousWeekLabel} vs ${currentWeekLabel}`
+        : (language === 'es' ? 'Sin rango' : 'No range');
 
       styleHeader(compactSheet, 2);
       styleHeader(compactSheet, 3);
       compactSheet.getRow(3).font = { bold: false, color: { argb: HEADER_TEXT } };
       compactSheet.getRow(3).height = 18;
-      compactSheet.views = [{ state: 'frozen', ySplit: 3, xSplit: 2 }];
+      compactSheet.views = [{ state: 'frozen', ySplit: 3, xSplit: 3 }];
       compactSheet.autoFilter = {
         from: { row: 2, column: 1 },
         to: { row: 2, column: compactHeaderEndColumn },
@@ -4271,27 +4245,53 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         PRG: 'D1FAE5',
       };
 
-      let compactRow = 4;
+      const compactCurrentSnapshotWeekStart = hasWeekOverWeekRange
+        ? currentWeekStart
+        : weeklyRange[weeklyRange.length - 1];
+      const compactPreviousSnapshotWeekStart = hasWeekOverWeekRange
+        ? previousWeekStart
+        : compactCurrentSnapshotWeekStart;
+      const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
+      const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       compactProjects.forEach((projectSnapshot) => {
+        compactCurrentSnapshotByProject.set(
+          projectSnapshot.projectId,
+          buildCompactSnapshotByWeekStart(projectSnapshot.projectId, compactCurrentSnapshotWeekStart)
+        );
+        compactPreviousSnapshotByProject.set(
+          projectSnapshot.projectId,
+          buildCompactSnapshotByWeekStart(projectSnapshot.projectId, compactPreviousSnapshotWeekStart)
+        );
+      });
+
+      const renderCompactSnapshotRows = (
+        projectName: string,
+        snapshot: CompactProjectSnapshot,
+        viewLabel: string,
+        viewFill: string
+      ) => {
         DEPARTMENTS.forEach((dept, deptIndex) => {
           const row = compactSheet.getRow(compactRow);
-          row.getCell(1).value = deptIndex === 0 ? projectSnapshot.projectName : '';
-          row.getCell(2).value = dept;
+          row.getCell(1).value = deptIndex === 0 ? projectName : '';
+          row.getCell(2).value = viewLabel;
+          row.getCell(3).value = dept;
           row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-          row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
           row.getCell(1).font = deptIndex === 0 ? { bold: true } : { bold: false };
-          row.getCell(2).font = { bold: true, color: { argb: '2E1A47' } };
+          row.getCell(2).font = { size: 9, bold: true, color: { argb: '1E3A8A' } };
+          row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: viewFill } };
+          row.getCell(3).font = { bold: true, color: { argb: '2E1A47' } };
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const column = compactMatrixStartColumn + weekIndex;
-            const compactCell = compactGrid.get(`${projectSnapshot.projectId}|${dept}|${weekStartDate}`);
+            const compactCell = resolveCompactCellState(snapshot, dept, weekStartDate);
             const cell = row.getCell(column);
-            const value = compactCell?.value || '-';
-            cell.value = value;
+            cell.value = compactCell.value;
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            cell.font = { size: 9, bold: compactCell?.active || false, color: { argb: '1F2937' } };
+            cell.font = { size: 9, bold: compactCell.active, color: { argb: '1F2937' } };
 
-            if (compactCell?.active) {
+            if (compactCell.active) {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
@@ -4300,70 +4300,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             }
           });
 
-          const previousCell = hasWeekOverWeekRange
-            ? compactGrid.get(`${projectSnapshot.projectId}|${dept}|${previousWeekStart}`)
-            : null;
-          const currentCell = hasWeekOverWeekRange
-            ? compactGrid.get(`${projectSnapshot.projectId}|${dept}|${currentWeekStart}`)
-            : null;
-          const previousValue = previousCell?.value || '-';
-          const currentValue = currentCell?.value || '-';
-          const changed = previousValue !== currentValue;
-          const changeLabel = !hasWeekOverWeekRange
-            ? (language === 'es' ? 'Sin rango' : 'No range')
-            : (
-                changed
-                  ? (
-                      previousValue === '-'
-                        ? (language === 'es' ? 'Inicio' : 'Started')
-                        : currentValue === '-'
-                          ? (language === 'es' ? 'Termino' : 'Ended')
-                          : `${previousValue} -> ${currentValue}`
-                    )
-                  : (language === 'es' ? 'Sin cambio' : 'No change')
-              );
-
-          const previousValueCell = row.getCell(compactPreviousColumn);
-          const currentValueCell = row.getCell(compactCurrentColumn);
-          const changeCell = row.getCell(compactChangeColumn);
-
-          previousValueCell.value = previousValue;
-          currentValueCell.value = currentValue;
-          changeCell.value = changeLabel;
-
-          previousValueCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          currentValueCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          changeCell.alignment = { vertical: 'middle', horizontal: 'left' };
-
-          if (previousCell?.active) {
-            previousValueCell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: previousCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
-            };
-          }
-          if (currentCell?.active) {
-            currentValueCell.fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: currentCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
-            };
-          }
-          if (hasWeekOverWeekRange) {
-            if (changed) {
-              changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
-              changeCell.font = { bold: true, color: { argb: '7C2D12' } };
-            } else {
-              changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } };
-              changeCell.font = { color: { argb: '065F46' } };
-            }
-          } else {
-            changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F3F4F6' } };
-            changeCell.font = { color: { argb: '6B7280' } };
-          }
-
           compactRow += 1;
         });
+      };
+
+      let compactRow = 4;
+      compactProjects.forEach((projectSnapshot) => {
+        const currentSnapshot = compactCurrentSnapshotByProject.get(projectSnapshot.projectId)
+          || createProjectCompactSnapshot(projectSnapshot.projectId);
+        const previousSnapshot = compactPreviousSnapshotByProject.get(projectSnapshot.projectId)
+          || createProjectCompactSnapshot(projectSnapshot.projectId);
+        const currentViewLabel = hasWeekOverWeekRange
+          ? `${language === 'es' ? 'Semana Actual' : 'Current Week'} (${currentWeekLabel})`
+          : `${language === 'es' ? 'Actual' : 'Current'} (${currentWeekLabel})`;
+        const previousViewLabel = hasWeekOverWeekRange
+          ? `${language === 'es' ? 'Semana Pasada' : 'Previous Week'} (${previousWeekLabel})`
+          : `${language === 'es' ? 'Referencia' : 'Reference'} (${previousWeekLabel})`;
+        const projectName = currentSnapshot.projectName || projectSnapshot.projectName;
+
+        renderCompactSnapshotRows(projectName, currentSnapshot, currentViewLabel, 'ECFDF5');
+        renderCompactSnapshotRows(projectName, previousSnapshot, previousViewLabel, 'EFF6FF');
 
         const separator = compactSheet.getRow(compactRow);
         separator.height = 6;
