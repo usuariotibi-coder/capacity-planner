@@ -138,6 +138,21 @@ interface TimingProjectGroup {
   entries: ActivityLogEntry[];
 }
 
+type TimingChangesViewMode = 'project' | 'week';
+
+interface TimingWeekEntry {
+  projectId: string;
+  projectName: string;
+  entry: ActivityLogEntry;
+}
+
+interface TimingWeekGroup {
+  weekStart: string;
+  yearWeek: string;
+  entries: TimingWeekEntry[];
+  projectCount: number;
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -649,6 +664,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [isTimingChangesLoading, setIsTimingChangesLoading] = useState(false);
   const [isTimingRangeExcelExporting, setIsTimingRangeExcelExporting] = useState(false);
   const [timingChangesError, setTimingChangesError] = useState<string | null>(null);
+  const [timingChangesViewMode, setTimingChangesViewMode] = useState<TimingChangesViewMode>('project');
   const [formValidationPopup, setFormValidationPopup] = useState<{
     scope: FormValidationScope;
     title: string;
@@ -690,6 +706,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setShowTimingChangesModal(false);
     setTimingChangesLogs([]);
     setTimingChangesError(null);
+    setTimingChangesViewMode('project');
   }, [isTimingAuditGeneralView]);
 
   useEffect(() => {
@@ -1552,6 +1569,52 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         return dateB - dateA;
       });
   }, [timingChangesLogs, projectById, language]);
+  const timingChangesByWeek = useMemo<TimingWeekGroup[]>(() => {
+    const grouped = new Map<string, {
+      weekStart: string;
+      yearWeek: string;
+      entries: TimingWeekEntry[];
+      projectIds: Set<string>;
+    }>();
+
+    timingChangesByProject.forEach((projectGroup) => {
+      projectGroup.entries.forEach((entry) => {
+        const changedAt = new Date(entry.createdAt);
+        if (Number.isNaN(changedAt.getTime())) return;
+
+        const weekStart = normalizeWeekStartDate(formatToISO(getWeekStart(changedAt)));
+        const weekDate = parseISODate(weekStart);
+        const year = Number.isNaN(weekDate.getTime()) ? changedAt.getFullYear() : weekDate.getFullYear();
+        const weekNum = getWeekNumber(weekStart);
+        const yearWeek = `${year}-CW${String(weekNum).padStart(2, '0')}`;
+        const current = grouped.get(weekStart) || {
+          weekStart,
+          yearWeek,
+          entries: [],
+          projectIds: new Set<string>(),
+        };
+
+        current.entries.push({
+          projectId: projectGroup.projectId,
+          projectName: projectGroup.projectName,
+          entry,
+        });
+        current.projectIds.add(projectGroup.projectId);
+        grouped.set(weekStart, current);
+      });
+    });
+
+    return Array.from(grouped.values())
+      .map((group) => ({
+        weekStart: group.weekStart,
+        yearWeek: group.yearWeek,
+        entries: [...group.entries].sort(
+          (a, b) => new Date(b.entry.createdAt).getTime() - new Date(a.entry.createdAt).getTime()
+        ),
+        projectCount: group.projectIds.size,
+      }))
+      .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime());
+  }, [timingChangesByProject]);
   const changeOrderSummaryByProjectDept = useMemo(() => {
     const map = new Map<string, { totalHours: number; count: number; orders: ProjectChangeOrder[] }>();
 
@@ -2799,6 +2862,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     const defaultToDate = `${selectedYear + 1}-12-31`;
     setTimingChangesFromDate(defaultFromDate);
     setTimingChangesToDate(defaultToDate);
+    setTimingChangesViewMode('project');
     setShowTimingChangesModal(true);
     void loadProjectTimingChanges(defaultFromDate, defaultToDate);
   };
@@ -8157,12 +8221,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold">
-                  {language === 'es' ? 'Cambios de Timing por Proyecto' : 'Project Timing Changes'}
+                  {language === 'es' ? 'Cambios de Timing' : 'Timing Changes'}
                 </h3>
                 <p className="text-[11px] opacity-90">
                   {language === 'es'
-                    ? 'Vista General - solo Project Manager'
-                    : 'General View - Project Manager only'}
+                    ? 'Vista General - por proyecto o por semana'
+                    : 'General View - by project or by week'}
                 </p>
               </div>
               <button
@@ -8208,6 +8272,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       : (language === 'es' ? 'Buscar cambios' : 'Search changes')}
                   </span>
                 </button>
+                <div className="inline-flex items-center rounded-md border border-[#cfbfd7] bg-white p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setTimingChangesViewMode('project')}
+                    className={`px-2 py-1 text-[11px] font-semibold rounded transition ${
+                      timingChangesViewMode === 'project'
+                        ? 'bg-[#4f3a70] text-white'
+                        : 'text-[#5b4676] hover:bg-[#f2ebfb]'
+                    }`}
+                  >
+                    {language === 'es' ? 'Proyecto' : 'Project'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimingChangesViewMode('week')}
+                    className={`px-2 py-1 text-[11px] font-semibold rounded transition ${
+                      timingChangesViewMode === 'week'
+                        ? 'bg-[#4f3a70] text-white'
+                        : 'text-[#5b4676] hover:bg-[#f2ebfb]'
+                    }`}
+                  >
+                    {language === 'es' ? 'Semana' : 'Week'}
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => void handleExportTimingRangeExcel()}
@@ -8223,8 +8311,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 </button>
                 <div className="text-[11px] text-[#6f5b80]">
                   {language === 'es'
-                    ? `Proyectos con cambios: ${timingChangesByProject.length}`
-                    : `Projects with changes: ${timingChangesByProject.length}`}
+                    ? `Semanas con cambios: ${timingChangesByWeek.length} | Proyectos con cambios: ${timingChangesByProject.length}`
+                    : `Weeks with changes: ${timingChangesByWeek.length} | Projects with changes: ${timingChangesByProject.length}`}
                 </div>
               </div>
             </div>
@@ -8243,6 +8331,45 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {language === 'es'
                     ? 'No se encontraron cambios de timing para el rango seleccionado.'
                     : 'No timing changes were found for the selected range.'}
+                </div>
+              ) : timingChangesViewMode === 'week' ? (
+                <div className="space-y-3">
+                  {timingChangesByWeek.map((weekGroup) => (
+                    <div key={`timing-week-${weekGroup.weekStart}`} className="rounded-lg border border-[#d8d0e4] bg-white shadow-sm overflow-hidden">
+                      <div className="px-3 py-2 bg-gradient-to-r from-[#ecf6ff] to-[#e6f2ff] border-b border-[#d8d0e4] flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold text-[#1f3558]">{weekGroup.yearWeek}</span>
+                          <span className="text-[10px] font-semibold text-[#5f7396]">{weekGroup.weekStart}</span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                          {weekGroup.entries.length} {language === 'es' ? 'cambios' : 'changes'} • {weekGroup.projectCount} {language === 'es' ? 'proyectos' : 'projects'}
+                        </span>
+                      </div>
+
+                      <div className="divide-y divide-[#eef1f8]">
+                        {weekGroup.entries.map((weekEntry) => (
+                          <div key={weekEntry.entry.id} className="px-3 py-2.5">
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#415171]">
+                              <span>{formatTimingDateTime(weekEntry.entry.createdAt)}</span>
+                              <span className="text-[#9ca9bf]">|</span>
+                              <span>{formatTimingUserName(weekEntry.entry.user)}</span>
+                              <span className="text-[#9ca9bf]">|</span>
+                              <span className="px-1.5 py-0.5 rounded bg-[#edf4ff] border border-[#d4e3fb] text-[#304d7a]">
+                                {weekEntry.projectName}
+                              </span>
+                            </div>
+                            <div className="mt-1.5 space-y-1">
+                              {getTimingSummaryLines(weekEntry.entry).map((line, idx) => (
+                                <p key={`${weekEntry.entry.id}-week-line-${idx}`} className="text-xs text-[#2f2243] leading-relaxed">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="space-y-3">
