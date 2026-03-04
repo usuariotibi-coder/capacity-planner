@@ -4182,14 +4182,22 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         { width: 32 },
         { width: 10 },
         ...weeklyRange.map(() => ({ width: 8 })),
+        { width: 13 },
+        { width: 13 },
+        { width: 24 },
       ];
 
-      const compactHeaderEndColumn = 2 + weeklyRange.length;
+      const compactMatrixStartColumn = 3;
+      const compactComparisonStartColumn = compactMatrixStartColumn + weeklyRange.length;
+      const compactPreviousColumn = compactComparisonStartColumn;
+      const compactCurrentColumn = compactComparisonStartColumn + 1;
+      const compactChangeColumn = compactComparisonStartColumn + 2;
+      const compactHeaderEndColumn = compactChangeColumn;
       compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
       const compactTitle = compactSheet.getCell(1, 1);
       compactTitle.value = language === 'es'
-        ? 'Timing Compacto Semanal (estado mas reciente por lunes)'
-        : 'Weekly Compact Timing (latest state by Monday)';
+        ? 'Timing Compacto Semanal (estado mas reciente por lunes + comparativa semanal)'
+        : 'Weekly Compact Timing (latest state by Monday + weekly comparison)';
       compactTitle.font = { bold: true, size: 12, color: { argb: HEADER_TEXT } };
       compactTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
       compactTitle.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -4207,11 +4215,42 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getCell(3, 2).value = '';
 
       weeklyRange.forEach((weekStartDate, index) => {
-        const column = index + 3;
+        const column = compactMatrixStartColumn + index;
         const weekNum = getWeekNumber(weekStartDate);
         compactSheet.getCell(2, column).value = `CW${String(weekNum).padStart(2, '0')}`;
         compactSheet.getCell(3, column).value = weekStartDate;
       });
+
+      const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
+      const resolvedCurrentWeekIndex = (() => {
+        const byToday = weeklyRange.indexOf(todayWeekStart);
+        if (byToday > 0) return byToday;
+        if (byToday === 0 && weeklyRange.length > 1) return 1;
+        return weeklyRange.length - 1;
+      })();
+      const resolvedPreviousWeekIndex = Math.max(0, resolvedCurrentWeekIndex - 1);
+      const hasWeekOverWeekRange =
+        weeklyRange.length >= 2 &&
+        resolvedCurrentWeekIndex >= 0 &&
+        resolvedCurrentWeekIndex < weeklyRange.length &&
+        resolvedPreviousWeekIndex >= 0 &&
+        resolvedPreviousWeekIndex < weeklyRange.length &&
+        resolvedCurrentWeekIndex !== resolvedPreviousWeekIndex;
+      const currentWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedCurrentWeekIndex] : '';
+      const previousWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedPreviousWeekIndex] : '';
+      const currentWeekLabel = hasWeekOverWeekRange
+        ? `CW${String(getWeekNumber(currentWeekStart)).padStart(2, '0')}`
+        : '-';
+      const previousWeekLabel = hasWeekOverWeekRange
+        ? `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')}`
+        : '-';
+
+      compactSheet.getCell(2, compactPreviousColumn).value = language === 'es' ? 'Semana Pasada' : 'Previous Week';
+      compactSheet.getCell(2, compactCurrentColumn).value = language === 'es' ? 'Semana Actual' : 'Current Week';
+      compactSheet.getCell(2, compactChangeColumn).value = language === 'es' ? 'Cambio' : 'Change';
+      compactSheet.getCell(3, compactPreviousColumn).value = previousWeekLabel;
+      compactSheet.getCell(3, compactCurrentColumn).value = currentWeekLabel;
+      compactSheet.getCell(3, compactChangeColumn).value = '';
 
       styleHeader(compactSheet, 2);
       styleHeader(compactSheet, 3);
@@ -4244,7 +4283,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           row.getCell(2).font = { bold: true, color: { argb: '2E1A47' } };
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
-            const column = weekIndex + 3;
+            const column = compactMatrixStartColumn + weekIndex;
             const compactCell = compactGrid.get(`${projectSnapshot.projectId}|${dept}|${weekStartDate}`);
             const cell = row.getCell(column);
             const value = compactCell?.value || '-';
@@ -4261,6 +4300,68 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             }
           });
 
+          const previousCell = hasWeekOverWeekRange
+            ? compactGrid.get(`${projectSnapshot.projectId}|${dept}|${previousWeekStart}`)
+            : null;
+          const currentCell = hasWeekOverWeekRange
+            ? compactGrid.get(`${projectSnapshot.projectId}|${dept}|${currentWeekStart}`)
+            : null;
+          const previousValue = previousCell?.value || '-';
+          const currentValue = currentCell?.value || '-';
+          const changed = previousValue !== currentValue;
+          const changeLabel = !hasWeekOverWeekRange
+            ? (language === 'es' ? 'Sin rango' : 'No range')
+            : (
+                changed
+                  ? (
+                      previousValue === '-'
+                        ? (language === 'es' ? 'Inicio' : 'Started')
+                        : currentValue === '-'
+                          ? (language === 'es' ? 'Termino' : 'Ended')
+                          : `${previousValue} -> ${currentValue}`
+                    )
+                  : (language === 'es' ? 'Sin cambio' : 'No change')
+              );
+
+          const previousValueCell = row.getCell(compactPreviousColumn);
+          const currentValueCell = row.getCell(compactCurrentColumn);
+          const changeCell = row.getCell(compactChangeColumn);
+
+          previousValueCell.value = previousValue;
+          currentValueCell.value = currentValue;
+          changeCell.value = changeLabel;
+
+          previousValueCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          currentValueCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          changeCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+          if (previousCell?.active) {
+            previousValueCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: previousCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
+            };
+          }
+          if (currentCell?.active) {
+            currentValueCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: currentCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
+            };
+          }
+          if (hasWeekOverWeekRange) {
+            if (changed) {
+              changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+              changeCell.font = { bold: true, color: { argb: '7C2D12' } };
+            } else {
+              changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } };
+              changeCell.font = { color: { argb: '065F46' } };
+            }
+          } else {
+            changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F3F4F6' } };
+            changeCell.font = { color: { argb: '6B7280' } };
+          }
+
           compactRow += 1;
         });
 
@@ -4274,115 +4375,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       });
 
       styleRows(compactSheet, 4);
-
-      const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
-      const resolvedCurrentWeekIndex = (() => {
-        const byToday = weeklyRange.indexOf(todayWeekStart);
-        if (byToday > 0) return byToday;
-        if (byToday === 0 && weeklyRange.length > 1) return 1;
-        return weeklyRange.length - 1;
-      })();
-      const resolvedPreviousWeekIndex = Math.max(0, resolvedCurrentWeekIndex - 1);
-      const hasWeekOverWeekRange =
-        weeklyRange.length >= 2 &&
-        resolvedCurrentWeekIndex >= 0 &&
-        resolvedCurrentWeekIndex < weeklyRange.length &&
-        resolvedPreviousWeekIndex >= 0 &&
-        resolvedPreviousWeekIndex < weeklyRange.length &&
-        resolvedCurrentWeekIndex !== resolvedPreviousWeekIndex;
-
-      const weekOverWeekSheet = workbook.addWorksheet(
-        language === 'es' ? 'Comparativo Actual vs Pasada' : 'Current vs Previous Week'
-      );
-      weekOverWeekSheet.columns = [
-        { header: language === 'es' ? 'Proyecto' : 'Project', key: 'project', width: 32 },
-        { header: 'DPTO', key: 'department', width: 10 },
-        { header: language === 'es' ? 'Semana Pasada' : 'Previous Week', key: 'previousWeek', width: 20 },
-        { header: language === 'es' ? 'Valor Pasado' : 'Previous Value', key: 'previousValue', width: 13 },
-        { header: language === 'es' ? 'Semana Actual' : 'Current Week', key: 'currentWeek', width: 20 },
-        { header: language === 'es' ? 'Valor Actual' : 'Current Value', key: 'currentValue', width: 13 },
-        { header: language === 'es' ? 'Cambio' : 'Change', key: 'change', width: 24 },
-      ];
-      styleHeader(weekOverWeekSheet);
-
-      if (!hasWeekOverWeekRange) {
-        const message = language === 'es'
-          ? 'No hay suficientes semanas para comparar semana actual contra semana pasada.'
-          : 'There are not enough weeks to compare current week against previous week.';
-        const row = weekOverWeekSheet.addRow({ project: message });
-        row.getCell(1).font = { italic: true };
-      } else {
-        const currentWeekStart = weeklyRange[resolvedCurrentWeekIndex];
-        const previousWeekStart = weeklyRange[resolvedPreviousWeekIndex];
-        const currentWeekLabel = `CW${String(getWeekNumber(currentWeekStart)).padStart(2, '0')} (${currentWeekStart})`;
-        const previousWeekLabel = `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')} (${previousWeekStart})`;
-
-        compactProjects.forEach((projectSnapshot) => {
-          DEPARTMENTS.forEach((dept) => {
-            const previousCell = compactGrid.get(`${projectSnapshot.projectId}|${dept}|${previousWeekStart}`);
-            const currentCell = compactGrid.get(`${projectSnapshot.projectId}|${dept}|${currentWeekStart}`);
-            const previousValue = previousCell?.value || '-';
-            const currentValue = currentCell?.value || '-';
-            const hasAnyValue = previousValue !== '-' || currentValue !== '-';
-            if (!hasAnyValue) return;
-
-            const changed = previousValue !== currentValue;
-            const changeLabel = changed
-              ? (
-                  previousValue === '-'
-                    ? (language === 'es' ? 'Inicio en semana actual' : 'Started in current week')
-                    : currentValue === '-'
-                      ? (language === 'es' ? 'Termino en semana actual' : 'Ended in current week')
-                      : `${previousValue} -> ${currentValue}`
-                )
-              : (language === 'es' ? 'Sin cambio' : 'No change');
-
-            const row = weekOverWeekSheet.addRow({
-              project: projectSnapshot.projectName,
-              department: dept,
-              previousWeek: previousWeekLabel,
-              previousValue,
-              currentWeek: currentWeekLabel,
-              currentValue,
-              change: changeLabel,
-            });
-
-            row.getCell(1).font = { bold: true };
-            row.getCell(2).font = { bold: true, color: { argb: '2E1A47' } };
-            row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
-            row.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
-
-            if (previousCell?.active) {
-              row.getCell(4).fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: previousCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
-              };
-            }
-            if (currentCell?.active) {
-              row.getCell(6).fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: currentCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
-              };
-            }
-            if (changed) {
-              row.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
-              row.getCell(7).font = { bold: true, color: { argb: '7C2D12' } };
-            } else {
-              row.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } };
-              row.getCell(7).font = { color: { argb: '065F46' } };
-            }
-          });
-        });
-      }
-
-      styleRows(weekOverWeekSheet, 2);
-      weekOverWeekSheet.views = [{ state: 'frozen', ySplit: 1 }];
-      weekOverWeekSheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: weekOverWeekSheet.columnCount },
-      };
 
       const dateStamp = new Date().toISOString().slice(0, 10);
       const fileName = language === 'es'
