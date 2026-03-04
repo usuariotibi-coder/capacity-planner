@@ -3661,6 +3661,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return;
       }
 
+      const normalizeCompactAction = (
+        rawAction: string
+      ): 'created' | 'updated' | 'deleted' | 'other' => {
+        const action = (rawAction || '').toLowerCase();
+        if (action === 'created' || action === 'create') return 'created';
+        if (action === 'updated' || action === 'update') return 'updated';
+        if (action === 'deleted' || action === 'delete') return 'deleted';
+        return 'other';
+      };
+
+      const assignmentResponse = await activityLogApi.getFiltered({
+        modelName: 'Assignment',
+        endDate,
+        ordering: 'created_at',
+        pageSize: 5000,
+      });
+      const assignmentLogs = (Array.isArray(assignmentResponse) ? assignmentResponse as ActivityLogEntry[] : [])
+        .filter((row) => row && row.modelName === 'Assignment' && normalizeCompactAction(row.action) !== 'other')
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
       interface TimingDetailRow {
         weekStart: string;
         yearWeek: string;
@@ -3837,6 +3857,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         departments: Record<Department, CompactDeptTimingSnapshot>;
       }
 
+      interface CompactAssignmentSnapshot {
+        projectId: string;
+        department: Department | '';
+        weekStartDate: string;
+        hours: number;
+        employeeId: string;
+      }
+
       interface CompactCellState {
         value: string;
         active: boolean;
@@ -3853,6 +3881,83 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const toFiniteNumber = (value: unknown): number | null => {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric : null;
+      };
+
+      const roundCompactHours = (value: number) => Math.round((value || 0) * 100) / 100;
+      const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
+      const asCompactNumber = (value: unknown): number | null => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+      };
+      const asCompactString = (value: unknown): string => (typeof value === 'string' ? value : '');
+      const normalizeCompactDepartment = (value: unknown): Department | '' => {
+        const raw = asCompactString(value).trim().toUpperCase();
+        if (!raw) return '';
+        return DEPARTMENT_SET.has(raw as Department) ? (raw as Department) : '';
+      };
+      const resolveCompactHoursFromPayload = (payload: Record<string, any>, fallbackHours: number): number => {
+        const hasSplitFields =
+          hasOwn(payload, 'scioHours')
+          || hasOwn(payload, 'externalHours')
+          || hasOwn(payload, 'scio_hours')
+          || hasOwn(payload, 'external_hours');
+
+        if (hasSplitFields) {
+          const scio = asCompactNumber(payload.scioHours ?? payload.scio_hours) ?? 0;
+          const external = asCompactNumber(payload.externalHours ?? payload.external_hours) ?? 0;
+          return roundCompactHours(Math.max(0, scio + external));
+        }
+
+        const totalCandidate = asCompactNumber(payload.totalHours ?? payload.total_hours);
+        if (totalCandidate !== null) return roundCompactHours(Math.max(0, totalCandidate));
+
+        const hoursCandidate = asCompactNumber(payload.hours);
+        if (hoursCandidate !== null) return roundCompactHours(Math.max(0, hoursCandidate));
+
+        return roundCompactHours(Math.max(0, fallbackHours));
+      };
+      const resolveCompactAssignmentProjectId = (payload: Record<string, any>, fallbackProjectId: string): string => {
+        const projectObj = asObject(payload.project);
+        const candidate =
+          payload.projectId
+          ?? payload.project_id
+          ?? projectObj?.id
+          ?? (typeof payload.project === 'string' ? payload.project : '')
+          ?? fallbackProjectId;
+        return asCompactString(candidate);
+      };
+      const resolveCompactAssignmentWeek = (payload: Record<string, any>, fallbackWeek: string): string => {
+        const raw = asCompactString(payload.weekStartDate ?? payload.week_start_date ?? fallbackWeek);
+        return raw ? normalizeWeekStartDate(raw) : '';
+      };
+      const buildCompactAssignmentSnapshot = (
+        payload: Record<string, any> | null,
+        previous: CompactAssignmentSnapshot | null
+      ): CompactAssignmentSnapshot | null => {
+        if (!payload && !previous) return null;
+
+        const current = payload || {};
+        const employeeId = asCompactString(current.employeeId ?? current.employee_id ?? previous?.employeeId ?? '');
+        const employeeDepartment = employeeId ? employeeById.get(employeeId)?.department : '';
+
+        const department =
+          normalizeCompactDepartment(current.department)
+          || normalizeCompactDepartment(current.dept)
+          || normalizeCompactDepartment(asObject(current.employee)?.department)
+          || normalizeCompactDepartment(employeeDepartment)
+          || previous?.department
+          || '';
+        const projectId = resolveCompactAssignmentProjectId(current, previous?.projectId || '');
+        const weekStartDate = resolveCompactAssignmentWeek(current, previous?.weekStartDate || '');
+        const hours = resolveCompactHoursFromPayload(current, previous?.hours ?? 0);
+
+        return {
+          projectId,
+          department,
+          weekStartDate,
+          hours,
+          employeeId: employeeId || previous?.employeeId || '',
+        };
       };
 
       const extractCompactDeptSnapshot = (stageRows: unknown): Partial<CompactDeptTimingSnapshot> | null => {
@@ -4046,12 +4151,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const resolveCompactCapacityCellState = (
         snapshot: CompactProjectSnapshot,
         department: Department,
-        weekStartDate: string
+        weekStartDate: string,
+        assignmentHoursByCell: Map<string, number>
       ): CompactCapacityCellState => {
         const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
 
-        const assignmentEntry = assignmentIndex.byCell.get(`${snapshot.projectId}|${department}|${weekStartDate}`);
-        const totalHours = assignmentEntry?.totalHours ?? 0;
+        const totalHours = assignmentHoursByCell.get(`${snapshot.projectId}|${department}|${weekStartDate}`) || 0;
         const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
         const hasCapacityLoad = normalizedCapacity > 0;
 
@@ -4092,6 +4197,50 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           }
         }
         return snapshot;
+      };
+
+      const buildCompactAssignmentHoursByWeekStart = (weekStartDate: string): Map<string, number> => {
+        const assignmentStateById = new Map<string, CompactAssignmentSnapshot>();
+        if (!weekStartDate) return new Map<string, number>();
+
+        for (const log of assignmentLogs) {
+          const logDay = (log.createdAt || '').slice(0, 10);
+          if (!logDay || logDay > weekStartDate) break;
+
+          const action = normalizeCompactAction(log.action);
+          if (action === 'other') continue;
+
+          const changesObj = asObject(log.changes);
+          const payload = changesObj
+            ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
+            : null;
+
+          const existingPrev = assignmentStateById.get(log.objectId) || null;
+          const fallbackPrev = action === 'deleted' && !existingPrev
+            ? buildCompactAssignmentSnapshot(payload, null)
+            : existingPrev;
+
+          let nextSnapshot: CompactAssignmentSnapshot | null = null;
+          if (action !== 'deleted') {
+            nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+          }
+
+          if (action === 'deleted') {
+            assignmentStateById.delete(log.objectId);
+          } else if (nextSnapshot) {
+            assignmentStateById.set(log.objectId, nextSnapshot);
+          }
+        }
+
+        const hoursByCell = new Map<string, number>();
+        assignmentStateById.forEach((snapshot) => {
+          if (!snapshot.projectId || !snapshot.department || !snapshot.weekStartDate) return;
+          if (snapshot.hours <= 0) return;
+          const key = `${snapshot.projectId}|${snapshot.department}|${snapshot.weekStartDate}`;
+          hoursByCell.set(key, roundCompactHours((hoursByCell.get(key) || 0) + snapshot.hours));
+        });
+
+        return hoursByCell;
       };
 
       const ExcelJS = await import('exceljs');
@@ -4287,6 +4436,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousSnapshotWeekStart = hasWeekOverWeekRange
         ? previousWeekStart
         : compactCurrentSnapshotWeekStart;
+      const compactCurrentAssignmentHoursByCell = buildCompactAssignmentHoursByWeekStart(compactCurrentSnapshotWeekStart);
+      const compactPreviousAssignmentHoursByCell = buildCompactAssignmentHoursByWeekStart(compactPreviousSnapshotWeekStart);
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       compactProjects.forEach((projectSnapshot) => {
@@ -4305,6 +4456,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const renderCompactSnapshotRows = (
         snapshot: CompactProjectSnapshot,
+        assignmentHoursByCell: Map<string, number>,
         viewLabel: string,
         viewFill: string,
         rowFill: string,
@@ -4328,7 +4480,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const column = compactMatrixStartColumn + weekIndex;
-            const compactCell = resolveCompactCapacityCellState(snapshot, dept, weekStartDate);
+            const compactCell = resolveCompactCapacityCellState(
+              snapshot,
+              dept,
+              weekStartDate,
+              assignmentHoursByCell
+            );
             const cell = row.getCell(column);
             cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '-';
             if (compactCell.capacityValue !== null) {
@@ -4397,6 +4554,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const projectStartRow = compactRow;
         const currentBlock = renderCompactSnapshotRows(
           currentSnapshot,
+          compactCurrentAssignmentHoursByCell,
           currentViewLabel,
           'DBEAFE',
           'F0F9FF',
@@ -4404,6 +4562,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         );
         const previousBlock = renderCompactSnapshotRows(
           previousSnapshot,
+          compactPreviousAssignmentHoursByCell,
           previousViewLabel,
           'E5E7EB',
           'F9FAFB',
@@ -4422,8 +4581,18 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const currentRow = currentBlock.rowByDepartment[dept];
           const previousRow = previousBlock.rowByDepartment[dept];
           weeklyRange.forEach((weekStartDate, weekIndex) => {
-            const currentCellState = resolveCompactCapacityCellState(currentSnapshot, dept, weekStartDate);
-            const previousCellState = resolveCompactCapacityCellState(previousSnapshot, dept, weekStartDate);
+            const currentCellState = resolveCompactCapacityCellState(
+              currentSnapshot,
+              dept,
+              weekStartDate,
+              compactCurrentAssignmentHoursByCell
+            );
+            const previousCellState = resolveCompactCapacityCellState(
+              previousSnapshot,
+              dept,
+              weekStartDate,
+              compactPreviousAssignmentHoursByCell
+            );
             const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
             const sameTimingActivity = currentCellState.active === previousCellState.active;
             if (sameCapacity && sameTimingActivity) return;
