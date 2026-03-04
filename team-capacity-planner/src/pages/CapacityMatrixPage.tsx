@@ -3843,6 +3843,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         isFirstWeek: boolean;
       }
 
+      interface CompactCapacityCellState extends CompactCellState {
+        capacityValue: number | null;
+        displayValue: string;
+      }
+
       const toFiniteNumber = (value: unknown): number | null => {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric : null;
@@ -4030,6 +4035,37 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         };
       };
 
+      const formatCompactCapacityValue = (value: number): string => {
+        const rounded = Math.round(value * 100) / 100;
+        if (Number.isInteger(rounded)) return `${rounded}`;
+        return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      };
+
+      const resolveCompactCapacityCellState = (
+        snapshot: CompactProjectSnapshot,
+        department: Department,
+        weekStartDate: string
+      ): CompactCapacityCellState => {
+        const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
+        if (!timingCell.active) {
+          return {
+            ...timingCell,
+            capacityValue: null,
+            displayValue: '-',
+          };
+        }
+
+        const assignmentEntry = assignmentIndex.byCell.get(`${snapshot.projectId}|${department}|${weekStartDate}`);
+        const totalHours = assignmentEntry?.totalHours ?? 0;
+        const normalizedCapacity = department === 'MFG' ? totalHours : (totalHours / 45);
+
+        return {
+          ...timingCell,
+          capacityValue: normalizedCapacity,
+          displayValue: formatCompactCapacityValue(normalizedCapacity),
+        };
+      };
+
       const compactProjectIds = Array.from(new Set(timingLogs.map((entry) => entry.objectId).filter(Boolean)));
       const compactProjects = compactProjectIds
         .map((projectId) => createProjectCompactSnapshot(projectId))
@@ -4171,8 +4207,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
       const compactTitle = compactSheet.getCell(1, 1);
       compactTitle.value = language === 'es'
-        ? 'Timing Compacto Semanal (comparativa: estado actual vs semana pasada)'
-        : 'Weekly Compact Timing (comparison: current state vs previous week)';
+        ? 'Capacity Compacto Semanal (comparativa: capacidad actual vs semana pasada)'
+        : 'Weekly Compact Capacity (comparison: current capacity vs previous week)';
       compactTitle.font = { bold: true, size: 12, color: { argb: HEADER_TEXT } };
       compactTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
       compactTitle.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -4189,7 +4225,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getCell(2, 3).value = 'DPTO';
       compactSheet.getCell(3, 1).value = '';
       compactSheet.getCell(3, 2).value = '';
-      compactSheet.getCell(3, 3).value = '';
+      compactSheet.getCell(3, 3).value = language === 'es'
+        ? 'Cap (MFG=h, otros=talento)'
+        : 'Cap (MFG=h, others=people)';
 
       weeklyRange.forEach((weekStartDate, index) => {
         const column = compactMatrixStartColumn + index;
@@ -4292,17 +4330,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const column = compactMatrixStartColumn + weekIndex;
-            const compactCell = resolveCompactCellState(snapshot, dept, weekStartDate);
+            const compactCell = resolveCompactCapacityCellState(snapshot, dept, weekStartDate);
             const cell = row.getCell(column);
-            cell.value = compactCell.value;
+            cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '-';
+            if (compactCell.capacityValue !== null) {
+              cell.numFmt = '0.##';
+            }
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            cell.font = { size: 9, bold: compactCell.active, color: { argb: '1F2937' } };
+            const hasCapacityLoad = compactCell.capacityValue !== null && compactCell.capacityValue > 0;
+            cell.font = {
+              size: 9,
+              bold: hasCapacityLoad,
+              color: { argb: hasCapacityLoad ? '1F2937' : '6B7280' },
+            };
 
             if (compactCell.active) {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
-                fgColor: { argb: compactCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
+                fgColor: {
+                  argb:
+                    compactCell.isFirstWeek
+                      ? 'FDE68A'
+                      : (hasCapacityLoad ? compactDeptFillByDept[dept] : 'E2E8F0'),
+                },
               };
             } else {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
@@ -4371,9 +4422,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const currentRow = currentBlock.rowByDepartment[dept];
           const previousRow = previousBlock.rowByDepartment[dept];
           weeklyRange.forEach((weekStartDate, weekIndex) => {
-            const currentCellState = resolveCompactCellState(currentSnapshot, dept, weekStartDate);
-            const previousCellState = resolveCompactCellState(previousSnapshot, dept, weekStartDate);
-            if (currentCellState.value === previousCellState.value) return;
+            const currentCellState = resolveCompactCapacityCellState(currentSnapshot, dept, weekStartDate);
+            const previousCellState = resolveCompactCapacityCellState(previousSnapshot, dept, weekStartDate);
+            const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
+            const sameTimingActivity = currentCellState.active === previousCellState.active;
+            if (sameCapacity && sameTimingActivity) return;
             const column = compactMatrixStartColumn + weekIndex;
             compactDiffCells.push({ row: currentRow, column });
             compactDiffCells.push({ row: previousRow, column });
