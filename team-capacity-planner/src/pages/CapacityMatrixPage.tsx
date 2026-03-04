@@ -3821,6 +3821,264 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return a.changedAtRaw.localeCompare(b.changedAtRaw);
       });
 
+      interface CompactDeptTimingSnapshot {
+        stage: Stage;
+        weekStart: number | null;
+        weekEnd: number | null;
+        durationWeeks: number | null;
+        departmentStartDate: string;
+      }
+
+      interface CompactProjectSnapshot {
+        projectId: string;
+        projectName: string;
+        startDate: string;
+        numberOfWeeks: number | null;
+        departments: Record<Department, CompactDeptTimingSnapshot>;
+      }
+
+      interface CompactCellState {
+        value: string;
+        active: boolean;
+        isFirstWeek: boolean;
+      }
+
+      const toFiniteNumber = (value: unknown): number | null => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+      };
+
+      const extractCompactDeptSnapshot = (stageRows: unknown): Partial<CompactDeptTimingSnapshot> | null => {
+        if (!Array.isArray(stageRows) || stageRows.length === 0) return null;
+
+        let minWeekStart: number | null = null;
+        let maxWeekEnd: number | null = null;
+        let firstDuration: number | null = null;
+        let departmentStartDate = '';
+        let stage: Stage = null;
+
+        stageRows.forEach((rawStage, index) => {
+          const stageObj = asObject(rawStage);
+          if (!stageObj) return;
+
+          if (stage === null && (typeof stageObj.stage === 'string' || stageObj.stage === null)) {
+            stage = stageObj.stage as Stage;
+          }
+
+          const weekStartValue = toFiniteNumber(stageObj.weekStart);
+          const weekEndValue = toFiniteNumber(stageObj.weekEnd);
+          const durationValue = toFiniteNumber(stageObj.durationWeeks);
+          const deptStartValue = typeof stageObj.departmentStartDate === 'string'
+            ? stageObj.departmentStartDate.slice(0, 10)
+            : '';
+
+          if (durationValue !== null && durationValue > 0 && firstDuration === null) {
+            firstDuration = durationValue;
+          }
+
+          if (weekStartValue !== null && weekEndValue !== null && weekEndValue >= weekStartValue) {
+            if (minWeekStart === null || weekStartValue < minWeekStart) {
+              minWeekStart = weekStartValue;
+              if (deptStartValue) departmentStartDate = deptStartValue;
+            }
+            if (maxWeekEnd === null || weekEndValue > maxWeekEnd) {
+              maxWeekEnd = weekEndValue;
+            }
+          } else if (!departmentStartDate && index === 0 && deptStartValue) {
+            departmentStartDate = deptStartValue;
+          }
+        });
+
+        const durationFromRange =
+          minWeekStart !== null &&
+          maxWeekEnd !== null &&
+          maxWeekEnd >= minWeekStart
+            ? (maxWeekEnd - minWeekStart + 1)
+            : null;
+
+        return {
+          stage,
+          weekStart: minWeekStart,
+          weekEnd: maxWeekEnd,
+          durationWeeks: durationFromRange ?? firstDuration,
+          departmentStartDate,
+        };
+      };
+
+      const createEmptyCompactDeptSnapshot = (): CompactDeptTimingSnapshot => ({
+        stage: null,
+        weekStart: null,
+        weekEnd: null,
+        durationWeeks: null,
+        departmentStartDate: '',
+      });
+
+      const createProjectCompactSnapshot = (projectId: string): CompactProjectSnapshot => {
+        const project = projectById.get(projectId);
+        const departments = DEPARTMENTS.reduce((acc, dept) => {
+          acc[dept] = createEmptyCompactDeptSnapshot();
+          return acc;
+        }, {} as Record<Department, CompactDeptTimingSnapshot>);
+
+        if (project?.departmentStages) {
+          DEPARTMENTS.forEach((dept) => {
+            const parsed = extractCompactDeptSnapshot(project.departmentStages?.[dept]);
+            if (!parsed) return;
+            departments[dept] = {
+              stage: parsed.stage ?? departments[dept].stage,
+              weekStart: parsed.weekStart ?? departments[dept].weekStart,
+              weekEnd: parsed.weekEnd ?? departments[dept].weekEnd,
+              durationWeeks: parsed.durationWeeks ?? departments[dept].durationWeeks,
+              departmentStartDate: parsed.departmentStartDate ?? departments[dept].departmentStartDate,
+            };
+          });
+        }
+
+        const fallbackName = timingLogs.find((entry) => entry.objectId === projectId)
+          ?.changes?.updates?.name;
+
+        return {
+          projectId,
+          projectName: project?.name || fallbackName || `${language === 'es' ? 'Proyecto' : 'Project'} ${projectId.slice(0, 8)}`,
+          startDate: project?.startDate || '',
+          numberOfWeeks: Number.isFinite(Number(project?.numberOfWeeks)) ? Number(project?.numberOfWeeks) : null,
+          departments,
+        };
+      };
+
+      const applyTimingUpdateToCompactSnapshot = (snapshot: CompactProjectSnapshot, updates: Record<string, any>) => {
+        if (typeof updates.name === 'string' && updates.name.trim()) {
+          snapshot.projectName = updates.name.trim();
+        }
+        if (typeof updates.startDate === 'string' && updates.startDate) {
+          snapshot.startDate = updates.startDate.slice(0, 10);
+        }
+        const updatedDuration = toFiniteNumber(updates.numberOfWeeks);
+        if (updatedDuration !== null && updatedDuration > 0) {
+          snapshot.numberOfWeeks = updatedDuration;
+        }
+
+        const departmentStages = asObject(updates.departmentStages);
+        if (!departmentStages) return;
+
+        DEPARTMENTS.forEach((dept) => {
+          const parsed = extractCompactDeptSnapshot(departmentStages[dept]);
+          if (!parsed) return;
+          const current = snapshot.departments[dept];
+          snapshot.departments[dept] = {
+            stage: parsed.stage ?? current.stage,
+            weekStart: parsed.weekStart ?? current.weekStart,
+            weekEnd: parsed.weekEnd ?? current.weekEnd,
+            durationWeeks: parsed.durationWeeks ?? current.durationWeeks,
+            departmentStartDate: parsed.departmentStartDate ?? current.departmentStartDate,
+          };
+        });
+      };
+
+      const resolveCompactCellState = (
+        snapshot: CompactProjectSnapshot,
+        department: Department,
+        weekStartDate: string
+      ): CompactCellState => {
+        let effectiveStartDate = '';
+        let durationWeeks = 0;
+
+        if (department === 'PM') {
+          effectiveStartDate = snapshot.startDate;
+          durationWeeks = snapshot.numberOfWeeks || 0;
+        } else {
+          const deptSnapshot = snapshot.departments[department];
+          effectiveStartDate = deptSnapshot.departmentStartDate || '';
+          if (!effectiveStartDate && snapshot.startDate && deptSnapshot.weekStart !== null) {
+            const fallbackStart = parseISODate(snapshot.startDate);
+            fallbackStart.setDate(fallbackStart.getDate() + ((deptSnapshot.weekStart - 1) * 7));
+            effectiveStartDate = formatToISO(fallbackStart);
+          }
+          durationWeeks =
+            (deptSnapshot.durationWeeks && deptSnapshot.durationWeeks > 0)
+              ? deptSnapshot.durationWeeks
+              : (
+                  deptSnapshot.weekStart !== null &&
+                  deptSnapshot.weekEnd !== null &&
+                  deptSnapshot.weekEnd >= deptSnapshot.weekStart
+                    ? (deptSnapshot.weekEnd - deptSnapshot.weekStart + 1)
+                    : 0
+                );
+        }
+
+        if (!effectiveStartDate || durationWeeks <= 0) {
+          return { value: '-', active: false, isFirstWeek: false };
+        }
+
+        const start = parseISODate(effectiveStartDate);
+        const week = parseISODate(weekStartDate);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(week.getTime())) {
+          return { value: '-', active: false, isFirstWeek: false };
+        }
+
+        const end = new Date(start);
+        end.setDate(end.getDate() + (durationWeeks * 7) - 1);
+        if (week < start || week > end) {
+          return { value: '-', active: false, isFirstWeek: false };
+        }
+
+        const weekNumber = Math.floor((week.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+        return {
+          value: `${weekNumber}`,
+          active: true,
+          isFirstWeek: weekNumber === 1,
+        };
+      };
+
+      const compactProjectIds = Array.from(new Set(timingLogs.map((entry) => entry.objectId).filter(Boolean)));
+      const compactProjects = compactProjectIds
+        .map((projectId) => createProjectCompactSnapshot(projectId))
+        .sort((a, b) => a.projectName.localeCompare(b.projectName));
+
+      const compactLogsByProject = new Map<string, ActivityLogEntry[]>();
+      timingLogs.forEach((entry) => {
+        const bucket = compactLogsByProject.get(entry.objectId) || [];
+        bucket.push(entry);
+        compactLogsByProject.set(entry.objectId, bucket);
+      });
+
+      const compactStateByProject = new Map<string, CompactProjectSnapshot>();
+      const compactLogIndexByProject = new Map<string, number>();
+      compactProjects.forEach((projectSnapshot) => {
+        compactStateByProject.set(projectSnapshot.projectId, projectSnapshot);
+        compactLogIndexByProject.set(projectSnapshot.projectId, 0);
+      });
+
+      const compactGrid = new Map<string, CompactCellState>();
+      weeklyRange.forEach((weekStartDate) => {
+        compactProjects.forEach((projectSnapshot) => {
+          const projectId = projectSnapshot.projectId;
+          const projectLogs = compactLogsByProject.get(projectId) || [];
+          let logIndex = compactLogIndexByProject.get(projectId) || 0;
+          const snapshot = compactStateByProject.get(projectId);
+          if (!snapshot) return;
+
+          while (logIndex < projectLogs.length) {
+            const log = projectLogs[logIndex];
+            const logDay = (log.createdAt || '').slice(0, 10);
+            if (!logDay || logDay > weekStartDate) break;
+            const updates = extractProjectUpdatePayload(log.changes);
+            if (updates) {
+              applyTimingUpdateToCompactSnapshot(snapshot, updates);
+            }
+            logIndex += 1;
+          }
+          compactLogIndexByProject.set(projectId, logIndex);
+
+          DEPARTMENTS.forEach((dept) => {
+            compactGrid.set(
+              `${projectId}|${dept}|${weekStartDate}`,
+              resolveCompactCellState(snapshot, dept, weekStartDate)
+            );
+          });
+        });
+      });
+
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const BORDER = 'D5D1DA';
@@ -3918,6 +4176,104 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         from: { row: 1, column: 1 },
         to: { row: 1, column: projectSheet.columnCount },
       };
+
+      const compactSheet = workbook.addWorksheet(language === 'es' ? 'Timing Compacto Semanal' : 'Weekly Compact Timing');
+      compactSheet.columns = [
+        { width: 32 },
+        { width: 10 },
+        ...weeklyRange.map(() => ({ width: 8 })),
+      ];
+
+      const compactHeaderEndColumn = 2 + weeklyRange.length;
+      compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
+      const compactTitle = compactSheet.getCell(1, 1);
+      compactTitle.value = language === 'es'
+        ? 'Timing Compacto Semanal (estado mas reciente por lunes)'
+        : 'Weekly Compact Timing (latest state by Monday)';
+      compactTitle.font = { bold: true, size: 12, color: { argb: HEADER_TEXT } };
+      compactTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+      compactTitle.alignment = { vertical: 'middle', horizontal: 'left' };
+      compactTitle.border = {
+        top: { style: 'thin', color: { argb: BORDER } },
+        left: { style: 'thin', color: { argb: BORDER } },
+        bottom: { style: 'thin', color: { argb: BORDER } },
+        right: { style: 'thin', color: { argb: BORDER } },
+      };
+      compactSheet.getRow(1).height = 24;
+
+      compactSheet.getCell(2, 1).value = language === 'es' ? 'Proyecto' : 'Project';
+      compactSheet.getCell(2, 2).value = 'DPTO';
+      compactSheet.getCell(3, 1).value = '';
+      compactSheet.getCell(3, 2).value = '';
+
+      weeklyRange.forEach((weekStartDate, index) => {
+        const column = index + 3;
+        const weekNum = getWeekNumber(weekStartDate);
+        compactSheet.getCell(2, column).value = `CW${String(weekNum).padStart(2, '0')}`;
+        compactSheet.getCell(3, column).value = weekStartDate;
+      });
+
+      styleHeader(compactSheet, 2);
+      styleHeader(compactSheet, 3);
+      compactSheet.getRow(3).font = { bold: false, color: { argb: HEADER_TEXT } };
+      compactSheet.getRow(3).height = 18;
+      compactSheet.views = [{ state: 'frozen', ySplit: 3, xSplit: 2 }];
+      compactSheet.autoFilter = {
+        from: { row: 2, column: 1 },
+        to: { row: 2, column: compactHeaderEndColumn },
+      };
+
+      const compactDeptFillByDept: Record<Department, string> = {
+        PM: 'EDE9FE',
+        MED: 'DCFCE7',
+        HD: 'DBEAFE',
+        MFG: 'FEF3C7',
+        BUILD: 'FEE2E2',
+        PRG: 'D1FAE5',
+      };
+
+      let compactRow = 4;
+      compactProjects.forEach((projectSnapshot) => {
+        DEPARTMENTS.forEach((dept, deptIndex) => {
+          const row = compactSheet.getRow(compactRow);
+          row.getCell(1).value = deptIndex === 0 ? projectSnapshot.projectName : '';
+          row.getCell(2).value = dept;
+          row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
+          row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell(1).font = deptIndex === 0 ? { bold: true } : { bold: false };
+          row.getCell(2).font = { bold: true, color: { argb: '2E1A47' } };
+
+          weeklyRange.forEach((weekStartDate, weekIndex) => {
+            const column = weekIndex + 3;
+            const compactCell = compactGrid.get(`${projectSnapshot.projectId}|${dept}|${weekStartDate}`);
+            const cell = row.getCell(column);
+            const value = compactCell?.value || '-';
+            cell.value = value;
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.font = { size: 9, bold: compactCell?.active || false, color: { argb: '1F2937' } };
+
+            if (compactCell?.active) {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: compactCell.isFirstWeek ? 'FDE68A' : compactDeptFillByDept[dept] },
+              };
+            }
+          });
+
+          compactRow += 1;
+        });
+
+        const separator = compactSheet.getRow(compactRow);
+        separator.height = 6;
+        for (let column = 1; column <= compactHeaderEndColumn; column += 1) {
+          separator.getCell(column).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F3F4F6' } };
+          applyBorder(separator.getCell(column));
+        }
+        compactRow += 1;
+      });
+
+      styleRows(compactSheet, 4);
 
       const dateStamp = new Date().toISOString().slice(0, 10);
       const fileName = language === 'es'
