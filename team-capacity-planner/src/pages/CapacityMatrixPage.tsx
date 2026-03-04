@@ -3846,6 +3846,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       interface CompactCapacityCellState extends CompactCellState {
         capacityValue: number | null;
         displayValue: string;
+        inTimingRange: boolean;
+        hasCapacityLoad: boolean;
       }
 
       const toFiniteNumber = (value: unknown): number | null => {
@@ -4047,22 +4049,18 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         weekStartDate: string
       ): CompactCapacityCellState => {
         const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
-        if (!timingCell.active) {
-          return {
-            ...timingCell,
-            capacityValue: null,
-            displayValue: '-',
-          };
-        }
 
         const assignmentEntry = assignmentIndex.byCell.get(`${snapshot.projectId}|${department}|${weekStartDate}`);
         const totalHours = assignmentEntry?.totalHours ?? 0;
-        const normalizedCapacity = department === 'MFG' ? totalHours : (totalHours / 45);
+        const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
+        const hasCapacityLoad = normalizedCapacity > 0;
 
         return {
           ...timingCell,
-          capacityValue: normalizedCapacity,
-          displayValue: formatCompactCapacityValue(normalizedCapacity),
+          capacityValue: hasCapacityLoad ? normalizedCapacity : null,
+          displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '-',
+          inTimingRange: timingCell.active,
+          hasCapacityLoad,
         };
       };
 
@@ -4337,14 +4335,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               cell.numFmt = '0.##';
             }
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            const hasCapacityLoad = compactCell.capacityValue !== null && compactCell.capacityValue > 0;
             cell.font = {
               size: 9,
-              bold: hasCapacityLoad,
-              color: { argb: hasCapacityLoad ? '1F2937' : '6B7280' },
+              bold: compactCell.hasCapacityLoad,
+              color: { argb: compactCell.hasCapacityLoad ? '1F2937' : '6B7280' },
             };
 
-            if (compactCell.active) {
+            if (compactCell.inTimingRange) {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
@@ -4352,9 +4349,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   argb:
                     compactCell.isFirstWeek
                       ? 'FDE68A'
-                      : (hasCapacityLoad ? compactDeptFillByDept[dept] : 'E2E8F0'),
+                      : (compactCell.hasCapacityLoad ? compactDeptFillByDept[dept] : 'E2E8F0'),
                 },
               };
+            } else if (compactCell.hasCapacityLoad) {
+              // Hours exist outside timing window; keep visible with warning color.
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FDE68A' } };
             } else {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
             }
