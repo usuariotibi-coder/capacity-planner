@@ -4152,11 +4152,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         snapshot: CompactProjectSnapshot,
         department: Department,
         weekStartDate: string,
-        assignmentHoursByCell: Map<string, number>
+        assignmentHoursByCell: Map<string, number>,
+        fallbackAssignmentHoursByCell?: Map<string, number>
       ): CompactCapacityCellState => {
         const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
 
-        const totalHours = assignmentHoursByCell.get(`${snapshot.projectId}|${department}|${weekStartDate}`) || 0;
+        const assignmentKey = `${snapshot.projectId}|${department}|${weekStartDate}`;
+        const totalHours = assignmentHoursByCell.has(assignmentKey)
+          ? (assignmentHoursByCell.get(assignmentKey) || 0)
+          : (fallbackAssignmentHoursByCell?.get(assignmentKey) || 0);
         const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
         const hasCapacityLoad = normalizedCapacity > 0;
 
@@ -4240,6 +4244,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           hoursByCell.set(key, roundCompactHours((hoursByCell.get(key) || 0) + snapshot.hours));
         });
 
+        return hoursByCell;
+      };
+
+      const buildCurrentAssignmentHoursByCell = (): Map<string, number> => {
+        const hoursByCell = new Map<string, number>();
+        assignmentIndex.byCell.forEach((entry, key) => {
+          const totalHours = roundCompactHours(entry?.totalHours ?? 0);
+          if (totalHours > 0) {
+            hoursByCell.set(key, totalHours);
+          }
+        });
         return hoursByCell;
       };
 
@@ -4436,7 +4451,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousSnapshotWeekStart = hasWeekOverWeekRange
         ? previousWeekStart
         : compactCurrentSnapshotWeekStart;
-      const compactCurrentAssignmentHoursByCell = buildCompactAssignmentHoursByWeekStart(compactCurrentSnapshotWeekStart);
+      const compactCurrentAssignmentHoursByCell = buildCurrentAssignmentHoursByCell();
       const compactPreviousAssignmentHoursByCell = buildCompactAssignmentHoursByWeekStart(compactPreviousSnapshotWeekStart);
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
@@ -4457,6 +4472,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const renderCompactSnapshotRows = (
         snapshot: CompactProjectSnapshot,
         assignmentHoursByCell: Map<string, number>,
+        fallbackAssignmentHoursByCell: Map<string, number> | undefined,
         viewLabel: string,
         viewFill: string,
         rowFill: string,
@@ -4484,7 +4500,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               snapshot,
               dept,
               weekStartDate,
-              assignmentHoursByCell
+              assignmentHoursByCell,
+              fallbackAssignmentHoursByCell
             );
             const cell = row.getCell(column);
             cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '-';
@@ -4555,6 +4572,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const currentBlock = renderCompactSnapshotRows(
           currentSnapshot,
           compactCurrentAssignmentHoursByCell,
+          undefined,
           currentViewLabel,
           'DBEAFE',
           'F0F9FF',
@@ -4563,6 +4581,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const previousBlock = renderCompactSnapshotRows(
           previousSnapshot,
           compactPreviousAssignmentHoursByCell,
+          compactCurrentAssignmentHoursByCell,
           previousViewLabel,
           'E5E7EB',
           'F9FAFB',
@@ -4591,7 +4610,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               previousSnapshot,
               dept,
               weekStartDate,
-              compactPreviousAssignmentHoursByCell
+              compactPreviousAssignmentHoursByCell,
+              compactCurrentAssignmentHoursByCell
             );
             const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
             const sameTimingActivity = currentCellState.active === previousCellState.active;
