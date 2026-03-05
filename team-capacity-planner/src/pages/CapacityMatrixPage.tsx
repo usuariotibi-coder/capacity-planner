@@ -4664,8 +4664,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 };
               }
             } else if (compactCell.hasCapacityLoad) {
-              // Hours exist outside timing window; keep visible with warning color.
-              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FDE68A' } };
+              // Keep palette consistent with on-screen stages; avoid warning yellow.
+              const stagePalette = getCompactStagePalette(compactCell.stage, dept);
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: stagePalette?.bg || compactDeptFillByDept[dept] },
+              };
+              if (stagePalette) {
+                cell.font = {
+                  ...(cell.font || {}),
+                  bold: true,
+                  color: { argb: stagePalette.fg },
+                };
+              }
             } else {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
             }
