@@ -4858,6 +4858,78 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         }
       });
 
+      const compactLegendRows = DEPARTMENTS.flatMap((dept) =>
+        (STAGE_OPTIONS[dept] || []).map((stage) => ({ dept, stage }))
+      );
+      if (compactLegendRows.length > 0) {
+        const legendTitleRow = compactRow + 1;
+        const legendHeaderRow = legendTitleRow + 1;
+        let legendRow = legendHeaderRow + 1;
+
+        compactSheet.mergeCells(legendTitleRow, 1, legendTitleRow, 4);
+        const legendTitleCell = compactSheet.getCell(legendTitleRow, 1);
+        legendTitleCell.value = language === 'es'
+          ? 'Leyenda de colores por departamento y etapa'
+          : 'Stage color legend by department';
+        legendTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+        legendTitleCell.font = { bold: true, color: { argb: HEADER_TEXT } };
+        legendTitleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+        applyBorder(legendTitleCell);
+        compactSheet.getRow(legendTitleRow).height = 20;
+
+        const legendHeaders = [
+          language === 'es' ? 'DPTO' : 'Dept',
+          language === 'es' ? 'Etapa' : 'Stage',
+          language === 'es' ? 'Codigo' : 'Code',
+          language === 'es' ? 'Color' : 'Color',
+        ];
+        legendHeaders.forEach((header, index) => {
+          const cell = compactSheet.getCell(legendHeaderRow, index + 1);
+          cell.value = header;
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '475569' } };
+          cell.font = { bold: true, color: { argb: WHITE } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          applyBorder(cell);
+        });
+        compactSheet.getRow(legendHeaderRow).height = 18;
+
+        compactLegendRows.forEach(({ dept, stage }) => {
+          const palette = getCompactStagePalette(stage, dept) || { bg: 'E5E7EB', fg: '111827' };
+          const row = compactSheet.getRow(legendRow);
+          row.height = 18;
+
+          const deptCell = row.getCell(1);
+          deptCell.value = dept;
+          deptCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F8FAFC' } };
+          deptCell.font = { bold: true, color: { argb: '1F2937' } };
+          deptCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          applyBorder(deptCell);
+
+          const stageLabelCell = row.getCell(2);
+          stageLabelCell.value = getStageLabel(stage, t as Record<string, string>);
+          stageLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF' } };
+          stageLabelCell.font = { color: { argb: '1F2937' } };
+          stageLabelCell.alignment = { vertical: 'middle', horizontal: 'left' };
+          applyBorder(stageLabelCell);
+
+          const stageCodeCell = row.getCell(3);
+          stageCodeCell.value = stage;
+          stageCodeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF' } };
+          stageCodeCell.font = { color: { argb: '64748B' }, size: 8 };
+          stageCodeCell.alignment = { vertical: 'middle', horizontal: 'left' };
+          applyBorder(stageCodeCell);
+
+          const sampleCell = row.getCell(4);
+          sampleCell.value = language === 'es' ? 'Muestra' : 'Sample';
+          sampleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.bg } };
+          sampleCell.font = { bold: true, color: { argb: palette.fg } };
+          sampleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          applyBorder(sampleCell);
+
+          legendRow += 1;
+        });
+      }
+
       const dateStamp = new Date().toISOString().slice(0, 10);
       const fileName = language === 'es'
         ? `timing-semanal-${startDate}-a-${endDate}-${dateStamp}.xlsx`
