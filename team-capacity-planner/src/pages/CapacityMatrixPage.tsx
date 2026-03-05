@@ -3863,6 +3863,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         weekStartDate: string;
         hours: number;
         employeeId: string;
+        stage: Stage;
       }
 
       interface CompactCellState {
@@ -3876,6 +3877,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         displayValue: string;
         inTimingRange: boolean;
         hasCapacityLoad: boolean;
+        stage: Stage;
       }
 
       const toFiniteNumber = (value: unknown): number | null => {
@@ -3894,6 +3896,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const raw = asCompactString(value).trim().toUpperCase();
         if (!raw) return '';
         return DEPARTMENT_SET.has(raw as Department) ? (raw as Department) : '';
+      };
+      const normalizeCompactStage = (value: unknown): Stage => {
+        if (value === null) return null;
+        const raw = asCompactString(value).trim();
+        return raw ? (raw as Stage) : null;
       };
       const resolveCompactHoursFromPayload = (payload: Record<string, any>, fallbackHours: number): number => {
         const hasSplitFields =
@@ -3950,6 +3957,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const projectId = resolveCompactAssignmentProjectId(current, previous?.projectId || '');
         const weekStartDate = resolveCompactAssignmentWeek(current, previous?.weekStartDate || '');
         const hours = resolveCompactHoursFromPayload(current, previous?.hours ?? 0);
+        const hasStageField = hasOwn(current, 'stage') || hasOwn(current, 'stage_name');
+        const stage = hasStageField
+          ? normalizeCompactStage(current.stage ?? current.stage_name)
+          : (previous?.stage ?? null);
 
         return {
           projectId,
@@ -3957,6 +3968,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           weekStartDate,
           hours,
           employeeId: employeeId || previous?.employeeId || '',
+          stage,
         };
       };
 
@@ -4148,12 +4160,40 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
       };
 
+      const parseTailwindBgHex = (bgClass: string): string | null => {
+        const match = bgClass.match(/#([0-9A-Fa-f]{6})/);
+        return match ? match[1].toUpperCase() : null;
+      };
+
+      const compactFallbackBgByClass: Record<string, string> = {
+        'bg-gray-100': 'F3F4F6',
+        'bg-red-500': 'EF4444',
+        'bg-red-700': 'B91C1C',
+        'bg-yellow-100': 'FEF9C3',
+        'bg-green-100': 'DCFCE7',
+      };
+
+      const getCompactStagePalette = (
+        stage: Stage,
+        department: Department
+      ): { bg: string; fg: string } | null => {
+        if (!stage) return null;
+        const stageColor = getStageColor(stage, department);
+        const parsedBg = parseTailwindBgHex(stageColor.bg);
+        const bg = parsedBg || compactFallbackBgByClass[stageColor.bg];
+        if (!bg) return null;
+        const fg = stageColor.text.includes('text-white') ? WHITE : '111827';
+        return { bg, fg };
+      };
+
       const resolveCompactCapacityCellState = (
         snapshot: CompactProjectSnapshot,
         department: Department,
         weekStartDate: string,
         assignmentHoursByCell: Map<string, number>,
+        assignmentStageByCell: Map<string, Stage>,
         fallbackAssignmentHoursByCell?: Map<string, number>,
+        fallbackAssignmentStageByCell?: Map<string, Stage>,
         fallbackBlockedKeys?: Set<string>
       ): CompactCapacityCellState => {
         const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
@@ -4163,6 +4203,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const totalHours = assignmentHoursByCell.has(assignmentKey)
           ? (assignmentHoursByCell.get(assignmentKey) || 0)
           : (allowFallback ? (fallbackAssignmentHoursByCell?.get(assignmentKey) || 0) : 0);
+        const stage = assignmentStageByCell.has(assignmentKey)
+          ? (assignmentStageByCell.get(assignmentKey) || null)
+          : (allowFallback ? (fallbackAssignmentStageByCell?.get(assignmentKey) || null) : null);
         const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
         const hasCapacityLoad = normalizedCapacity > 0;
 
@@ -4172,6 +4215,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '-',
           inTimingRange: timingCell.active,
           hasCapacityLoad,
+          stage,
         };
       };
 
@@ -4212,6 +4256,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const buildCompactAssignmentHoursContextByWeekStart = (weekStartDate: string): {
         hoursByCell: Map<string, number>;
+        stageByCell: Map<string, Stage>;
         changedKeysAfterSnapshot: Set<string>;
       } => {
         const assignmentStateById = new Map<string, CompactAssignmentSnapshot>();
@@ -4219,6 +4264,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         if (!weekStartDate) {
           return {
             hoursByCell: new Map<string, number>(),
+            stageByCell: new Map<string, Stage>(),
             changedKeysAfterSnapshot,
           };
         }
@@ -4296,24 +4342,38 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         }
 
         const hoursByCell = new Map<string, number>();
+        const stageByCell = new Map<string, Stage>();
         snapshotStateById.forEach((snapshot) => {
           const key = getCompactAssignmentCellKey(snapshot);
           if (!key || snapshot.hours <= 0) return;
           hoursByCell.set(key, roundCompactHours((hoursByCell.get(key) || 0) + snapshot.hours));
+
+          if (snapshot.stage) {
+            const department = snapshot.department as Department;
+            const currentStage = stageByCell.get(key) || null;
+            if (isHigherPriorityStage(department, snapshot.stage, currentStage)) {
+              stageByCell.set(key, snapshot.stage);
+            }
+          }
         });
 
-        return { hoursByCell, changedKeysAfterSnapshot };
+        return { hoursByCell, stageByCell, changedKeysAfterSnapshot };
       };
 
-      const buildCurrentAssignmentHoursByCell = (): Map<string, number> => {
+      const buildCurrentAssignmentContext = (): {
+        hoursByCell: Map<string, number>;
+        stageByCell: Map<string, Stage>;
+      } => {
         const hoursByCell = new Map<string, number>();
+        const stageByCell = new Map<string, Stage>();
         assignmentIndex.byCell.forEach((entry, key) => {
           const totalHours = roundCompactHours(entry?.totalHours ?? 0);
           if (totalHours > 0) {
             hoursByCell.set(key, totalHours);
+            stageByCell.set(key, entry?.stage ?? null);
           }
         });
-        return hoursByCell;
+        return { hoursByCell, stageByCell };
       };
 
       const ExcelJS = await import('exceljs');
@@ -4509,9 +4569,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousSnapshotWeekStart = hasWeekOverWeekRange
         ? previousWeekStart
         : compactCurrentSnapshotWeekStart;
-      const compactCurrentAssignmentHoursByCell = buildCurrentAssignmentHoursByCell();
+      const compactCurrentAssignmentContext = buildCurrentAssignmentContext();
+      const compactCurrentAssignmentHoursByCell = compactCurrentAssignmentContext.hoursByCell;
+      const compactCurrentAssignmentStageByCell = compactCurrentAssignmentContext.stageByCell;
       const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(compactPreviousSnapshotWeekStart);
       const compactPreviousAssignmentHoursByCell = compactPreviousAssignmentContext.hoursByCell;
+      const compactPreviousAssignmentStageByCell = compactPreviousAssignmentContext.stageByCell;
       const compactChangedKeysAfterPrevious = compactPreviousAssignmentContext.changedKeysAfterSnapshot;
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
@@ -4532,7 +4595,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const renderCompactSnapshotRows = (
         snapshot: CompactProjectSnapshot,
         assignmentHoursByCell: Map<string, number>,
+        assignmentStageByCell: Map<string, Stage>,
         fallbackAssignmentHoursByCell: Map<string, number> | undefined,
+        fallbackAssignmentStageByCell: Map<string, Stage> | undefined,
         fallbackBlockedKeys: Set<string> | undefined,
         viewLabel: string,
         viewFill: string,
@@ -4562,7 +4627,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               dept,
               weekStartDate,
               assignmentHoursByCell,
+              assignmentStageByCell,
               fallbackAssignmentHoursByCell,
+              fallbackAssignmentStageByCell,
               fallbackBlockedKeys
             );
             const cell = row.getCell(column);
@@ -4578,16 +4645,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             };
 
             if (compactCell.inTimingRange) {
+              const stagePalette = getCompactStagePalette(compactCell.stage, dept);
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
                 fgColor: {
                   argb:
-                    compactCell.isFirstWeek
-                      ? 'FDE68A'
-                      : (compactCell.hasCapacityLoad ? compactDeptFillByDept[dept] : 'E2E8F0'),
+                    compactCell.hasCapacityLoad
+                      ? (stagePalette?.bg || compactDeptFillByDept[dept])
+                      : 'E2E8F0',
                 },
               };
+              if (compactCell.hasCapacityLoad && stagePalette) {
+                cell.font = {
+                  ...(cell.font || {}),
+                  bold: true,
+                  color: { argb: stagePalette.fg },
+                };
+              }
             } else if (compactCell.hasCapacityLoad) {
               // Hours exist outside timing window; keep visible with warning color.
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FDE68A' } };
@@ -4634,6 +4709,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const currentBlock = renderCompactSnapshotRows(
           currentSnapshot,
           compactCurrentAssignmentHoursByCell,
+          compactCurrentAssignmentStageByCell,
+          undefined,
           undefined,
           undefined,
           currentViewLabel,
@@ -4644,7 +4721,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const previousBlock = renderCompactSnapshotRows(
           previousSnapshot,
           compactPreviousAssignmentHoursByCell,
+          compactPreviousAssignmentStageByCell,
           compactCurrentAssignmentHoursByCell,
+          compactCurrentAssignmentStageByCell,
           compactChangedKeysAfterPrevious,
           previousViewLabel,
           'E5E7EB',
@@ -4668,14 +4747,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               currentSnapshot,
               dept,
               weekStartDate,
-              compactCurrentAssignmentHoursByCell
+              compactCurrentAssignmentHoursByCell,
+              compactCurrentAssignmentStageByCell
             );
             const previousCellState = resolveCompactCapacityCellState(
               previousSnapshot,
               dept,
               weekStartDate,
               compactPreviousAssignmentHoursByCell,
+              compactPreviousAssignmentStageByCell,
               compactCurrentAssignmentHoursByCell,
+              compactCurrentAssignmentStageByCell,
               compactChangedKeysAfterPrevious
             );
             const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
@@ -4757,8 +4839,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         const fillArgb = (cell.fill as any)?.fgColor?.argb;
         if (!fillArgb || fillArgb === WHITE) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7ED' } };
+          cell.font = { ...(cell.font || {}), bold: true, color: { argb: '9A3412' } };
+        } else {
+          // Keep stage color text so exported palette matches on-screen cells.
+          cell.font = { ...(cell.font || {}), bold: true };
         }
-        cell.font = { ...(cell.font || {}), bold: true, color: { argb: '9A3412' } };
       });
 
       const dateStamp = new Date().toISOString().slice(0, 10);
