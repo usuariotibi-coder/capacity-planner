@@ -4501,25 +4501,31 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         to: { row: 2, column: compactHeaderEndColumn },
       };
 
+      let compactDataStartRow = 4;
       const compactLegendRows = DEPARTMENTS.flatMap((dept) =>
         (STAGE_OPTIONS[dept] || []).map((stage) => ({ dept, stage }))
       );
       if (compactLegendRows.length > 0) {
-        const legendStartColumn = compactHeaderEndColumn + 2;
+        const legendStartColumn = 1;
         const legendEndColumn = legendStartColumn + 3;
-        compactSheet.getColumn(legendStartColumn).width = 10;
-        compactSheet.getColumn(legendStartColumn + 1).width = 24;
+        const legendTitleRow = 4;
+        const legendHeaderRow = legendTitleRow + 1;
+        let legendRow = legendHeaderRow + 1;
+        compactDataStartRow = legendRow + compactLegendRows.length + 1;
+
+        compactSheet.getColumn(legendStartColumn).width = Math.max(compactSheet.getColumn(legendStartColumn).width || 0, 10);
+        compactSheet.getColumn(legendStartColumn + 1).width = Math.max(compactSheet.getColumn(legendStartColumn + 1).width || 0, 24);
         compactSheet.getColumn(legendStartColumn + 2).width = 30;
         compactSheet.getColumn(legendStartColumn + 3).width = 12;
 
-        compactSheet.mergeCells(1, legendStartColumn, 1, legendEndColumn);
-        const legendTitleCell = compactSheet.getCell(1, legendStartColumn);
+        compactSheet.mergeCells(legendTitleRow, legendStartColumn, legendTitleRow, legendEndColumn);
+        const legendTitleCell = compactSheet.getCell(legendTitleRow, legendStartColumn);
         legendTitleCell.value = language === 'es'
           ? 'Leyenda de colores (Etapas)'
           : 'Stage Color Legend';
         legendTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
         legendTitleCell.font = { bold: true, color: { argb: HEADER_TEXT } };
-        legendTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        legendTitleCell.alignment = { vertical: 'middle', horizontal: 'left' };
         applyBorder(legendTitleCell);
 
         const legendHeaders = [
@@ -4529,7 +4535,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           language === 'es' ? 'Color' : 'Color',
         ];
         legendHeaders.forEach((header, index) => {
-          const cell = compactSheet.getCell(2, legendStartColumn + index);
+          const cell = compactSheet.getCell(legendHeaderRow, legendStartColumn + index);
           cell.value = header;
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '475569' } };
           cell.font = { bold: true, color: { argb: WHITE } };
@@ -4537,7 +4543,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           applyBorder(cell);
         });
 
-        let legendRow = 3;
         compactLegendRows.forEach(({ dept, stage }) => {
           const palette = getCompactStagePalette(stage, dept) || { bg: 'E5E7EB', fg: '111827' };
           const row = compactSheet.getRow(legendRow);
@@ -4724,7 +4729,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         };
       };
 
-      let compactRow = 4;
+      let compactRow = compactDataStartRow;
       compactProjects.forEach((projectSnapshot) => {
         const currentSnapshot = compactCurrentSnapshotByProject.get(projectSnapshot.projectId)
           || createProjectCompactSnapshot(projectSnapshot.projectId);
