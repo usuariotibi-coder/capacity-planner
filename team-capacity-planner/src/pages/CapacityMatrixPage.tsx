@@ -4153,14 +4153,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         department: Department,
         weekStartDate: string,
         assignmentHoursByCell: Map<string, number>,
-        fallbackAssignmentHoursByCell?: Map<string, number>
+        fallbackAssignmentHoursByCell?: Map<string, number>,
+        fallbackBlockedKeys?: Set<string>
       ): CompactCapacityCellState => {
         const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
 
         const assignmentKey = `${snapshot.projectId}|${department}|${weekStartDate}`;
+        const allowFallback = !fallbackBlockedKeys?.has(assignmentKey);
         const totalHours = assignmentHoursByCell.has(assignmentKey)
           ? (assignmentHoursByCell.get(assignmentKey) || 0)
-          : (fallbackAssignmentHoursByCell?.get(assignmentKey) || 0);
+          : (allowFallback ? (fallbackAssignmentHoursByCell?.get(assignmentKey) || 0) : 0);
         const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
         const hasCapacityLoad = normalizedCapacity > 0;
 
@@ -4203,48 +4205,104 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return snapshot;
       };
 
-      const buildCompactAssignmentHoursByWeekStart = (weekStartDate: string): Map<string, number> => {
-        const assignmentStateById = new Map<string, CompactAssignmentSnapshot>();
-        if (!weekStartDate) return new Map<string, number>();
+      const getCompactAssignmentCellKey = (snapshot: CompactAssignmentSnapshot | null): string => {
+        if (!snapshot || !snapshot.projectId || !snapshot.department || !snapshot.weekStartDate) return '';
+        return `${snapshot.projectId}|${snapshot.department}|${snapshot.weekStartDate}`;
+      };
 
-        for (const log of assignmentLogs) {
+      const buildCompactAssignmentHoursContextByWeekStart = (weekStartDate: string): {
+        hoursByCell: Map<string, number>;
+        changedKeysAfterSnapshot: Set<string>;
+      } => {
+        const assignmentStateById = new Map<string, CompactAssignmentSnapshot>();
+        const changedKeysAfterSnapshot = new Set<string>();
+        if (!weekStartDate) {
+          return {
+            hoursByCell: new Map<string, number>(),
+            changedKeysAfterSnapshot,
+          };
+        }
+
+        let logIndex = 0;
+        while (logIndex < assignmentLogs.length) {
+          const log = assignmentLogs[logIndex];
           const logDay = (log.createdAt || '').slice(0, 10);
           if (!logDay || logDay > weekStartDate) break;
 
           const action = normalizeCompactAction(log.action);
-          if (action === 'other') continue;
+          if (action !== 'other') {
+            const changesObj = asObject(log.changes);
+            const payload = changesObj
+              ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
+              : null;
 
-          const changesObj = asObject(log.changes);
-          const payload = changesObj
-            ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
-            : null;
+            const existingPrev = assignmentStateById.get(log.objectId) || null;
+            const fallbackPrev = action === 'deleted' && !existingPrev
+              ? buildCompactAssignmentSnapshot(payload, null)
+              : existingPrev;
 
-          const existingPrev = assignmentStateById.get(log.objectId) || null;
-          const fallbackPrev = action === 'deleted' && !existingPrev
-            ? buildCompactAssignmentSnapshot(payload, null)
-            : existingPrev;
+            let nextSnapshot: CompactAssignmentSnapshot | null = null;
+            if (action !== 'deleted') {
+              nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+            }
 
-          let nextSnapshot: CompactAssignmentSnapshot | null = null;
-          if (action !== 'deleted') {
-            nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+            if (action === 'deleted') {
+              assignmentStateById.delete(log.objectId);
+            } else if (nextSnapshot) {
+              assignmentStateById.set(log.objectId, nextSnapshot);
+            }
           }
 
-          if (action === 'deleted') {
-            assignmentStateById.delete(log.objectId);
-          } else if (nextSnapshot) {
-            assignmentStateById.set(log.objectId, nextSnapshot);
+          logIndex += 1;
+        }
+
+        const snapshotStateById = new Map<string, CompactAssignmentSnapshot>();
+        assignmentStateById.forEach((value, key) => {
+          snapshotStateById.set(key, { ...value });
+        });
+
+        while (logIndex < assignmentLogs.length) {
+          const log = assignmentLogs[logIndex];
+          const action = normalizeCompactAction(log.action);
+          if (action !== 'other') {
+            const changesObj = asObject(log.changes);
+            const payload = changesObj
+              ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
+              : null;
+
+            const existingPrev = assignmentStateById.get(log.objectId) || null;
+            const fallbackPrev = action === 'deleted' && !existingPrev
+              ? buildCompactAssignmentSnapshot(payload, null)
+              : existingPrev;
+
+            let nextSnapshot: CompactAssignmentSnapshot | null = null;
+            if (action !== 'deleted') {
+              nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+            }
+
+            const previousKey = getCompactAssignmentCellKey(fallbackPrev);
+            const nextKey = getCompactAssignmentCellKey(nextSnapshot);
+            if (previousKey) changedKeysAfterSnapshot.add(previousKey);
+            if (nextKey) changedKeysAfterSnapshot.add(nextKey);
+
+            if (action === 'deleted') {
+              assignmentStateById.delete(log.objectId);
+            } else if (nextSnapshot) {
+              assignmentStateById.set(log.objectId, nextSnapshot);
+            }
           }
+
+          logIndex += 1;
         }
 
         const hoursByCell = new Map<string, number>();
-        assignmentStateById.forEach((snapshot) => {
-          if (!snapshot.projectId || !snapshot.department || !snapshot.weekStartDate) return;
-          if (snapshot.hours <= 0) return;
-          const key = `${snapshot.projectId}|${snapshot.department}|${snapshot.weekStartDate}`;
+        snapshotStateById.forEach((snapshot) => {
+          const key = getCompactAssignmentCellKey(snapshot);
+          if (!key || snapshot.hours <= 0) return;
           hoursByCell.set(key, roundCompactHours((hoursByCell.get(key) || 0) + snapshot.hours));
         });
 
-        return hoursByCell;
+        return { hoursByCell, changedKeysAfterSnapshot };
       };
 
       const buildCurrentAssignmentHoursByCell = (): Map<string, number> => {
@@ -4452,7 +4510,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         ? previousWeekStart
         : compactCurrentSnapshotWeekStart;
       const compactCurrentAssignmentHoursByCell = buildCurrentAssignmentHoursByCell();
-      const compactPreviousAssignmentHoursByCell = buildCompactAssignmentHoursByWeekStart(compactPreviousSnapshotWeekStart);
+      const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(compactPreviousSnapshotWeekStart);
+      const compactPreviousAssignmentHoursByCell = compactPreviousAssignmentContext.hoursByCell;
+      const compactChangedKeysAfterPrevious = compactPreviousAssignmentContext.changedKeysAfterSnapshot;
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       compactProjects.forEach((projectSnapshot) => {
@@ -4473,6 +4533,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         snapshot: CompactProjectSnapshot,
         assignmentHoursByCell: Map<string, number>,
         fallbackAssignmentHoursByCell: Map<string, number> | undefined,
+        fallbackBlockedKeys: Set<string> | undefined,
         viewLabel: string,
         viewFill: string,
         rowFill: string,
@@ -4501,7 +4562,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               dept,
               weekStartDate,
               assignmentHoursByCell,
-              fallbackAssignmentHoursByCell
+              fallbackAssignmentHoursByCell,
+              fallbackBlockedKeys
             );
             const cell = row.getCell(column);
             cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '-';
@@ -4573,6 +4635,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           currentSnapshot,
           compactCurrentAssignmentHoursByCell,
           undefined,
+          undefined,
           currentViewLabel,
           'DBEAFE',
           'F0F9FF',
@@ -4582,6 +4645,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           previousSnapshot,
           compactPreviousAssignmentHoursByCell,
           compactCurrentAssignmentHoursByCell,
+          compactChangedKeysAfterPrevious,
           previousViewLabel,
           'E5E7EB',
           'F9FAFB',
@@ -4611,7 +4675,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               dept,
               weekStartDate,
               compactPreviousAssignmentHoursByCell,
-              compactCurrentAssignmentHoursByCell
+              compactCurrentAssignmentHoursByCell,
+              compactChangedKeysAfterPrevious
             );
             const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
             const sameTimingActivity = currentCellState.active === previousCellState.active;
