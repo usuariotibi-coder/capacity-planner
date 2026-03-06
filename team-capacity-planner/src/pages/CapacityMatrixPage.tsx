@@ -4530,6 +4530,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const compactBlockRanges: Array<{ startRow: number; endRow: number; outlineColor: string }> = [];
       const compactDiffCells: Array<{ row: number; column: number }> = [];
+      const compactCurrentDiffCells: Array<{ row: number; column: number }> = [];
       const compactRowsWithChanges = new Set<number>();
 
       const renderCompactSnapshotRows = (
@@ -4724,6 +4725,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             departmentHasChanges = true;
             const column = compactMatrixStartColumn + weekIndex;
             compactDiffCells.push({ row: currentRow, column });
+            compactCurrentDiffCells.push({ row: currentRow, column });
             compactDiffCells.push({ row: previousRow, column });
           });
 
@@ -4808,6 +4810,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           // Keep stage color text so exported palette matches on-screen cells.
           cell.font = { ...(cell.font || {}), bold: true };
         }
+      });
+
+      compactCurrentDiffCells.forEach(({ row, column }) => {
+        const cell = compactSheet.getRow(row).getCell(column);
+        cell.font = { ...(cell.font || {}), bold: true, color: { argb: '000000' } };
+        setBorderEdge(cell, 'top', '000000');
+        setBorderEdge(cell, 'right', '000000');
+        setBorderEdge(cell, 'bottom', '000000');
+        setBorderEdge(cell, 'left', '000000');
       });
 
       compactRowsWithChanges.forEach((rowNumber) => {
