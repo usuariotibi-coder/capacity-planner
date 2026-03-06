@@ -168,6 +168,7 @@ const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const PROJECT_TIMING_KEYS = new Set(['startDate', 'endDate', 'numberOfWeeks', 'departmentStages']);
 const PROJECT_TIMING_NESTED_KEYS = new Set(['departmentStartDate', 'durationWeeks', 'weekStart', 'weekEnd']);
+const getEndOfYearDate = (year: number): string => `${year}-12-31`;
 
 const asObject = (value: unknown): Record<string, any> | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -659,7 +660,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [showTimingChangesModal, setShowTimingChangesModal] = useState(false);
   const [timingChangesFromDate, setTimingChangesFromDate] = useState<string>(() => `${new Date().getFullYear()}-01-01`);
-  const [timingChangesToDate, setTimingChangesToDate] = useState<string>(() => formatToISO(new Date()));
+  const [timingChangesToDate, setTimingChangesToDate] = useState<string>(() => getEndOfYearDate(new Date().getFullYear()));
   const [timingChangesLogs, setTimingChangesLogs] = useState<ActivityLogEntry[]>([]);
   const [isTimingChangesLoading, setIsTimingChangesLoading] = useState(false);
   const [isTimingRangeExcelExporting, setIsTimingRangeExcelExporting] = useState(false);
@@ -2740,7 +2741,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return (
       <div
         key={dept}
-        className="w-full min-w-0 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2 py-1.5 border border-gray-200"
+        className="w-full min-w-0 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-1.5 py-1.5 border border-gray-200"
         title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
@@ -2748,28 +2749,28 @@ ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
         <div className="flex items-center gap-1 min-w-0">
-          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-1.5 py-1 shrink-0 min-w-[46px] min-h-[36px]">
-            <span className="text-[10px] font-bold text-gray-800 leading-none">{dept}</span>
+          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-1 py-1 shrink-0 min-w-[40px] min-h-[34px]">
+            <span className="text-[9px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
           <div className="flex items-stretch gap-1 min-w-0 flex-1">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[36px]">
-              <span className="text-[8px] font-semibold leading-none">{quotedCompactLabel}</span>
-              <span className="mt-0.5 text-[11px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[34px]">
+              <span className="text-[7px] font-semibold leading-none">{quotedCompactLabel}</span>
+              <span className="mt-0.5 text-[10px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[36px]">
-              <span className="text-[8px] font-semibold leading-none">{usedCompactLabel}</span>
-              <span className="mt-0.5 text-[11px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[34px]">
+              <span className="text-[7px] font-semibold leading-none">{usedCompactLabel}</span>
+              <span className="mt-0.5 text-[10px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[36px]">
-              <span className="text-[8px] font-semibold leading-none">{forecastCompactLabel}</span>
-              <span className="mt-0.5 text-[11px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-0.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[34px]">
+              <span className="text-[7px] font-semibold leading-none">{forecastCompactLabel}</span>
+              <span className="mt-0.5 text-[10px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</span>
             </div>
           </div>
 
-          <div className={`rounded px-1 py-1 text-center flex flex-col items-center justify-center shrink-0 min-w-[54px] min-h-[36px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
-            <span className="text-[8px] font-semibold leading-none opacity-80">Util</span>
-            <span className="mt-0.5 text-[11px] font-black leading-none">{utilizationPercent}%</span>
+          <div className={`rounded px-0.5 py-1 text-center flex flex-col items-center justify-center shrink-0 min-w-[48px] min-h-[34px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+            <span className="text-[7px] font-semibold leading-none opacity-80">Util</span>
+            <span className="mt-0.5 text-[10px] font-black leading-none">{utilizationPercent}%</span>
           </div>
         </div>
       </div>
@@ -2858,7 +2859,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
   const openTimingChangesModal = () => {
     const defaultFromDate = `${selectedYear}-01-01`;
-    const defaultToDate = `${selectedYear + 1}-12-31`;
+    const defaultToDate = getEndOfYearDate(selectedYear);
     setTimingChangesFromDate(defaultFromDate);
     setTimingChangesToDate(defaultToDate);
     setTimingChangesViewMode('project');
@@ -9061,10 +9062,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {expandedProjects[proj.id] && (
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
-                      <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
+                      <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-hidden">
                         <div
-                          className="grid grid-flow-col auto-cols-max gap-1.5 min-w-max"
-                          style={{ gridAutoColumns: 'clamp(196px, 13.5vw, 214px)' }}
+                          className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
                         >
                           {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                         </div>
