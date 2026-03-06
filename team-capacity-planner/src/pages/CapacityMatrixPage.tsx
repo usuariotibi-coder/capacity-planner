@@ -2747,29 +2747,31 @@ ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="grid grid-cols-[auto,minmax(0,1fr),auto] items-stretch gap-1 min-w-0">
-          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[50px] min-h-[38px]">
-            <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
+        <div className="grid gap-1 min-w-0">
+          <div className="grid grid-cols-[auto,minmax(0,1fr)] items-stretch gap-1 min-w-0">
+            <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2.5 py-1.5 shrink-0 min-w-[68px] min-h-[36px]">
+              <span className="text-[12px] font-bold text-gray-800 leading-none">{dept}</span>
+            </div>
+
+            <div className={`rounded px-2 py-1 text-center flex flex-col items-center justify-center min-w-0 min-h-[36px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
+              <span className="text-[10px] font-semibold leading-none opacity-80">Util</span>
+              <span className="mt-0.5 text-[14px] font-black leading-none">{utilizationPercent}%</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 items-stretch gap-1 min-w-0">
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
-              <span className="text-[9px] font-semibold leading-none">{quotedCompactLabel}</span>
-              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1.5 text-slate-700 min-w-0 text-center flex flex-col items-center justify-center min-h-[40px]">
+              <span className="text-[10px] font-semibold leading-none">{quotedCompactLabel}</span>
+              <span className="mt-0.5 text-[14px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
-              <span className="text-[9px] font-semibold leading-none">{usedCompactLabel}</span>
-              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1.5 text-slate-700 min-w-0 text-center flex flex-col items-center justify-center min-h-[40px]">
+              <span className="text-[10px] font-semibold leading-none">{usedCompactLabel}</span>
+              <span className="mt-0.5 text-[14px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(utilizedHoursValue)}</span>
             </div>
-            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
-              <span className="text-[9px] font-semibold leading-none">{forecastCompactLabel}</span>
-              <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</span>
+            <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1.5 text-slate-700 min-w-0 text-center flex flex-col items-center justify-center min-h-[40px]">
+              <span className="text-[10px] font-semibold leading-none">{forecastCompactLabel}</span>
+              <span className="mt-0.5 text-[14px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(forecastedHoursValue)}</span>
             </div>
-          </div>
-
-          <div className={`rounded px-1.5 py-1 text-center flex flex-col items-center justify-center shrink-0 min-w-[58px] min-h-[38px] ${utilizationColorInfo.bg} ${utilizationColorInfo.text}`}>
-            <span className="text-[9px] font-semibold leading-none opacity-80">Util</span>
-            <span className="mt-0.5 text-[12px] font-black leading-none">{utilizationPercent}%</span>
           </div>
         </div>
       </div>
@@ -9064,7 +9066,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-hidden">
                         <div
                           className="grid gap-1.5 w-full"
-                          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}
+                          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 248px), 1fr))' }}
                         >
                           {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                         </div>
