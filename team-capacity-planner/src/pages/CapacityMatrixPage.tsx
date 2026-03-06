@@ -1773,6 +1773,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         showHardOutOfRangeIndicator: false,
         showShiftGapBackground: false,
         showShiftDashedIndicator: false,
+        showShiftedRangeBorder: false,
       };
     }
 
@@ -1816,11 +1817,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const showShiftGapBackground = isDisplacedByTimingShift && totalHours <= 0;
     const showShiftDashedIndicator = isDisplacedByTimingShift && totalHours > 0;
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0 && !isDisplacedByTimingShift;
+    const showShiftedRangeBorder = hasDepartmentTimingShift && isDeptWeekInRange;
 
     return {
       showHardOutOfRangeIndicator,
       showShiftGapBackground,
       showShiftDashedIndicator,
+      showShiftedRangeBorder,
     };
   };
 
@@ -8649,6 +8652,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             showHardOutOfRangeIndicator,
                             showShiftGapBackground,
                             showShiftDashedIndicator,
+                            showShiftedRangeBorder,
                           } = getCellShiftIndicators(
                             proj,
                             dept,
@@ -8681,6 +8685,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   : ''
                               }`}
                             >
+                              {showShiftedRangeBorder && (
+                                <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                              )}
                               {showShiftGapBackground && (
                                 <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                               )}
@@ -9160,6 +9167,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     showHardOutOfRangeIndicator,
                                     showShiftGapBackground,
                                     showShiftDashedIndicator,
+                                    showShiftedRangeBorder,
                                   } = getCellShiftIndicators(
                                     proj,
                                     dept,
@@ -9186,6 +9194,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                         } ${displacedCellBgClass}`}
                                       >
+                                        {showShiftedRangeBorder && (
+                                          <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                                        )}
                                         {showShiftGapBackground && (
                                           <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                                         )}
@@ -9229,6 +9240,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                             : 'border-gray-300'
                                       } ${displacedCellBgClass}`}
                                     >
+                                      {showShiftedRangeBorder && (
+                                        <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                                      )}
                                       {showShiftGapBackground && (
                                         <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                                       )}
