@@ -2749,8 +2749,8 @@ ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
         <div className="flex items-center gap-1 min-w-0">
-          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-1 py-1 shrink-0 min-w-[40px] min-h-[34px]">
-            <span className="text-[9px] font-bold text-gray-800 leading-none">{dept}</span>
+          <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-1 py-1 shrink-0 min-w-fit min-h-[34px]">
+            <span className="text-[8px] font-bold text-gray-800 leading-none whitespace-nowrap">{dept}</span>
           </div>
 
           <div className="flex items-stretch gap-1 min-w-0 flex-1">
