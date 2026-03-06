@@ -2722,7 +2722,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return `${formatHours(value)}h`;
   };
 
-  const renderProjectDepartmentSummaryCard = (projectId: string, dept: Department, isMobile = false) => {
+  const renderProjectDepartmentSummaryCard = (projectId: string, dept: Department) => {
     const quotedHoursValue = getQuotedHours(dept, projectId);
     const quotedChangeOrdersValue = getQuotedChangeOrders(dept, projectId);
     const totalQuotedHoursValue = quotedHoursValue + quotedChangeOrdersValue;
@@ -2733,7 +2733,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
-    const cardWidthClass = isMobile ? 'w-[292px] sm:w-[304px]' : 'w-full min-w-0';
     const quotedCompactLabel = language === 'es' ? 'Cot' : 'Qtd';
     const usedCompactLabel = language === 'es' ? 'Usa' : 'Used';
     const forecastCompactLabel = language === 'es' ? 'Pron' : 'Fcst';
@@ -2741,19 +2740,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return (
       <div
         key={dept}
-        className={`${cardWidthClass} bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2 py-1.5 border border-gray-200`}
+        className="w-full min-w-0 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-md px-2 py-1.5 border border-gray-200"
         title={`${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
 ${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
 ${t.utilizationLabel}: ${utilizationPercent}%`}
       >
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="grid grid-cols-[auto,minmax(0,1fr),auto] items-stretch gap-1 min-w-0">
           <div className="flex items-center justify-center rounded bg-white/80 border border-slate-300 px-2 py-1 shrink-0 min-w-[50px] min-h-[38px]">
             <span className="text-[11px] font-bold text-gray-800 leading-none">{dept}</span>
           </div>
 
-          <div className="flex items-stretch gap-1 min-w-0 flex-1">
+          <div className="grid grid-cols-3 items-stretch gap-1 min-w-0">
             <div className="rounded bg-slate-100 border border-slate-300 px-1.5 py-1 text-slate-700 min-w-0 basis-0 flex-1 text-center flex flex-col items-center justify-center min-h-[38px]">
               <span className="text-[9px] font-semibold leading-none">{quotedCompactLabel}</span>
               <span className="mt-0.5 text-[12px] font-bold leading-none whitespace-nowrap">{formatSummaryHours(totalQuotedHoursValue)}</span>
@@ -9062,14 +9061,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   {expandedProjects[proj.id] && (
                     <>
                       {/* Quoted/Used/Forecast/Utilization by Department - extra compact */}
-                      <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-x-auto" style={{ scrollBehavior: 'smooth' }}>
-                        <div style={{ zoom: `${Math.max(90, getEffectiveProjectZoom(proj.id)) / 100}`, display: 'inline-block', minWidth: '100%' }}>
-                          <div className="flex md:hidden gap-1 min-w-max">
-                            {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept, true))}
-                          </div>
-                          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1.5 w-full">
-                            {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
-                          </div>
+                      <div className="capacity-project-summary-shell bg-white rounded p-1 border border-gray-200 m-0.5 overflow-hidden">
+                        <div
+                          className="grid gap-1.5 w-full"
+                          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}
+                        >
+                          {DEPARTMENTS.map((dept) => renderProjectDepartmentSummaryCard(proj.id, dept))}
                         </div>
                       </div>
 
