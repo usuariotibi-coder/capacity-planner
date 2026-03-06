@@ -4450,17 +4450,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getCell(2, 1).value = language === 'es' ? 'Proyecto' : 'Project';
       compactSheet.getCell(2, 2).value = language === 'es' ? 'Vista' : 'View';
       compactSheet.getCell(2, 3).value = 'DPTO';
-      compactSheet.getCell(3, 1).value = '';
-      compactSheet.getCell(3, 2).value = '';
-      compactSheet.getCell(3, 3).value = language === 'es'
-        ? 'Cap (MFG=h, otros=talento)'
-        : 'Cap (MFG=h, others=people)';
 
       weeklyRange.forEach((weekStartDate, index) => {
         const column = compactMatrixStartColumn + index;
         const weekNum = getWeekNumber(weekStartDate);
         compactSheet.getCell(2, column).value = `CW${String(weekNum).padStart(2, '0')}`;
-        compactSheet.getCell(3, column).value = weekStartDate;
       });
 
       const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
@@ -4487,98 +4481,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         ? `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')}`
         : '-';
 
-      compactSheet.getCell(3, 2).value = hasWeekOverWeekRange
-        ? `${previousWeekLabel} vs ${currentWeekLabel}`
-        : (language === 'es' ? 'Sin rango' : 'No range');
-
       styleHeader(compactSheet, 2);
-      styleHeader(compactSheet, 3);
-      compactSheet.getRow(3).font = { bold: false, color: { argb: HEADER_TEXT } };
-      compactSheet.getRow(3).height = 18;
-      compactSheet.views = [{ state: 'frozen', ySplit: 3, xSplit: 3 }];
+      compactSheet.views = [{ state: 'frozen', ySplit: 2, xSplit: 3 }];
       compactSheet.autoFilter = {
         from: { row: 2, column: 1 },
         to: { row: 2, column: compactHeaderEndColumn },
       };
 
-      let compactDataStartRow = 4;
-      const compactLegendRows = DEPARTMENTS.flatMap((dept) =>
-        (STAGE_OPTIONS[dept] || []).map((stage) => ({ dept, stage }))
-      );
-      if (compactLegendRows.length > 0) {
-        const legendStartColumn = 1;
-        const legendEndColumn = legendStartColumn + 3;
-        const legendTitleRow = 4;
-        const legendHeaderRow = legendTitleRow + 1;
-        let legendRow = legendHeaderRow + 1;
-        compactDataStartRow = legendRow + compactLegendRows.length + 1;
-
-        compactSheet.getColumn(legendStartColumn).width = Math.max(compactSheet.getColumn(legendStartColumn).width || 0, 10);
-        compactSheet.getColumn(legendStartColumn + 1).width = Math.max(compactSheet.getColumn(legendStartColumn + 1).width || 0, 24);
-        compactSheet.getColumn(legendStartColumn + 2).width = 30;
-        compactSheet.getColumn(legendStartColumn + 3).width = 12;
-
-        compactSheet.mergeCells(legendTitleRow, legendStartColumn, legendTitleRow, legendEndColumn);
-        const legendTitleCell = compactSheet.getCell(legendTitleRow, legendStartColumn);
-        legendTitleCell.value = language === 'es'
-          ? 'Leyenda de colores (Etapas)'
-          : 'Stage Color Legend';
-        legendTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
-        legendTitleCell.font = { bold: true, color: { argb: HEADER_TEXT } };
-        legendTitleCell.alignment = { vertical: 'middle', horizontal: 'left' };
-        applyBorder(legendTitleCell);
-
-        const legendHeaders = [
-          language === 'es' ? 'DPTO' : 'Dept',
-          language === 'es' ? 'Etapa' : 'Stage',
-          language === 'es' ? 'Codigo' : 'Code',
-          language === 'es' ? 'Color' : 'Color',
-        ];
-        legendHeaders.forEach((header, index) => {
-          const cell = compactSheet.getCell(legendHeaderRow, legendStartColumn + index);
-          cell.value = header;
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '475569' } };
-          cell.font = { bold: true, color: { argb: WHITE } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
-          applyBorder(cell);
-        });
-
-        compactLegendRows.forEach(({ dept, stage }) => {
-          const palette = getCompactStagePalette(stage, dept) || { bg: 'E5E7EB', fg: '111827' };
-          const row = compactSheet.getRow(legendRow);
-          row.height = 18;
-
-          const deptCell = row.getCell(legendStartColumn);
-          deptCell.value = dept;
-          deptCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F8FAFC' } };
-          deptCell.font = { bold: true, color: { argb: '1F2937' } };
-          deptCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          applyBorder(deptCell);
-
-          const stageLabelCell = row.getCell(legendStartColumn + 1);
-          stageLabelCell.value = getStageLabel(stage, t as Record<string, string>);
-          stageLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
-          stageLabelCell.font = { color: { argb: '1F2937' } };
-          stageLabelCell.alignment = { vertical: 'middle', horizontal: 'left' };
-          applyBorder(stageLabelCell);
-
-          const stageCodeCell = row.getCell(legendStartColumn + 2);
-          stageCodeCell.value = stage;
-          stageCodeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: WHITE } };
-          stageCodeCell.font = { color: { argb: '64748B' }, size: 8 };
-          stageCodeCell.alignment = { vertical: 'middle', horizontal: 'left' };
-          applyBorder(stageCodeCell);
-
-          const sampleCell = row.getCell(legendStartColumn + 3);
-          sampleCell.value = language === 'es' ? 'Muestra' : 'Sample';
-          sampleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.bg } };
-          sampleCell.font = { bold: true, color: { argb: palette.fg } };
-          sampleCell.alignment = { vertical: 'middle', horizontal: 'center' };
-          applyBorder(sampleCell);
-
-          legendRow += 1;
-        });
-      }
+      const compactDataStartRow = 3;
 
       const compactDeptFillByDept: Record<Department, string> = {
         PM: 'EDE9FE',
@@ -4832,7 +4742,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         compactRow += 1;
       });
 
-      styleRows(compactSheet, 4);
+      styleRows(compactSheet, 3);
 
       const setBorderEdge = (
         cell: any,
