@@ -1774,6 +1774,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         showShiftGapBackground: false,
         showShiftDashedIndicator: false,
         showShiftedRangeBorder: false,
+        showOverlappedShiftBorder: false,
       };
     }
 
@@ -1781,11 +1782,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const effectiveDeptStartDate = deptMeta?.effectiveStartDate || project.startDate || '';
     const effectiveDeptEndDate = deptMeta?.effectiveEndDate || project.endDate || project.startDate || '';
     const expectedDeptStartDate = deptMeta?.expectedStartDate || project.startDate || '';
+    const expectedDeptEndDate = deptMeta?.expectedEndDate || project.endDate || project.startDate || '';
     const isDeptWeekInRange =
       !!effectiveDeptStartDate &&
       !!effectiveDeptEndDate &&
       weekStart >= effectiveDeptStartDate &&
       weekStart <= effectiveDeptEndDate;
+    const isWeekInExpectedRange =
+      !!expectedDeptStartDate &&
+      !!expectedDeptEndDate &&
+      weekStart >= expectedDeptStartDate &&
+      weekStart <= expectedDeptEndDate;
     const normalizedEffectiveStart = effectiveDeptStartDate.slice(0, 10);
     const normalizedExpectedStart = expectedDeptStartDate.slice(0, 10);
     const hasDepartmentTimingShift =
@@ -1818,12 +1825,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const showShiftDashedIndicator = isDisplacedByTimingShift && totalHours > 0;
     const showHardOutOfRangeIndicator = outOfEstimatedRange && totalHours > 0 && !isDisplacedByTimingShift;
     const showShiftedRangeBorder = hasDepartmentTimingShift && isDeptWeekInRange;
+    const showOverlappedShiftBorder = hasDepartmentTimingShift && isDeptWeekInRange && isWeekInExpectedRange;
 
     return {
       showHardOutOfRangeIndicator,
       showShiftGapBackground,
       showShiftDashedIndicator,
       showShiftedRangeBorder,
+      showOverlappedShiftBorder,
     };
   };
 
@@ -8653,6 +8662,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             showShiftGapBackground,
                             showShiftDashedIndicator,
                             showShiftedRangeBorder,
+                            showOverlappedShiftBorder,
                           } = getCellShiftIndicators(
                             proj,
                             dept,
@@ -8686,10 +8696,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }`}
                             >
                               {showShiftedRangeBorder && (
-                                <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                                <div className="pointer-events-none absolute inset-0 border border-[#f97316] z-[8]" />
+                              )}
+                              {showOverlappedShiftBorder && (
+                                <div className="pointer-events-none absolute inset-[1px] border border-black z-[9]" />
                               )}
                               {showShiftGapBackground && (
-                                <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
+                                <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[10]" />
                               )}
                               {showShiftDashedIndicator && (
                                 <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
@@ -9168,6 +9181,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     showShiftGapBackground,
                                     showShiftDashedIndicator,
                                     showShiftedRangeBorder,
+                                    showOverlappedShiftBorder,
                                   } = getCellShiftIndicators(
                                     proj,
                                     dept,
@@ -9195,10 +9209,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         } ${displacedCellBgClass}`}
                                       >
                                         {showShiftedRangeBorder && (
-                                          <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                                          <div className="pointer-events-none absolute inset-0 border border-[#f97316] z-[8]" />
+                                        )}
+                                        {showOverlappedShiftBorder && (
+                                          <div className="pointer-events-none absolute inset-[1px] border border-black z-[9]" />
                                         )}
                                         {showShiftGapBackground && (
-                                          <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
+                                          <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[10]" />
                                         )}
                                         {showShiftDashedIndicator && (
                                           <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
@@ -9241,10 +9258,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       } ${displacedCellBgClass}`}
                                     >
                                       {showShiftedRangeBorder && (
-                                        <div className="pointer-events-none absolute inset-0 border border-[#6d28d9] z-[8]" />
+                                        <div className="pointer-events-none absolute inset-0 border border-[#f97316] z-[8]" />
+                                      )}
+                                      {showOverlappedShiftBorder && (
+                                        <div className="pointer-events-none absolute inset-[1px] border border-black z-[9]" />
                                       )}
                                       {showShiftGapBackground && (
-                                        <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
+                                        <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[10]" />
                                       )}
                                       {showShiftDashedIndicator && (
                                         <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
