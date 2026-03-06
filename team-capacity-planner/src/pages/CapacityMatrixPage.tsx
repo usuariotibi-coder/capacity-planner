@@ -8682,7 +8682,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               }`}
                             >
                               {showShiftGapBackground && (
-                                <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                               )}
                               {showShiftDashedIndicator && (
                                 <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
@@ -9187,7 +9187,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         } ${displacedCellBgClass}`}
                                       >
                                         {showShiftGapBackground && (
-                                          <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                          <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                                         )}
                                         {showShiftDashedIndicator && (
                                           <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
@@ -9230,7 +9230,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       } ${displacedCellBgClass}`}
                                     >
                                       {showShiftGapBackground && (
-                                        <div className="pointer-events-none absolute inset-0 bg-[#bfdbfe]/70 z-[9]" />
+                                        <div className="pointer-events-none absolute inset-0 border border-black bg-[#bfdbfe]/70 z-[9]" />
                                       )}
                                       {showShiftDashedIndicator && (
                                         <div className="pointer-events-none absolute inset-0 border-2 border-dashed border-[#1e3a8a] z-10" />
