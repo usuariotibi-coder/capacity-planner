@@ -4426,10 +4426,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         { width: 32 },
         { width: 16 },
         { width: 10 },
+        { width: 18 },
         ...weeklyRange.map(() => ({ width: 8 })),
       ];
 
-      const compactMatrixStartColumn = 4;
+      const compactChangesColumn = 4;
+      const compactMatrixStartColumn = 5;
       const compactHeaderEndColumn = compactMatrixStartColumn + weeklyRange.length - 1;
       compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
       const compactTitle = compactSheet.getCell(1, 1);
@@ -4450,6 +4452,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getCell(2, 1).value = language === 'es' ? 'Proyecto' : 'Project';
       compactSheet.getCell(2, 2).value = language === 'es' ? 'Vista' : 'View';
       compactSheet.getCell(2, 3).value = 'DPTO';
+      compactSheet.getCell(2, compactChangesColumn).value = language === 'es' ? 'Cambios' : 'Changes';
 
       weeklyRange.forEach((weekStartDate, index) => {
         const column = compactMatrixStartColumn + index;
@@ -4482,7 +4485,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         : '-';
 
       styleHeader(compactSheet, 2);
-      compactSheet.views = [{ state: 'frozen', ySplit: 2, xSplit: 3 }];
+      compactSheet.views = [{ state: 'frozen', ySplit: 2, xSplit: 4 }];
       compactSheet.autoFilter = {
         from: { row: 2, column: 1 },
         to: { row: 2, column: compactHeaderEndColumn },
@@ -4527,6 +4530,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const compactBlockRanges: Array<{ startRow: number; endRow: number; outlineColor: string }> = [];
       const compactDiffCells: Array<{ row: number; column: number }> = [];
+      const compactRowsWithChanges = new Set<number>();
 
       const renderCompactSnapshotRows = (
         snapshot: CompactProjectSnapshot,
@@ -4548,13 +4552,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           row.getCell(1).value = '';
           row.getCell(2).value = '';
           row.getCell(3).value = dept;
+          row.getCell(compactChangesColumn).value = '';
           row.height = 20;
           row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
           row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell(compactChangesColumn).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
           row.getCell(1).font = deptIndex === 0 ? { bold: true } : { bold: false };
           row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
           row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
           row.getCell(3).font = { bold: true, color: { argb: '2E1A47' } };
+          row.getCell(compactChangesColumn).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
+          row.getCell(compactChangesColumn).font = { size: 8, color: { argb: '6B7280' } };
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const column = compactMatrixStartColumn + weekIndex;
@@ -4690,6 +4698,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         DEPARTMENTS.forEach((dept) => {
           const currentRow = currentBlock.rowByDepartment[dept];
           const previousRow = previousBlock.rowByDepartment[dept];
+          let departmentHasChanges = false;
+
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const currentCellState = resolveCompactCapacityCellState(
               currentSnapshot,
@@ -4711,10 +4721,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             const sameCapacity = currentCellState.displayValue === previousCellState.displayValue;
             const sameTimingActivity = currentCellState.active === previousCellState.active;
             if (sameCapacity && sameTimingActivity) return;
+            departmentHasChanges = true;
             const column = compactMatrixStartColumn + weekIndex;
             compactDiffCells.push({ row: currentRow, column });
             compactDiffCells.push({ row: previousRow, column });
           });
+
+          if (departmentHasChanges) {
+            compactRowsWithChanges.add(currentRow);
+            compactRowsWithChanges.add(previousRow);
+          }
         });
 
         compactBlockRanges.push({
@@ -4792,6 +4808,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           // Keep stage color text so exported palette matches on-screen cells.
           cell.font = { ...(cell.font || {}), bold: true };
         }
+      });
+
+      compactRowsWithChanges.forEach((rowNumber) => {
+        const changeCell = compactSheet.getRow(rowNumber).getCell(compactChangesColumn);
+        changeCell.value = language === 'es' ? 'Hubo un cambio' : 'Change detected';
+        changeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+        changeCell.font = { bold: true, size: 8, color: { argb: '92400E' } };
+        changeCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       });
 
       const dateStamp = new Date().toISOString().slice(0, 10);
