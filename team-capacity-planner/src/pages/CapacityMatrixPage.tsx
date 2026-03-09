@@ -4391,6 +4391,75 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return { hoursByCell, stageByCell };
       };
 
+      interface CompactDepartmentMetrics {
+        quotedHours: number;
+        usedHours: number;
+        forecastedHours: number;
+        utilizationPercent: number;
+      }
+
+      const getCompactQuotedHours = (projectId: string, department: Department): number => {
+        const project = projectById.get(projectId);
+        const quotedHours = project?.departmentHoursAllocated?.[department] || 0;
+        const quotedChangeOrders = getQuotedChangeOrders(department, projectId);
+        return roundCompactHours(quotedHours + quotedChangeOrders);
+      };
+
+      const buildCompactDepartmentMetricsMap = (
+        snapshotWeekStart: string,
+        hoursByCell: Map<string, number>
+      ) => {
+        const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+        hoursByCell.forEach((hours, key) => {
+          const [projectId, departmentRaw, weekStartDate] = key.split('|');
+          if (!projectId || !departmentRaw || !weekStartDate) return;
+          if (!DEPARTMENT_SET.has(departmentRaw as Department)) return;
+
+          const department = departmentRaw as Department;
+          const metricsKey = `${projectId}|${department}`;
+          const existing = metricsByProjectDept.get(metricsKey) || {
+            quotedHours: getCompactQuotedHours(projectId, department),
+            usedHours: 0,
+            forecastedHours: 0,
+            utilizationPercent: 0,
+          };
+
+          if (snapshotWeekStart && weekStartDate < snapshotWeekStart) {
+            existing.usedHours = roundCompactHours(existing.usedHours + hours);
+          } else {
+            existing.forecastedHours = roundCompactHours(existing.forecastedHours + hours);
+          }
+
+          metricsByProjectDept.set(metricsKey, existing);
+        });
+
+        metricsByProjectDept.forEach((entry) => {
+          const totalPlanned = entry.usedHours + entry.forecastedHours;
+          entry.utilizationPercent = entry.quotedHours > 0
+            ? Math.round((totalPlanned / entry.quotedHours) * 100)
+            : (totalPlanned > 0 ? 100 : 0);
+        });
+
+        return metricsByProjectDept;
+      };
+
+      const getCompactDepartmentMetrics = (
+        metricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+        projectId: string,
+        department: Department
+      ): CompactDepartmentMetrics => {
+        const existing = metricsByProjectDept.get(`${projectId}|${department}`);
+        if (existing) return existing;
+
+        return {
+          quotedHours: getCompactQuotedHours(projectId, department),
+          usedHours: 0,
+          forecastedHours: 0,
+          utilizationPercent: 0,
+        };
+      };
+
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const BORDER = 'D5D1DA';
@@ -4439,11 +4508,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         { width: 16 },
         { width: 10 },
         { width: 18 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        { width: 10 },
         ...weeklyRange.map(() => ({ width: 8 })),
       ];
 
       const compactChangesColumn = 4;
-      const compactMatrixStartColumn = 5;
+      const compactQuotedColumn = 5;
+      const compactUsedColumn = 6;
+      const compactForecastColumn = 7;
+      const compactUtilColumn = 8;
+      const compactMatrixStartColumn = 9;
       const compactHeaderEndColumn = compactMatrixStartColumn + weeklyRange.length - 1;
       compactSheet.mergeCells(1, 1, 1, compactHeaderEndColumn);
       const compactTitle = compactSheet.getCell(1, 1);
@@ -4465,6 +4542,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       compactSheet.getCell(2, 2).value = language === 'es' ? 'Vista' : 'View';
       compactSheet.getCell(2, 3).value = 'DPTO';
       compactSheet.getCell(2, compactChangesColumn).value = language === 'es' ? 'Cambios' : 'Changes';
+      compactSheet.getCell(2, compactQuotedColumn).value = language === 'es' ? 'Cotizado' : 'Quoted';
+      compactSheet.getCell(2, compactUsedColumn).value = language === 'es' ? 'Usado' : 'Used';
+      compactSheet.getCell(2, compactForecastColumn).value = language === 'es' ? 'Pronostico' : 'Fcst';
+      compactSheet.getCell(2, compactUtilColumn).value = language === 'es' ? 'Util %' : 'Util %';
 
       weeklyRange.forEach((weekStartDate, index) => {
         const column = compactMatrixStartColumn + index;
@@ -4497,7 +4578,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         : '-';
 
       styleHeader(compactSheet, 2);
-      compactSheet.views = [{ state: 'frozen', ySplit: 2, xSplit: 4 }];
+      compactSheet.views = [{ state: 'frozen', ySplit: 2, xSplit: 8 }];
       compactSheet.autoFilter = {
         from: { row: 2, column: 1 },
         to: { row: 2, column: compactHeaderEndColumn },
@@ -4527,6 +4608,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousAssignmentHoursByCell = compactPreviousAssignmentContext.hoursByCell;
       const compactPreviousAssignmentStageByCell = compactPreviousAssignmentContext.stageByCell;
       const compactChangedKeysAfterPrevious = compactPreviousAssignmentContext.changedKeysAfterSnapshot;
+      const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(
+        compactCurrentSnapshotWeekStart,
+        compactCurrentAssignmentHoursByCell
+      );
+      const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(
+        compactPreviousSnapshotWeekStart,
+        compactPreviousAssignmentHoursByCell
+      );
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       compactProjects.forEach((projectSnapshot) => {
@@ -4552,6 +4641,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         fallbackAssignmentHoursByCell: Map<string, number> | undefined,
         fallbackAssignmentStageByCell: Map<string, Stage> | undefined,
         fallbackBlockedKeys: Set<string> | undefined,
+        metricsByProjectDept: Map<string, CompactDepartmentMetrics>,
         viewLabel: string,
         viewFill: string,
         rowFill: string,
@@ -4576,6 +4666,46 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           row.getCell(3).font = { bold: true, color: { argb: '2E1A47' } };
           row.getCell(compactChangesColumn).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
           row.getCell(compactChangesColumn).font = { size: 8, color: { argb: '6B7280' } };
+
+          const metrics = getCompactDepartmentMetrics(metricsByProjectDept, snapshot.projectId, dept);
+          const quotedCell = row.getCell(compactQuotedColumn);
+          quotedCell.value = metrics.quotedHours;
+          quotedCell.numFmt = '0.##';
+          quotedCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          quotedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EEF2FF' } };
+          quotedCell.font = { size: 9, bold: true, color: { argb: '1E3A8A' } };
+
+          const usedCell = row.getCell(compactUsedColumn);
+          usedCell.value = metrics.usedHours;
+          usedCell.numFmt = '0.##';
+          usedCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          usedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'ECFDF5' } };
+          usedCell.font = { size: 9, bold: true, color: { argb: '065F46' } };
+
+          const forecastCell = row.getCell(compactForecastColumn);
+          forecastCell.value = metrics.forecastedHours;
+          forecastCell.numFmt = '0.##';
+          forecastCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          forecastCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+          forecastCell.font = { size: 9, bold: true, color: { argb: '92400E' } };
+
+          const utilPalette = getUtilizationColor(metrics.utilizationPercent);
+          const utilCell = row.getCell(compactUtilColumn);
+          utilCell.value = metrics.utilizationPercent;
+          utilCell.numFmt = '0"%"';
+          utilCell.alignment = { vertical: 'middle', horizontal: 'center' };
+          utilCell.font = {
+            size: 9,
+            bold: true,
+            color: { argb: utilPalette.text.includes('text-white') ? 'FFFFFF' : '111827' },
+          };
+          utilCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: {
+              argb: parseTailwindBgHex(utilPalette.bg) || compactFallbackBgByClass[utilPalette.bg] || 'F3F4F6',
+            },
+          };
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const column = compactMatrixStartColumn + weekIndex;
@@ -4682,6 +4812,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           undefined,
           undefined,
           undefined,
+          compactCurrentMetricsByProjectDept,
           currentViewLabel,
           'DBEAFE',
           'F0F9FF',
@@ -4694,6 +4825,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           compactCurrentAssignmentHoursByCell,
           compactCurrentAssignmentStageByCell,
           compactChangedKeysAfterPrevious,
+          compactPreviousMetricsByProjectDept,
           previousViewLabel,
           'E5E7EB',
           'F9FAFB',
