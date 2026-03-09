@@ -4844,6 +4844,31 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           const currentRow = currentBlock.rowByDepartment[dept];
           const previousRow = previousBlock.rowByDepartment[dept];
           let departmentHasChanges = false;
+          const currentMetrics = getCompactDepartmentMetrics(
+            compactCurrentMetricsByProjectDept,
+            currentSnapshot.projectId,
+            dept
+          );
+          const previousMetrics = getCompactDepartmentMetrics(
+            compactPreviousMetricsByProjectDept,
+            previousSnapshot.projectId,
+            dept
+          );
+
+          const metricDiffs: Array<{ column: number; changed: boolean }> = [
+            { column: compactQuotedColumn, changed: currentMetrics.quotedHours !== previousMetrics.quotedHours },
+            { column: compactUsedColumn, changed: currentMetrics.usedHours !== previousMetrics.usedHours },
+            { column: compactForecastColumn, changed: currentMetrics.forecastedHours !== previousMetrics.forecastedHours },
+            { column: compactUtilColumn, changed: currentMetrics.utilizationPercent !== previousMetrics.utilizationPercent },
+          ];
+
+          metricDiffs.forEach(({ column, changed }) => {
+            if (!changed) return;
+            departmentHasChanges = true;
+            compactDiffCells.push({ row: currentRow, column });
+            compactCurrentDiffCells.push({ row: currentRow, column });
+            compactDiffCells.push({ row: previousRow, column });
+          });
 
           weeklyRange.forEach((weekStartDate, weekIndex) => {
             const currentCellState = resolveCompactCapacityCellState(
