@@ -656,7 +656,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
-  const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [selectedVisibleProjectId, setSelectedVisibleProjectId] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -2131,53 +2130,21 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return sortProjectsByStoredOrder(generalProjects, scopeKey);
   }, [generalProjects, projectOrderByScope]);
 
-  const normalizedProjectSearchQuery = projectSearchQuery.trim().toLowerCase();
-
   const filteredDepartmentProjects = useMemo(() => {
-    return orderedDepartmentProjects.filter((proj) => {
-      if (selectedVisibleProjectId && proj.id !== selectedVisibleProjectId) {
-        return false;
-      }
+    if (!selectedVisibleProjectId) {
+      return [];
+    }
 
-      if (!normalizedProjectSearchQuery) {
-        return true;
-      }
-
-      const searchableValues = [
-        proj.name,
-        proj.client,
-        proj.facility,
-        projectManagerNameById.get(proj.id) || '',
-      ];
-
-      return searchableValues.some((value) =>
-        String(value || '').toLowerCase().includes(normalizedProjectSearchQuery)
-      );
-    });
-  }, [orderedDepartmentProjects, selectedVisibleProjectId, normalizedProjectSearchQuery, projectManagerNameById]);
+    return orderedDepartmentProjects.filter((proj) => proj.id === selectedVisibleProjectId);
+  }, [orderedDepartmentProjects, selectedVisibleProjectId]);
 
   const filteredGeneralProjects = useMemo(() => {
-    return orderedGeneralProjects.filter((proj) => {
-      if (selectedVisibleProjectId && proj.id !== selectedVisibleProjectId) {
-        return false;
-      }
+    if (!selectedVisibleProjectId) {
+      return [];
+    }
 
-      if (!normalizedProjectSearchQuery) {
-        return true;
-      }
-
-      const searchableValues = [
-        proj.name,
-        proj.client,
-        proj.facility,
-        projectManagerNameById.get(proj.id) || '',
-      ];
-
-      return searchableValues.some((value) =>
-        String(value || '').toLowerCase().includes(normalizedProjectSearchQuery)
-      );
-    });
-  }, [orderedGeneralProjects, selectedVisibleProjectId, normalizedProjectSearchQuery, projectManagerNameById]);
+    return orderedGeneralProjects.filter((proj) => proj.id === selectedVisibleProjectId);
+  }, [orderedGeneralProjects, selectedVisibleProjectId]);
 
   const orderedProjectsInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
@@ -2187,7 +2154,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return departmentFilter === 'General' ? filteredGeneralProjects : filteredDepartmentProjects;
   }, [departmentFilter, filteredDepartmentProjects, filteredGeneralProjects]);
 
-  const hasActiveProjectListFilters = selectedVisibleProjectId.length > 0 || normalizedProjectSearchQuery.length > 0;
+  const hasActiveProjectListFilters = selectedVisibleProjectId.length > 0;
 
   const departmentProjectRowById = useMemo(() => {
     const map = new Map<string, number>();
@@ -7662,29 +7629,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   };
 
   const clearProjectListFilters = () => {
-    setProjectSearchQuery('');
     setSelectedVisibleProjectId('');
   };
 
-  const projectListSummaryText = orderedProjectsInCurrentView.length > 0
+  const selectedVisibleProject = projectsVisibleInCurrentView[0];
+
+  const projectListSummaryText = selectedVisibleProject
     ? (language === 'es'
-      ? `${projectsVisibleInCurrentView.length} de ${orderedProjectsInCurrentView.length} proyectos`
-      : `${projectsVisibleInCurrentView.length} of ${orderedProjectsInCurrentView.length} projects`)
+      ? `Proyecto seleccionado: ${selectedVisibleProject.name}`
+      : `Selected project: ${selectedVisibleProject.name}`)
     : null;
 
   const renderProjectListFilters = () => (
     <div className="mb-2 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:flex-row sm:flex-wrap sm:items-end">
-      <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
-        <span>{t.searchProject || (language === 'es' ? 'Buscar proyecto' : 'Search project')}</span>
-        <input
-          type="text"
-          value={projectSearchQuery}
-          onChange={(e) => setProjectSearchQuery(e.target.value)}
-          placeholder={t.searchProjectPlaceholder || (language === 'es' ? 'Escribe nombre, cliente o PM' : 'Type name, client or PM')}
-          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-        />
-      </label>
-
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
         <span>{t.filterProjects || t.selectProject}</span>
         <select
@@ -7692,7 +7649,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           onChange={(e) => setSelectedVisibleProjectId(e.target.value)}
           className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         >
-          <option value="">{t.allVisibleProjects || (language === 'es' ? 'Todos los proyectos visibles' : 'All visible projects')}</option>
+          <option value="">{t.selectAProject}</option>
           {orderedProjectsInCurrentView.map((proj) => (
             <option key={proj.id} value={proj.id}>
               {proj.name} | {proj.client}
@@ -7942,6 +7899,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {/* Tabla de Departamentos - Only show for department-specific views */}
         {departmentFilter !== 'General' && (
           <div style={{ zoom: `${zoom / 100}` }}>
+            {renderProjectListFilters()}
+
             {/* Department Weekly Occupancy Summary Panel */}
             {(() => {
               const dept = departmentFilter as Department;
@@ -8484,15 +8443,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </h2>
             </div>
 
-            {renderProjectListFilters()}
-
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
             {projectsVisibleInCurrentView.length === 0 && (
               <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
                 {hasActiveProjectListFilters
                   ? (t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.'))
-                  : t.noProjects}
+                  : (t.selectProjectToView || (language === 'es' ? 'Selecciona un proyecto en el filtro para verlo.' : 'Select a project in the filter to view it.'))}
               </div>
             )}
 
@@ -9028,6 +8985,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {/* Projects Table - Only in General View */}
         {departmentFilter === 'General' && (
           <div style={{ zoom: `${zoom / 100}` }}>
+            {renderProjectListFilters()}
+
             {/* Global Capacity Summary Panel by Week - Separated by Departments - STICKY */}
             {showGlobalPanel && (
               <div className="sticky top-0 z-40 mb-0.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-none p-0.5 shadow-sm">
@@ -9204,13 +9163,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </h2>
             </div>
 
-              {renderProjectListFilters()}
-
               {projectsVisibleInCurrentView.length === 0 && (
                 <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
                   {hasActiveProjectListFilters
                     ? (t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.'))
-                    : t.noProjects}
+                    : (t.selectProjectToView || (language === 'es' ? 'Selecciona un proyecto en el filtro para verlo.' : 'Select a project in the filter to view it.'))}
                 </div>
               )}
 
