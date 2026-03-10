@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
+﻿import { useState, useEffect, useRef, useMemo, type CSSProperties, type DragEvent } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -209,6 +209,7 @@ const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yello
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
 const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
+const TIMING_COMPACT_STICKY_WIDTHS = [72, 80, 56, 72, 56, 56, 56, 56] as const;
 const PROJECT_TIMING_KEYS = new Set(['startDate', 'endDate', 'numberOfWeeks', 'departmentStages']);
 const PROJECT_TIMING_NESTED_KEYS = new Set(['departmentStartDate', 'durationWeeks', 'weekStart', 'weekEnd']);
 const getEndOfYearDate = (year: number): string => `${year}-12-31`;
@@ -8727,6 +8728,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     return 'shadow-[inset_2px_0_0_#f87171,inset_-2px_0_0_#f87171] relative z-[1]';
   };
 
+  const getTimingCompactStickyColumnStyle = (columnIndex: number): CSSProperties => {
+    const left = TIMING_COMPACT_STICKY_WIDTHS
+      .slice(0, columnIndex)
+      .reduce((sum, width) => sum + width, 0);
+
+    return {
+      left: `${left}px`,
+      minWidth: `${TIMING_COMPACT_STICKY_WIDTHS[columnIndex]}px`,
+      width: `${TIMING_COMPACT_STICKY_WIDTHS[columnIndex]}px`,
+      maxWidth: `${TIMING_COMPACT_STICKY_WIDTHS[columnIndex]}px`,
+    };
+  };
+
   const getTimingCompactCellClasses = (
     cell: TimingCompactPreviewCell,
     department: Department
@@ -10960,14 +10974,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                         <table className="min-w-[1500px] w-full border-collapse text-[11px]">
                           <thead className="sticky top-0 z-10">
                             <tr className="bg-[#2e1a47] text-white">
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-left font-bold">Project</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-left font-bold">{language === 'es' ? 'Vista' : 'View'}</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">DPTO</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Cambios' : 'Changes'}</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Cotizado' : 'Quoted'}</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Usado' : 'Used'}</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Pronostico' : 'Fcst'}</th>
-                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">Util %</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-left font-bold" style={getTimingCompactStickyColumnStyle(0)}>Project</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-left font-bold" style={getTimingCompactStickyColumnStyle(1)}>{language === 'es' ? 'Vista' : 'View'}</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold" style={getTimingCompactStickyColumnStyle(2)}>DPTO</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold" style={getTimingCompactStickyColumnStyle(3)}>{language === 'es' ? 'Cambios' : 'Changes'}</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold" style={getTimingCompactStickyColumnStyle(4)}>{language === 'es' ? 'Cotizado' : 'Quoted'}</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold" style={getTimingCompactStickyColumnStyle(5)}>{language === 'es' ? 'Usado' : 'Used'}</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold" style={getTimingCompactStickyColumnStyle(6)}>{language === 'es' ? 'Pronostico' : 'Fcst'}</th>
+                              <th className="sticky z-30 border border-[#d8d0e4] bg-[#2e1a47] px-3 py-2 text-center font-bold shadow-[8px_0_12px_-10px_rgba(46,26,71,0.5)]" style={getTimingCompactStickyColumnStyle(7)}>Util %</th>
                               {timingCompactPreview.weeklyRange.map((weekStartDate, weekIndex) => (
                                 <th
                                   key={`${group.projectId}-${weekStartDate}`}
@@ -10987,30 +11001,30 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                   const separatorTopClass = !viewBlock.current && rowIndex === 0 ? 'border-t-[4px] border-t-[#7a6796]' : '';
                                   return (
                                     <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
-                                      <td className={`border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] bg-white px-3 py-2 font-semibold text-[#2e1a47] align-middle ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(0)}>
                                         {rowIndex === 0 ? group.projectName : ''}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 font-semibold align-middle ${viewBg} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 font-semibold align-middle ${viewBg} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(1)}>
                                         {rowIndex === 0 ? viewBlock.label : ''}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold text-[#2e1a47] bg-slate-50 ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-bold text-[#2e1a47] bg-slate-50 ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(2)}>
                                         {row.department}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.changeDetected ? 'bg-amber-100 text-amber-900' : 'bg-slate-50 text-slate-400'} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.changeDetected ? 'bg-amber-100 text-amber-900' : 'bg-slate-50 text-slate-400'} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(3)}>
                                         {row.changeDetected
                                           ? (language === 'es' ? 'Hubo un cambio' : 'Change detected')
                                           : '-'}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-indigo-100 text-indigo-900` : 'bg-indigo-50 text-indigo-700'} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-indigo-100 text-indigo-900` : 'bg-indigo-50 text-indigo-700'} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(4)}>
                                         {formatTimingCompactMetric(row.metrics.quotedHours)}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-emerald-100 text-emerald-900` : 'bg-emerald-50 text-emerald-700'} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-emerald-100 text-emerald-900` : 'bg-emerald-50 text-emerald-700'} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(5)}>
                                         {formatTimingCompactMetric(row.metrics.usedHours)}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-amber-100 text-amber-900` : 'bg-amber-50 text-amber-700'} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-amber-100 text-amber-900` : 'bg-amber-50 text-amber-700'} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(6)}>
                                         {formatTimingCompactMetric(row.metrics.forecastedHours)}
                                       </td>
-                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${getTimingCompactChangeHighlight(row.metricDiffs.utilizationPercent, metricHighlightCurrent)} ${separatorTopClass}`}>
+                                      <td className={`sticky z-20 border border-[#e7deef] px-3 py-2 text-center font-bold shadow-[8px_0_12px_-10px_rgba(46,26,71,0.45)] ${utilPalette.bg} ${utilPalette.text} ${getTimingCompactChangeHighlight(row.metricDiffs.utilizationPercent, metricHighlightCurrent)} ${separatorTopClass}`} style={getTimingCompactStickyColumnStyle(7)}>
                                         {formatTimingCompactMetric(row.metrics.utilizationPercent, true)}
                                       </td>
                                       {row.cells.map((cell, cellIndex) => (
