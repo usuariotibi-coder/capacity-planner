@@ -8679,7 +8679,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     : `Showing all: ${orderedProjectsInCurrentView.length}`;
 
   const renderProjectListFilters = () => (
-    <div className="mb-2 grid gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-end">
+    <div className="mb-2 grid gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_168px_108px_120px] sm:items-end">
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
         <span>{t.filterProjects || t.selectProject}</span>
         <select
@@ -8699,7 +8699,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         </select>
       </label>
 
-      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap">
+      <label className="inline-flex h-[28px] w-[168px] items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap">
         <input
           type="checkbox"
           checked={showAllVisibleProjects}
@@ -8713,12 +8713,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         type="button"
         onClick={clearProjectListFilters}
         disabled={!hasActiveProjectListFilters}
-        className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-[28px] w-[108px] rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {t.clearFilters || (language === 'es' ? 'Limpiar filtros' : 'Clear filters')}
       </button>
 
-      <div className="text-[10px] font-semibold text-slate-500 sm:justify-self-end sm:min-w-[120px] text-right whitespace-nowrap">
+      <div className="h-[28px] w-[120px] pt-[6px] text-[10px] font-semibold text-slate-500 text-right whitespace-nowrap">
         {projectListSummaryText}
       </div>
     </div>
