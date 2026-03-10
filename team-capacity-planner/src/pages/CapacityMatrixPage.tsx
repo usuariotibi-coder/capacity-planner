@@ -1,5 +1,4 @@
 ﻿import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
-import { Fragment } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -10965,23 +10964,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             </tr>
                           </thead>
                           <tbody>
-                            {[{ label: group.currentViewLabel, rows: group.currentRows, current: true }, { label: group.previousViewLabel, rows: group.previousRows, current: false }].map((viewBlock) => (
-                              <Fragment key={`${group.projectId}-${viewBlock.label}`}>
-                                {!viewBlock.current && (
-                                  <tr>
-                                    <td
-                                      colSpan={8 + timingCompactPreview.weeklyRange.length}
-                                      className="border-x border-b-2 border-b-[#8f7ab3] border-x-[#d8d0e4] bg-gradient-to-r from-[#efe8fb] via-[#e5dcf5] to-[#efe8fb] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#5a4679]"
-                                    >
-                                      {language === 'es' ? 'Comparativo semana pasada' : 'Previous week comparison'}
-                                    </td>
-                                  </tr>
-                                )}
-                                {viewBlock.rows.map((row, rowIndex) => {
+                            {[{ label: group.currentViewLabel, rows: group.currentRows, current: true }, { label: group.previousViewLabel, rows: group.previousRows, current: false }].map((viewBlock) =>
+                                viewBlock.rows.map((row, rowIndex) => {
                                   const utilPalette = getUtilizationColor(row.metrics.utilizationPercent);
                                   const viewBg = viewBlock.current ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
                                   const metricHighlightCurrent = viewBlock.current;
-                                  const separatorTopClass = !viewBlock.current && rowIndex === 0 ? 'border-t-[3px] border-t-[#6f5b8d]' : '';
+                                  const separatorTopClass = !viewBlock.current && rowIndex === 0 ? 'border-t-[4px] border-t-[#7a6796]' : '';
                                   return (
                                     <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
                                       <td className={`border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle ${separatorTopClass}`}>
@@ -11020,9 +11008,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       ))}
                                     </tr>
                                   );
-                                })}
-                              </Fragment>
-                            ))}
+                                })
+                            )}
                           </tbody>
                         </table>
                       </div>
