@@ -3597,8 +3597,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     const compactCurrentAssignmentContext = buildCurrentAssignmentContext();
     const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(previousSnapshotCutoffDate);
+    const compactPreviousEffectiveHoursByCell = new Map(compactPreviousAssignmentContext.hoursByCell);
+    const compactPreviousEffectiveStageByCell = new Map(compactPreviousAssignmentContext.stageByCell);
+    compactCurrentAssignmentContext.hoursByCell.forEach((hours, key) => {
+      if (compactPreviousAssignmentContext.changedKeysAfterSnapshot.has(key)) return;
+      if (!compactPreviousEffectiveHoursByCell.has(key)) {
+        compactPreviousEffectiveHoursByCell.set(key, hours);
+      }
+      if (!compactPreviousEffectiveStageByCell.has(key) && compactCurrentAssignmentContext.stageByCell.has(key)) {
+        compactPreviousEffectiveStageByCell.set(key, compactCurrentAssignmentContext.stageByCell.get(key) || null);
+      }
+    });
     const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactCurrentAssignmentContext.hoursByCell);
-    const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(previousWeekStart, compactPreviousAssignmentContext.hoursByCell);
+    const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactPreviousEffectiveHoursByCell);
 
     const projectGroups = compactProjects.map((projectSnapshot) => {
       const currentSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, currentWeekStart);
@@ -3686,8 +3697,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         undefined,
         compactCurrentMetricsByProjectDept,
         previousSnapshot,
-        compactPreviousAssignmentContext.hoursByCell,
-        compactPreviousAssignmentContext.stageByCell,
+        compactPreviousEffectiveHoursByCell,
+        compactPreviousEffectiveStageByCell,
         compactCurrentAssignmentContext.hoursByCell,
         compactCurrentAssignmentContext.stageByCell,
         compactPreviousAssignmentContext.changedKeysAfterSnapshot,
@@ -3697,8 +3708,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       const previousRows = buildRows(
         previousSnapshot,
-        compactPreviousAssignmentContext.hoursByCell,
-        compactPreviousAssignmentContext.stageByCell,
+        compactPreviousEffectiveHoursByCell,
+        compactPreviousEffectiveStageByCell,
         compactCurrentAssignmentContext.hoursByCell,
         compactCurrentAssignmentContext.stageByCell,
         compactPreviousAssignmentContext.changedKeysAfterSnapshot,
@@ -5478,13 +5489,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousAssignmentHoursByCell = compactPreviousAssignmentContext.hoursByCell;
       const compactPreviousAssignmentStageByCell = compactPreviousAssignmentContext.stageByCell;
       const compactChangedKeysAfterPrevious = compactPreviousAssignmentContext.changedKeysAfterSnapshot;
+      const compactPreviousEffectiveHoursByCell = new Map(compactPreviousAssignmentHoursByCell);
+      const compactPreviousEffectiveStageByCell = new Map(compactPreviousAssignmentStageByCell);
+      compactCurrentAssignmentHoursByCell.forEach((hours, key) => {
+        if (compactChangedKeysAfterPrevious.has(key)) return;
+        if (!compactPreviousEffectiveHoursByCell.has(key)) {
+          compactPreviousEffectiveHoursByCell.set(key, hours);
+        }
+        if (!compactPreviousEffectiveStageByCell.has(key) && compactCurrentAssignmentStageByCell.has(key)) {
+          compactPreviousEffectiveStageByCell.set(key, compactCurrentAssignmentStageByCell.get(key) || null);
+        }
+      });
       const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(
         compactCurrentSnapshotWeekStart,
         compactCurrentAssignmentHoursByCell
       );
       const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(
-        compactPreviousSnapshotWeekStart,
-        compactPreviousAssignmentHoursByCell
+        compactCurrentSnapshotWeekStart,
+        compactPreviousEffectiveHoursByCell
       );
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
@@ -5690,8 +5712,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         );
         const previousBlock = renderCompactSnapshotRows(
           previousSnapshot,
-          compactPreviousAssignmentHoursByCell,
-          compactPreviousAssignmentStageByCell,
+          compactPreviousEffectiveHoursByCell,
+          compactPreviousEffectiveStageByCell,
           compactCurrentAssignmentHoursByCell,
           compactCurrentAssignmentStageByCell,
           compactChangedKeysAfterPrevious,
@@ -5752,8 +5774,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               previousSnapshot,
               dept,
               weekStartDate,
-              compactPreviousAssignmentHoursByCell,
-              compactPreviousAssignmentStageByCell,
+              compactPreviousEffectiveHoursByCell,
+              compactPreviousEffectiveStageByCell,
               compactCurrentAssignmentHoursByCell,
               compactCurrentAssignmentStageByCell,
               compactChangedKeysAfterPrevious
