@@ -151,6 +151,50 @@ interface TimingWeekGroup {
   projectCount: number;
 }
 
+interface TimingCompactPreviewCell {
+  value: string;
+  active: boolean;
+  hasCapacityLoad: boolean;
+  inTimingRange: boolean;
+  stage: Stage;
+  changed: boolean;
+  highlightCurrent: boolean;
+}
+
+interface TimingCompactPreviewMetrics {
+  quotedHours: number;
+  usedHours: number;
+  forecastedHours: number;
+  utilizationPercent: number;
+}
+
+interface TimingCompactPreviewDepartmentRow {
+  department: Department;
+  changeDetected: boolean;
+  metrics: TimingCompactPreviewMetrics;
+  metricDiffs: {
+    quotedHours: boolean;
+    usedHours: boolean;
+    forecastedHours: boolean;
+    utilizationPercent: boolean;
+  };
+  cells: TimingCompactPreviewCell[];
+}
+
+interface TimingCompactPreviewProjectGroup {
+  projectId: string;
+  projectName: string;
+  currentViewLabel: string;
+  previousViewLabel: string;
+  currentRows: TimingCompactPreviewDepartmentRow[];
+  previousRows: TimingCompactPreviewDepartmentRow[];
+}
+
+interface TimingCompactPreviewData {
+  weeklyRange: string[];
+  projectGroups: TimingCompactPreviewProjectGroup[];
+}
+
 type FormValidationScope = 'quick' | 'import';
 type PdfExportScope = 'single' | 'all' | 'selected';
 const PROJECT_ORDER_STORAGE_KEY = 'capacity_project_order_by_scope_v1';
@@ -661,6 +705,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [timingChangesFromDate, setTimingChangesFromDate] = useState<string>(() => `${new Date().getFullYear()}-01-01`);
   const [timingChangesToDate, setTimingChangesToDate] = useState<string>(() => getEndOfYearDate(new Date().getFullYear()));
   const [timingChangesLogs, setTimingChangesLogs] = useState<ActivityLogEntry[]>([]);
+  const [timingAssignmentLogs, setTimingAssignmentLogs] = useState<ActivityLogEntry[]>([]);
   const [isTimingChangesLoading, setIsTimingChangesLoading] = useState(false);
   const [isTimingRangeExcelExporting, setIsTimingRangeExcelExporting] = useState(false);
   const [timingChangesError, setTimingChangesError] = useState<string | null>(null);
@@ -704,6 +749,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (isTimingAuditGeneralView) return;
     setShowTimingChangesModal(false);
     setTimingChangesLogs([]);
+    setTimingAssignmentLogs([]);
     setTimingChangesError(null);
   }, [isTimingAuditGeneralView]);
 
@@ -2856,6 +2902,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   ) => {
     if (!startDate || !endDate) {
       setTimingChangesLogs([]);
+      setTimingAssignmentLogs([]);
       setTimingChangesError(language === 'es'
         ? 'Selecciona ambas fechas para consultar los cambios.'
         : 'Select both dates to query timing changes.');
@@ -2863,6 +2910,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     }
     if (startDate > endDate) {
       setTimingChangesLogs([]);
+      setTimingAssignmentLogs([]);
       setTimingChangesError(language === 'es'
         ? 'La fecha inicial no puede ser mayor a la fecha final.'
         : 'The start date cannot be greater than the end date.');
@@ -2872,16 +2920,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setIsTimingChangesLoading(true);
     setTimingChangesError(null);
     try {
-      const response = await activityLogApi.getFiltered({
-        modelName: 'Project',
-        action: 'updated',
-        startDate,
-        endDate,
-        ordering: '-created_at',
-        pageSize: 500,
-      });
+      const [projectResponse, assignmentResponse] = await Promise.all([
+        activityLogApi.getFiltered({
+          modelName: 'Project',
+          action: 'updated',
+          startDate,
+          endDate,
+          ordering: '-created_at',
+          pageSize: 2000,
+        }),
+        activityLogApi.getFiltered({
+          modelName: 'Assignment',
+          endDate,
+          ordering: 'created_at',
+          pageSize: 5000,
+        }),
+      ]);
 
-      const rows = Array.isArray(response) ? response as ActivityLogEntry[] : [];
+      const rows = Array.isArray(projectResponse) ? projectResponse as ActivityLogEntry[] : [];
       const filteredRows = rows.filter((row) => {
         if (!row || row.modelName !== 'Project') return false;
         const action = (row.action || '').toLowerCase();
@@ -2892,10 +2948,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return hasTimingDataDeep(updates);
       });
 
+      const assignmentRows = Array.isArray(assignmentResponse) ? assignmentResponse as ActivityLogEntry[] : [];
+      const filteredAssignmentRows = assignmentRows.filter((row) => {
+        if (!row || row.modelName !== 'Assignment') return false;
+        const action = (row.action || '').toLowerCase();
+        return action === 'created' || action === 'create' || action === 'updated' || action === 'update' || action === 'deleted' || action === 'delete';
+      });
+
       setTimingChangesLogs(filteredRows);
+      setTimingAssignmentLogs(filteredAssignmentRows);
     } catch (error) {
       console.error('[CapacityMatrix] Error loading project timing changes:', error);
       setTimingChangesLogs([]);
+      setTimingAssignmentLogs([]);
       setTimingChangesError(error instanceof Error
         ? error.message
         : (language === 'es'
@@ -2914,6 +2979,763 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setShowTimingChangesModal(true);
     void loadProjectTimingChanges(defaultFromDate, defaultToDate);
   };
+
+  const timingCompactPreview = useMemo<TimingCompactPreviewData | null>(() => {
+    if (!timingChangesLogs.length) return null;
+
+    const weeklyRange = getWeeksInRange(timingChangesFromDate, timingChangesToDate)
+      .map((week) => normalizeWeekStartDate(week))
+      .filter((week, idx, arr) => week && arr.indexOf(week) === idx);
+
+    if (weeklyRange.length === 0) {
+      return null;
+    }
+
+    const timingLogs = [...timingChangesLogs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const assignmentLogs = [...timingAssignmentLogs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    interface CompactDeptTimingSnapshot {
+      stage: Stage;
+      weekStart: number | null;
+      weekEnd: number | null;
+      durationWeeks: number | null;
+      departmentStartDate: string;
+    }
+
+    interface CompactProjectSnapshot {
+      projectId: string;
+      projectName: string;
+      startDate: string;
+      numberOfWeeks: number | null;
+      departments: Record<Department, CompactDeptTimingSnapshot>;
+    }
+
+    interface CompactAssignmentSnapshot {
+      projectId: string;
+      department: Department | '';
+      weekStartDate: string;
+      hours: number;
+      employeeId: string;
+      stage: Stage;
+    }
+
+    interface CompactCellState {
+      value: string;
+      active: boolean;
+      isFirstWeek: boolean;
+    }
+
+    interface CompactCapacityCellState extends CompactCellState {
+      capacityValue: number | null;
+      displayValue: string;
+      inTimingRange: boolean;
+      hasCapacityLoad: boolean;
+      stage: Stage;
+    }
+
+    interface CompactDepartmentMetrics {
+      quotedHours: number;
+      usedHours: number;
+      forecastedHours: number;
+      utilizationPercent: number;
+    }
+
+    const normalizeCompactAction = (rawAction: string): 'created' | 'updated' | 'deleted' | 'other' => {
+      const action = (rawAction || '').toLowerCase();
+      if (action === 'created' || action === 'create') return 'created';
+      if (action === 'updated' || action === 'update') return 'updated';
+      if (action === 'deleted' || action === 'delete') return 'deleted';
+      return 'other';
+    };
+
+    const toFiniteNumber = (value: unknown): number | null => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const roundCompactHours = (value: number) => Math.round((value || 0) * 100) / 100;
+    const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
+    const asCompactNumber = (value: unknown): number | null => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+    const asCompactString = (value: unknown): string => (typeof value === 'string' ? value : '');
+    const normalizeCompactDepartment = (value: unknown): Department | '' => {
+      const raw = asCompactString(value).trim().toUpperCase();
+      if (!raw) return '';
+      return DEPARTMENT_SET.has(raw as Department) ? (raw as Department) : '';
+    };
+    const normalizeCompactStage = (value: unknown): Stage => {
+      if (value === null) return null;
+      const raw = asCompactString(value).trim();
+      return raw ? (raw as Stage) : null;
+    };
+
+    const resolveCompactHoursFromPayload = (payload: Record<string, any>, fallbackHours: number): number => {
+      const hasSplitFields =
+        hasOwn(payload, 'scioHours') ||
+        hasOwn(payload, 'externalHours') ||
+        hasOwn(payload, 'scio_hours') ||
+        hasOwn(payload, 'external_hours');
+
+      if (hasSplitFields) {
+        const scio = asCompactNumber(payload.scioHours ?? payload.scio_hours) ?? 0;
+        const external = asCompactNumber(payload.externalHours ?? payload.external_hours) ?? 0;
+        return roundCompactHours(Math.max(0, scio + external));
+      }
+
+      const totalCandidate = asCompactNumber(payload.totalHours ?? payload.total_hours);
+      if (totalCandidate !== null) return roundCompactHours(Math.max(0, totalCandidate));
+
+      const hoursCandidate = asCompactNumber(payload.hours);
+      if (hoursCandidate !== null) return roundCompactHours(Math.max(0, hoursCandidate));
+
+      return roundCompactHours(Math.max(0, fallbackHours));
+    };
+
+    const resolveCompactAssignmentProjectId = (payload: Record<string, any>, fallbackProjectId: string): string => {
+      const projectObj = asObject(payload.project);
+      const candidate =
+        payload.projectId ??
+        payload.project_id ??
+        projectObj?.id ??
+        (typeof payload.project === 'string' ? payload.project : '') ??
+        fallbackProjectId;
+      return asCompactString(candidate);
+    };
+
+    const resolveCompactAssignmentWeek = (payload: Record<string, any>, fallbackWeek: string): string => {
+      const raw = asCompactString(payload.weekStartDate ?? payload.week_start_date ?? fallbackWeek);
+      return raw ? normalizeWeekStartDate(raw) : '';
+    };
+
+    const buildCompactAssignmentSnapshot = (
+      payload: Record<string, any> | null,
+      previous: CompactAssignmentSnapshot | null
+    ): CompactAssignmentSnapshot | null => {
+      if (!payload && !previous) return null;
+
+      const current = payload || {};
+      const employeeId = asCompactString(current.employeeId ?? current.employee_id ?? previous?.employeeId ?? '');
+      const employeeDepartment = employeeId ? employeeById.get(employeeId)?.department : '';
+
+      const department =
+        normalizeCompactDepartment(current.department) ||
+        normalizeCompactDepartment(current.dept) ||
+        normalizeCompactDepartment(asObject(current.employee)?.department) ||
+        normalizeCompactDepartment(employeeDepartment) ||
+        previous?.department ||
+        '';
+      const projectId = resolveCompactAssignmentProjectId(current, previous?.projectId || '');
+      const weekStartDate = resolveCompactAssignmentWeek(current, previous?.weekStartDate || '');
+      const hours = resolveCompactHoursFromPayload(current, previous?.hours ?? 0);
+      const hasStageField = hasOwn(current, 'stage') || hasOwn(current, 'stage_name');
+      const stage = hasStageField
+        ? normalizeCompactStage(current.stage ?? current.stage_name)
+        : (previous?.stage ?? null);
+
+      return {
+        projectId,
+        department,
+        weekStartDate,
+        hours,
+        employeeId: employeeId || previous?.employeeId || '',
+        stage,
+      };
+    };
+
+    const extractCompactDeptSnapshot = (stageRows: unknown): Partial<CompactDeptTimingSnapshot> | null => {
+      if (!Array.isArray(stageRows) || stageRows.length === 0) return null;
+
+      let minWeekStart: number | null = null;
+      let maxWeekEnd: number | null = null;
+      let firstDuration: number | null = null;
+      let departmentStartDate = '';
+      let stage: Stage = null;
+
+      stageRows.forEach((rawStage, index) => {
+        const stageObj = asObject(rawStage);
+        if (!stageObj) return;
+
+        if (stage === null && (typeof stageObj.stage === 'string' || stageObj.stage === null)) {
+          stage = stageObj.stage as Stage;
+        }
+
+        const weekStartValue = toFiniteNumber(stageObj.weekStart);
+        const weekEndValue = toFiniteNumber(stageObj.weekEnd);
+        const durationValue = toFiniteNumber(stageObj.durationWeeks);
+        const deptStartValue = typeof stageObj.departmentStartDate === 'string'
+          ? stageObj.departmentStartDate.slice(0, 10)
+          : '';
+
+        if (durationValue !== null && durationValue > 0 && firstDuration === null) {
+          firstDuration = durationValue;
+        }
+
+        if (weekStartValue !== null && weekEndValue !== null && weekEndValue >= weekStartValue) {
+          if (minWeekStart === null || weekStartValue < minWeekStart) {
+            minWeekStart = weekStartValue;
+            if (deptStartValue) departmentStartDate = deptStartValue;
+          }
+          if (maxWeekEnd === null || weekEndValue > maxWeekEnd) {
+            maxWeekEnd = weekEndValue;
+          }
+        } else if (!departmentStartDate && index === 0 && deptStartValue) {
+          departmentStartDate = deptStartValue;
+        }
+      });
+
+      const durationFromRange =
+        minWeekStart !== null &&
+        maxWeekEnd !== null &&
+        maxWeekEnd >= minWeekStart
+          ? (maxWeekEnd - minWeekStart + 1)
+          : null;
+
+      return {
+        stage,
+        weekStart: minWeekStart,
+        weekEnd: maxWeekEnd,
+        durationWeeks: durationFromRange ?? firstDuration,
+        departmentStartDate,
+      };
+    };
+
+    const createEmptyCompactDeptSnapshot = (): CompactDeptTimingSnapshot => ({
+      stage: null,
+      weekStart: null,
+      weekEnd: null,
+      durationWeeks: null,
+      departmentStartDate: '',
+    });
+
+    const createProjectCompactSnapshot = (projectId: string): CompactProjectSnapshot => {
+      const project = projectById.get(projectId);
+      const departments = DEPARTMENTS.reduce((acc, dept) => {
+        acc[dept] = createEmptyCompactDeptSnapshot();
+        return acc;
+      }, {} as Record<Department, CompactDeptTimingSnapshot>);
+
+      if (project?.departmentStages) {
+        DEPARTMENTS.forEach((dept) => {
+          const parsed = extractCompactDeptSnapshot(project.departmentStages?.[dept]);
+          if (!parsed) return;
+          departments[dept] = {
+            stage: parsed.stage ?? departments[dept].stage,
+            weekStart: parsed.weekStart ?? departments[dept].weekStart,
+            weekEnd: parsed.weekEnd ?? departments[dept].weekEnd,
+            durationWeeks: parsed.durationWeeks ?? departments[dept].durationWeeks,
+            departmentStartDate: parsed.departmentStartDate ?? departments[dept].departmentStartDate,
+          };
+        });
+      }
+
+      const fallbackName = timingLogs.find((entry) => entry.objectId === projectId)?.changes?.updates?.name;
+
+      return {
+        projectId,
+        projectName: project?.name || fallbackName || `${language === 'es' ? 'Proyecto' : 'Project'} ${projectId.slice(0, 8)}`,
+        startDate: project?.startDate || '',
+        numberOfWeeks: Number.isFinite(Number(project?.numberOfWeeks)) ? Number(project?.numberOfWeeks) : null,
+        departments,
+      };
+    };
+
+    const applyTimingUpdateToCompactSnapshot = (snapshot: CompactProjectSnapshot, updates: Record<string, any>) => {
+      if (typeof updates.name === 'string' && updates.name.trim()) {
+        snapshot.projectName = updates.name.trim();
+      }
+      if (typeof updates.startDate === 'string' && updates.startDate) {
+        snapshot.startDate = updates.startDate.slice(0, 10);
+      }
+      const updatedDuration = toFiniteNumber(updates.numberOfWeeks);
+      if (updatedDuration !== null && updatedDuration > 0) {
+        snapshot.numberOfWeeks = updatedDuration;
+      }
+
+      const departmentStages = asObject(updates.departmentStages);
+      if (!departmentStages) return;
+
+      DEPARTMENTS.forEach((dept) => {
+        const parsed = extractCompactDeptSnapshot(departmentStages[dept]);
+        if (!parsed) return;
+        const current = snapshot.departments[dept];
+        snapshot.departments[dept] = {
+          stage: parsed.stage ?? current.stage,
+          weekStart: parsed.weekStart ?? current.weekStart,
+          weekEnd: parsed.weekEnd ?? current.weekEnd,
+          durationWeeks: parsed.durationWeeks ?? current.durationWeeks,
+          departmentStartDate: parsed.departmentStartDate ?? current.departmentStartDate,
+        };
+      });
+    };
+
+    const resolveCompactCellState = (
+      snapshot: CompactProjectSnapshot,
+      department: Department,
+      weekStartDate: string
+    ): CompactCellState => {
+      let effectiveStartDate = '';
+      let durationWeeks = 0;
+
+      if (department === 'PM') {
+        effectiveStartDate = snapshot.startDate;
+        durationWeeks = snapshot.numberOfWeeks || 0;
+      } else {
+        const deptSnapshot = snapshot.departments[department];
+        effectiveStartDate = deptSnapshot.departmentStartDate || '';
+        if (!effectiveStartDate && snapshot.startDate && deptSnapshot.weekStart !== null) {
+          const fallbackStart = parseISODate(snapshot.startDate);
+          fallbackStart.setDate(fallbackStart.getDate() + ((deptSnapshot.weekStart - 1) * 7));
+          effectiveStartDate = formatToISO(fallbackStart);
+        }
+        durationWeeks =
+          (deptSnapshot.durationWeeks && deptSnapshot.durationWeeks > 0)
+            ? deptSnapshot.durationWeeks
+            : (
+                deptSnapshot.weekStart !== null &&
+                deptSnapshot.weekEnd !== null &&
+                deptSnapshot.weekEnd >= deptSnapshot.weekStart
+                  ? (deptSnapshot.weekEnd - deptSnapshot.weekStart + 1)
+                  : 0
+              );
+      }
+
+      if (!effectiveStartDate || durationWeeks <= 0) {
+        return { value: '-', active: false, isFirstWeek: false };
+      }
+
+      const start = parseISODate(effectiveStartDate);
+      const week = parseISODate(weekStartDate);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(week.getTime())) {
+        return { value: '-', active: false, isFirstWeek: false };
+      }
+
+      const end = new Date(start);
+      end.setDate(end.getDate() + (durationWeeks * 7) - 1);
+      if (week < start || week > end) {
+        return { value: '-', active: false, isFirstWeek: false };
+      }
+
+      const weekNumber = Math.floor((week.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+      return {
+        value: `${weekNumber}`,
+        active: true,
+        isFirstWeek: weekNumber === 1,
+      };
+    };
+
+    const formatCompactCapacityValue = (value: number): string => {
+      const rounded = Math.round(value * 100) / 100;
+      if (Number.isInteger(rounded)) return `${rounded}`;
+      return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    };
+
+    const resolveCompactCapacityCellState = (
+      snapshot: CompactProjectSnapshot,
+      department: Department,
+      weekStartDate: string,
+      assignmentHoursByCell: Map<string, number>,
+      assignmentStageByCell: Map<string, Stage>,
+      fallbackAssignmentHoursByCell?: Map<string, number>,
+      fallbackAssignmentStageByCell?: Map<string, Stage>,
+      fallbackBlockedKeys?: Set<string>
+    ): CompactCapacityCellState => {
+      const timingCell = resolveCompactCellState(snapshot, department, weekStartDate);
+      const assignmentKey = `${snapshot.projectId}|${department}|${weekStartDate}`;
+      const allowFallback = !fallbackBlockedKeys?.has(assignmentKey);
+      const totalHours = assignmentHoursByCell.has(assignmentKey)
+        ? (assignmentHoursByCell.get(assignmentKey) || 0)
+        : (allowFallback ? (fallbackAssignmentHoursByCell?.get(assignmentKey) || 0) : 0);
+      const stage = assignmentStageByCell.has(assignmentKey)
+        ? (assignmentStageByCell.get(assignmentKey) || null)
+        : (allowFallback ? (fallbackAssignmentStageByCell?.get(assignmentKey) || null) : null);
+      const normalizedCapacity = department === 'MFG' ? totalHours : calculateTalent(totalHours);
+      const hasCapacityLoad = normalizedCapacity > 0;
+
+      return {
+        ...timingCell,
+        capacityValue: hasCapacityLoad ? normalizedCapacity : null,
+        displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '-',
+        inTimingRange: timingCell.active,
+        hasCapacityLoad,
+        stage,
+      };
+    };
+
+    const compactProjectIds = Array.from(new Set(timingLogs.map((entry) => entry.objectId).filter(Boolean)));
+    const compactProjects = compactProjectIds
+      .map((projectId) => createProjectCompactSnapshot(projectId))
+      .sort((a, b) => a.projectName.localeCompare(b.projectName));
+
+    const compactLogsByProject = new Map<string, ActivityLogEntry[]>();
+    timingLogs.forEach((entry) => {
+      const bucket = compactLogsByProject.get(entry.objectId) || [];
+      bucket.push(entry);
+      compactLogsByProject.set(entry.objectId, bucket);
+    });
+
+    const buildCompactSnapshotByWeekStart = (projectId: string, weekStartDate: string): CompactProjectSnapshot => {
+      const snapshot = createProjectCompactSnapshot(projectId);
+      if (!weekStartDate) return snapshot;
+      const projectLogs = compactLogsByProject.get(projectId) || [];
+      for (const log of projectLogs) {
+        const logDay = (log.createdAt || '').slice(0, 10);
+        if (!logDay || logDay > weekStartDate) break;
+        const updates = extractProjectUpdatePayload(log.changes);
+        if (updates) {
+          applyTimingUpdateToCompactSnapshot(snapshot, updates);
+        }
+      }
+      return snapshot;
+    };
+
+    const getCompactAssignmentCellKey = (snapshot: CompactAssignmentSnapshot | null): string => {
+      if (!snapshot || !snapshot.projectId || !snapshot.department || !snapshot.weekStartDate) return '';
+      return `${snapshot.projectId}|${snapshot.department}|${snapshot.weekStartDate}`;
+    };
+
+    const buildCompactAssignmentHoursContextByWeekStart = (weekStartDate: string): {
+      hoursByCell: Map<string, number>;
+      stageByCell: Map<string, Stage>;
+      changedKeysAfterSnapshot: Set<string>;
+    } => {
+      const assignmentStateById = new Map<string, CompactAssignmentSnapshot>();
+      const changedKeysAfterSnapshot = new Set<string>();
+      if (!weekStartDate) {
+        return { hoursByCell: new Map<string, number>(), stageByCell: new Map<string, Stage>(), changedKeysAfterSnapshot };
+      }
+
+      let logIndex = 0;
+      while (logIndex < assignmentLogs.length) {
+        const log = assignmentLogs[logIndex];
+        const logDay = (log.createdAt || '').slice(0, 10);
+        if (!logDay || logDay > weekStartDate) break;
+
+        const action = normalizeCompactAction(log.action);
+        if (action !== 'other') {
+          const changesObj = asObject(log.changes);
+          const payload = changesObj
+            ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
+            : null;
+
+          const existingPrev = assignmentStateById.get(log.objectId) || null;
+          const fallbackPrev = action === 'deleted' && !existingPrev
+            ? buildCompactAssignmentSnapshot(payload, null)
+            : existingPrev;
+
+          let nextSnapshot: CompactAssignmentSnapshot | null = null;
+          if (action !== 'deleted') {
+            nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+          }
+
+          if (action === 'deleted') {
+            assignmentStateById.delete(log.objectId);
+          } else if (nextSnapshot) {
+            assignmentStateById.set(log.objectId, nextSnapshot);
+          }
+        }
+
+        logIndex += 1;
+      }
+
+      const snapshotStateById = new Map<string, CompactAssignmentSnapshot>();
+      assignmentStateById.forEach((value, key) => {
+        snapshotStateById.set(key, { ...value });
+      });
+
+      while (logIndex < assignmentLogs.length) {
+        const log = assignmentLogs[logIndex];
+        const action = normalizeCompactAction(log.action);
+        if (action !== 'other') {
+          const changesObj = asObject(log.changes);
+          const payload = changesObj
+            ? (asObject(changesObj.assignment) || asObject(changesObj.updates) || changesObj)
+            : null;
+
+          const existingPrev = assignmentStateById.get(log.objectId) || null;
+          const fallbackPrev = action === 'deleted' && !existingPrev
+            ? buildCompactAssignmentSnapshot(payload, null)
+            : existingPrev;
+
+          let nextSnapshot: CompactAssignmentSnapshot | null = null;
+          if (action !== 'deleted') {
+            nextSnapshot = buildCompactAssignmentSnapshot(payload, fallbackPrev);
+          }
+
+          const previousKey = getCompactAssignmentCellKey(fallbackPrev);
+          const nextKey = getCompactAssignmentCellKey(nextSnapshot);
+          if (previousKey) changedKeysAfterSnapshot.add(previousKey);
+          if (nextKey) changedKeysAfterSnapshot.add(nextKey);
+
+          if (action === 'deleted') {
+            assignmentStateById.delete(log.objectId);
+          } else if (nextSnapshot) {
+            assignmentStateById.set(log.objectId, nextSnapshot);
+          }
+        }
+
+        logIndex += 1;
+      }
+
+      const hoursByCell = new Map<string, number>();
+      const stageByCell = new Map<string, Stage>();
+      snapshotStateById.forEach((snapshot) => {
+        const key = getCompactAssignmentCellKey(snapshot);
+        if (!key || snapshot.hours <= 0) return;
+        hoursByCell.set(key, roundCompactHours((hoursByCell.get(key) || 0) + snapshot.hours));
+
+        if (snapshot.stage) {
+          const department = snapshot.department as Department;
+          const currentStage = stageByCell.get(key) || null;
+          if (isHigherPriorityStage(department, snapshot.stage, currentStage)) {
+            stageByCell.set(key, snapshot.stage);
+          }
+        }
+      });
+
+      return { hoursByCell, stageByCell, changedKeysAfterSnapshot };
+    };
+
+    const buildCurrentAssignmentContext = (): { hoursByCell: Map<string, number>; stageByCell: Map<string, Stage> } => {
+      const hoursByCell = new Map<string, number>();
+      const stageByCell = new Map<string, Stage>();
+      assignmentIndex.byCell.forEach((entry, key) => {
+        const totalHours = roundCompactHours(entry?.totalHours ?? 0);
+        if (totalHours > 0) {
+          hoursByCell.set(key, totalHours);
+          stageByCell.set(key, entry?.stage ?? null);
+        }
+      });
+      return { hoursByCell, stageByCell };
+    };
+
+    const getCompactQuotedHours = (projectId: string, department: Department): number => {
+      const project = projectById.get(projectId);
+      const quotedHours = project?.departmentHoursAllocated?.[department] || 0;
+      const quotedChangeOrders = getQuotedChangeOrders(department, projectId);
+      return roundCompactHours(quotedHours + quotedChangeOrders);
+    };
+
+    const buildCompactDepartmentMetricsMap = (
+      snapshotWeekStart: string,
+      hoursByCell: Map<string, number>
+    ) => {
+      const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+      hoursByCell.forEach((hours, key) => {
+        const [projectId, departmentRaw, weekStartDate] = key.split('|');
+        if (!projectId || !departmentRaw || !weekStartDate) return;
+        if (!DEPARTMENT_SET.has(departmentRaw as Department)) return;
+
+        const department = departmentRaw as Department;
+        const metricsKey = `${projectId}|${department}`;
+        const existing = metricsByProjectDept.get(metricsKey) || {
+          quotedHours: getCompactQuotedHours(projectId, department),
+          usedHours: 0,
+          forecastedHours: 0,
+          utilizationPercent: 0,
+        };
+
+        if (snapshotWeekStart && weekStartDate < snapshotWeekStart) {
+          existing.usedHours = roundCompactHours(existing.usedHours + hours);
+        } else {
+          existing.forecastedHours = roundCompactHours(existing.forecastedHours + hours);
+        }
+
+        metricsByProjectDept.set(metricsKey, existing);
+      });
+
+      metricsByProjectDept.forEach((entry) => {
+        const totalPlanned = entry.usedHours + entry.forecastedHours;
+        entry.utilizationPercent = entry.quotedHours > 0
+          ? Math.round((totalPlanned / entry.quotedHours) * 100)
+          : (totalPlanned > 0 ? 100 : 0);
+      });
+
+      return metricsByProjectDept;
+    };
+
+    const getCompactDepartmentMetrics = (
+      metricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+      projectId: string,
+      department: Department
+    ): CompactDepartmentMetrics => {
+      return metricsByProjectDept.get(`${projectId}|${department}`) || {
+        quotedHours: getCompactQuotedHours(projectId, department),
+        usedHours: 0,
+        forecastedHours: 0,
+        utilizationPercent: 0,
+      };
+    };
+
+    const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
+    const resolvedCurrentWeekIndex = (() => {
+      const byToday = weeklyRange.indexOf(todayWeekStart);
+      if (byToday > 0) return byToday;
+      if (byToday === 0 && weeklyRange.length > 1) return 1;
+      return weeklyRange.length - 1;
+    })();
+    const resolvedPreviousWeekIndex = Math.max(0, resolvedCurrentWeekIndex - 1);
+    const hasWeekOverWeekRange =
+      weeklyRange.length >= 2 &&
+      resolvedCurrentWeekIndex >= 0 &&
+      resolvedCurrentWeekIndex < weeklyRange.length &&
+      resolvedPreviousWeekIndex >= 0 &&
+      resolvedPreviousWeekIndex < weeklyRange.length &&
+      resolvedCurrentWeekIndex !== resolvedPreviousWeekIndex;
+    const currentWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedCurrentWeekIndex] : weeklyRange[weeklyRange.length - 1];
+    const previousWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedPreviousWeekIndex] : currentWeekStart;
+    const currentWeekLabel = currentWeekStart ? `CW${String(getWeekNumber(currentWeekStart)).padStart(2, '0')}` : '-';
+    const previousWeekLabel = previousWeekStart ? `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')}` : '-';
+
+    const compactCurrentAssignmentContext = buildCurrentAssignmentContext();
+    const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(previousWeekStart);
+    const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactCurrentAssignmentContext.hoursByCell);
+    const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(previousWeekStart, compactPreviousAssignmentContext.hoursByCell);
+
+    const projectGroups = compactProjects.map((projectSnapshot) => {
+      const currentSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, currentWeekStart);
+      const previousSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, previousWeekStart);
+
+      const buildRows = (
+        snapshot: CompactProjectSnapshot,
+        assignmentHoursByCell: Map<string, number>,
+        assignmentStageByCell: Map<string, Stage>,
+        fallbackAssignmentHoursByCell: Map<string, number> | undefined,
+        fallbackAssignmentStageByCell: Map<string, Stage> | undefined,
+        fallbackBlockedKeys: Set<string> | undefined,
+        metricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+        compareSnapshot: CompactProjectSnapshot,
+        compareHoursByCell: Map<string, number>,
+        compareStageByCell: Map<string, Stage>,
+        compareFallbackHoursByCell: Map<string, number> | undefined,
+        compareFallbackStageByCell: Map<string, Stage> | undefined,
+        compareBlockedKeys: Set<string> | undefined,
+        compareMetricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+        highlightCurrent: boolean
+      ): TimingCompactPreviewDepartmentRow[] => {
+        return DEPARTMENTS.map((dept) => {
+          const metrics = getCompactDepartmentMetrics(metricsByProjectDept, snapshot.projectId, dept);
+          const compareMetrics = getCompactDepartmentMetrics(compareMetricsByProjectDept, compareSnapshot.projectId, dept);
+          const metricDiffs = {
+            quotedHours: metrics.quotedHours !== compareMetrics.quotedHours,
+            usedHours: metrics.usedHours !== compareMetrics.usedHours,
+            forecastedHours: metrics.forecastedHours !== compareMetrics.forecastedHours,
+            utilizationPercent: metrics.utilizationPercent !== compareMetrics.utilizationPercent,
+          };
+
+          const cells = weeklyRange.map((weekStartDate) => {
+            const currentCellState = resolveCompactCapacityCellState(
+              snapshot,
+              dept,
+              weekStartDate,
+              assignmentHoursByCell,
+              assignmentStageByCell,
+              fallbackAssignmentHoursByCell,
+              fallbackAssignmentStageByCell,
+              fallbackBlockedKeys
+            );
+            const compareCellState = resolveCompactCapacityCellState(
+              compareSnapshot,
+              dept,
+              weekStartDate,
+              compareHoursByCell,
+              compareStageByCell,
+              compareFallbackHoursByCell,
+              compareFallbackStageByCell,
+              compareBlockedKeys
+            );
+            const changed =
+              currentCellState.displayValue !== compareCellState.displayValue ||
+              currentCellState.active !== compareCellState.active;
+
+            return {
+              value: currentCellState.displayValue,
+              active: currentCellState.active,
+              hasCapacityLoad: currentCellState.hasCapacityLoad,
+              inTimingRange: currentCellState.inTimingRange,
+              stage: currentCellState.stage,
+              changed,
+              highlightCurrent: highlightCurrent && changed,
+            };
+          });
+
+          return {
+            department: dept,
+            changeDetected: Object.values(metricDiffs).some(Boolean) || cells.some((cell) => cell.changed),
+            metrics,
+            metricDiffs,
+            cells,
+          };
+        });
+      };
+
+      const currentRows = buildRows(
+        currentSnapshot,
+        compactCurrentAssignmentContext.hoursByCell,
+        compactCurrentAssignmentContext.stageByCell,
+        undefined,
+        undefined,
+        undefined,
+        compactCurrentMetricsByProjectDept,
+        previousSnapshot,
+        compactPreviousAssignmentContext.hoursByCell,
+        compactPreviousAssignmentContext.stageByCell,
+        compactCurrentAssignmentContext.hoursByCell,
+        compactCurrentAssignmentContext.stageByCell,
+        compactPreviousAssignmentContext.changedKeysAfterSnapshot,
+        compactPreviousMetricsByProjectDept,
+        true
+      );
+
+      const previousRows = buildRows(
+        previousSnapshot,
+        compactPreviousAssignmentContext.hoursByCell,
+        compactPreviousAssignmentContext.stageByCell,
+        compactCurrentAssignmentContext.hoursByCell,
+        compactCurrentAssignmentContext.stageByCell,
+        compactPreviousAssignmentContext.changedKeysAfterSnapshot,
+        compactPreviousMetricsByProjectDept,
+        currentSnapshot,
+        compactCurrentAssignmentContext.hoursByCell,
+        compactCurrentAssignmentContext.stageByCell,
+        undefined,
+        undefined,
+        undefined,
+        compactCurrentMetricsByProjectDept,
+        false
+      );
+
+      return {
+        projectId: projectSnapshot.projectId,
+        projectName: currentSnapshot.projectName || projectSnapshot.projectName,
+        currentViewLabel: hasWeekOverWeekRange
+          ? `${language === 'es' ? 'Semana Actual' : 'Current Week'} (${currentWeekLabel})`
+          : `${language === 'es' ? 'Actual' : 'Current'} (${currentWeekLabel})`,
+        previousViewLabel: hasWeekOverWeekRange
+          ? `${language === 'es' ? 'Semana Pasada' : 'Previous Week'} (${previousWeekLabel})`
+          : `${language === 'es' ? 'Referencia' : 'Reference'} (${previousWeekLabel})`,
+        currentRows,
+        previousRows,
+      };
+    });
+
+    return {
+      weeklyRange,
+      projectGroups,
+    };
+  }, [
+    timingChangesLogs,
+    timingAssignmentLogs,
+    timingChangesFromDate,
+    timingChangesToDate,
+    projectById,
+    employeeById,
+    assignmentIndex.byCell,
+    language,
+    getQuotedChangeOrders,
+  ]);
 
   const handleExportTimingRangeExcel = async () => {
     return handleExportTimingChangesExcel();
@@ -7670,6 +8492,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     </div>
   );
 
+  const formatTimingCompactMetric = (value: number, isPercent = false): string => {
+    if (isPercent) return `${Math.round(value || 0)}%`;
+    const rounded = Math.round((value || 0) * 100) / 100;
+    if (Number.isInteger(rounded)) return `${rounded}`;
+    return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+  };
+
+  const getTimingCompactCellClasses = (
+    cell: TimingCompactPreviewCell,
+    department: Department
+  ): string => {
+    if (cell.inTimingRange) {
+      if (cell.hasCapacityLoad) {
+        const stagePalette = getStageColor(cell.stage, department);
+        return `${stagePalette.bg} ${stagePalette.text}`;
+      }
+      return 'bg-slate-200 text-slate-500';
+    }
+
+    if (cell.hasCapacityLoad) {
+      const stagePalette = getStageColor(cell.stage, department);
+      return `${stagePalette.bg} ${stagePalette.text}`;
+    }
+
+    return 'bg-white text-slate-400';
+  };
+
   return (
     <div className="brand-page-shell capacity-matrix-page h-full flex flex-col">
       {/* Edit Cell Modal */}
@@ -9764,7 +10613,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       {showTimingChangesModal && isTimingAuditGeneralView && (
         <div className="fixed inset-0 z-[92] bg-black/55 flex items-center justify-center p-3">
-          <div className="w-full max-w-6xl max-h-[92vh] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col">
+          <div className="h-[94vh] w-full max-w-[98vw] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col">
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold">
@@ -9772,8 +10621,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 </h3>
                 <p className="text-[11px] opacity-90">
                   {language === 'es'
-                    ? 'Vista General - por proyecto o por semana'
-                    : 'General View - by project or by week'}
+                    ? 'Vista General - comparativo compacto semanal'
+                    : 'General View - weekly compact comparison'}
                 </p>
               </div>
               <button
@@ -9840,7 +10689,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-[#f7f4fb] p-4">
+            <div className="flex-1 overflow-auto bg-[#f7f4fb] p-4">
               {isTimingChangesLoading ? (
                 <div className="text-sm font-semibold text-[#4f3a70]">
                   {language === 'es' ? 'Cargando cambios de timing...' : 'Loading timing changes...'}
@@ -9855,37 +10704,96 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     ? 'No se encontraron cambios de timing para el rango seleccionado.'
                     : 'No timing changes were found for the selected range.'}
                 </div>
+              ) : !timingCompactPreview ? (
+                <div className="rounded-lg border border-[#dfd5ef] bg-white px-3 py-3 text-sm text-[#5d4a72]">
+                  {language === 'es'
+                    ? 'No se pudo construir la vista compacta del Excel para este rango.'
+                    : 'The compact Excel preview could not be built for this range.'}
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {timingChangesByProject.map((group) => (
-                    <div key={`timing-group-${group.projectId}`} className="rounded-lg border border-[#d8d0e4] bg-white shadow-sm overflow-hidden">
-                      <div className="px-3 py-2 bg-gradient-to-r from-[#f3ecff] to-[#eee5fb] border-b border-[#d8d0e4] flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-bold text-[#2e1a47] truncate">{group.projectName}</span>
-                          <span className="text-[10px] font-semibold text-[#7a6b8f]">#{group.projectId.slice(0, 8)}</span>
+                <div className="space-y-4">
+                  {timingCompactPreview.projectGroups.map((group) => (
+                    <div key={`timing-compact-${group.projectId}`} className="rounded-xl border border-[#d8d0e4] bg-white shadow-sm overflow-hidden">
+                      <div className="px-4 py-2.5 bg-gradient-to-r from-[#f3ecff] to-[#eee5fb] border-b border-[#d8d0e4] flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-bold text-[#2e1a47] truncate">{group.projectName}</span>
+                            <span className="text-[10px] font-semibold text-[#7a6b8f]">#{group.projectId.slice(0, 8)}</span>
+                          </div>
+                          <p className="text-[11px] text-[#6f5b80]">
+                            {language === 'es'
+                              ? 'Previsualizacion compacta del XLSX semanal'
+                              : 'Weekly XLSX compact preview'}
+                          </p>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                          {group.entries.length} {language === 'es' ? 'cambios' : 'changes'}
-                        </span>
                       </div>
 
-                      <div className="divide-y divide-[#efe8f8]">
-                        {group.entries.map((entry) => (
-                          <div key={entry.id} className="px-3 py-2.5">
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#5a4670]">
-                              <span>{formatTimingDateTime(entry.createdAt)}</span>
-                              <span className="text-[#9b8bb1]">|</span>
-                              <span>{formatTimingUserName(entry.user)}</span>
-                            </div>
-                            <div className="mt-1.5 space-y-1">
-                              {getTimingSummaryLines(entry).map((line, idx) => (
-                                <p key={`${entry.id}-line-${idx}`} className="text-xs text-[#2f2243] leading-relaxed">
-                                  {line}
-                                </p>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-[1500px] w-full border-collapse text-[11px]">
+                          <thead className="sticky top-0 z-10">
+                            <tr className="bg-[#2e1a47] text-white">
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-left font-bold">Project</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-left font-bold">{language === 'es' ? 'Vista' : 'View'}</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">DPTO</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Cambios' : 'Changes'}</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Cotizado' : 'Quoted'}</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Usado' : 'Used'}</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Pronostico' : 'Fcst'}</th>
+                              <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">Util %</th>
+                              {timingCompactPreview.weeklyRange.map((weekStartDate) => (
+                                <th key={`${group.projectId}-${weekStartDate}`} className="border border-[#d8d0e4] px-2 py-2 text-center font-bold min-w-[56px]">
+                                  {`CW${String(getWeekNumber(weekStartDate)).padStart(2, '0')}`}
+                                </th>
                               ))}
-                            </div>
-                          </div>
-                        ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[{ label: group.currentViewLabel, rows: group.currentRows, current: true }, { label: group.previousViewLabel, rows: group.previousRows, current: false }].map((viewBlock) =>
+                              viewBlock.rows.map((row, rowIndex) => {
+                                const utilPalette = getUtilizationColor(row.metrics.utilizationPercent);
+                                const viewBg = viewBlock.current ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
+                                return (
+                                  <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
+                                    <td className="border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle">
+                                      {rowIndex === 0 ? group.projectName : ''}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 font-semibold align-middle ${viewBg}`}>
+                                      {rowIndex === 0 ? viewBlock.label : ''}
+                                    </td>
+                                    <td className="border border-[#e7deef] px-3 py-2 text-center font-bold text-[#2e1a47] bg-slate-50">
+                                      {row.department}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.changeDetected ? 'bg-amber-100 text-amber-900' : 'bg-slate-50 text-slate-400'}`}>
+                                      {row.changeDetected
+                                        ? (language === 'es' ? 'Hubo un cambio' : 'Change detected')
+                                        : '-'}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? 'ring-1 ring-black bg-indigo-100 text-indigo-900' : 'bg-indigo-50 text-indigo-700'}`}>
+                                      {formatTimingCompactMetric(row.metrics.quotedHours)}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? 'ring-1 ring-black bg-emerald-100 text-emerald-900' : 'bg-emerald-50 text-emerald-700'}`}>
+                                      {formatTimingCompactMetric(row.metrics.usedHours)}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? 'ring-1 ring-black bg-amber-100 text-amber-900' : 'bg-amber-50 text-amber-700'}`}>
+                                      {formatTimingCompactMetric(row.metrics.forecastedHours)}
+                                    </td>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${row.metricDiffs.utilizationPercent ? 'ring-1 ring-black' : ''}`}>
+                                      {formatTimingCompactMetric(row.metrics.utilizationPercent, true)}
+                                    </td>
+                                    {row.cells.map((cell, cellIndex) => (
+                                      <td
+                                        key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
+                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${cell.highlightCurrent ? 'ring-1 ring-black' : ''} ${cell.changed && !cell.highlightCurrent ? 'bg-amber-50' : ''}`}
+                                      >
+                                        {cell.value}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   ))}
