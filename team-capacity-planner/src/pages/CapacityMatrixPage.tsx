@@ -3594,6 +3594,45 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       return metricsByProjectDept;
     };
 
+    const hasCompactDepartmentAssignmentChanges = (
+      projectId: string,
+      department: Department,
+      changedKeysAfterSnapshot: Set<string>
+    ): boolean => {
+      const prefix = `${projectId}|${department}|`;
+      for (const key of changedKeysAfterSnapshot) {
+        if (key.startsWith(prefix)) return true;
+      }
+      return false;
+    };
+
+    const buildPreviousEffectiveDepartmentMetricsMap = (
+      currentMetricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+      previousMetricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+      changedKeysAfterSnapshot: Set<string>
+    ) => {
+      const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+      compactProjects.forEach((projectSnapshot) => {
+        DEPARTMENTS.forEach((department) => {
+          const hasAssignmentChanges = hasCompactDepartmentAssignmentChanges(
+            projectSnapshot.projectId,
+            department,
+            changedKeysAfterSnapshot
+          );
+
+          metricsByProjectDept.set(
+            `${projectSnapshot.projectId}|${department}`,
+            hasAssignmentChanges
+              ? getCompactDepartmentMetrics(previousMetricsByProjectDept, projectSnapshot.projectId, department)
+              : getCompactDepartmentMetrics(currentMetricsByProjectDept, projectSnapshot.projectId, department)
+          );
+        });
+      });
+
+      return metricsByProjectDept;
+    };
+
     const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
     const resolvedCurrentWeekIndex = (() => {
       const byToday = weeklyRange.indexOf(todayWeekStart);
@@ -3634,7 +3673,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       }
     });
     const compactCurrentMetricsByProjectDept = buildLiveCompactDepartmentMetricsMap();
-    const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactPreviousEffectiveHoursByCell);
+    const compactPreviousMetricsByProjectDept = buildPreviousEffectiveDepartmentMetricsMap(
+      compactCurrentMetricsByProjectDept,
+      buildCompactDepartmentMetricsMap(currentWeekStart, compactPreviousEffectiveHoursByCell),
+      compactPreviousAssignmentContext.changedKeysAfterSnapshot
+    );
 
     const projectGroups = compactProjects.map((projectSnapshot) => {
       const currentSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, currentWeekStart);
@@ -5385,6 +5428,45 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return metricsByProjectDept;
       };
 
+      const hasCompactDepartmentAssignmentChanges = (
+        projectId: string,
+        department: Department,
+        changedKeysAfterSnapshot: Set<string>
+      ): boolean => {
+        const prefix = `${projectId}|${department}|`;
+        for (const key of changedKeysAfterSnapshot) {
+          if (key.startsWith(prefix)) return true;
+        }
+        return false;
+      };
+
+      const buildPreviousEffectiveDepartmentMetricsMap = (
+        currentMetricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+        previousMetricsByProjectDept: Map<string, CompactDepartmentMetrics>,
+        changedKeysAfterSnapshot: Set<string>
+      ) => {
+        const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+        compactProjects.forEach((projectSnapshot) => {
+          DEPARTMENTS.forEach((department) => {
+            const hasAssignmentChanges = hasCompactDepartmentAssignmentChanges(
+              projectSnapshot.projectId,
+              department,
+              changedKeysAfterSnapshot
+            );
+
+            metricsByProjectDept.set(
+              `${projectSnapshot.projectId}|${department}`,
+              hasAssignmentChanges
+                ? getCompactDepartmentMetrics(previousMetricsByProjectDept, projectSnapshot.projectId, department)
+                : getCompactDepartmentMetrics(currentMetricsByProjectDept, projectSnapshot.projectId, department)
+            );
+          });
+        });
+
+        return metricsByProjectDept;
+      };
+
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const BORDER = 'D5D1DA';
@@ -5572,9 +5654,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         }
       });
       const compactCurrentMetricsByProjectDept = buildLiveCompactDepartmentMetricsMap();
-      const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(
-        compactCurrentSnapshotWeekStart,
-        compactPreviousEffectiveHoursByCell
+      const compactPreviousMetricsByProjectDept = buildPreviousEffectiveDepartmentMetricsMap(
+        compactCurrentMetricsByProjectDept,
+        buildCompactDepartmentMetricsMap(
+          compactCurrentSnapshotWeekStart,
+          compactPreviousEffectiveHoursByCell
+        ),
+        compactChangedKeysAfterPrevious
       );
       const compactCurrentSnapshotByProject = new Map<string, CompactProjectSnapshot>();
       const compactPreviousSnapshotByProject = new Map<string, CompactProjectSnapshot>();
