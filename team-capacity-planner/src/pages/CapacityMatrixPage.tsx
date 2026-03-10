@@ -3356,7 +3356,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       return {
         ...timingCell,
         capacityValue: hasCapacityLoad ? normalizedCapacity : null,
-        displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '-',
+        displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '',
         inTimingRange: timingCell.active,
         hasCapacityLoad,
         stage,
@@ -5102,7 +5102,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         return {
           ...timingCell,
           capacityValue: hasCapacityLoad ? normalizedCapacity : null,
-          displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '-',
+          displayValue: hasCapacityLoad ? formatCompactCapacityValue(normalizedCapacity) : '',
           inTimingRange: timingCell.active,
           hasCapacityLoad,
           stage,
@@ -5633,7 +5633,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               fallbackBlockedKeys
             );
             const cell = row.getCell(column);
-            cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '-';
+            cell.value = compactCell.capacityValue !== null ? compactCell.capacityValue : '';
             if (compactCell.capacityValue !== null) {
               cell.numFmt = '0.##';
             }
@@ -5644,32 +5644,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               color: { argb: compactCell.hasCapacityLoad ? '1F2937' : '6B7280' },
             };
 
-            if (compactCell.inTimingRange) {
+            if (compactCell.hasCapacityLoad) {
               const stagePalette = getCompactStagePalette(compactCell.stage, dept);
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
                 fgColor: {
-                  argb:
-                    compactCell.hasCapacityLoad
-                      ? (stagePalette?.bg || compactDeptFillByDept[dept])
-                      : 'E2E8F0',
+                  argb: stagePalette?.bg || compactDeptFillByDept[dept],
                 },
-              };
-              if (compactCell.hasCapacityLoad && stagePalette) {
-                cell.font = {
-                  ...(cell.font || {}),
-                  bold: true,
-                  color: { argb: stagePalette.fg },
-                };
-              }
-            } else if (compactCell.hasCapacityLoad) {
-              // Keep palette consistent with on-screen stages; avoid warning yellow.
-              const stagePalette = getCompactStagePalette(compactCell.stage, dept);
-              cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: stagePalette?.bg || compactDeptFillByDept[dept] },
               };
               if (stagePalette) {
                 cell.font = {
@@ -5679,7 +5661,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 };
               }
             } else {
-              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF' } };
             }
           });
 
@@ -8609,20 +8591,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     cell: TimingCompactPreviewCell,
     department: Department
   ): string => {
-    if (cell.inTimingRange) {
-      if (cell.hasCapacityLoad) {
-        const stagePalette = getStageColor(cell.stage, department);
-        return `${stagePalette.bg} ${stagePalette.text}`;
-      }
-      return 'bg-slate-200 text-slate-500';
-    }
-
     if (cell.hasCapacityLoad) {
       const stagePalette = getStageColor(cell.stage, department);
       return `${stagePalette.bg} ${stagePalette.text}`;
     }
 
-    return 'bg-white text-slate-400';
+    return 'bg-white text-transparent';
   };
 
   return (
@@ -10719,7 +10693,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
       {showTimingChangesModal && isTimingAuditGeneralView && (
         <div className="fixed inset-0 z-[92] bg-black/55 flex items-center justify-center p-3">
-          <div className="h-[94vh] w-full max-w-[98vw] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col">
+          <div
+            className="h-[94vh] min-h-[60vh] w-full max-w-[98vw] bg-white rounded-xl shadow-2xl border border-[#d8d0e4] overflow-hidden flex flex-col resize-y"
+            style={{ resize: 'vertical' }}
+          >
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold">
@@ -10890,7 +10867,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                     {row.cells.map((cell, cellIndex) => (
                                       <td
                                         key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
-                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed, cell.highlightCurrent)}`}
+                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed && cell.hasCapacityLoad, cell.highlightCurrent)}`}
                                       >
                                         {cell.value}
                                       </td>
