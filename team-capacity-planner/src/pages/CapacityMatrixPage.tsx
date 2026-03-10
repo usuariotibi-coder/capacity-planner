@@ -8921,32 +8921,37 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </button>
           )}
 
-          {projectsVisibleInCurrentView.length > 0 && (
-            <button
-              onClick={handleExportTimelineExcel}
-              disabled={isExportingExcel}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
-              title={language === 'es' ? 'Exportar timeline en Excel' : 'Export timeline to Excel'}
-            >
-              <span>XLSX</span>
-              <span className="hidden sm:inline">
-                {isExportingExcel
-                  ? (language === 'es' ? 'Exportando...' : 'Exporting...')
-                  : (language === 'es' ? 'Exportar' : 'Export')}
-              </span>
-            </button>
-          )}
+          <button
+            onClick={handleExportTimelineExcel}
+            disabled={isExportingExcel || projectsVisibleInCurrentView.length === 0}
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+            title={
+              projectsVisibleInCurrentView.length === 0
+                ? (language === 'es' ? 'Selecciona un proyecto para exportar en Excel' : 'Select a project to export to Excel')
+                : (language === 'es' ? 'Exportar timeline en Excel' : 'Export timeline to Excel')
+            }
+          >
+            <span>XLSX</span>
+            <span className="hidden sm:inline">
+              {isExportingExcel
+                ? (language === 'es' ? 'Exportando...' : 'Exporting...')
+                : (language === 'es' ? 'Exportar' : 'Export')}
+            </span>
+          </button>
 
-          {projectsVisibleInCurrentView.length > 0 && (
-            <button
-              onClick={openExportPdfModal}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#ce0037] hover:bg-[#ba0032] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
-              title={language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF'}
-            >
-              <span>PDF</span>
-              <span className="hidden sm:inline">{language === 'es' ? 'Exportar' : 'Export'}</span>
-            </button>
-          )}
+          <button
+            onClick={openExportPdfModal}
+            disabled={projectsVisibleInCurrentView.length === 0}
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#ce0037] hover:bg-[#ba0032] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
+            title={
+              projectsVisibleInCurrentView.length === 0
+                ? (language === 'es' ? 'Selecciona un proyecto para exportar en PDF' : 'Select a project to export to PDF')
+                : (language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF')
+            }
+          >
+            <span>PDF</span>
+            <span className="hidden sm:inline">{language === 'es' ? 'Exportar' : 'Export'}</span>
+          </button>
         </div>
       </div>
 
