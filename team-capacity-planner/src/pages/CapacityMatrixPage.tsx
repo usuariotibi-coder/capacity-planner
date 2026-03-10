@@ -192,6 +192,7 @@ interface TimingCompactPreviewProjectGroup {
 
 interface TimingCompactPreviewData {
   weeklyRange: string[];
+  currentWeekIndex: number;
   projectGroups: TimingCompactPreviewProjectGroup[];
 }
 
@@ -3808,6 +3809,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     return {
       weeklyRange,
+      currentWeekIndex: resolvedCurrentWeekIndex,
       projectGroups,
     };
   }, [
@@ -8720,6 +8722,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     return 'shadow-[inset_0_0_0_2px_#f59e0b] bg-amber-50';
   };
 
+  const getTimingCompactCurrentWeekMarkerClass = (isCurrentWeekColumn: boolean): string => {
+    if (!isCurrentWeekColumn) return '';
+    return 'shadow-[inset_2px_0_0_#f87171,inset_-2px_0_0_#f87171] relative z-[1]';
+  };
+
   const getTimingCompactCellClasses = (
     cell: TimingCompactPreviewCell,
     department: Department
@@ -10961,8 +10968,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Usado' : 'Used'}</th>
                               <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">{language === 'es' ? 'Pronostico' : 'Fcst'}</th>
                               <th className="border border-[#d8d0e4] px-3 py-2 text-center font-bold">Util %</th>
-                              {timingCompactPreview.weeklyRange.map((weekStartDate) => (
-                                <th key={`${group.projectId}-${weekStartDate}`} className="border border-[#d8d0e4] px-2 py-2 text-center font-bold min-w-[56px]">
+                              {timingCompactPreview.weeklyRange.map((weekStartDate, weekIndex) => (
+                                <th
+                                  key={`${group.projectId}-${weekStartDate}`}
+                                  className={`border border-[#d8d0e4] px-2 py-2 text-center font-bold min-w-[56px] ${getTimingCompactCurrentWeekMarkerClass(weekIndex === timingCompactPreview.currentWeekIndex)}`}
+                                >
                                   {`CW${String(getWeekNumber(weekStartDate)).padStart(2, '0')}`}
                                 </th>
                               ))}
@@ -11006,7 +11016,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                       {row.cells.map((cell, cellIndex) => (
                                         <td
                                           key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
-                                          className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed && cell.hasCapacityLoad, cell.highlightCurrent)} ${separatorTopClass}`}
+                                          className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed && cell.hasCapacityLoad, cell.highlightCurrent)} ${getTimingCompactCurrentWeekMarkerClass(cellIndex === timingCompactPreview.currentWeekIndex)} ${separatorTopClass}`}
                                         >
                                           {cell.value}
                                         </td>
