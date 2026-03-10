@@ -701,6 +701,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
   const [selectedVisibleProjectId, setSelectedVisibleProjectId] = useState('');
+  const [showAllVisibleProjects, setShowAllVisibleProjects] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [showTimingChangesModal, setShowTimingChangesModal] = useState(false);
@@ -2175,20 +2176,28 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   }, [generalProjects, projectOrderByScope]);
 
   const filteredDepartmentProjects = useMemo(() => {
+    if (showAllVisibleProjects) {
+      return orderedDepartmentProjects;
+    }
+
     if (!selectedVisibleProjectId) {
       return [];
     }
 
     return orderedDepartmentProjects.filter((proj) => proj.id === selectedVisibleProjectId);
-  }, [orderedDepartmentProjects, selectedVisibleProjectId]);
+  }, [orderedDepartmentProjects, selectedVisibleProjectId, showAllVisibleProjects]);
 
   const filteredGeneralProjects = useMemo(() => {
+    if (showAllVisibleProjects) {
+      return orderedGeneralProjects;
+    }
+
     if (!selectedVisibleProjectId) {
       return [];
     }
 
     return orderedGeneralProjects.filter((proj) => proj.id === selectedVisibleProjectId);
-  }, [orderedGeneralProjects, selectedVisibleProjectId]);
+  }, [orderedGeneralProjects, selectedVisibleProjectId, showAllVisibleProjects]);
 
   const orderedProjectsInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
@@ -2198,7 +2207,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return departmentFilter === 'General' ? filteredGeneralProjects : filteredDepartmentProjects;
   }, [departmentFilter, filteredDepartmentProjects, filteredGeneralProjects]);
 
-  const hasActiveProjectListFilters = selectedVisibleProjectId.length > 0;
+  const hasActiveProjectListFilters = showAllVisibleProjects || selectedVisibleProjectId.length > 0;
 
   const departmentProjectRowById = useMemo(() => {
     const map = new Map<string, number>();
@@ -8662,15 +8671,20 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
   const clearProjectListFilters = () => {
     setSelectedVisibleProjectId('');
+    setShowAllVisibleProjects(false);
   };
 
-  const selectedVisibleProject = projectsVisibleInCurrentView[0];
+  const selectedVisibleProject = orderedProjectsInCurrentView.find((proj) => proj.id === selectedVisibleProjectId) || null;
 
-  const projectListSummaryText = selectedVisibleProject
+  const projectListSummaryText = showAllVisibleProjects
     ? (language === 'es'
-      ? `Proyecto seleccionado: ${selectedVisibleProject.name}`
-      : `Selected project: ${selectedVisibleProject.name}`)
-    : null;
+      ? `Mostrando todos: ${projectsVisibleInCurrentView.length}`
+      : `Showing all: ${projectsVisibleInCurrentView.length}`)
+    : selectedVisibleProject
+      ? (language === 'es'
+        ? `Proyecto seleccionado: ${selectedVisibleProject.name}`
+        : `Selected project: ${selectedVisibleProject.name}`)
+      : null;
 
   const renderProjectListFilters = () => (
     <div className="mb-2 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:flex-row sm:flex-wrap sm:items-end">
@@ -8678,7 +8692,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         <span>{t.filterProjects || t.selectProject}</span>
         <select
           value={selectedVisibleProjectId}
-          onChange={(e) => setSelectedVisibleProjectId(e.target.value)}
+          onChange={(e) => {
+            setSelectedVisibleProjectId(e.target.value);
+            setShowAllVisibleProjects(false);
+          }}
           className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="">{t.selectAProject}</option>
@@ -8688,6 +8705,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700">
+        <input
+          type="checkbox"
+          checked={showAllVisibleProjects}
+          onChange={(e) => setShowAllVisibleProjects(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        <span>{t.allVisibleProjects || (language === 'es' ? 'Todos los proyectos visibles' : 'All visible projects')}</span>
       </label>
 
       <button
