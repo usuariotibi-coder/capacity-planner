@@ -8596,6 +8596,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     return rounded.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
   };
 
+  const getTimingCompactChangeHighlight = (
+    changed: boolean,
+    highlightCurrent: boolean
+  ): string => {
+    if (!changed) return '';
+    if (highlightCurrent) return 'shadow-[inset_0_0_0_2px_#dc2626] bg-red-50';
+    return 'shadow-[inset_0_0_0_2px_#f59e0b] bg-amber-50';
+  };
+
   const getTimingCompactCellClasses = (
     cell: TimingCompactPreviewCell,
     department: Department
@@ -10849,6 +10858,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                               viewBlock.rows.map((row, rowIndex) => {
                                 const utilPalette = getUtilizationColor(row.metrics.utilizationPercent);
                                 const viewBg = viewBlock.current ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
+                                const metricHighlightCurrent = viewBlock.current;
                                 return (
                                   <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
                                     <td className="border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle">
@@ -10865,22 +10875,22 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                                         ? (language === 'es' ? 'Hubo un cambio' : 'Change detected')
                                         : '-'}
                                     </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? 'ring-1 ring-black bg-indigo-100 text-indigo-900' : 'bg-indigo-50 text-indigo-700'}`}>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-indigo-100 text-indigo-900` : 'bg-indigo-50 text-indigo-700'}`}>
                                       {formatTimingCompactMetric(row.metrics.quotedHours)}
                                     </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? 'ring-1 ring-black bg-emerald-100 text-emerald-900' : 'bg-emerald-50 text-emerald-700'}`}>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-emerald-100 text-emerald-900` : 'bg-emerald-50 text-emerald-700'}`}>
                                       {formatTimingCompactMetric(row.metrics.usedHours)}
                                     </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? 'ring-1 ring-black bg-amber-100 text-amber-900' : 'bg-amber-50 text-amber-700'}`}>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-amber-100 text-amber-900` : 'bg-amber-50 text-amber-700'}`}>
                                       {formatTimingCompactMetric(row.metrics.forecastedHours)}
                                     </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${row.metricDiffs.utilizationPercent ? 'ring-1 ring-black' : ''}`}>
+                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${getTimingCompactChangeHighlight(row.metricDiffs.utilizationPercent, metricHighlightCurrent)}`}>
                                       {formatTimingCompactMetric(row.metrics.utilizationPercent, true)}
                                     </td>
                                     {row.cells.map((cell, cellIndex) => (
                                       <td
                                         key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
-                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${cell.highlightCurrent ? 'ring-1 ring-black' : ''} ${cell.changed && !cell.highlightCurrent ? 'bg-amber-50' : ''}`}
+                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed, cell.highlightCurrent)}`}
                                       >
                                         {cell.value}
                                       </td>
