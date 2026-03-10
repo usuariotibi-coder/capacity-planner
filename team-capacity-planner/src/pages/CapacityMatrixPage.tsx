@@ -656,6 +656,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [selectedVisibleProjectId, setSelectedVisibleProjectId] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [showTimingChangesModal, setShowTimingChangesModal] = useState(false);
@@ -2129,15 +2131,87 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return sortProjectsByStoredOrder(generalProjects, scopeKey);
   }, [generalProjects, projectOrderByScope]);
 
-  const projectsVisibleInCurrentView = useMemo(() => {
+  const normalizedProjectSearchQuery = projectSearchQuery.trim().toLowerCase();
+
+  const filteredDepartmentProjects = useMemo(() => {
+    return orderedDepartmentProjects.filter((proj) => {
+      if (selectedVisibleProjectId && proj.id !== selectedVisibleProjectId) {
+        return false;
+      }
+
+      if (!normalizedProjectSearchQuery) {
+        return true;
+      }
+
+      const searchableValues = [
+        proj.name,
+        proj.client,
+        proj.facility,
+        projectManagerNameById.get(proj.id) || '',
+      ];
+
+      return searchableValues.some((value) =>
+        String(value || '').toLowerCase().includes(normalizedProjectSearchQuery)
+      );
+    });
+  }, [orderedDepartmentProjects, selectedVisibleProjectId, normalizedProjectSearchQuery, projectManagerNameById]);
+
+  const filteredGeneralProjects = useMemo(() => {
+    return orderedGeneralProjects.filter((proj) => {
+      if (selectedVisibleProjectId && proj.id !== selectedVisibleProjectId) {
+        return false;
+      }
+
+      if (!normalizedProjectSearchQuery) {
+        return true;
+      }
+
+      const searchableValues = [
+        proj.name,
+        proj.client,
+        proj.facility,
+        projectManagerNameById.get(proj.id) || '',
+      ];
+
+      return searchableValues.some((value) =>
+        String(value || '').toLowerCase().includes(normalizedProjectSearchQuery)
+      );
+    });
+  }, [orderedGeneralProjects, selectedVisibleProjectId, normalizedProjectSearchQuery, projectManagerNameById]);
+
+  const orderedProjectsInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
   }, [departmentFilter, orderedDepartmentProjects, orderedGeneralProjects]);
 
+  const projectsVisibleInCurrentView = useMemo(() => {
+    return departmentFilter === 'General' ? filteredGeneralProjects : filteredDepartmentProjects;
+  }, [departmentFilter, filteredDepartmentProjects, filteredGeneralProjects]);
+
+  const hasActiveProjectListFilters = selectedVisibleProjectId.length > 0 || normalizedProjectSearchQuery.length > 0;
+
   const departmentProjectRowById = useMemo(() => {
     const map = new Map<string, number>();
-    orderedDepartmentProjects.forEach((proj, idx) => map.set(proj.id, idx));
+    filteredDepartmentProjects.forEach((proj, idx) => map.set(proj.id, idx));
     return map;
-  }, [orderedDepartmentProjects]);
+  }, [filteredDepartmentProjects]);
+
+  useEffect(() => {
+    if (!selectedVisibleProjectId) return;
+
+    const selectedStillExists = orderedProjectsInCurrentView.some((proj) => proj.id === selectedVisibleProjectId);
+    if (!selectedStillExists) {
+      setSelectedVisibleProjectId('');
+    }
+  }, [selectedVisibleProjectId, orderedProjectsInCurrentView]);
+
+  useEffect(() => {
+    if (departmentFilter === 'General' || !selectedProjectCell) return;
+
+    const selectedStillVisible = filteredDepartmentProjects.some((proj) => proj.id === selectedProjectCell.projectId);
+    if (!selectedStillVisible) {
+      setSelectedProjectCell(null);
+    }
+  }, [departmentFilter, filteredDepartmentProjects, selectedProjectCell]);
 
   const weekIndexByDate = useMemo(() => {
     const map = new Map<string, number>();
@@ -6775,14 +6849,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           nextRow = Math.max(0, currentRow - 1);
           break;
         case 'ArrowDown':
-          nextRow = Math.min(orderedDepartmentProjects.length - 1, currentRow + 1);
+          nextRow = Math.min(filteredDepartmentProjects.length - 1, currentRow + 1);
           break;
         default:
           return;
       }
 
       event.preventDefault();
-      const nextProject = orderedDepartmentProjects[nextRow];
+      const nextProject = filteredDepartmentProjects[nextRow];
       const nextWeekData = allWeeksData[nextWeek];
       if (!nextProject || !nextWeekData) return;
 
@@ -6805,7 +6879,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     editingCell,
     selectedProjectCell,
     projectCellClipboard,
-    orderedDepartmentProjects,
+    filteredDepartmentProjects,
     allWeeksData,
     departmentProjectRowById,
     weekIndexByDate,
@@ -7587,6 +7661,63 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     );
   };
 
+  const clearProjectListFilters = () => {
+    setProjectSearchQuery('');
+    setSelectedVisibleProjectId('');
+  };
+
+  const projectListSummaryText = orderedProjectsInCurrentView.length > 0
+    ? (language === 'es'
+      ? `${projectsVisibleInCurrentView.length} de ${orderedProjectsInCurrentView.length} proyectos`
+      : `${projectsVisibleInCurrentView.length} of ${orderedProjectsInCurrentView.length} projects`)
+    : null;
+
+  const renderProjectListFilters = () => (
+    <div className="mb-2 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:flex-row sm:flex-wrap sm:items-end">
+      <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
+        <span>{t.searchProject || (language === 'es' ? 'Buscar proyecto' : 'Search project')}</span>
+        <input
+          type="text"
+          value={projectSearchQuery}
+          onChange={(e) => setProjectSearchQuery(e.target.value)}
+          placeholder={t.searchProjectPlaceholder || (language === 'es' ? 'Escribe nombre, cliente o PM' : 'Type name, client or PM')}
+          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        />
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
+        <span>{t.filterProjects || t.selectProject}</span>
+        <select
+          value={selectedVisibleProjectId}
+          onChange={(e) => setSelectedVisibleProjectId(e.target.value)}
+          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        >
+          <option value="">{t.allVisibleProjects || (language === 'es' ? 'Todos los proyectos visibles' : 'All visible projects')}</option>
+          {orderedProjectsInCurrentView.map((proj) => (
+            <option key={proj.id} value={proj.id}>
+              {proj.name} | {proj.client}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        type="button"
+        onClick={clearProjectListFilters}
+        disabled={!hasActiveProjectListFilters}
+        className="rounded-md border border-slate-300 bg-white px-3 py-1 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {t.clearFilters || (language === 'es' ? 'Limpiar filtros' : 'Clear filters')}
+      </button>
+
+      {projectListSummaryText && (
+        <div className="text-[10px] font-semibold text-slate-500 sm:ml-auto">
+          {projectListSummaryText}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="brand-page-shell capacity-matrix-page h-full flex flex-col">
       {/* Edit Cell Modal */}
@@ -8353,9 +8484,19 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </h2>
             </div>
 
+            {renderProjectListFilters()}
+
             {/* Projects in department view - each with individual zoom controls */}
             {/* Filter: If project has visibleInDepartments, only show in those departments. Otherwise, show in all. */}
-            {orderedDepartmentProjects.map((proj) => {
+            {projectsVisibleInCurrentView.length === 0 && (
+              <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
+                {hasActiveProjectListFilters
+                  ? (t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.'))
+                  : t.noProjects}
+              </div>
+            )}
+
+            {filteredDepartmentProjects.map((proj) => {
               const dept = departmentFilter as Department;
               const scopeKey = getProjectOrderScopeKey(departmentFilter);
               const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
@@ -9063,7 +9204,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
               </h2>
             </div>
 
-              {orderedGeneralProjects.map((proj) => {
+              {renderProjectListFilters()}
+
+              {projectsVisibleInCurrentView.length === 0 && (
+                <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-medium text-slate-500">
+                  {hasActiveProjectListFilters
+                    ? (t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.'))
+                    : t.noProjects}
+                </div>
+              )}
+
+              {filteredGeneralProjects.map((proj) => {
                 const scopeKey = getProjectOrderScopeKey('General');
                 const isHighProbabilityProject = !!proj.isHighProbability;
                 const projectHeaderClass = isHighProbabilityProject
