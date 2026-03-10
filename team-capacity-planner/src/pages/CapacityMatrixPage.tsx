@@ -3569,6 +3569,31 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       };
     };
 
+    const buildLiveCompactDepartmentMetricsMap = () => {
+      const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+      compactProjects.forEach((projectSnapshot) => {
+        DEPARTMENTS.forEach((department) => {
+          const quotedHours = getCompactQuotedHours(projectSnapshot.projectId, department);
+          const usedHours = roundCompactHours(getUtilizedHours(department, projectSnapshot.projectId));
+          const forecastedHours = roundCompactHours(getForecastedHours(department, projectSnapshot.projectId));
+          const totalPlanned = usedHours + forecastedHours;
+          const utilizationPercent = quotedHours > 0
+            ? Math.round((totalPlanned / quotedHours) * 100)
+            : (totalPlanned > 0 ? 100 : 0);
+
+          metricsByProjectDept.set(`${projectSnapshot.projectId}|${department}`, {
+            quotedHours,
+            usedHours,
+            forecastedHours,
+            utilizationPercent,
+          });
+        });
+      });
+
+      return metricsByProjectDept;
+    };
+
     const todayWeekStart = normalizeWeekStartDate(formatToISO(getWeekStart(new Date())));
     const resolvedCurrentWeekIndex = (() => {
       const byToday = weeklyRange.indexOf(todayWeekStart);
@@ -3608,7 +3633,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         compactPreviousEffectiveStageByCell.set(key, compactCurrentAssignmentContext.stageByCell.get(key) || null);
       }
     });
-    const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactCurrentAssignmentContext.hoursByCell);
+    const compactCurrentMetricsByProjectDept = buildLiveCompactDepartmentMetricsMap();
     const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactPreviousEffectiveHoursByCell);
 
     const projectGroups = compactProjects.map((projectSnapshot) => {
@@ -5335,6 +5360,31 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         };
       };
 
+      const buildLiveCompactDepartmentMetricsMap = () => {
+        const metricsByProjectDept = new Map<string, CompactDepartmentMetrics>();
+
+        compactProjects.forEach((projectSnapshot) => {
+          DEPARTMENTS.forEach((department) => {
+            const quotedHours = getCompactQuotedHours(projectSnapshot.projectId, department);
+            const usedHours = roundCompactHours(getUtilizedHours(department, projectSnapshot.projectId));
+            const forecastedHours = roundCompactHours(getForecastedHours(department, projectSnapshot.projectId));
+            const totalPlanned = usedHours + forecastedHours;
+            const utilizationPercent = quotedHours > 0
+              ? Math.round((totalPlanned / quotedHours) * 100)
+              : (totalPlanned > 0 ? 100 : 0);
+
+            metricsByProjectDept.set(`${projectSnapshot.projectId}|${department}`, {
+              quotedHours,
+              usedHours,
+              forecastedHours,
+              utilizationPercent,
+            });
+          });
+        });
+
+        return metricsByProjectDept;
+      };
+
       const ExcelJS = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
       const BORDER = 'D5D1DA';
@@ -5521,10 +5571,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           compactPreviousEffectiveStageByCell.set(key, compactCurrentAssignmentStageByCell.get(key) || null);
         }
       });
-      const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(
-        compactCurrentSnapshotWeekStart,
-        compactCurrentAssignmentHoursByCell
-      );
+      const compactCurrentMetricsByProjectDept = buildLiveCompactDepartmentMetricsMap();
       const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(
         compactCurrentSnapshotWeekStart,
         compactPreviousEffectiveHoursByCell
