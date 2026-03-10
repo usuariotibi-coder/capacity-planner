@@ -3586,17 +3586,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       resolvedCurrentWeekIndex !== resolvedPreviousWeekIndex;
     const currentWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedCurrentWeekIndex] : weeklyRange[weeklyRange.length - 1];
     const previousWeekStart = hasWeekOverWeekRange ? weeklyRange[resolvedPreviousWeekIndex] : currentWeekStart;
+    const previousSnapshotCutoffDate = (() => {
+      if (!currentWeekStart) return previousWeekStart;
+      const cutoff = parseISODate(currentWeekStart);
+      cutoff.setDate(cutoff.getDate() - 1);
+      return formatToISO(cutoff);
+    })();
     const currentWeekLabel = currentWeekStart ? `CW${String(getWeekNumber(currentWeekStart)).padStart(2, '0')}` : '-';
     const previousWeekLabel = previousWeekStart ? `CW${String(getWeekNumber(previousWeekStart)).padStart(2, '0')}` : '-';
 
     const compactCurrentAssignmentContext = buildCurrentAssignmentContext();
-    const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(previousWeekStart);
+    const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(previousSnapshotCutoffDate);
     const compactCurrentMetricsByProjectDept = buildCompactDepartmentMetricsMap(currentWeekStart, compactCurrentAssignmentContext.hoursByCell);
     const compactPreviousMetricsByProjectDept = buildCompactDepartmentMetricsMap(previousWeekStart, compactPreviousAssignmentContext.hoursByCell);
 
     const projectGroups = compactProjects.map((projectSnapshot) => {
       const currentSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, currentWeekStart);
-      const previousSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, previousWeekStart);
+      const previousSnapshot = buildCompactSnapshotByWeekStart(projectSnapshot.projectId, previousSnapshotCutoffDate);
 
       const buildRows = (
         snapshot: CompactProjectSnapshot,
@@ -5459,10 +5465,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       const compactPreviousSnapshotWeekStart = hasWeekOverWeekRange
         ? previousWeekStart
         : compactCurrentSnapshotWeekStart;
+      const compactPreviousSnapshotCutoffDate = (() => {
+        if (!compactCurrentSnapshotWeekStart) return compactPreviousSnapshotWeekStart;
+        const cutoff = parseISODate(compactCurrentSnapshotWeekStart);
+        cutoff.setDate(cutoff.getDate() - 1);
+        return formatToISO(cutoff);
+      })();
       const compactCurrentAssignmentContext = buildCurrentAssignmentContext();
       const compactCurrentAssignmentHoursByCell = compactCurrentAssignmentContext.hoursByCell;
       const compactCurrentAssignmentStageByCell = compactCurrentAssignmentContext.stageByCell;
-      const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(compactPreviousSnapshotWeekStart);
+      const compactPreviousAssignmentContext = buildCompactAssignmentHoursContextByWeekStart(compactPreviousSnapshotCutoffDate);
       const compactPreviousAssignmentHoursByCell = compactPreviousAssignmentContext.hoursByCell;
       const compactPreviousAssignmentStageByCell = compactPreviousAssignmentContext.stageByCell;
       const compactChangedKeysAfterPrevious = compactPreviousAssignmentContext.changedKeysAfterSnapshot;
@@ -5483,7 +5495,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         );
         compactPreviousSnapshotByProject.set(
           projectSnapshot.projectId,
-          buildCompactSnapshotByWeekStart(projectSnapshot.projectId, compactPreviousSnapshotWeekStart)
+          buildCompactSnapshotByWeekStart(projectSnapshot.projectId, compactPreviousSnapshotCutoffDate)
         );
       });
 
