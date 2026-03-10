@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo, type DragEvent } from 'react';
+import { Fragment } from 'react';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -10964,51 +10965,64 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             </tr>
                           </thead>
                           <tbody>
-                            {[{ label: group.currentViewLabel, rows: group.currentRows, current: true }, { label: group.previousViewLabel, rows: group.previousRows, current: false }].map((viewBlock) =>
-                              viewBlock.rows.map((row, rowIndex) => {
-                                const utilPalette = getUtilizationColor(row.metrics.utilizationPercent);
-                                const viewBg = viewBlock.current ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
-                                const metricHighlightCurrent = viewBlock.current;
-                                return (
-                                  <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
-                                    <td className="border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle">
-                                      {rowIndex === 0 ? group.projectName : ''}
+                            {[{ label: group.currentViewLabel, rows: group.currentRows, current: true }, { label: group.previousViewLabel, rows: group.previousRows, current: false }].map((viewBlock) => (
+                              <Fragment key={`${group.projectId}-${viewBlock.label}`}>
+                                {!viewBlock.current && (
+                                  <tr>
+                                    <td
+                                      colSpan={8 + timingCompactPreview.weeklyRange.length}
+                                      className="border-x border-b-2 border-b-[#8f7ab3] border-x-[#d8d0e4] bg-gradient-to-r from-[#efe8fb] via-[#e5dcf5] to-[#efe8fb] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#5a4679]"
+                                    >
+                                      {language === 'es' ? 'Comparativo semana pasada' : 'Previous week comparison'}
                                     </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 font-semibold align-middle ${viewBg}`}>
-                                      {rowIndex === 0 ? viewBlock.label : ''}
-                                    </td>
-                                    <td className="border border-[#e7deef] px-3 py-2 text-center font-bold text-[#2e1a47] bg-slate-50">
-                                      {row.department}
-                                    </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.changeDetected ? 'bg-amber-100 text-amber-900' : 'bg-slate-50 text-slate-400'}`}>
-                                      {row.changeDetected
-                                        ? (language === 'es' ? 'Hubo un cambio' : 'Change detected')
-                                        : '-'}
-                                    </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-indigo-100 text-indigo-900` : 'bg-indigo-50 text-indigo-700'}`}>
-                                      {formatTimingCompactMetric(row.metrics.quotedHours)}
-                                    </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-emerald-100 text-emerald-900` : 'bg-emerald-50 text-emerald-700'}`}>
-                                      {formatTimingCompactMetric(row.metrics.usedHours)}
-                                    </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-amber-100 text-amber-900` : 'bg-amber-50 text-amber-700'}`}>
-                                      {formatTimingCompactMetric(row.metrics.forecastedHours)}
-                                    </td>
-                                    <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${getTimingCompactChangeHighlight(row.metricDiffs.utilizationPercent, metricHighlightCurrent)}`}>
-                                      {formatTimingCompactMetric(row.metrics.utilizationPercent, true)}
-                                    </td>
-                                    {row.cells.map((cell, cellIndex) => (
-                                      <td
-                                        key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
-                                        className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed && cell.hasCapacityLoad, cell.highlightCurrent)}`}
-                                      >
-                                        {cell.value}
-                                      </td>
-                                    ))}
                                   </tr>
-                                );
-                              })
-                            )}
+                                )}
+                                {viewBlock.rows.map((row, rowIndex) => {
+                                  const utilPalette = getUtilizationColor(row.metrics.utilizationPercent);
+                                  const viewBg = viewBlock.current ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
+                                  const metricHighlightCurrent = viewBlock.current;
+                                  const separatorTopClass = !viewBlock.current && rowIndex === 0 ? 'border-t-[3px] border-t-[#6f5b8d]' : '';
+                                  return (
+                                    <tr key={`${group.projectId}-${viewBlock.label}-${row.department}`} className={row.changeDetected ? 'bg-amber-50/40' : 'bg-white'}>
+                                      <td className={`border border-[#e7deef] px-3 py-2 font-semibold text-[#2e1a47] align-middle ${separatorTopClass}`}>
+                                        {rowIndex === 0 ? group.projectName : ''}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 font-semibold align-middle ${viewBg} ${separatorTopClass}`}>
+                                        {rowIndex === 0 ? viewBlock.label : ''}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold text-[#2e1a47] bg-slate-50 ${separatorTopClass}`}>
+                                        {row.department}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.changeDetected ? 'bg-amber-100 text-amber-900' : 'bg-slate-50 text-slate-400'} ${separatorTopClass}`}>
+                                        {row.changeDetected
+                                          ? (language === 'es' ? 'Hubo un cambio' : 'Change detected')
+                                          : '-'}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.quotedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-indigo-100 text-indigo-900` : 'bg-indigo-50 text-indigo-700'} ${separatorTopClass}`}>
+                                        {formatTimingCompactMetric(row.metrics.quotedHours)}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.usedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-emerald-100 text-emerald-900` : 'bg-emerald-50 text-emerald-700'} ${separatorTopClass}`}>
+                                        {formatTimingCompactMetric(row.metrics.usedHours)}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-semibold ${row.metricDiffs.forecastedHours ? `${getTimingCompactChangeHighlight(true, metricHighlightCurrent)} bg-amber-100 text-amber-900` : 'bg-amber-50 text-amber-700'} ${separatorTopClass}`}>
+                                        {formatTimingCompactMetric(row.metrics.forecastedHours)}
+                                      </td>
+                                      <td className={`border border-[#e7deef] px-3 py-2 text-center font-bold ${utilPalette.bg} ${utilPalette.text} ${getTimingCompactChangeHighlight(row.metricDiffs.utilizationPercent, metricHighlightCurrent)} ${separatorTopClass}`}>
+                                        {formatTimingCompactMetric(row.metrics.utilizationPercent, true)}
+                                      </td>
+                                      {row.cells.map((cell, cellIndex) => (
+                                        <td
+                                          key={`${group.projectId}-${viewBlock.label}-${row.department}-${timingCompactPreview.weeklyRange[cellIndex]}`}
+                                          className={`border border-[#e7deef] px-2 py-2 text-center font-semibold ${getTimingCompactCellClasses(cell, row.department)} ${getTimingCompactChangeHighlight(cell.changed && cell.hasCapacityLoad, cell.highlightCurrent)} ${separatorTopClass}`}
+                                        >
+                                          {cell.value}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </Fragment>
+                            ))}
                           </tbody>
                         </table>
                       </div>
