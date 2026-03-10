@@ -8674,17 +8674,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setShowAllVisibleProjects(false);
   };
 
-  const selectedVisibleProject = orderedProjectsInCurrentView.find((proj) => proj.id === selectedVisibleProjectId) || null;
-
-  const projectListSummaryText = showAllVisibleProjects
-    ? (language === 'es'
-      ? `Mostrando todos: ${projectsVisibleInCurrentView.length}`
-      : `Showing all: ${projectsVisibleInCurrentView.length}`)
-    : selectedVisibleProject
-      ? (language === 'es'
-        ? `Proyecto seleccionado: ${selectedVisibleProject.name}`
-        : `Selected project: ${selectedVisibleProject.name}`)
-      : null;
+  const projectListSummaryText = language === 'es'
+    ? `Mostrando todos: ${orderedProjectsInCurrentView.length}`
+    : `Showing all: ${orderedProjectsInCurrentView.length}`;
 
   const renderProjectListFilters = () => (
     <div className="mb-2 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:flex-row sm:flex-wrap sm:items-end">
@@ -8726,11 +8718,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         {t.clearFilters || (language === 'es' ? 'Limpiar filtros' : 'Clear filters')}
       </button>
 
-      {projectListSummaryText && (
-        <div className="text-[10px] font-semibold text-slate-500 sm:ml-auto">
-          {projectListSummaryText}
-        </div>
-      )}
+      <div className="text-[10px] font-semibold text-slate-500 sm:ml-auto sm:min-w-[120px] text-right">
+        {projectListSummaryText}
+      </div>
     </div>
   );
 
