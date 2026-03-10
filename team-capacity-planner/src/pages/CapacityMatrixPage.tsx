@@ -8994,7 +8994,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-x-auto overflow-y-scroll p-2">
 
         {/* Tabla de Departamentos - Only show for department-specific views */}
         {departmentFilter !== 'General' && (
