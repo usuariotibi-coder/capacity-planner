@@ -5377,6 +5377,27 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         });
       };
 
+      const applyVerticalWeekMarker = (
+        sheet: any,
+        columnNumber: number,
+        startRow: number,
+        endRow: number
+      ) => {
+        if (!columnNumber || columnNumber < 1 || endRow < startRow) return;
+
+        for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
+          const cell = sheet.getRow(rowNumber).getCell(columnNumber);
+          const border = cell.border || {};
+          const thin = { style: 'thin', color: { argb: BORDER } };
+          cell.border = {
+            top: border.top || thin,
+            bottom: border.bottom || thin,
+            left: { style: 'medium', color: { argb: 'F87171' } },
+            right: { style: 'medium', color: { argb: 'F87171' } },
+          };
+        }
+      };
+
       const compactSheet = workbook.addWorksheet(language === 'es' ? 'Timing Compacto Semanal' : 'Weekly Compact Timing');
       compactSheet.columns = [
         { width: 32 },
@@ -5890,6 +5911,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         changeCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
       });
 
+      if (resolvedCurrentWeekIndex >= 0 && resolvedCurrentWeekIndex < weeklyRange.length) {
+        applyVerticalWeekMarker(
+          compactSheet,
+          compactMatrixStartColumn + resolvedCurrentWeekIndex,
+          1,
+          Math.max(compactRow - 1, 2)
+        );
+      }
+
       const dateStamp = new Date().toISOString().slice(0, 10);
       const fileName = language === 'es'
         ? `timing-semanal-${startDate}-a-${endDate}-${dateStamp}.xlsx`
@@ -6015,6 +6045,27 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
           bottom: { style: 'thin', color: { argb: BORDER_LIGHT } },
           right: { style: 'thin', color: { argb: BORDER_LIGHT } },
         };
+      };
+
+      const applyVerticalWeekMarker = (
+        sheet: any,
+        columnNumber: number,
+        startRow: number,
+        endRow: number
+      ) => {
+        if (!columnNumber || columnNumber < 1 || endRow < startRow) return;
+
+        for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
+          const cell = sheet.getRow(rowNumber).getCell(columnNumber);
+          const border = cell.border || {};
+          const thin = { style: 'thin', color: { argb: BORDER_LIGHT } };
+          cell.border = {
+            top: border.top || thin,
+            bottom: border.bottom || thin,
+            left: { style: 'medium', color: { argb: 'F87171' } },
+            right: { style: 'medium', color: { argb: 'F87171' } },
+          };
+        }
       };
 
       const getUtilizationFill = (percent: number, hasCapacity: boolean): { bg: string; fg: string } => {
@@ -6157,6 +6208,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
         capRow += 1;
       });
+
+      if (currentDateWeekIndex >= 0) {
+        applyVerticalWeekMarker(capacitySheet, weekColStart + currentDateWeekIndex, 1, capRow - 1);
+      }
 
       const projectsSheet = workbook.addWorksheet(`${selectedYear}-MX`, {
         // Freeze between C|D (xSplit=3) and 9|10 (ySplit=9)
@@ -6370,6 +6425,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         projRow += 1;
       });
 
+      if (currentDateWeekIndex >= 0) {
+        applyVerticalWeekMarker(projectsSheet, 6 + currentDateWeekIndex, 1, projRow - 1);
+      }
+
       const buildDepartmentYearSheet = (dept: Department) => {
         const sheetName = `${dept}-${selectedYear}`.slice(0, 31);
         const deptSheet = workbook.addWorksheet(sheetName, {
@@ -6554,6 +6613,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
           projectRow += 2;
         });
+
+        if (currentDateWeekIndex >= 0) {
+          applyVerticalWeekMarker(deptSheet, deptWeekStart + currentDateWeekIndex, 1, Math.max(projectRow - 1, 14));
+        }
       };
 
       DEPARTMENTS.forEach((dept) => {
