@@ -669,6 +669,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [isChangeOrderModalOpen, setIsChangeOrderModalOpen] = useState(false);
   const [changeOrderContext, setChangeOrderContext] = useState<{ projectId: string; department: Department } | null>(null);
   const [changeOrderForm, setChangeOrderForm] = useState({ name: '', hoursQuoted: '' });
+  const [editingChangeOrderId, setEditingChangeOrderId] = useState<string | null>(null);
   const [isSavingChangeOrder, setIsSavingChangeOrder] = useState(false);
 
   // Utilized/Forecast hours are calculated automatically from assignments
@@ -7168,6 +7169,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   const openChangeOrderModal = (projectId: string, department: Department) => {
     setChangeOrderContext({ projectId, department });
     setChangeOrderForm({ name: '', hoursQuoted: '' });
+    setEditingChangeOrderId(null);
     setIsChangeOrderModalOpen(true);
   };
 
@@ -7175,7 +7177,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
     setIsChangeOrderModalOpen(false);
     setChangeOrderContext(null);
     setChangeOrderForm({ name: '', hoursQuoted: '' });
+    setEditingChangeOrderId(null);
     setIsSavingChangeOrder(false);
+  };
+
+  const startEditingChangeOrder = (order: ProjectChangeOrder) => {
+    setEditingChangeOrderId(order.id);
+    setChangeOrderForm({
+      name: order.name,
+      hoursQuoted: `${order.hoursQuoted}`,
+    });
   };
 
   const handleSaveChangeOrder = async () => {
@@ -7193,26 +7204,46 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
     try {
       setIsSavingChangeOrder(true);
-      const created = await changeOrdersApi.create({
-        projectId: changeOrderContext.projectId,
-        department: changeOrderContext.department,
-        name,
-        hoursQuoted: hoursValue,
-      });
-      const projectId = (created as any)?.projectId || (created as any)?.project?.id || changeOrderContext.projectId;
-      setChangeOrders((prev) => [
-        ...prev,
-        {
-          id: (created as any)?.id,
-          projectId,
-          department: (created as any)?.department || changeOrderContext.department,
-          name: (created as any)?.name || name,
-          hoursQuoted: Number((created as any)?.hoursQuoted ?? hoursValue),
-          createdAt: (created as any)?.createdAt,
-          updatedAt: (created as any)?.updatedAt,
-        },
-      ]);
+      if (editingChangeOrderId) {
+        const updated = await changeOrdersApi.update(editingChangeOrderId, {
+          name,
+          hoursQuoted: hoursValue,
+        });
+        setChangeOrders((prev) =>
+          prev.map((order) =>
+            order.id === editingChangeOrderId
+              ? {
+                  ...order,
+                  name: (updated as any)?.name || name,
+                  hoursQuoted: Number((updated as any)?.hoursQuoted ?? hoursValue),
+                  updatedAt: (updated as any)?.updatedAt || order.updatedAt,
+                }
+              : order
+          )
+        );
+      } else {
+        const created = await changeOrdersApi.create({
+          projectId: changeOrderContext.projectId,
+          department: changeOrderContext.department,
+          name,
+          hoursQuoted: hoursValue,
+        });
+        const projectId = (created as any)?.projectId || (created as any)?.project?.id || changeOrderContext.projectId;
+        setChangeOrders((prev) => [
+          ...prev,
+          {
+            id: (created as any)?.id,
+            projectId,
+            department: (created as any)?.department || changeOrderContext.department,
+            name: (created as any)?.name || name,
+            hoursQuoted: Number((created as any)?.hoursQuoted ?? hoursValue),
+            createdAt: (created as any)?.createdAt,
+            updatedAt: (created as any)?.updatedAt,
+          },
+        ]);
+      }
       setChangeOrderForm({ name: '', hoursQuoted: '' });
+      setEditingChangeOrderId(null);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[CapacityMatrix] Error saving Change Order:', errorMsg);
@@ -8893,6 +8924,23 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </div>
 
             <div className="p-4 space-y-3">
+              {editingChangeOrderId && (
+                <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <span className="text-xs font-semibold text-emerald-800">
+                    {language === 'es' ? 'Editando Change Order existente' : 'Editing existing change order'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingChangeOrderId(null);
+                      setChangeOrderForm({ name: '', hoursQuoted: '' });
+                    }}
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+                  >
+                    {language === 'es' ? 'Cancelar edicion' : 'Cancel edit'}
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">{t.changeOrderName}</label>
                 <input
@@ -8928,7 +8976,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   disabled={isSavingChangeOrder}
                   className="px-3 py-2 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 transition disabled:opacity-60"
                 >
-                  {isSavingChangeOrder ? (language === 'es' ? 'Guardando...' : 'Saving...') : (t.addButton || 'Agregar')}
+                  {isSavingChangeOrder
+                    ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                    : (editingChangeOrderId ? (t.update || 'Update') : (t.addButton || 'Agregar'))}
                 </button>
               </div>
 
@@ -8947,10 +8997,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                       ) : (
                         <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-md">
                           {sortedOrders.map((order) => (
-                            <div key={order.id} className="flex items-center justify-between px-2 py-1 text-xs border-b border-gray-100 last:border-b-0">
+                            <button
+                              key={order.id}
+                              type="button"
+                              onClick={() => startEditingChangeOrder(order)}
+                              className={`flex w-full items-center justify-between px-2 py-1 text-xs border-b border-gray-100 last:border-b-0 text-left transition hover:bg-emerald-50 ${
+                                editingChangeOrderId === order.id ? 'bg-emerald-100' : ''
+                              }`}
+                            >
                               <span className="font-semibold text-gray-700">{order.name}</span>
                               <span className="text-emerald-700 font-bold">{formatHours(order.hoursQuoted)}h</span>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
