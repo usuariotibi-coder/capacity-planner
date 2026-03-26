@@ -608,8 +608,21 @@ export const employeesApi = {
 // Projects API
 export const projectsApi = {
   getAll: async () => {
-    const data = await apiFetch('/api/projects/');
-    return data.results || data;
+    let endpoint = '/api/projects/?page_size=1000';
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+
+      if (data && Array.isArray(data.results)) {
+        allResults = allResults.concat(data.results);
+        endpoint = data.next ? toRelativeApiEndpoint(data.next) : '';
+      } else {
+        return Array.isArray(data) ? data : [];
+      }
+    }
+
+    return allResults;
   },
 
   get: async (id: string) => {
