@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useProjectStore } from '../stores/projectStore';
+import { useMemo } from 'react';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
 import type { Project, Department, DepartmentStageConfig, ProjectVisibilityScope } from '../types';
@@ -99,12 +100,31 @@ export function ProjectsPage() {
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
   const [showInGeneral, setShowInGeneral] = useState<boolean>(true);
   const [formNotice, setFormNotice] = useState<{ type: FormNoticeType; message: string } | null>(null);
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
 
   useEffect(() => {
     if (!formNotice) return;
     const timeout = setTimeout(() => setFormNotice(null), 4200);
     return () => clearTimeout(timeout);
   }, [formNotice]);
+
+  const filteredProjects = useMemo(() => {
+    const normalizedSearch = projectSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) return projects;
+
+    return projects.filter((proj) => {
+      const projectManagerName = proj.projectManagerId
+        ? (employees.find((e) => e.id === proj.projectManagerId)?.name || '')
+        : '';
+
+      return [
+        proj.name,
+        proj.client,
+        proj.facility,
+        projectManagerName,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    });
+  }, [employees, projectSearchTerm, projects]);
 
   const calculateEndDate = (startDate: string, weeks: number): string => {
     const start = parseISODate(startDate);
@@ -792,6 +812,27 @@ export function ProjectsPage() {
       )}
 
       <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
+      <div className="mb-4 flex flex-col gap-2 rounded-lg border border-[#d5d1da] bg-white px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-[#4f3a70]">
+          <span>{t.filterProjects || t.searchProject}</span>
+          <input
+            type="text"
+            value={projectSearchTerm}
+            onChange={(e) => setProjectSearchTerm(e.target.value)}
+            placeholder={t.searchProjectPlaceholder || (language === 'es' ? 'Escribe numero, nombre o cliente' : 'Type project number, name or client')}
+            className="w-full rounded-md border border-[#d5d1da] bg-white px-3 py-2 text-sm font-medium text-[#2e1a47] outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => setProjectSearchTerm('')}
+          disabled={projectSearchTerm.trim().length === 0}
+          className="h-[38px] rounded-md border border-[#d5d1da] bg-white px-4 py-2 text-xs font-semibold text-[#4f3a70] transition hover:bg-[#f4f1f8] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t.clearFilters || (language === 'es' ? 'Limpiar filtros' : 'Clear filters')}
+        </button>
+      </div>
+
       {/* Projects table */}
       <div className="brand-panel projects-table-shell overflow-x-auto border-2 border-[#d5d1da] rounded-lg bg-white">
         <table className="brand-table w-full border-collapse">
@@ -807,7 +848,7 @@ export function ProjectsPage() {
             </tr>
           </thead>
           <tbody>
-            {projects.map((proj, idx) => (
+            {filteredProjects.map((proj, idx) => (
               <tr key={proj.id} className={`projects-row transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white projects-row-even' : 'bg-[#f4f1f8] projects-row-odd'}`}>
                 <td className="projects-cell-main border px-4 py-3 font-semibold text-[#2e1a47]">{proj.name}</td>
                 <td className="projects-cell-muted border px-4 py-3 text-[#4f3a70]">{proj.client}</td>
@@ -879,6 +920,12 @@ export function ProjectsPage() {
       {projects.length === 0 && !isFormOpen && (
         <div className="projects-empty-state text-center py-12 text-[#6c6480]">
           <p>{t.noProjects}</p>
+        </div>
+      )}
+
+      {projects.length > 0 && filteredProjects.length === 0 && !isFormOpen && (
+        <div className="projects-empty-state text-center py-12 text-[#6c6480]">
+          <p>{t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.')}</p>
         </div>
       )}
     </div>

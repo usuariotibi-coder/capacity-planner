@@ -701,6 +701,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
   const [selectedExportProjectIds, setSelectedExportProjectIds] = useState<string[]>([]);
   const [selectedVisibleProjectId, setSelectedVisibleProjectId] = useState('');
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
   const [showAllVisibleProjects, setShowAllVisibleProjects] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -763,6 +765,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       console.error('[CapacityMatrix] Failed to persist project order:', error);
     }
   }, [projectOrderByScope]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!projectSearchContainerRef.current) return;
+      if (projectSearchContainerRef.current.contains(event.target as Node)) return;
+      setIsProjectSearchOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
 
   // No need to handle resize - always showing desktop view with scrollable containers
 
@@ -1466,6 +1479,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Refs for synchronized horizontal scrolling between Capacity and Projects
   const departmentCapacityScrollRef = useRef<HTMLDivElement>(null);
   const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
+  const projectSearchContainerRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
   const isPastingProjectCellRef = useRef(false);
@@ -2203,11 +2217,27 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
   }, [departmentFilter, orderedDepartmentProjects, orderedGeneralProjects]);
 
+  const formatProjectSearchLabel = (proj: Project): string => `${proj.name} | ${proj.client}`;
+
+  const filteredProjectSearchOptions = useMemo(() => {
+    const normalizedSearch = projectSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return orderedProjectsInCurrentView;
+    }
+
+    return orderedProjectsInCurrentView.filter((proj) =>
+      formatProjectSearchLabel(proj).toLowerCase().includes(normalizedSearch)
+    );
+  }, [orderedProjectsInCurrentView, projectSearchTerm]);
+
   const projectsVisibleInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? filteredGeneralProjects : filteredDepartmentProjects;
   }, [departmentFilter, filteredDepartmentProjects, filteredGeneralProjects]);
 
-  const hasActiveProjectListFilters = showAllVisibleProjects || selectedVisibleProjectId.length > 0;
+  const hasActiveProjectListFilters =
+    showAllVisibleProjects ||
+    selectedVisibleProjectId.length > 0 ||
+    projectSearchTerm.trim().length > 0;
 
   const departmentProjectRowById = useMemo(() => {
     const map = new Map<string, number>();
@@ -2221,6 +2251,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const selectedStillExists = orderedProjectsInCurrentView.some((proj) => proj.id === selectedVisibleProjectId);
     if (!selectedStillExists) {
       setSelectedVisibleProjectId('');
+      setProjectSearchTerm('');
     }
   }, [selectedVisibleProjectId, orderedProjectsInCurrentView]);
 
@@ -8671,32 +8702,84 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
 
   const clearProjectListFilters = () => {
     setSelectedVisibleProjectId('');
+    setProjectSearchTerm('');
+    setIsProjectSearchOpen(false);
     setShowAllVisibleProjects(false);
   };
 
-  const projectListSummaryText = language === 'es'
-    ? `Mostrando todos: ${orderedProjectsInCurrentView.length}`
-    : `Showing all: ${orderedProjectsInCurrentView.length}`;
+  const projectListSummaryText = projectSearchTerm.trim().length > 0
+    ? (language === 'es'
+      ? `Coincidencias: ${filteredProjectSearchOptions.length}`
+      : `Matches: ${filteredProjectSearchOptions.length}`)
+    : (language === 'es'
+      ? `Mostrando todos: ${orderedProjectsInCurrentView.length}`
+      : `Showing all: ${orderedProjectsInCurrentView.length}`);
+
+  const handleProjectSearchSelect = (project: Project) => {
+    setSelectedVisibleProjectId(project.id);
+    setProjectSearchTerm(formatProjectSearchLabel(project));
+    setShowAllVisibleProjects(false);
+    setIsProjectSearchOpen(false);
+  };
 
   const renderProjectListFilters = () => (
     <div className="mb-2 grid gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_168px_108px_120px] sm:items-end">
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-[10px] font-semibold text-slate-700">
         <span>{t.filterProjects || t.selectProject}</span>
-        <select
-          value={selectedVisibleProjectId}
-          onChange={(e) => {
-            setSelectedVisibleProjectId(e.target.value);
-            setShowAllVisibleProjects(false);
-          }}
-          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-        >
-          <option value="">{t.selectAProject}</option>
-          {orderedProjectsInCurrentView.map((proj) => (
-            <option key={proj.id} value={proj.id}>
-              {proj.name} | {proj.client}
-            </option>
-          ))}
-        </select>
+        <div ref={projectSearchContainerRef} className="relative">
+          <input
+            type="text"
+            value={projectSearchTerm}
+            placeholder={t.searchProjectPlaceholder || t.selectAProject}
+            onFocus={(e) => {
+              setIsProjectSearchOpen(true);
+              e.currentTarget.select();
+            }}
+            onChange={(e) => {
+              setProjectSearchTerm(e.target.value);
+              setSelectedVisibleProjectId('');
+              setShowAllVisibleProjects(false);
+              setIsProjectSearchOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                if (filteredProjectSearchOptions.length > 0) {
+                  handleProjectSearchSelect(filteredProjectSearchOptions[0]);
+                }
+              }
+
+              if (e.key === 'Escape') {
+                setIsProjectSearchOpen(false);
+              }
+            }}
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+
+          {isProjectSearchOpen && (
+            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-slate-300 bg-white shadow-lg">
+              {filteredProjectSearchOptions.length > 0 ? (
+                filteredProjectSearchOptions.map((proj) => (
+                  <button
+                    key={proj.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleProjectSearchSelect(proj)}
+                    className={`block w-full border-b border-slate-100 px-2 py-1.5 text-left text-xs font-medium last:border-b-0 hover:bg-indigo-50 ${
+                      selectedVisibleProjectId === proj.id ? 'bg-indigo-100 text-indigo-900' : 'text-slate-700'
+                    }`}
+                  >
+                    {formatProjectSearchLabel(proj)}
+                  </button>
+                ))
+              ) : (
+                <div className="px-2 py-2 text-xs font-medium text-slate-500">
+                  {t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.')}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </label>
 
       <label className="inline-flex h-[28px] w-[168px] items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap">
