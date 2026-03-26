@@ -2439,7 +2439,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Handle importing an existing project to the current department
   const handleImportProject = async () => {
-    if (departmentFilter === 'General' || departmentFilter === 'PM') {
+    if (departmentFilter === 'General') {
       return;
     }
 
@@ -2451,11 +2451,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return;
     }
 
-    if (!importProjectForm.projectId || !importProjectForm.startDate || !importProjectForm.numberOfWeeks) {
+    const isPmImport = dept === 'PM';
+
+    if (
+      !importProjectForm.projectId ||
+      (!isPmImport && (!importProjectForm.startDate || !importProjectForm.numberOfWeeks))
+    ) {
       const missing: string[] = [];
       if (!importProjectForm.projectId) missing.push(t.selectProject || 'Project');
-      if (!importProjectForm.startDate) missing.push(t.startDate || 'Start Date');
-      if (!importProjectForm.numberOfWeeks) missing.push(t.numberOfWeeks || 'Number of Weeks');
+      if (!isPmImport && !importProjectForm.startDate) missing.push(t.startDate || 'Start Date');
+      if (!isPmImport && !importProjectForm.numberOfWeeks) missing.push(t.numberOfWeeks || 'Number of Weeks');
       const title = language === 'es' ? 'Faltan datos obligatorios' : 'Required fields missing';
       const prefix = language === 'es' ? 'Completa:' : 'Please complete:';
       setFormValidationPopup({
@@ -2472,9 +2477,45 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return;
     }
 
+    const budgetHours = Number(importProjectForm.budgetHours || 0);
+    const existingHours = selectedProject.departmentHoursAllocated;
+    const currentVisible = selectedProject.visibleInDepartments || [];
+    const newVisibleInDepartments = currentVisible.includes(dept)
+      ? currentVisible
+      : [...currentVisible, dept];
+    const newDepartmentHoursAllocated: Record<string, number> = {
+      PM: existingHours?.PM || 0,
+      MED: existingHours?.MED || 0,
+      HD: existingHours?.HD || 0,
+      MFG: existingHours?.MFG || 0,
+      BUILD: existingHours?.BUILD || 0,
+      PRG: existingHours?.PRG || 0,
+    };
+
+    if (Number.isFinite(budgetHours) && importProjectForm.budgetHours !== '') {
+      newDepartmentHoursAllocated[dept] = budgetHours;
+    }
+
+    if (dept === 'PM') {
+      await updateProject(selectedProject.id, {
+        departmentHoursAllocated: newDepartmentHoursAllocated,
+        visibleInDepartments: newVisibleInDepartments,
+      } as Partial<Project>);
+
+      setFormValidationPopup(null);
+      setShowImportProjectModal(false);
+      setImportProjectForm({
+        projectId: '',
+        startDate: '',
+        numberOfWeeks: '',
+        budgetHours: '',
+      });
+      setImportProjectSearchTerm('');
+      return;
+    }
+
     const startDateISO = importProjectForm.startDate;
     const numberOfWeeks = importProjectForm.numberOfWeeks as number;
-    const budgetHours = Number(importProjectForm.budgetHours || 0);
 
     // Build new departmentStages - add this department's configuration
     const existingStages = selectedProject.departmentStages;
@@ -2493,24 +2534,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       departmentStartDate: startDateISO,
       durationWeeks: numberOfWeeks,
     }];
-
-    // Build new departmentHoursAllocated - add this department's budget
-    const existingHours = selectedProject.departmentHoursAllocated;
-    const newDepartmentHoursAllocated: Record<string, number> = {
-      PM: existingHours?.PM || 0,
-      MED: existingHours?.MED || 0,
-      HD: existingHours?.HD || 0,
-      MFG: existingHours?.MFG || 0,
-      BUILD: existingHours?.BUILD || 0,
-      PRG: existingHours?.PRG || 0,
-    };
     newDepartmentHoursAllocated[dept] = Number.isFinite(budgetHours) ? budgetHours : 0;
-
-    // Build new visibleInDepartments - add this department
-    const currentVisible = selectedProject.visibleInDepartments || [];
-    const newVisibleInDepartments = currentVisible.includes(dept)
-      ? currentVisible
-      : [...currentVisible, dept];
 
     // Update the project
     await updateProject(selectedProject.id, {
@@ -2952,6 +2976,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
   const canManageProjectsInCurrentDepartment =
     departmentFilter !== 'General' &&
     departmentFilter !== 'PM' &&
+    canEditDepartment(departmentFilter as Department);
+  const canImportProjectsInCurrentView =
+    departmentFilter !== 'General' &&
     canEditDepartment(departmentFilter as Department);
 
   const loadProjectTimingChanges = async (
@@ -9102,8 +9129,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
             </button>
           )}
 
-          {/* Import Existing Project Button - Only in department view (except PM) */}
-          {canManageProjectsInCurrentDepartment && getAvailableProjectsForImport().length > 0 && (
+          {/* Import Existing Project Button - Available in department views, including PM */}
+          {canImportProjectsInCurrentView && getAvailableProjectsForImport().length > 0 && (
             <button
               onClick={() => setShowImportProjectModal(true)}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#827691] hover:bg-[#716381] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
@@ -11462,7 +11489,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
         )}
 
         {/* Import Existing Project Modal */}
-        {showImportProjectModal && canManageProjectsInCurrentDepartment && (
+        {showImportProjectModal && canImportProjectsInCurrentView && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[80] p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="bg-amber-600 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -11519,7 +11546,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                             key={proj.id}
                             type="button"
                             onClick={() => {
-                              setImportProjectForm({ ...importProjectForm, projectId: proj.id });
+                              setImportProjectForm({
+                                ...importProjectForm,
+                                projectId: proj.id,
+                                startDate: departmentFilter === 'PM' ? proj.startDate : importProjectForm.startDate,
+                                numberOfWeeks: departmentFilter === 'PM' ? proj.numberOfWeeks : importProjectForm.numberOfWeeks,
+                              });
                               setImportProjectSearchTerm(`${proj.name} - ${proj.client}`);
                             }}
                             className={`block w-full border-b border-amber-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-amber-50 ${
@@ -11555,40 +11587,44 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   })()}
                 </div>
 
-                {/* Start Date for this department */}
-                <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDateDept || 'Start Date for'} {departmentFilter}</label>
-                  <WeekNumberDatePicker
-                    value={importProjectForm.startDate}
-                    onChange={(date) => setImportProjectForm({ ...importProjectForm, startDate: date })}
-                    language={language}
-                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
-                  />
-                </div>
+                {departmentFilter !== 'PM' && (
+                  <>
+                    {/* Start Date for this department */}
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.startDateDept || 'Start Date for'} {departmentFilter}</label>
+                      <WeekNumberDatePicker
+                        value={importProjectForm.startDate}
+                        onChange={(date) => setImportProjectForm({ ...importProjectForm, startDate: date })}
+                        language={language}
+                        className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                      />
+                    </div>
 
-                {/* Number of Weeks for this department */}
-                <div>
-                  <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.numberOfWeeks}</label>
-                  <input
-                    type="text"
-                    value={importProjectForm.numberOfWeeks}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d+$/.test(value)) {
-                        const num = value === '' ? '' : parseInt(value);
-                        if (num === '' || (num >= 1 && num <= 52)) {
-                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: num });
-                        } else if (num < 1) {
-                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: 1 });
-                        } else if (num > 52) {
-                          setImportProjectForm({ ...importProjectForm, numberOfWeeks: 52 });
-                        }
-                      }
-                    }}
-                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
-                    placeholder="4"
-                  />
-                </div>
+                    {/* Number of Weeks for this department */}
+                    <div>
+                      <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.numberOfWeeks}</label>
+                      <input
+                        type="text"
+                        value={importProjectForm.numberOfWeeks}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d+$/.test(value)) {
+                            const num = value === '' ? '' : parseInt(value);
+                            if (num === '' || (num >= 1 && num <= 52)) {
+                              setImportProjectForm({ ...importProjectForm, numberOfWeeks: num });
+                            } else if (num < 1) {
+                              setImportProjectForm({ ...importProjectForm, numberOfWeeks: 1 });
+                            } else if (num > 52) {
+                              setImportProjectForm({ ...importProjectForm, numberOfWeeks: 52 });
+                            }
+                          }
+                        }}
+                        className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                        placeholder="4"
+                      />
+                    </div>
+                  </>
+                )}
 
                 {/* Budget Hours for this department */}
                 <div>
