@@ -696,6 +696,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     numberOfWeeks: '' as any,
     budgetHours: '' as any,
   });
+  const [importProjectSearchTerm, setImportProjectSearchTerm] = useState('');
   const [showExportPdfModal, setShowExportPdfModal] = useState(false);
   const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
@@ -2525,6 +2526,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       numberOfWeeks: '',
       budgetHours: '',
     });
+    setImportProjectSearchTerm('');
   };
 
   const handleClearHighProbabilityFromDepartment = (project: Project) => {
@@ -2590,6 +2592,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       return true;
     });
   };
+
+  const filteredProjectsForImport = useMemo(() => {
+    const normalizedSearch = importProjectSearchTerm.trim().toLowerCase();
+    const availableProjects = getAvailableProjectsForImport();
+
+    if (!normalizedSearch) {
+      return availableProjects;
+    }
+
+    return availableProjects.filter((proj) =>
+      `${proj.name} | ${proj.client}`.toLowerCase().includes(normalizedSearch)
+    );
+  }, [departmentFilter, importProjectSearchTerm, projects]);
 
   const getProjectZoom = (projectId: string): number => {
     return projectZooms[projectId] || 100;
@@ -11398,6 +11413,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 <button
                   onClick={() => {
                     setShowImportProjectModal(false);
+                    setImportProjectSearchTerm('');
                     setFormValidationPopup(null);
                   }}
                   className="hover:bg-amber-700 p-1 rounded transition"
@@ -11428,18 +11444,42 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 {/* Select Project */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.selectProject || 'Select Project'}</label>
-                  <select
-                    value={importProjectForm.projectId}
-                    onChange={(e) => setImportProjectForm({ ...importProjectForm, projectId: e.target.value })}
-                    className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
-                  >
-                    <option value="">{t.selectAProject || '-- Select a project --'}</option>
-                    {getAvailableProjectsForImport().map((proj) => (
-                      <option key={proj.id} value={proj.id}>
-                        {proj.name} - {proj.client}{proj.isHighProbability ? ` (${language === 'es' ? 'High Probability' : 'High Probability'})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={importProjectSearchTerm}
+                      onChange={(e) => {
+                        setImportProjectSearchTerm(e.target.value);
+                        setImportProjectForm({ ...importProjectForm, projectId: '' });
+                      }}
+                      placeholder={t.searchProjectPlaceholder || (language === 'es' ? 'Escribe numero, nombre o cliente' : 'Type project number, name or client')}
+                      className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
+                    />
+                    <div className="max-h-44 overflow-y-auto rounded-lg border-2 border-amber-200 bg-white">
+                      {filteredProjectsForImport.length > 0 ? (
+                        filteredProjectsForImport.map((proj) => (
+                          <button
+                            key={proj.id}
+                            type="button"
+                            onClick={() => {
+                              setImportProjectForm({ ...importProjectForm, projectId: proj.id });
+                              setImportProjectSearchTerm(`${proj.name} - ${proj.client}`);
+                            }}
+                            className={`block w-full border-b border-amber-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-amber-50 ${
+                              importProjectForm.projectId === proj.id ? 'bg-amber-100 text-amber-900 font-semibold' : 'text-gray-700'
+                            }`}
+                          >
+                            {proj.name} - {proj.client}
+                            {proj.isHighProbability ? ` (${language === 'es' ? 'High Probability' : 'High Probability'})` : ''}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          {t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   {importProjectForm.projectId && (() => {
                     const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
                     return selectedProject && (
@@ -11517,6 +11557,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     type="button"
                     onClick={() => {
                       setShowImportProjectModal(false);
+                      setImportProjectSearchTerm('');
                       setFormValidationPopup(null);
                     }}
                     className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
