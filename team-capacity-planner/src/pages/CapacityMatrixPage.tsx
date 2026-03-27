@@ -11381,10 +11381,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     type="text"
                     value={quickProjectForm.budgetHours}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d+$/.test(value)) {
-                        const num = value === '' ? '' : parseInt(value);
-                        setQuickProjectForm({ ...quickProjectForm, budgetHours: num });
+                      const value = e.target.value.replace(',', '.');
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setQuickProjectForm({ ...quickProjectForm, budgetHours: value });
                       }
                     }}
                     className="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none transition bg-white text-sm"
