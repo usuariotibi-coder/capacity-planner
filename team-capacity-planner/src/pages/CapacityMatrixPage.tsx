@@ -698,6 +698,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     budgetHours: '' as any,
   });
   const [importProjectSearchTerm, setImportProjectSearchTerm] = useState('');
+  const [isImportProjectSearchOpen, setIsImportProjectSearchOpen] = useState(false);
   const [showExportPdfModal, setShowExportPdfModal] = useState(false);
   const [pdfExportScope, setPdfExportScope] = useState<PdfExportScope>('single');
   const [selectedExportProjectId, setSelectedExportProjectId] = useState('');
@@ -770,9 +771,18 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      if (!projectSearchContainerRef.current) return;
-      if (projectSearchContainerRef.current.contains(event.target as Node)) return;
+      const target = event.target as Node;
+
+      if (projectSearchContainerRef.current?.contains(target)) {
+        return;
+      }
+
+      if (importProjectSearchContainerRef.current?.contains(target)) {
+        return;
+      }
+
       setIsProjectSearchOpen(false);
+      setIsImportProjectSearchOpen(false);
     };
 
     document.addEventListener('mousedown', handlePointerDown);
@@ -1481,6 +1491,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Refs for synchronized horizontal scrolling between Capacity and Projects
   const departmentCapacityScrollRef = useRef<HTMLDivElement>(null);
   const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
+  const importProjectSearchContainerRef = useRef<HTMLDivElement>(null);
   const projectSearchContainerRef = useRef<HTMLDivElement>(null);
   const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
@@ -2511,6 +2522,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         budgetHours: '',
       });
       setImportProjectSearchTerm('');
+      setIsImportProjectSearchOpen(false);
       return;
     }
 
@@ -2552,6 +2564,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       budgetHours: '',
     });
     setImportProjectSearchTerm('');
+    setIsImportProjectSearchOpen(false);
   };
 
   const handleClearHighProbabilityFromDepartment = (project: Project) => {
@@ -2627,7 +2640,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }
 
     return availableProjects.filter((proj) =>
-      `${proj.name} | ${proj.client}`.toLowerCase().includes(normalizedSearch)
+      [proj.name, proj.client].some((value) => value.toLowerCase().includes(normalizedSearch))
     );
   }, [departmentFilter, importProjectSearchTerm, projects]);
 
@@ -11498,6 +11511,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                   onClick={() => {
                     setShowImportProjectModal(false);
                     setImportProjectSearchTerm('');
+                    setIsImportProjectSearchOpen(false);
                     setFormValidationPopup(null);
                   }}
                   className="hover:bg-amber-700 p-1 rounded transition"
@@ -11528,46 +11542,51 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                 {/* Select Project */}
                 <div>
                   <label className="block text-sm font-bold mb-1.5 text-gray-700">{t.selectProject || 'Select Project'}</label>
-                  <div className="space-y-2">
+                  <div ref={importProjectSearchContainerRef} className="space-y-2">
                     <input
                       type="text"
                       value={importProjectSearchTerm}
+                      onFocus={() => setIsImportProjectSearchOpen(true)}
                       onChange={(e) => {
                         setImportProjectSearchTerm(e.target.value);
                         setImportProjectForm({ ...importProjectForm, projectId: '' });
+                        setIsImportProjectSearchOpen(true);
                       }}
                       placeholder={t.searchProjectPlaceholder || (language === 'es' ? 'Escribe numero, nombre o cliente' : 'Type project number, name or client')}
                       className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
                     />
-                    <div className="max-h-44 overflow-y-auto rounded-lg border-2 border-amber-200 bg-white">
-                      {filteredProjectsForImport.length > 0 ? (
-                        filteredProjectsForImport.map((proj) => (
-                          <button
-                            key={proj.id}
-                            type="button"
-                            onClick={() => {
-                              setImportProjectForm({
-                                ...importProjectForm,
-                                projectId: proj.id,
-                                startDate: departmentFilter === 'PM' ? proj.startDate : importProjectForm.startDate,
-                                numberOfWeeks: departmentFilter === 'PM' ? proj.numberOfWeeks : importProjectForm.numberOfWeeks,
-                              });
-                              setImportProjectSearchTerm(`${proj.name} - ${proj.client}`);
-                            }}
-                            className={`block w-full border-b border-amber-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-amber-50 ${
-                              importProjectForm.projectId === proj.id ? 'bg-amber-100 text-amber-900 font-semibold' : 'text-gray-700'
-                            }`}
-                          >
-                            {proj.name} - {proj.client}
-                            {proj.isHighProbability ? ` (${language === 'es' ? 'High Probability' : 'High Probability'})` : ''}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500">
-                          {t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.')}
-                        </div>
-                      )}
-                    </div>
+                    {isImportProjectSearchOpen && (
+                      <div className="max-h-44 overflow-y-auto rounded-lg border-2 border-amber-200 bg-white">
+                        {filteredProjectsForImport.length > 0 ? (
+                          filteredProjectsForImport.map((proj) => (
+                            <button
+                              key={proj.id}
+                              type="button"
+                              onClick={() => {
+                                setImportProjectForm({
+                                  ...importProjectForm,
+                                  projectId: proj.id,
+                                  startDate: departmentFilter === 'PM' ? proj.startDate : importProjectForm.startDate,
+                                  numberOfWeeks: departmentFilter === 'PM' ? proj.numberOfWeeks : importProjectForm.numberOfWeeks,
+                                });
+                                setImportProjectSearchTerm(proj.name);
+                                setIsImportProjectSearchOpen(false);
+                              }}
+                              className={`block w-full border-b border-amber-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-amber-50 ${
+                                importProjectForm.projectId === proj.id ? 'bg-amber-100 text-amber-900 font-semibold' : 'text-gray-700'
+                              }`}
+                            >
+                              {proj.name} - {proj.client}
+                              {proj.isHighProbability ? ` (${language === 'es' ? 'High Probability' : 'High Probability'})` : ''}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            {t.noProjectsMatchFilter || (language === 'es' ? 'No se encontraron proyectos con ese filtro.' : 'No projects matched the current filter.')}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {importProjectForm.projectId && (() => {
                     const selectedProject = projects.find(p => p.id === importProjectForm.projectId);
@@ -11633,10 +11652,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     type="text"
                     value={importProjectForm.budgetHours}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d+$/.test(value)) {
-                        const num = value === '' ? '' : parseInt(value);
-                        setImportProjectForm({ ...importProjectForm, budgetHours: num });
+                      const value = e.target.value.replace(',', '.');
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setImportProjectForm({ ...importProjectForm, budgetHours: value });
                       }
                     }}
                     className="w-full border-2 border-amber-200 rounded-lg px-3 py-2 focus:border-amber-500 focus:outline-none transition bg-white text-sm"
@@ -11651,6 +11669,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`}
                     onClick={() => {
                       setShowImportProjectModal(false);
                       setImportProjectSearchTerm('');
+                      setIsImportProjectSearchOpen(false);
                       setFormValidationPopup(null);
                     }}
                     className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
