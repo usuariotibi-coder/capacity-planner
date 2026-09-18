@@ -6299,7 +6299,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     const baseCapacity = scioTeamMembers[department]?.[weekDate] || 0;
     const ptoAdjustment = scioPto[department]?.[weekDate] || 0;
     const trainingAdjustment = scioTraining[department]?.[weekDate] || 0;
-    const effectiveScioCapacity = Math.max(0, baseCapacity - ptoAdjustment - trainingAdjustment);
+    // Intentionally not clamped to 0: PTO/Training recorded beyond the SCIO Team
+    // Members headcount for the week is a real over-commitment and must surface
+    // as negative capacity rather than being silently absorbed.
+    const effectiveScioCapacity = baseCapacity - ptoAdjustment - trainingAdjustment;
 
     if (department === 'BUILD') {
       const predefinedTeams = ['AMI', 'VICER', 'ITAX', 'MCI', 'MG Electrical'];
@@ -6416,8 +6419,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         }
       };
 
-      const getUtilizationFill = (percent: number, hasCapacity: boolean): { bg: string; fg: string } => {
-        if (!hasCapacity) return { bg: 'E5E7EB', fg: '374151' };
+      const getUtilizationFill = (percent: number, totalCapacity: number): { bg: string; fg: string } => {
+        if (totalCapacity < 0) return { bg: 'B91C1C', fg: WHITE }; // negative base capacity: critical
+        if (totalCapacity === 0) return { bg: 'E5E7EB', fg: '374151' };
         if (percent >= 100) return { bg: 'B91C1C', fg: WHITE };
         if (percent >= 90) return { bg: 'EF4444', fg: WHITE };
         if (percent >= 70) return { bg: 'FACC15', fg: '1F2937' };
@@ -6543,11 +6547,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           const isMfg = dept === 'MFG';
           const occupiedValue = isMfg ? totalWeekHours : totalWeekHours / 45;
           const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
-          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
+          const availableValue = totalCapacity - occupiedValue;
           const utilizationPercent = totalCapacity > 0
             ? (occupiedValue / totalCapacity) * 100
             : (occupiedValue > 0 ? 100 : 0);
-          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity);
 
           const availableCell = capacitySheet.getCell(capRow, weekColStart + index);
           availableCell.value = roundValue(availableValue);
@@ -6616,11 +6620,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
           const occupiedValue = dept === 'MFG' ? totalWeekHours : totalWeekHours / 45;
           const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
-          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
+          const availableValue = totalCapacity - occupiedValue;
           const utilizationPercent = totalCapacity > 0
             ? (occupiedValue / totalCapacity) * 100
             : (occupiedValue > 0 ? 100 : 0);
-          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity);
 
           const weekCell = projectsSheet.getCell(row, 6 + idx);
           weekCell.value = roundValue(availableValue);
@@ -6872,11 +6876,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
           const occupiedValue = dept === 'MFG' ? totalWeekHours : totalWeekHours / 45;
           const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
-          const availableValue = totalCapacity > 0 ? (totalCapacity - occupiedValue) : 0;
+          const availableValue = totalCapacity - occupiedValue;
           const utilizationPercent = totalCapacity > 0
             ? (occupiedValue / totalCapacity) * 100
             : (occupiedValue > 0 ? 100 : 0);
-          const palette = getUtilizationFill(utilizationPercent, totalCapacity > 0);
+          const palette = getUtilizationFill(utilizationPercent, totalCapacity);
 
           const usedCell = deptSheet.getCell(3, deptWeekStart + idx);
           usedCell.value = roundValue(occupiedValue);
@@ -9347,6 +9351,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                   let bgColor = 'bg-gray-200'; let textColor = 'text-gray-700';
                   const utilPct = totalCapacity > 0 ? (occupiedValue / totalCapacity) * 100 : 0;
                   if (totalCapacity === 0) { bgColor = 'bg-gray-200'; textColor = 'text-gray-700'; }
+                  else if (totalCapacity < 0) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
                   else if (utilPct >= 100) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
                   else if (utilPct >= 90) { bgColor = 'bg-red-500'; textColor = 'text-white'; }
                   else if (utilPct >= 70) { bgColor = 'bg-yellow-300'; textColor = 'text-yellow-900'; }
@@ -10005,6 +10010,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           if (totalCapacity === 0) {
                             bgColor = 'bg-gray-200';
                             textColor = 'text-gray-700';
+                          } else if (totalCapacity < 0) {
+                            // Negative base capacity (e.g. PTO/Training exceeding SCIO Team Members): critical
+                            bgColor = 'bg-red-700 animate-pulse';
+                            textColor = 'text-white';
                           } else if (utilizationPercentForCapacity >= 100) {
                             // Critical: 100%+ utilization
                             bgColor = 'bg-red-700 animate-pulse';
@@ -10666,6 +10675,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           if (totalCapacity === 0) {
                             bgColor = 'bg-gray-200';
                             textColor = 'text-gray-700';
+                          } else if (totalCapacity < 0) {
+                            // Negative base capacity (e.g. PTO/Training exceeding SCIO Team Members): critical
+                            bgColor = 'bg-red-700 animate-pulse';
+                            textColor = 'text-white';
                           } else if (utilizationPercentForCapacity >= 100) {
                             // Critical: 100%+ utilization
                             bgColor = 'bg-red-700 animate-pulse';
