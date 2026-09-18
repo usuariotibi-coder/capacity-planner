@@ -909,7 +909,6 @@ export function ProjectsPage() {
                         onClick={async () => {
                           if (!hasFullAccess) return;
                           const isClosed = !!proj.isClosed;
-                          const action = isClosed ? 'reabrir' : 'cerrar';
                           if (window.confirm(language === 'es' ? `¿${isClosed ? 'Reabrir' : 'Cerrar'} proyecto "${proj.name}"?` : `${isClosed ? 'Reopen' : 'Close'} project "${proj.name}"?`)) {
                             try {
                               await updateProject(proj.id, { isClosed: !isClosed });

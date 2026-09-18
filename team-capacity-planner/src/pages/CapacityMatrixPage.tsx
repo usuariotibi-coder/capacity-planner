@@ -9,7 +9,7 @@ import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, norma
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle, History } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, XCircle, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle, History } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';

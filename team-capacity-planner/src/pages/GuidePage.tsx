@@ -1,5 +1,4 @@
 import { useLanguage } from '../context/LanguageContext';
-import { useTranslation } from '../utils/translations';
 import { BookOpen, Users, Briefcase, Grid3x3, FileText, Shield, Key, Eye, Edit3, UserCheck, Lock } from 'lucide-react';
 
 type RoleCard = {
@@ -338,7 +337,6 @@ const FACILITIES = [
 
 export function GuidePage() {
   const { language } = useLanguage();
-  const t = useTranslation(language);
   const isSpanish = language === 'es';
 
   const l = (es: string, en: string) => isSpanish ? es : en;
