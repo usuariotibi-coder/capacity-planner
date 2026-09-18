@@ -1,0 +1,1143 @@
+/**
+ * API Service - Handles all communication with the Django REST API
+ */
+
+import { API_BASE_URL, API_FALLBACK_BASE_URL } from '../utils/apiUrl';
+
+const API_BASE_URL_CANDIDATES = Array.from(new Set([API_BASE_URL, API_FALLBACK_BASE_URL].filter(Boolean)));
+let ACTIVE_API_BASE_URL = API_BASE_URL_CANDIDATES[0];
+const API_BASE_URL_UNAVAILABLE_TTL_MS = 60 * 1000;
+const API_BASE_URL_UNAVAILABLE_UNTIL = new Map<string, number>();
+
+const buildApiUrl = (baseUrl: string, endpoint: string): string => {
+  const safeEndpoint = typeof endpoint === 'string' ? endpoint : '';
+  if (safeEndpoint.startsWith('http')) return safeEndpoint;
+
+  const normalizedBaseUrl = (baseUrl || '').replace(/\/+$/, '');
+  let normalizedEndpoint = safeEndpoint.startsWith('/') ? safeEndpoint : `/${safeEndpoint}`;
+
+  // Avoid accidental /api/api duplication when env base URL already includes /api.
+  if (
+    normalizedBaseUrl.toLowerCase().endsWith('/api') &&
+    normalizedEndpoint.toLowerCase().startsWith('/api/')
+  ) {
+    normalizedEndpoint = normalizedEndpoint.slice(4);
+  }
+
+  return `${normalizedBaseUrl}${normalizedEndpoint}`;
+};
+
+const getMatchingApiBaseForAbsoluteEndpoint = (endpoint: string): string | null => {
+  if (typeof endpoint !== 'string' || !endpoint.startsWith('http')) return null;
+
+  try {
+    const endpointHost = new URL(endpoint).host;
+    return API_BASE_URL_CANDIDATES.find(base => new URL(base).host === endpointHost) || null;
+  } catch {
+    return null;
+  }
+};
+
+const toRelativeApiEndpoint = (endpoint: string): string => {
+  if (typeof endpoint !== 'string') return '';
+  const matchingBase = getMatchingApiBaseForAbsoluteEndpoint(endpoint);
+  if (!matchingBase) return endpoint;
+
+  try {
+    const url = new URL(endpoint);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return endpoint;
+  }
+};
+
+const markApiBaseTemporarilyUnavailable = (baseUrl: string): void => {
+  API_BASE_URL_UNAVAILABLE_UNTIL.set(baseUrl, Date.now() + API_BASE_URL_UNAVAILABLE_TTL_MS);
+};
+
+const clearApiBaseUnavailable = (baseUrl: string): void => {
+  API_BASE_URL_UNAVAILABLE_UNTIL.delete(baseUrl);
+};
+
+const isApiBaseTemporarilyUnavailable = (baseUrl: string): boolean => {
+  const unavailableUntil = API_BASE_URL_UNAVAILABLE_UNTIL.get(baseUrl);
+  if (!unavailableUntil) return false;
+  if (unavailableUntil <= Date.now()) {
+    API_BASE_URL_UNAVAILABLE_UNTIL.delete(baseUrl);
+    return false;
+  }
+  return true;
+};
+
+const getApiBaseCandidates = (preferredBase: string): string[] => {
+  const orderedBases = [preferredBase, ...API_BASE_URL_CANDIDATES.filter(base => base !== preferredBase)];
+  const availableBases = orderedBases.filter(base => !isApiBaseTemporarilyUnavailable(base));
+  return availableBases.length > 0 ? availableBases : orderedBases;
+};
+
+const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: string): Promise<boolean> => {
+  if (API_BASE_URL_CANDIDATES.length < 2 || response.ok) return false;
+
+  const authOrSessionEndpoints = [
+    '/api/token/',
+    '/api/token/refresh/',
+    '/api/register/',
+    '/api/logout/',
+    '/api/verify-email/',
+    '/api/verify-code/',
+    '/api/resend-verification-email/',
+    '/api/session-status/',
+  ];
+
+  if (response.status === 404 && authOrSessionEndpoints.some(prefix => endpoint.startsWith(prefix))) {
+    return true;
+  }
+
+  if (response.status === 404) {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) return true;
+    try {
+      const bodyPreview = (await response.clone().text()).slice(0, 200).toLowerCase();
+      if (bodyPreview.includes('<!doctype html') || bodyPreview.includes('<html') || bodyPreview.includes('<title>not found</title>')) {
+        return true;
+      }
+    } catch {
+      // ignore body parse issues here
+    }
+  }
+
+  return false;
+};
+
+const fetchWithApiFallback = async (endpoint: string, options: RequestInit = {}): Promise<{ response: Response; requestUrl: string }> => {
+  const matchingBase = getMatchingApiBaseForAbsoluteEndpoint(endpoint);
+  const normalizedEndpoint = toRelativeApiEndpoint(endpoint);
+
+  if (normalizedEndpoint.startsWith('http')) {
+    const response = await fetch(normalizedEndpoint, options);
+    return { response, requestUrl: normalizedEndpoint };
+  }
+
+  const preferredBase = matchingBase || ACTIVE_API_BASE_URL;
+  const candidates = getApiBaseCandidates(preferredBase);
+  let lastNetworkError: unknown = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidateBase = candidates[i];
+    const requestUrl = buildApiUrl(candidateBase, normalizedEndpoint);
+
+    try {
+      const response = await fetch(requestUrl, options);
+      if (response.ok) {
+        clearApiBaseUnavailable(candidateBase);
+        if (candidateBase !== ACTIVE_API_BASE_URL) {
+          console.warn('[API] Switching active API base URL to fallback:', candidateBase);
+          ACTIVE_API_BASE_URL = candidateBase;
+        }
+        return { response, requestUrl };
+      }
+
+      const canRetry = i < candidates.length - 1 && await shouldRetryWithAlternateApiBase(response, normalizedEndpoint);
+      if (canRetry) {
+        console.warn('[API] Retrying request with alternate API base URL after non-API response:', requestUrl);
+        continue;
+      }
+
+      return { response, requestUrl };
+    } catch (error) {
+      markApiBaseTemporarilyUnavailable(candidateBase);
+      lastNetworkError = error;
+      if (i < candidates.length - 1) {
+        console.warn('[API] Network error on current API base URL, trying fallback:', requestUrl);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastNetworkError ?? new Error('Unable to reach API service');
+};
+
+// Token storage keys
+const ACCESS_TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+
+// Get stored tokens
+export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
+export const getRefreshToken = () => localStorage.getItem(REFRESH_TOKEN_KEY);
+
+// Store tokens
+export const setTokens = (access: string, refresh: string) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+};
+
+// Clear tokens (logout)
+export const clearTokens = () => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+// Check if user is authenticated
+export const isAuthenticated = () => !!getAccessToken();
+
+// Convert snake_case to camelCase
+const toCamelCase = (str: string): string => {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
+// Convert camelCase to snake_case
+const toSnakeCase = (str: string): string => {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+};
+
+// Transform object keys from snake_case to camelCase
+const transformKeysToCamel = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(transformKeysToCamel);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const camelKey = toCamelCase(key);
+      acc[camelKey] = transformKeysToCamel(obj[key]);
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
+
+// Keys that should NOT have their nested keys transformed (they contain department codes like PM, MED, etc.)
+const PRESERVE_NESTED_KEYS = ['departmentHoursAllocated', 'department_hours_allocated'];
+
+// Transform object keys from camelCase to snake_case
+const transformKeysToSnake = (obj: any, preserveNestedKeys = false): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(item => transformKeysToSnake(item, preserveNestedKeys));
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const snakeKey = toSnakeCase(key);
+      // Check if this key's nested values should be preserved (not transformed)
+      const shouldPreserveNested = PRESERVE_NESTED_KEYS.includes(key) || PRESERVE_NESTED_KEYS.includes(snakeKey);
+      if (shouldPreserveNested) {
+        // Keep nested object as-is (don't transform department codes like PM, MED, etc.)
+        acc[snakeKey] = obj[key];
+      } else {
+        acc[snakeKey] = transformKeysToSnake(obj[key], preserveNestedKeys);
+      }
+      return acc;
+    }, {} as any);
+  }
+  return obj;
+};
+
+// Refresh access token
+const refreshAccessToken = async (): Promise<string | null> => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const { response } = await fetchWithApiFallback('/api/token/refresh/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+      return data.access;
+    }
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+  }
+
+  clearTokens();
+  return null;
+};
+
+// Base fetch with authentication
+const apiFetch = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
+  let accessToken = getAccessToken();
+
+  const makeRequest = async (token: string | null) => {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    };
+
+    // Debug logging
+    console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
+    if (options.body) {
+      console.log('[API] Request body:', options.body);
+    }
+
+    const { response, requestUrl } = await fetchWithApiFallback(endpoint, {
+      ...options,
+      headers,
+    });
+    console.log('[API] Request URL:', requestUrl);
+
+    return response;
+  };
+
+  let response = await makeRequest(accessToken);
+
+  // If unauthorized, try to refresh token
+  if (response.status === 401 && accessToken) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[API] Error ${response.status}:`, errorText);
+    let errorData = {};
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { detail: errorText || `HTTP error ${response.status}` };
+    }
+    const errorMessage = (errorData as any).detail ||
+                         Object.values(errorData).flat().join(', ') ||
+                         `HTTP error ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  // Handle 204 No Content (DELETE responses)
+  if (response.status === 204) {
+    console.log('[API] Success: 204 No Content');
+    return null;
+  }
+
+  const data = await response.json();
+  console.log('[API] Response:', data);
+  return transformKeysToCamel(data);
+};
+
+// Like apiFetch, but for multipart/form-data uploads: no forced JSON Content-Type
+// (the browser sets the correct multipart boundary itself when given a FormData body).
+const apiFetchMultipart = async (endpoint: string, formData: FormData): Promise<any> => {
+  let accessToken = getAccessToken();
+
+  const makeRequest = async (token: string | null) => {
+    const headers: HeadersInit = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+    const { response } = await fetchWithApiFallback(endpoint, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response;
+  };
+
+  let response = await makeRequest(accessToken);
+
+  if (response.status === 401 && accessToken) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorData: any = {};
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { detail: errorText || `HTTP error ${response.status}` };
+    }
+    const errorMessage = errorData.detail || Object.values(errorData).flat().join(', ') || `HTTP error ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  return transformKeysToCamel(data);
+};
+
+const normalizeApiEndpoint = (endpoint: string): string => {
+  if (!endpoint) return endpoint;
+  return toRelativeApiEndpoint(endpoint);
+};
+
+// Auth API
+export const authApi = {
+  login: async (username: string, password: string) => {
+    console.log('[LOGIN] Starting login request...');
+    console.log('[LOGIN] API URL:', buildApiUrl(ACTIVE_API_BASE_URL, '/api/token/'));
+    console.log('[LOGIN] Username:', username);
+
+    try {
+      const { response, requestUrl } = await fetchWithApiFallback('/api/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      console.log('[LOGIN] Request URL:', requestUrl);
+
+      console.log('[LOGIN] Response status:', response.status);
+      console.log('[LOGIN] Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('[LOGIN] Error response:', errorText);
+
+        // Parse backend error and extract meaningful message
+        let errorMessage = 'Credenciales inválidas';
+        try {
+          const errorData = JSON.parse(errorText);
+          // Handle non_field_errors (e.g., "Máximo de dispositivos conectados")
+          if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+            errorMessage = errorData.non_field_errors.join('. ');
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else {
+            // Join all error messages from the response
+            const messages = Object.values(errorData).flat();
+            if (messages.length > 0) {
+              errorMessage = messages.join('. ');
+            }
+          }
+        } catch {
+          // If JSON parsing fails, use the raw text or default message
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('[LOGIN] Success! Token received');
+      setTokens(data.access, data.refresh);
+      return data;
+    } catch (error) {
+      console.error('[LOGIN] Error:', error);
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    const refreshToken = getRefreshToken();
+    const accessToken = getAccessToken();
+
+    // Call backend to deactivate the session
+    if (refreshToken && accessToken) {
+      try {
+        await fetchWithApiFallback('/api/logout/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        });
+        console.log('[LOGOUT] Session deactivated on backend');
+      } catch (error) {
+        console.error('[LOGOUT] Failed to deactivate session on backend:', error);
+      }
+    }
+
+    // Clear local tokens
+    clearTokens();
+  },
+
+  register: async (data: {
+    email: string;
+    password: string;
+    confirm_password: string;
+    first_name: string;
+    last_name: string;
+    department: string;
+    other_department?: string;
+  }) => {
+    const { response } = await fetchWithApiFallback('/api/register/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Registration failed';
+
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = (errorData.detail as string) || Object.entries(errorData)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+          .join('; ') || errorMessage;
+      } catch {
+        errorMessage = errorText
+          ? `${errorMessage} (HTTP ${response.status})`
+          : `${errorMessage} (HTTP ${response.status})`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  },
+
+  verifyEmail: async (token: string) => {
+    const { response } = await fetchWithApiFallback(`/api/verify-email/${token}/`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Email verification failed');
+    }
+
+    return response.json();
+  },
+
+  resendVerificationEmail: async (email: string) => {
+    const { response } = await fetchWithApiFallback('/api/resend-verification-email/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData.error || 'Failed to resend verification email';
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  },
+
+  verifyCode: async (email: string, code: string) => {
+    const { response } = await fetchWithApiFallback('/api/verify-code/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Verification failed');
+    }
+
+    return response.json();
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    return apiFetch('/api/change-password/', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      }),
+    });
+  },
+};
+
+// Session API
+export const sessionApi = {
+  getStatusResponse: async (): Promise<Response> => {
+    let accessToken = getAccessToken();
+
+    const makeRequest = async (token: string | null): Promise<Response> => {
+      const headers: HeadersInit = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const { response } = await fetchWithApiFallback('/api/session-status/', {
+        method: 'GET',
+        headers,
+        cache: 'no-store',
+      });
+      return response;
+    };
+
+    let response = await makeRequest(accessToken);
+
+    if (response.status === 401 && accessToken) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await makeRequest(newToken);
+      }
+    }
+
+    return response;
+  },
+};
+
+// Registered Users API (Business Intelligence only)
+export const registeredUsersApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/registered-users/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/registered-users/${id}/`);
+  },
+
+  create: async (userData: any) => {
+    return apiFetch('/api/registered-users/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(userData)),
+    });
+  },
+
+  update: async (id: string, userData: any) => {
+    return apiFetch(`/api/registered-users/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(userData)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/registered-users/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  resetPassword: async (id: string, password: string, confirmPassword: string) => {
+    return apiFetch(`/api/registered-users/${id}/reset-password/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        password,
+        confirm_password: confirmPassword,
+      }),
+    });
+  },
+};
+
+// Employees API
+export const employeesApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/employees/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/employees/${id}/`);
+  },
+
+  create: async (employee: any) => {
+    return apiFetch('/api/employees/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(employee)),
+    });
+  },
+
+  update: async (id: string, employee: any) => {
+    return apiFetch(`/api/employees/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(employee)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/employees/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Projects API
+export const projectsApi = {
+  getAll: async () => {
+    let endpoint = '/api/projects/?page_size=1000&include_closed=true';
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+
+      if (data && Array.isArray(data.results)) {
+        allResults = allResults.concat(data.results);
+        endpoint = data.next ? toRelativeApiEndpoint(data.next) : '';
+      } else {
+        return Array.isArray(data) ? data : [];
+      }
+    }
+
+    return allResults;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/projects/${id}/`);
+  },
+
+  create: async (project: any) => {
+    return apiFetch('/api/projects/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(project)),
+    });
+  },
+
+  update: async (id: string, project: any) => {
+    return apiFetch(`/api/projects/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(project)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/projects/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateBudgetHours: async (id: string, budgetUpdate: { department: string; hoursUtilized?: number; hoursForecast?: number }) => {
+    return apiFetch(`/api/projects/${id}/update-budget-hours/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(budgetUpdate)),
+    });
+  },
+};
+
+// Assignments API
+export const assignmentsApi = {
+  getAll: async (
+    options: {
+      onPage?: (page: any[]) => void;
+      startDate?: string;
+      endDate?: string;
+      pageSize?: number;
+    } = {}
+  ) => {
+    const { onPage, startDate, endDate, pageSize } = options;
+    const params = new URLSearchParams();
+    params.set('page_size', String(pageSize ?? 200));
+    if (startDate) {
+      params.set('start_date', startDate);
+    }
+    if (endDate) {
+      params.set('end_date', endDate);
+    }
+    let endpoint = `/api/assignments/?${params.toString()}`;
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+      if (Array.isArray(data)) {
+        if (onPage) {
+          onPage(data);
+        }
+        return data;
+      }
+
+      const results = data.results || [];
+      if (results.length > 0 && onPage) {
+        onPage(results);
+      }
+      allResults = allResults.concat(results);
+      endpoint = data.next ? normalizeApiEndpoint(data.next) : '';
+    }
+
+    return allResults;
+  },
+
+  getSummaryByProjectDept: async (options: {
+    projectIds: string[];
+    department?: string;
+    currentWeekStart?: string;
+  }) => {
+    const params = new URLSearchParams();
+    params.set('project_ids', options.projectIds.join(','));
+    if (options.department) {
+      params.set('department', options.department);
+    }
+    if (options.currentWeekStart) {
+      params.set('current_week_start', options.currentWeekStart);
+    }
+    return apiFetch(`/api/assignments/summary-by-project-dept/?${params.toString()}`);
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/assignments/${id}/`);
+  },
+
+  create: async (assignment: any) => {
+    return apiFetch('/api/assignments/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(assignment)),
+    });
+  },
+
+  update: async (id: string, assignment: any) => {
+    return apiFetch(`/api/assignments/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(assignment)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/assignments/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Daily Time Entry API (daily actuals log: project / OIL / indirect / vacation)
+export const dailyTimeEntriesApi = {
+  getAll: async (options: { startDate?: string; endDate?: string; department?: string } = {}) => {
+    const { startDate, endDate, department } = options;
+    const params = new URLSearchParams();
+    params.set('page_size', '1000');
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    if (department) params.set('department', department);
+
+    let endpoint = `/api/daily-time-entries/?${params.toString()}`;
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+      if (Array.isArray(data)) return data;
+      allResults = allResults.concat(data.results || []);
+      endpoint = data.next ? normalizeApiEndpoint(data.next) : '';
+    }
+
+    return allResults;
+  },
+
+  getByProject: async (projectIds?: string[]) => {
+    const params = new URLSearchParams();
+    if (projectIds && projectIds.length > 0) params.set('project_ids', projectIds.join(','));
+    return apiFetch(`/api/daily-time-entries/by-project/?${params.toString()}`);
+  },
+
+  create: async (entry: any) => {
+    return apiFetch('/api/daily-time-entries/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(entry)),
+    });
+  },
+
+  update: async (id: string, entry: any) => {
+    return apiFetch(`/api/daily-time-entries/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(entry)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/daily-time-entries/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// SCIO Team Capacity API
+export const scioTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/scio-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/scio-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/scio-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Subcontracted Team Capacity API
+export const subcontractedTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/subcontracted-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/subcontracted-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/subcontracted-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// PRG External Team Capacity API
+export const prgExternalTeamCapacityApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/prg-external-team-capacity/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`);
+  },
+
+  create: async (capacity: any) => {
+    return apiFetch('/api/prg-external-team-capacity/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  update: async (id: string, capacity: any) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(capacity)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/prg-external-team-capacity/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Department Weekly Total API
+export const departmentWeeklyTotalApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/department-weekly-total/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`);
+  },
+
+  create: async (total: any) => {
+    return apiFetch('/api/department-weekly-total/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(total)),
+    });
+  },
+
+  update: async (id: string, total: any) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(total)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/department-weekly-total/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Project Budget API
+export const projectBudgetsApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/project-budgets/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/project-budgets/${id}/`);
+  },
+
+  create: async (budget: any) => {
+    return apiFetch('/api/project-budgets/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(budget)),
+    });
+  },
+
+  update: async (id: string, budget: any) => {
+    return apiFetch(`/api/project-budgets/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(budget)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/project-budgets/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Project Change Orders API
+export const changeOrdersApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/project-change-orders/');
+    return data.results || data;
+  },
+
+  get: async (id: string) => {
+    return apiFetch(`/api/project-change-orders/${id}/`);
+  },
+
+  create: async (changeOrder: any) => {
+    return apiFetch('/api/project-change-orders/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(changeOrder)),
+    });
+  },
+
+  update: async (id: string, changeOrder: any) => {
+    return apiFetch(`/api/project-change-orders/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(changeOrder)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/project-change-orders/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Finance actuals: real historical hours per project/department/week, imported from
+// the Finance WIP report. Read-only from the app's perspective (written by the
+// import endpoint below).
+export const projectDepartmentWeeklyActualsApi = {
+  getAll: async (params: { projectIds?: string[]; department?: string } = {}) => {
+    const query = new URLSearchParams();
+    query.set('page_size', '500'); // server clamps to LargeResultsSetPagination's max_page_size
+    if (params.projectIds?.length) query.set('project_ids', params.projectIds.join(','));
+    if (params.department) query.set('department', params.department);
+
+    let endpoint = `/api/project-department-weekly-actuals/?${query.toString()}`;
+    let allResults: any[] = [];
+
+    while (endpoint) {
+      const data = await apiFetch(endpoint);
+      if (data && Array.isArray(data.results)) {
+        allResults = allResults.concat(data.results);
+        endpoint = data.next ? toRelativeApiEndpoint(data.next) : '';
+      } else {
+        return Array.isArray(data) ? data : [];
+      }
+    }
+
+    return allResults;
+  },
+};
+
+// Finance report import: uploads the cumulative WIP .xlsx and reads past runs.
+export const financeImportApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/finance-imports/');
+    return data.results || data;
+  },
+
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiFetchMultipart('/api/finance-imports/import-file/', formData);
+  },
+};
+
+// Activity Log API
+export const activityLogApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/activity-logs/');
+    return data.results || data;
+  },
+
+  getFiltered: async (options?: {
+    modelName?: string;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+    ordering?: string;
+    pageSize?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (options?.modelName) params.set('model_name', options.modelName);
+    if (options?.action) params.set('action', options.action);
+    if (options?.startDate) params.set('start_date', options.startDate);
+    if (options?.endDate) params.set('end_date', options.endDate);
+    if (options?.ordering) params.set('ordering', options.ordering);
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+
+    let endpoint = `/api/activity-logs/${params.toString() ? `?${params.toString()}` : ''}`;
+    const rows: any[] = [];
+    let safetyCounter = 0;
+
+    while (endpoint && safetyCounter < 100) {
+      safetyCounter += 1;
+      const data = await apiFetch(endpoint);
+
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      const pageRows = Array.isArray(data?.results) ? data.results : [];
+      rows.push(...pageRows);
+
+      const next = typeof data?.next === 'string' && data.next
+        ? toRelativeApiEndpoint(data.next)
+        : '';
+      endpoint = next;
+    }
+
+    return rows;
+  },
+
+  logActivity: async (action: string, modelName: string, objectId: string, changes?: any) => {
+    try {
+      const normalizedAction = (() => {
+        const raw = (action || '').toString().trim();
+        const lower = raw.toLowerCase();
+        if (['created', 'updated', 'deleted', 'viewed'].includes(lower)) return lower;
+        if (['create', 'created'].includes(lower)) return 'created';
+        if (['update', 'updated'].includes(lower)) return 'updated';
+        if (['delete', 'deleted', 'remove', 'removed'].includes(lower)) return 'deleted';
+        if (['view', 'viewed', 'read'].includes(lower)) return 'viewed';
+        return lower;
+      })();
+      console.log('[ActivityLog] Logging activity:', { action: normalizedAction, modelName, objectId, changes });
+      const response = await apiFetch('/api/activity-logs/', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: normalizedAction,
+          model_name: modelName,
+          object_id: objectId,
+          changes: changes || null,
+        }),
+      });
+      console.log('[ActivityLog] Activity logged successfully:', response);
+    } catch (error) {
+      // Log errors to console for debugging
+      console.error('[ActivityLog] Failed to log activity:', error);
+    }
+  },
+};
