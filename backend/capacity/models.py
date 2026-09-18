@@ -375,6 +375,43 @@ class ScioTeamCapacity(models.Model):
         return f"{self.department} - {self.week_start_date}: cap={self.capacity}, pto={self.pto}, training={self.training}"
 
 
+class ScioHeadcountEvent(models.Model):
+    """
+    A hire or departure event for a department's SCIO Team Members headcount.
+
+    This is a ledger, not a snapshot: instead of a manager typing the SCIO Team
+    Members number into every week of the Capacity Matrix by hand, they log
+    "+1 as of March 10" or "-2 as of June 1" here (with a free-text comment for
+    context, e.g. who/why). Saving an event recomputes the cumulative headcount
+    and bulk-writes ScioTeamCapacity.capacity for every week from the earliest
+    event's week forward, overwriting whatever was there before (see
+    recompute_scio_capacity_from_events). PTO/training stay untouched and
+    remain manually edited per week, independent of this ledger.
+
+    Deliberately not linked to Employee: this tracks an anonymous headcount
+    delta, not named individuals (Employee/Assignment already cover per-person
+    project staffing separately).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices)
+    effective_date = models.DateField(help_text="Calendar date the headcount change takes effect")
+    delta = models.FloatField(help_text="Signed headcount change, e.g. +1 for a hire, -2 for two departures")
+    comment = models.TextField(blank=True, help_text="Optional context, e.g. who joined/left and why")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='scio_headcount_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'effective_date']
+        indexes = [
+            models.Index(fields=['department', 'effective_date']),
+        ]
+
+    def __str__(self):
+        sign = '+' if self.delta >= 0 else ''
+        return f"{self.department} - {self.effective_date}: {sign}{self.delta}"
+
+
 class SubcontractedTeamCapacity(models.Model):
     """Subcontracted team capacity per company and week (BUILD department only)"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

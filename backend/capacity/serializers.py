@@ -39,6 +39,7 @@ from .models import (
     Stage,
     SubcontractCompany,
     ScioTeamCapacity,
+    ScioHeadcountEvent,
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
     DepartmentWeeklyTotal,
@@ -2298,6 +2299,27 @@ class ScioTeamCapacitySerializer(serializers.ModelSerializer):
     def get_validators(self):
         """Remove unique_together validators to allow upsert behavior in ViewSet"""
         return []
+
+
+class ScioHeadcountEventSerializer(serializers.ModelSerializer):
+    """Serializer for a SCIO headcount hire/departure event."""
+
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = ScioHeadcountEvent
+        fields = (
+            'id',
+            'department',
+            'effective_date',
+            'delta',
+            'comment',
+            'created_by',
+            'created_by_username',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_by', 'created_by_username', 'created_at', 'updated_at')
 
 
 class SubcontractedTeamCapacitySerializer(serializers.ModelSerializer):

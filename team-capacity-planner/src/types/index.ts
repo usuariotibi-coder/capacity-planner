@@ -191,6 +191,25 @@ export interface Assignment {
 }
 
 /**
+ * SCIO HEADCOUNT EVENT
+ * A hire (positive delta) or departure (negative delta) logged against a
+ * department's SCIO Team Members headcount, effective on a given date. Saving
+ * one recomputes and overwrites ScioTeamCapacity.capacity for every week from
+ * the earliest event's week forward -- see the backend's
+ * recompute_scio_capacity_from_events. Anonymous by design: not linked to a
+ * named Employee record.
+ */
+export interface ScioHeadcountEvent {
+  id: string;
+  department: Department;
+  effectiveDate: string; // ISO format YYYY-MM-DD
+  delta: number; // Signed headcount change, e.g. +1 for a hire, -2 for two departures
+  comment?: string;
+  createdByUsername?: string | null;
+  createdAt?: string;
+}
+
+/**
  * PROJECT DEPARTMENT WEEKLY ACTUAL
  * Real historical hours per project/department/week, sourced from the Finance
  * actuals report (no per-employee breakdown available). Past weeks are locked to

@@ -864,6 +864,35 @@ export const scioTeamCapacityApi = {
   },
 };
 
+// SCIO Headcount Events API (hire/departure ledger that drives SCIO Team Members)
+export const scioHeadcountEventsApi = {
+  getAll: async (department?: string) => {
+    const query = department ? `?department=${encodeURIComponent(department)}` : '';
+    const data = await apiFetch(`/api/scio-headcount-events/${query}`);
+    return data.results || data;
+  },
+
+  create: async (event: any) => {
+    return apiFetch('/api/scio-headcount-events/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(event)),
+    });
+  },
+
+  update: async (id: string, event: any) => {
+    return apiFetch(`/api/scio-headcount-events/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(event)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/scio-headcount-events/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Subcontracted Team Capacity API
 export const subcontractedTeamCapacityApi = {
   getAll: async () => {

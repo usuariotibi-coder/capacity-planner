@@ -50,7 +50,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import (
     Employee, Project, Assignment, DailyTimeEntry, TimeEntryType, DepartmentStageConfig,
     ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
-    ScioTeamCapacity, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
+    ScioTeamCapacity, ScioHeadcountEvent, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
     DepartmentWeeklyTotal, EmailVerification, UserDepartment, OtherDepartment,
     ProjectDepartmentWeeklyActual, FinanceJobCumulative, FinanceImportLog
 )
@@ -60,7 +60,7 @@ from .serializers import (
     AssignmentSerializer, AssignmentListSerializer, DailyTimeEntrySerializer,
     DepartmentStageConfigSerializer,
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
-    ScioTeamCapacitySerializer, SubcontractedTeamCapacitySerializer,
+    ScioTeamCapacitySerializer, ScioHeadcountEventSerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
     UserRegistrationSerializer, RegisteredUserSerializer,
     ProjectDepartmentWeeklyActualSerializer, FinanceImportLogSerializer
@@ -2254,6 +2254,91 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._ensure_full_access()
         instance.delete()
+
+
+def _week_start(d):
+    """Monday of the week containing date d (matches the frontend's getWeekStart)."""
+    return d - timedelta(days=d.weekday())
+
+
+def recompute_scio_capacity_from_events(department):
+    """
+    Rebuild ScioTeamCapacity.capacity for `department` from its ScioHeadcountEvent
+    ledger: cumulative headcount at each week = sum of every event's delta whose
+    effective week is <= that week. Writes every week from the earliest event's
+    week through a 2-year horizon, overwriting whatever capacity value was there
+    (PTO/training on those rows are left untouched). Weeks before the earliest
+    event are not touched. No-op if there are no events for the department.
+    """
+    events = list(
+        ScioHeadcountEvent.objects.filter(department=department).order_by('effective_date')
+    )
+    if not events:
+        return
+
+    checkpoints = {}
+    for event in events:
+        week = _week_start(event.effective_date)
+        checkpoints[week] = checkpoints.get(week, 0) + event.delta
+
+    sorted_weeks = sorted(checkpoints.keys())
+    earliest_week = sorted_weeks[0]
+    horizon = _week_start(max(datetime.now().date(), events[-1].effective_date)) + timedelta(weeks=104)
+
+    cumulative = 0.0
+    checkpoint_idx = 0
+    week = earliest_week
+    while week <= horizon:
+        while checkpoint_idx < len(sorted_weeks) and sorted_weeks[checkpoint_idx] <= week:
+            cumulative += checkpoints[sorted_weeks[checkpoint_idx]]
+            checkpoint_idx += 1
+        ScioTeamCapacity.objects.update_or_create(
+            department=department,
+            week_start_date=week,
+            defaults={'capacity': max(0.0, cumulative)},
+        )
+        week += timedelta(weeks=1)
+
+
+class ScioHeadcountEventViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for SCIO headcount hire/departure events.
+
+    Each create/update/delete recomputes and bulk-writes the affected
+    department's ScioTeamCapacity.capacity from the full event ledger --
+    see recompute_scio_capacity_from_events.
+    """
+    queryset = ScioHeadcountEvent.objects.all()
+    serializer_class = ScioHeadcountEventSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department']
+    ordering_fields = ['department', 'effective_date', 'created_at']
+    ordering = ['department', 'effective_date']
+
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify SCIO headcount events.")
+
+    def perform_create(self, serializer):
+        self._ensure_full_access()
+        instance = serializer.save(created_by=self.request.user)
+        recompute_scio_capacity_from_events(instance.department)
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        previous_department = serializer.instance.department
+        instance = serializer.save()
+        recompute_scio_capacity_from_events(previous_department)
+        if instance.department != previous_department:
+            recompute_scio_capacity_from_events(instance.department)
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        department = instance.department
+        instance.delete()
+        recompute_scio_capacity_from_events(department)
 
 
 # ==================== SUBCONTRACTED TEAM CAPACITY VIEWSET ====================

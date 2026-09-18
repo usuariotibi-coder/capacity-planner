@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
 import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrder, ProjectDepartmentWeeklyActual } from '../types';
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
+import { ScioHeadcountModal } from '../components/ScioHeadcountModal';
 
 type DepartmentFilter = 'General' | Department;
 type LegendStage = Exclude<Stage, null>;
@@ -682,6 +683,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
   const [buildTeamName, setBuildTeamName] = useState('');
 
+  // Modal state for logging SCIO headcount hires/departures
+  const [isHeadcountModalOpen, setIsHeadcountModalOpen] = useState(false);
+
   // Per-project zoom levels
   const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
 
@@ -817,46 +821,49 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // The old method of loading from employees list has been replaced with API loading
   // This ensures teams persist across page refreshes
 
+  // Load SCIO Team Capacity from API. Hoisted out of the mount effect so the
+  // SCIO headcount modal can trigger a refresh after logging a hire/departure
+  // (the backend recomputes capacity for every affected week server-side).
+  const loadScioTeamCapacity = async () => {
+    try {
+      console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
+      const data = await scioTeamCapacityApi.getAll();
+      console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
+      console.log('[CapacityMatrix] Total SCIO records loaded:', data?.length || 0);
+
+      // Transform API data to our state structure
+      const newScioTeamMembers: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
+      const newScioPto: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
+      const newScioTraining: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
+      const newRecordIds: Record<string, string> = {};
+
+      for (const record of data) {
+        const dept = record.department as Department;
+        const weekDate = normalizeWeekStartDate(record.weekStartDate);
+        const capacity = Number(record.capacity || 0);
+        const pto = Number(record.pto || 0);
+        const training = Number(record.training || 0);
+
+        if (dept && weekDate && newScioTeamMembers[dept]) {
+          newScioTeamMembers[dept][weekDate] = capacity;
+          newScioPto[dept][weekDate] = pto;
+          newScioTraining[dept][weekDate] = training;
+          newRecordIds[`${dept}-${weekDate}`] = record.id;
+        }
+      }
+
+      setScioTeamMembers(newScioTeamMembers);
+      setScioPto(newScioPto);
+      setScioTraining(newScioTraining);
+      setScioTeamRecordIds(newRecordIds);
+      console.log('[CapacityMatrix] SCIO Team Capacity state updated');
+    } catch (error) {
+      console.error('[CapacityMatrix] Error loading SCIO Team Capacity:', error);
+    }
+  };
+
   // Load SCIO Team Capacity from API on mount
   useEffect(() => {
-    const loadScioTeamCapacity = async () => {
-      try {
-        console.log('[CapacityMatrix] Loading SCIO Team Capacity from API...');
-        const data = await scioTeamCapacityApi.getAll();
-        console.log('[CapacityMatrix] SCIO Team Capacity loaded:', data);
-        console.log('[CapacityMatrix] Total SCIO records loaded:', data?.length || 0);
-
-        // Transform API data to our state structure
-        const newScioTeamMembers: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
-        const newScioPto: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
-        const newScioTraining: Record<Department, Record<string, number>> = createEmptyDepartmentWeekValues();
-        const newRecordIds: Record<string, string> = {};
-
-        for (const record of data) {
-          const dept = record.department as Department;
-          const weekDate = normalizeWeekStartDate(record.weekStartDate);
-          const capacity = Number(record.capacity || 0);
-          const pto = Number(record.pto || 0);
-          const training = Number(record.training || 0);
-
-          if (dept && weekDate && newScioTeamMembers[dept]) {
-            newScioTeamMembers[dept][weekDate] = capacity;
-            newScioPto[dept][weekDate] = pto;
-            newScioTraining[dept][weekDate] = training;
-            newRecordIds[`${dept}-${weekDate}`] = record.id;
-          }
-        }
-
-        setScioTeamMembers(newScioTeamMembers);
-        setScioPto(newScioPto);
-        setScioTraining(newScioTraining);
-        setScioTeamRecordIds(newRecordIds);
-        console.log('[CapacityMatrix] SCIO Team Capacity state updated');
-      } catch (error) {
-        console.error('[CapacityMatrix] Error loading SCIO Team Capacity:', error);
-      }
-    };
-
     loadScioTeamCapacity();
   }, []);
 
@@ -9529,14 +9536,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       <span className={deptIcon.color}>{deptIcon.icon}</span>
                       <span>{dept} - {t.weeklyOccupancyTotal}</span>
                     </h2>
-                    <button
-                      onClick={() => setShowDepartmentPanel(!showDepartmentPanel)}
-                      className="text-[#4f3a70] hover:text-[#2e1a47] font-bold text-xs cursor-pointer transition"
-                      title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
-                    >
-                      {showDepartmentPanel ? '▼' : '▶'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {hasFullAccess && (
+                        <button
+                          onClick={() => setIsHeadcountModalOpen(true)}
+                          className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
+                          title={language === 'es' ? 'Registrar altas/bajas de personal' : 'Log staff hires/departures'}
+                        >
+                          {language === 'es' ? '+ / − Personal' : '+ / − Staff'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowDepartmentPanel(!showDepartmentPanel)}
+                        className="text-[#4f3a70] hover:text-[#2e1a47] font-bold text-xs cursor-pointer transition"
+                        title={showDepartmentPanel ? 'Hide panel' : 'Show panel'}
+                      >
+                        {showDepartmentPanel ? '▼' : '▶'}
+                      </button>
+                    </div>
                   </div>
+
+                  <ScioHeadcountModal
+                    isOpen={isHeadcountModalOpen}
+                    department={dept}
+                    language={language}
+                    onClose={() => setIsHeadcountModalOpen(false)}
+                    onSaved={loadScioTeamCapacity}
+                  />
 
                   {/* Weekly occupancy calendar */}
                   {showDepartmentPanel && (

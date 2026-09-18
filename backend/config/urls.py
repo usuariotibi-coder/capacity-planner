@@ -17,6 +17,7 @@ from capacity.views import (
     ProjectChangeOrderViewSet,
     ActivityLogViewSet,
     ScioTeamCapacityViewSet,
+    ScioHeadcountEventViewSet,
     SubcontractedTeamCapacityViewSet,
     PrgExternalTeamCapacityViewSet,
     DepartmentWeeklyTotalViewSet,
@@ -44,6 +45,7 @@ router.register(r'project-budgets', ProjectBudgetViewSet, basename='project-budg
 router.register(r'project-change-orders', ProjectChangeOrderViewSet, basename='project-change-order')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 router.register(r'scio-team-capacity', ScioTeamCapacityViewSet, basename='scio-team-capacity')
+router.register(r'scio-headcount-events', ScioHeadcountEventViewSet, basename='scio-headcount-event')
 router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
 router.register(r'prg-external-team-capacity', PrgExternalTeamCapacityViewSet, basename='prg-external-team-capacity')
 router.register(r'department-weekly-total', DepartmentWeeklyTotalViewSet, basename='department-weekly-total')
