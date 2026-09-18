@@ -858,23 +858,6 @@ input[type="number"] {
   color: #1f2937 !important;
 }
 
-/* Resources page night-mode contrast */
-[data-theme="night"] .resources-page :is(
-  [class*="bg-[#f4f1f8]"],
-  [class*="bg-[#f1f7f7]"],
-  [class*="bg-[#f2eef8]"],
-  [class*="bg-[#fbf2ec]"],
-  [class*="bg-[#eef6f1]"],
-  [class*="bg-[#f3f7ed]"]
-) {
-  background: #2d1b42 !important;
-  border-color: #5f4a78 !important;
-}
-
-[data-theme="night"] .resources-page [class*="hover:bg-gray-50"]:hover {
-  background: #3a2651 !important;
-}
-
 /* Activity log page night-mode contrast */
 [data-theme="night"] .activity-log-page .brand-panel {
   background: #251638 !important;

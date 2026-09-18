@@ -1,5 +1,5 @@
 import { useLanguage } from '../context/LanguageContext';
-import { BookOpen, Users, Briefcase, Grid3x3, FileText, Shield, Key, Eye, Edit3, UserCheck, Lock } from 'lucide-react';
+import { BookOpen, Briefcase, Grid3x3, FileText, Shield, Key, Eye, Edit3, UserCheck, Lock } from 'lucide-react';
 
 type RoleCard = {
   title: string;
@@ -145,37 +145,6 @@ const WINDOWS: WindowCard[] = [
       'Visual stage indicators by background color',
       'Support for SCIO hours vs External hours (BUILD and PRG)',
       'Interactive color legend for stages and utilization',
-    ],
-  },
-  {
-    title: 'Recursos',
-    titleEn: 'Resources',
-    icon: <Users size={18} />,
-    description: 'Gestión de empleados y capacidades de equipo. Permite administrar el personal, sus horas disponibles, y las capacidades de equipos externos y subcontratados.',
-    descriptionEn: 'Employee and team capacity management. Allows managing personnel, their available hours, and external/subcontracted team capacities.',
-    features: [
-      'Lista de empleados con nombre, rol, departamento, capacidad semanal y estado',
-      'Crear nuevo empleado: nombre, rol, departamento, capacidad (default 45h/semana)',
-      'Editar empleado existente (nombre, rol, capacidad, estado activo/inactivo)',
-      'Eliminar empleado',
-      'Gestión de SCIO Team Capacity: capacidad del equipo interno por departamento y semana, incluyendo PTO y training',
-      'Gestión de Subcontracted Team Capacity (BUILD): personal subcontratado por compañía y semana',
-      'Gestión de PRG External Team Capacity: equipos externos de programación por nombre y semana',
-      'Vista de asignaciones por empleado (horas por proyecto/semana)',
-      'Exportación a Excel de la tabla de empleados',
-      'Botón para eliminar todos los datos (solo admin, con confirmación)',
-    ],
-    featuresEn: [
-      'Employee list with name, role, department, weekly capacity and status',
-      'Create new employee: name, role, department, capacity (default 45h/week)',
-      'Edit existing employee (name, role, capacity, active/inactive status)',
-      'Delete employee',
-      'SCIO Team Capacity management: internal team capacity by department and week, including PTO and training',
-      'Subcontracted Team Capacity management (BUILD): subcontracted personnel by company and week',
-      'PRG External Team Capacity management: external programming teams by name and week',
-      'Assignment view per employee (hours per project/week)',
-      'Export employee table to Excel',
-      'Delete all data button (admin only, with confirmation)',
     ],
   },
   {
@@ -540,12 +509,12 @@ export function GuidePage() {
             <ol className="space-y-3 text-sm text-[#4a4458]">
               {[
                 {
-                  es: 'Registrar empleados en la ventana "Recursos" con su departamento, rol y capacidad semanal.',
-                  en: 'Register employees in the "Resources" window with their department, role, and weekly capacity.',
+                  es: 'Registrar empleados (departamento, rol y capacidad semanal) desde el panel de administración del backend.',
+                  en: 'Register employees (department, role, and weekly capacity) from the backend admin panel.',
                 },
                 {
-                  es: 'Configurar capacidades de equipo (SCIO, subcontratados BUILD, externos PRG) en "Recursos".',
-                  en: 'Configure team capacities (SCIO, BUILD subcontracted, PRG external) in "Resources".',
+                  es: 'Configurar capacidades de equipo (SCIO, subcontratados BUILD, externos PRG) en la "Matriz de Capacidad".',
+                  en: 'Configure team capacities (SCIO, BUILD subcontracted, PRG external) in the "Capacity Matrix".',
                 },
                 {
                   es: 'Crear proyectos en "Proyectos" con nombre, cliente, fechas, facility y presupuesto de horas por departamento.',

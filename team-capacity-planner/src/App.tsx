@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ResourcesPage } from './pages/ResourcesPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
-import { DailyTimeEntryPage } from './pages/DailyTimeEntryPage';
 import { ActivityLogPage } from './pages/ActivityLogPage';
 import { GuidePage } from './pages/GuidePage';
 import { RegisteredUsersPage } from './pages/RegisteredUsersPage';
@@ -13,7 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Users, Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, CalendarDays, FileSpreadsheet } from 'lucide-react';
+import { Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -21,7 +19,7 @@ import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
 import { useInactivityLogout } from './hooks/useInactivityLogout';
 
-type Page = 'resources' | 'projects' | 'guide' | 'capacity' | 'daily-time' | 'activity-log' | 'registered-users' | 'finance-import';
+type Page = 'projects' | 'guide' | 'capacity' | 'activity-log' | 'registered-users' | 'finance-import';
 type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
@@ -190,8 +188,6 @@ function MainApp() {
 
   const navItems: Array<{ id: Page; label: string; icon: React.ReactNode }> = [
     { id: 'capacity', label: t.capacityMatrix, icon: <Grid3x3 size={14} /> },
-    { id: 'daily-time', label: language === 'es' ? 'Registro Diario' : 'Daily Time Entry', icon: <CalendarDays size={14} /> },
-    { id: 'resources', label: t.resources, icon: <Users size={14} /> },
     { id: 'projects', label: t.projects, icon: <Briefcase size={14} /> },
     { id: 'guide', label: t.guide || 'Guia', icon: <BookOpen size={14} /> },
     { id: 'activity-log', label: t.activityLog || 'Activity Log', icon: <FileText size={14} /> },
@@ -228,8 +224,6 @@ function MainApp() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'resources':
-        return <ResourcesPage />;
       case 'projects':
         return <ProjectsPage />;
       case 'guide':
@@ -242,8 +236,6 @@ function MainApp() {
         return <FinanceImportPage />;
       case 'capacity':
         return <CapacityMatrixPage departmentFilter={departmentFilter} />;
-      case 'daily-time':
-        return <DailyTimeEntryPage />;
       default:
         return <CapacityMatrixPage departmentFilter={departmentFilter} />;
     }
