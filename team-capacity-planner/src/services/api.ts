@@ -81,11 +81,7 @@ const shouldRetryWithAlternateApiBase = async (response: Response, endpoint: str
   const authOrSessionEndpoints = [
     '/api/token/',
     '/api/token/refresh/',
-    '/api/register/',
     '/api/logout/',
-    '/api/verify-email/',
-    '/api/verify-code/',
-    '/api/resend-verification-email/',
     '/api/session-status/',
   ];
 
@@ -448,87 +444,6 @@ export const authApi = {
 
     // Clear local tokens
     clearTokens();
-  },
-
-  register: async (data: {
-    email: string;
-    password: string;
-    confirm_password: string;
-    first_name: string;
-    last_name: string;
-    department: string;
-    other_department?: string;
-  }) => {
-    const { response } = await fetchWithApiFallback('/api/register/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = 'Registration failed';
-
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = (errorData.detail as string) || Object.entries(errorData)
-          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-          .join('; ') || errorMessage;
-      } catch {
-        errorMessage = errorText
-          ? `${errorMessage} (HTTP ${response.status})`
-          : `${errorMessage} (HTTP ${response.status})`;
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
-  },
-
-  verifyEmail: async (token: string) => {
-    const { response } = await fetchWithApiFallback(`/api/verify-email/${token}/`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Email verification failed');
-    }
-
-    return response.json();
-  },
-
-  resendVerificationEmail: async (email: string) => {
-    const { response } = await fetchWithApiFallback('/api/resend-verification-email/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = errorData.error || 'Failed to resend verification email';
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
-  },
-
-  verifyCode: async (email: string, code: string) => {
-    const { response } = await fetchWithApiFallback('/api/verify-code/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, code }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Verification failed');
-    }
-
-    return response.json();
   },
 
   changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {

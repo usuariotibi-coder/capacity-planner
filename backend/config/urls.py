@@ -24,10 +24,6 @@ from capacity.views import (
     ProjectDepartmentWeeklyActualViewSet,
     FinanceImportViewSet,
     RegisteredUserViewSet,
-    UserRegistrationView,
-    EmailVerificationView,
-    ResendVerificationEmailView,
-    VerifyCodeView,
     CaseInsensitiveTokenObtainPairView,
     LogoutView,
     SessionStatusView,
@@ -90,12 +86,6 @@ urlpatterns = [
     path('api/logout/', LogoutView.as_view(), name='logout'),
     path('api/session-status/', SessionStatusView.as_view(), name='session_status'),
     path('api/change-password/', ChangePasswordView.as_view(), name='change_password'),
-
-    # Registration endpoints
-    path('api/register/', UserRegistrationView.as_view(), name='user_register'),
-    path('api/verify-email/<str:token>/', EmailVerificationView.as_view(), name='email_verify'),
-    path('api/verify-code/', VerifyCodeView.as_view(), name='verify_code'),
-    path('api/resend-verification-email/', ResendVerificationEmailView.as_view(), name='resend_verification_email'),
 
     # API endpoints
     path('api/', include(router.urls)),

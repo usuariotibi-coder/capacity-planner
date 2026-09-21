@@ -12,7 +12,6 @@ from .models import (
     Assignment,
     Department,
     DepartmentStageConfig,
-    EmailVerification,
     Employee,
     Facility,
     OtherDepartment,
@@ -614,70 +613,6 @@ class RegisteredUsersDepartmentNormalizationTests(APITestCase):
 
         created = User.objects.get(email='head.eng.normalized@na.scio-automation.com')
         self.assertEqual(created.profile.other_department, OtherDepartment.HEAD_ENGINEERING)
-
-
-class RegistrationVerificationTests(APITestCase):
-    def _registration_payload(self, email='new.user@na.scio-automation.com'):
-        return {
-            'email': email,
-            'password': 'StrongPassword123!',
-            'confirm_password': 'StrongPassword123!',
-            'first_name': 'New',
-            'last_name': 'User',
-            'department': UserDepartment.PRG,
-        }
-
-    def test_registration_creates_inactive_user_with_verification_code(self):
-        payload = self._registration_payload()
-
-        response = self.client.post(reverse('user_register'), payload, format='json')
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(email=payload['email'])
-        verification = EmailVerification.objects.get(user=user)
-        self.assertFalse(user.is_active)
-        self.assertIsNotNone(verification.code)
-        self.assertEqual(len(verification.code), 6)
-        self.assertIsNone(verification.verified_at)
-
-    def test_login_fails_until_user_is_verified(self):
-        payload = self._registration_payload(email='pending.user@na.scio-automation.com')
-        register_response = self.client.post(reverse('user_register'), payload, format='json')
-        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
-
-        login_response = self.client.post(
-            reverse('token_obtain_pair'),
-            {'username': payload['email'], 'password': payload['password']},
-            format='json',
-        )
-
-        self.assertEqual(login_response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn('verificar', str(login_response.data).lower())
-
-    def test_verify_code_activates_user_and_allows_login(self):
-        payload = self._registration_payload(email='verified.user@na.scio-automation.com')
-        register_response = self.client.post(reverse('user_register'), payload, format='json')
-        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
-
-        verification = EmailVerification.objects.get(user__email=payload['email'])
-        verify_response = self.client.post(
-            reverse('verify_code'),
-            {'email': payload['email'], 'code': verification.code},
-            format='json',
-        )
-        self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
-
-        user = User.objects.get(email=payload['email'])
-        self.assertTrue(user.is_active)
-
-        login_response = self.client.post(
-            reverse('token_obtain_pair'),
-            {'username': payload['email'], 'password': payload['password']},
-            format='json',
-        )
-        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
-        self.assertIn('access', login_response.data)
-        self.assertIn('refresh', login_response.data)
 
 
 class HiddenDataAccessControlTests(APITestCase):

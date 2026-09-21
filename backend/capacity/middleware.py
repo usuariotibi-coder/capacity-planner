@@ -39,9 +39,6 @@ class SessionActivityMiddleware(MiddlewareMixin):
         if request.path in [
             '/api/token/',
             '/api/token/refresh/',
-            '/api/register/',
-            '/api/verify-email/',
-            '/api/verify-code/',
             '/api/session-status/',
         ]:
             return None

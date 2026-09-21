@@ -7,8 +7,6 @@ import { GuidePage } from './pages/GuidePage';
 import { RegisteredUsersPage } from './pages/RegisteredUsersPage';
 import { FinanceImportPage } from './pages/FinanceImportPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import EmailVerificationPage from './pages/EmailVerificationPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet } from 'lucide-react';
@@ -71,11 +69,15 @@ function MainApp() {
     currentUserDepartment,
     currentUserOtherDepartment,
     hasFullAccess,
+    isSuperuser,
   } = useAuth();
 
+  // Mirrors the backend's _has_bi_management_access: superusers manage
+  // registered users regardless of department (most don't have a
+  // UserProfile/department at all), or a BI-department user.
   const canManageRegisteredUsers =
-    currentUserDepartment === 'OTHER' &&
-    currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE';
+    isSuperuser ||
+    (currentUserDepartment === 'OTHER' && currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE');
 
   console.log('[MainApp] Render: isLoggedIn=', isLoggedIn, 'isLoading=', isLoading);
 
@@ -468,8 +470,6 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email/:token" element={<EmailVerificationPage />} />
         <Route
           path="/change-password"
           element={

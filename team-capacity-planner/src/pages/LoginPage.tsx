@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
-import { authApi } from '../services/api';
 import type { Language } from '../types';
 
 const LoginPage: React.FC = () => {
@@ -12,9 +11,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isResendingCode, setIsResendingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const { login } = useAuth();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation(language);
@@ -23,7 +20,6 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setVerificationMessage(null);
     setError(null);
 
     try {
@@ -33,27 +29,6 @@ const LoginPage: React.FC = () => {
       setError(err instanceof Error ? err.message : t.loginError);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const isUnverifiedAccount = (error || '').toLowerCase().includes('sin verificar')
-    || (error || '').toLowerCase().includes('unverified');
-
-  const handleResendVerificationCode = async () => {
-    if (!email) {
-      setError('Ingresa tu correo para reenviar el codigo');
-      return;
-    }
-
-    setIsResendingCode(true);
-    setVerificationMessage(null);
-    try {
-      await authApi.resendVerificationEmail(email);
-      setVerificationMessage('Te enviamos un nuevo codigo de verificacion a tu correo.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo reenviar el codigo');
-    } finally {
-      setIsResendingCode(false);
     }
   };
 
@@ -143,30 +118,6 @@ const LoginPage: React.FC = () => {
                   </svg>
                   <span className="text-sm">{error}</span>
                 </div>
-                {isUnverifiedAccount && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={handleResendVerificationCode}
-                      disabled={isResendingCode}
-                      className="text-left text-sm text-[#c7b9df] hover:text-[#ddd1ef] disabled:text-zinc-500 disabled:cursor-not-allowed"
-                    >
-                      {isResendingCode ? 'Reenviando codigo...' : 'Reenviar codigo de verificacion'}
-                    </button>
-                    <Link
-                      to={`/register?step=verify&email=${encodeURIComponent(email)}`}
-                      className="text-left text-sm text-[#c7b9df] hover:text-[#ddd1ef]"
-                    >
-                      Ir a verificar codigo
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {verificationMessage && (
-              <div className="bg-green-500/10 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg backdrop-blur-sm">
-                <span className="text-sm">{verificationMessage}</span>
               </div>
             )}
 
@@ -250,26 +201,6 @@ const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Divider */}
-          <div className="relative my-7">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-zinc-800 text-zinc-500 font-medium">{t.or}</span>
-            </div>
-          </div>
-
-          {/* Register link */}
-          <Link
-            to="/register"
-            className="block w-full py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-lg
-                       transition-all duration-300 text-center border border-zinc-700 hover:border-zinc-600
-                       hover:shadow-lg hover:scale-[1.01]"
-          >
-            {t.noAccountRegister}
-          </Link>
 
           {/* Footer */}
           <div className="mt-7 text-center text-sm">
