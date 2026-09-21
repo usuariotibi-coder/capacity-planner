@@ -1325,11 +1325,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if not effective_department or not _can_edit_department(self.request.user, effective_department):
             raise PermissionDenied("No permission to modify this department.")
 
-    def _ensure_week_is_editable(self, week_start_date):
+    def _ensure_week_is_editable(self, week_start_date, stage_only=False):
         """
         Past weeks (before the current week) are locked: their hours come from the
         Finance actuals import (see ProjectDepartmentWeeklyActual), not from manual
         entry. Full-access users (admins) are exempt, for one-off corrections.
+
+        Non-full-access users may still relabel the `stage` (and comment) on an
+        entry in a locked week -- hours stay whatever Finance reported -- when
+        stage_only=True (see perform_create/perform_update, which only pass that
+        when the write leaves hours/scio_hours/external_hours unchanged).
         """
         if _has_full_access(self.request.user):
             return
@@ -1337,11 +1342,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             return
         today = timezone.localdate()
         current_week_start = today - timedelta(days=today.weekday())
-        if week_start_date < current_week_start:
+        if week_start_date < current_week_start and not stage_only:
             raise PermissionDenied(
                 "Past weeks are locked and sourced from the Finance actuals report. "
-                "Only the current week and future weeks can be edited manually."
+                "Hours can't be changed manually there, but you can still relabel "
+                "the stage on an existing entry."
             )
+
+    @staticmethod
+    def _num(value):
+        return float(value) if value is not None else 0.0
 
     def perform_create(self, serializer):
         employee_id = serializer.validated_data.get('employee_id') or self.request.data.get('employee_id')
@@ -1352,7 +1362,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             or None
         )
         self._ensure_assignment_edit_permission(employee, department_override)
-        self._ensure_week_is_editable(serializer.validated_data.get('week_start_date'))
+        # A brand-new row in a locked week can only carry a stage label, not hours
+        # -- there's no prior value to compare against, so "unchanged" means zero.
+        zero_hours = (
+            self._num(serializer.validated_data.get('hours')) == 0
+            and self._num(serializer.validated_data.get('scio_hours')) == 0
+            and self._num(serializer.validated_data.get('external_hours')) == 0
+        )
+        self._ensure_week_is_editable(
+            serializer.validated_data.get('week_start_date'), stage_only=zero_hours
+        )
         serializer.save()
 
     def perform_update(self, serializer):
@@ -1366,10 +1385,25 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             'department_override', serializer.instance.department_override
         )
         self._ensure_assignment_edit_permission(employee, department_override)
+
+        instance = serializer.instance
+        new_week = serializer.validated_data.get('week_start_date', instance.week_start_date)
+        hours_unchanged = (
+            self._num(serializer.validated_data.get('hours', instance.hours))
+            == self._num(instance.hours)
+            and self._num(serializer.validated_data.get('scio_hours', instance.scio_hours))
+            == self._num(instance.scio_hours)
+            and self._num(serializer.validated_data.get('external_hours', instance.external_hours))
+            == self._num(instance.external_hours)
+        )
+        # Moving the row to a different week always affects both weeks' totals, so
+        # that only counts as a safe "stage-only" edit when the week isn't changing.
+        stage_only = hours_unchanged and new_week == instance.week_start_date
+
         # Lock is checked against both the existing row's week and any new week it's
         # being moved to, so a past week can't be edited in place nor moved into.
-        self._ensure_week_is_editable(serializer.instance.week_start_date)
-        self._ensure_week_is_editable(serializer.validated_data.get('week_start_date'))
+        self._ensure_week_is_editable(instance.week_start_date, stage_only=stage_only)
+        self._ensure_week_is_editable(new_week, stage_only=stage_only)
         serializer.save()
 
     def perform_destroy(self, instance):

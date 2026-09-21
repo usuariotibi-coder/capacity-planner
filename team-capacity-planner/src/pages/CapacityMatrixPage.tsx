@@ -105,6 +105,11 @@ interface StageHoursEntry {
   stage: Exclude<Stage, null> | '';
   hours: number;
   hoursInput: string;
+  // Original assignment row(s) this entry was built from, captured at modal-open
+  // time. Used only for the locked-week (Finance-actuals) save path, which
+  // relabels these rows' `stage` in place instead of the normal create/reset
+  // flow (which would otherwise touch hours).
+  assignmentIds?: string[];
 }
 
 interface StageResourceHoursEntry {
@@ -445,11 +450,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [selectedProjectCell, setSelectedProjectCell] = useState<ProjectCellSelectionState | null>(null);
   const [projectCellClipboard, setProjectCellClipboard] = useState<ProjectCellClipboardState | null>(null);
 
-  const createStageHoursEntry = (stage: Exclude<Stage, null> | '' = '', hours = 0): StageHoursEntry => ({
+  const createStageHoursEntry = (
+    stage: Exclude<Stage, null> | '' = '',
+    hours = 0,
+    assignmentIds?: string[]
+  ): StageHoursEntry => ({
     id: generateId(),
     stage,
     hours,
     hoursInput: hours > 0 ? `${hours}` : '',
+    assignmentIds,
   });
 
   const createStageResourceKey = (stageEntryId: string, employeeId: string) => `${stageEntryId}::${employeeId}`;
@@ -7459,7 +7469,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
   const handleEditCell = (department: Department, weekStart: string, projectId?: string) => {
     if (departmentFilter === 'General') return; // No edit in General view
     if (!canEditDepartment(department)) return;
-    if (isWeekLocked(weekStart)) return; // Past weeks are read-only (Finance actuals)
+    // Locked (past) weeks still open the modal -- hours are read-only there
+    // (from Finance actuals), but the stage label can still be relabeled.
 
     const { totalHours, assignments: deptAssignments, stage: cellStage, comment: cellComment } = getDepartmentWeekData(department, weekStart, projectId);
     const initialStage = cellStage ?? deptAssignments.find((assignment) => assignment.stage)?.stage ?? null;
@@ -7511,15 +7522,17 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
       }
     } else if (canUseStagePlanner) {
       const stageTotals = new Map<Exclude<Stage, null> | '', number>();
+      const stageAssignmentIds = new Map<Exclude<Stage, null> | '', string[]>();
       deptAssignments.forEach((assignment) => {
         const stageKey = (assignment.stage as Exclude<Stage, null> | null) || '';
         const assignmentHours = typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0);
         stageTotals.set(stageKey, roundHours((stageTotals.get(stageKey) || 0) + assignmentHours));
+        stageAssignmentIds.set(stageKey, [...(stageAssignmentIds.get(stageKey) || []), assignment.id]);
       });
 
       if (stageTotals.size > 0) {
         initialStageEntries = Array.from(stageTotals.entries()).map(([stageKey, hoursValue]) =>
-          createStageHoursEntry(stageKey, hoursValue)
+          createStageHoursEntry(stageKey, hoursValue, stageAssignmentIds.get(stageKey))
         );
       } else if (totalHours > 0) {
         initialStageEntries = [createStageHoursEntry(initialStage as Exclude<Stage, null> | '', roundHours(totalHours))];
@@ -7573,6 +7586,37 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     if (!editingCell) return;
     if (!canEditDepartment(editingCell.department)) {
       alert(t.readOnlyView || 'Read-only view');
+      return;
+    }
+
+    // Locked (past) week: hours come from Finance and are frozen (UI disables
+    // those inputs above), so skip the normal create/reset-to-zero flow
+    // entirely -- it would touch hours by design. Just relabel the `stage` in
+    // place on the existing assignment row(s) captured when the modal opened.
+    if (isWeekLocked(editingCell.weekStart)) {
+      const isBuildOrPRGLocked = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+      if (isBuildOrPRGLocked) {
+        const { assignments: lockedDeptAssignments } = getDepartmentWeekData(
+          editingCell.department,
+          editingCell.weekStart,
+          editingCell.projectId
+        );
+        await Promise.all(
+          lockedDeptAssignments.map((assignment) =>
+            updateAssignment(assignment.id, { stage: editingStage, comment: editingComment || undefined }, { skipRefetch: true })
+          )
+        );
+      } else {
+        await Promise.all(
+          editingStageEntries.flatMap((entry) =>
+            (entry.assignmentIds || []).map((assignmentId) =>
+              updateAssignment(assignmentId, { stage: entry.stage || null, comment: editingComment || undefined }, { skipRefetch: true })
+            )
+          )
+        );
+      }
+      closeEditModal();
+      void fetchAssignments(true);
       return;
     }
 
@@ -8398,6 +8442,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         ? (editingScioHours + editingExternalHours)
         : editingHours
     );
+    // Locked (past) week: hours are read-only (Finance actuals), but the stage
+    // label can still be relabeled. Full-access users are exempt (see isWeekLocked).
+    const isLockedWeek = isWeekLocked(editingCell.weekStart);
     const currentCellAssignments = getDepartmentWeekData(
       editingCell.department,
       editingCell.weekStart,
@@ -8454,6 +8501,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           </div>
 
           <div className="flex-1 overflow-y-auto p-3.5 md:p-4 bg-white">
+            {isLockedWeek && (
+              <div className="mb-3.5 md:mb-4 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
+                {language === 'es'
+                  ? 'Semana bloqueada: las horas vienen del reporte de Finanzas y no se pueden modificar aquí. Puedes actualizar la etapa.'
+                  : 'Locked week: hours come from the Finance report and can\'t be changed here. You can still update the stage.'}
+              </div>
+            )}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5 md:gap-4 items-start">
           {/* Hours and Stage block */}
           {isBuildOrPRGDepartment ? (
@@ -8482,7 +8536,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       handleSaveCell();
                     }
                   }}
-                  disabled={scioInputLocked}
+                  disabled={scioInputLocked || isLockedWeek}
                   autoFocus
                     className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="0"
@@ -8514,7 +8568,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                         handleSaveCell();
                       }
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLockedWeek}
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                     placeholder="0"
                   />
                 </div>
@@ -8561,7 +8616,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                   <button
                     type="button"
                     onClick={() => setEditingStageEntries((prev) => [...prev, createStageHoursEntry()])}
-                    className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-1 transition"
+                    disabled={isLockedWeek}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-1 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     + {t.add || 'Add'}
                   </button>
@@ -8608,7 +8664,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             value={selectedResourcesCount > 0 ? `${stageRowTotal || ''}` : entry.hoursInput}
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => {
-                              if (selectedResourcesCount > 0) return;
+                              if (selectedResourcesCount > 0 || isLockedWeek) return;
                               const raw = e.target.value;
                               const normalized = raw.replace(',', '.');
                               if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
@@ -8620,15 +8676,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 )));
                               }
                             }}
-                            readOnly={selectedResourcesCount > 0}
-                            disabled={selectedResourcesCount > 0}
+                            readOnly={selectedResourcesCount > 0 || isLockedWeek}
+                            disabled={selectedResourcesCount > 0 || isLockedWeek}
                             className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
                             placeholder="0"
                           />
                           <button
                             type="button"
                             onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
-                            className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg transition"
+                            disabled={isLockedWeek}
+                            className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
                             title={t.delete}
                           >
                             <X size={14} className="mx-auto" />
@@ -8649,6 +8706,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                     value={resourceData.hoursInput}
                                     onFocus={(e) => e.currentTarget.select()}
                                     onChange={(e) => {
+                                      if (isLockedWeek) return;
                                       const raw = e.target.value;
                                       const normalized = raw.replace(',', '.');
                                       if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
@@ -8662,7 +8720,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                         }));
                                       }
                                     }}
-                                    className="border border-gray-300 rounded-md px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    readOnly={isLockedWeek}
+                                    disabled={isLockedWeek}
+                                    className="border border-gray-300 rounded-md px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700"
                                     placeholder="0"
                                   />
                                 </div>
@@ -8700,7 +8760,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                   }
                 }}
                 autoFocus
-                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLockedWeek}
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 placeholder="0"
               />
             </div>
@@ -8802,7 +8863,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                         <input
                           type="checkbox"
                           checked={isSelected}
+                          disabled={isLockedWeek}
                           onChange={(e) => {
+                            if (isLockedWeek) return;
                             const newSelected = new Set(selectedEmployees);
                             if (e.target.checked) {
                               newSelected.add(emp.id);
@@ -8901,9 +8964,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                   </select>
                   <button
                     type="button"
-                    disabled={!supportEmployeeToAdd}
+                    disabled={!supportEmployeeToAdd || isLockedWeek}
                     onClick={() => {
-                      if (!supportEmployeeToAdd) return;
+                      if (!supportEmployeeToAdd || isLockedWeek) return;
                       setSelectedEmployees(new Set(selectedEmployees).add(supportEmployeeToAdd));
                       setSupportEmployeeToAdd('');
                     }}
@@ -8989,7 +9052,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           <div className="flex flex-wrap gap-2.5 justify-between p-3 md:px-4 border-t border-gray-200 flex-shrink-0 bg-white">
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200"
+              disabled={isLockedWeek}
+              title={isLockedWeek ? (language === 'es' ? 'Semana bloqueada: no se puede eliminar' : 'Locked week: cannot be deleted') : undefined}
+              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {t.delete}
             </button>
@@ -10508,7 +10573,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           const week = weekData.date;
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
                           const isLocked = isWeekLocked(week);
-                          const canEditThisDepartment = canEditDepartment(dept) && !isLocked;
+                          // Locked weeks stay clickable: hours are read-only there
+                          // (Finance actuals), but the stage label can still be edited.
+                          const canEditThisDepartment = canEditDepartment(dept);
                           const isSelectedCell =
                             selectedProjectCell?.projectId === proj.id &&
                             selectedProjectCell?.department === dept &&
@@ -10539,7 +10606,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 }
                               }}
                               data-week-index={weekIdx}
-                              title={isLocked ? (language === 'es' ? 'Semana bloqueada: los datos vienen del reporte de Finanzas' : 'Locked week: data comes from the Finance report') : undefined}
+                              title={isLocked ? (language === 'es' ? 'Semana bloqueada: las horas vienen del reporte de Finanzas, pero la etapa se puede editar' : 'Locked week: hours come from the Finance report, but the stage can still be edited') : undefined}
                               onClick={() => selectProjectCell(dept, week, proj.id)}
                               onDoubleClick={() => canEditThisDepartment && handleEditCell(dept, week, proj.id)}
                               className={`border p-0 relative text-xs transition-all ${

@@ -17,6 +17,7 @@ from .models import (
     OtherDepartment,
     Project,
     ProjectBudget,
+    Stage,
     UserDepartment,
     UserProfile,
     UserSession,
@@ -243,6 +244,131 @@ class ProjectDepartmentPermissionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AssignmentPastWeekLockTests(APITestCase):
+    """
+    Past weeks are locked to hours coming from the Finance actuals report, but a
+    department manager should still be able to relabel which stage those hours
+    belong to (see recompute-free stage_only path in AssignmentViewSet).
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='med-dept-user',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(user=self.user, department=UserDepartment.MED)
+        self.client.force_authenticate(user=self.user)
+
+        self.employee = Employee.objects.create(
+            name='Past Week Tester',
+            role='Engineer',
+            department=Department.MED,
+            capacity=45,
+        )
+        self.other_employee = Employee.objects.create(
+            name='Past Week Tester 2',
+            role='Engineer',
+            department=Department.MED,
+            capacity=45,
+        )
+        self.project = Project.objects.create(
+            name='Past Week Project',
+            client='Internal',
+            start_date=date(2020, 1, 6),
+            end_date=date(2030, 12, 30),
+            facility=Facility.MX,
+            number_of_weeks=1,
+            visible_in_departments=[Department.MED],
+        )
+
+        today = timezone.localdate()
+        current_week_start = today - timedelta(days=today.weekday())
+        self.past_week = current_week_start - timedelta(weeks=2)
+
+        self.assignment = Assignment.objects.create(
+            employee=self.employee,
+            project=self.project,
+            week_start_date=self.past_week,
+            hours=5,
+            stage=Stage.CONCEPT,
+        )
+
+    def test_department_user_cannot_change_hours_in_past_week(self):
+        response = self.client.patch(
+            reverse('assignment-detail', args=[self.assignment.id]),
+            {'hours': 8},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.hours, 5)
+
+    def test_department_user_can_relabel_stage_in_past_week_without_changing_hours(self):
+        response = self.client.patch(
+            reverse('assignment-detail', args=[self.assignment.id]),
+            {'stage': Stage.DETAIL_DESIGN},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.stage, Stage.DETAIL_DESIGN)
+        self.assertEqual(self.assignment.hours, 5)
+
+    def test_department_user_cannot_create_assignment_with_hours_in_past_week(self):
+        response = self.client.post(
+            reverse('assignment-list'),
+            {
+                'employee_id': str(self.other_employee.id),
+                'project_id': str(self.project.id),
+                'week_start_date': self.past_week.isoformat(),
+                'hours': 3,
+                'stage': Stage.CONCEPT,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_department_user_can_create_zero_hour_stage_entry_in_past_week(self):
+        response = self.client.post(
+            reverse('assignment-list'),
+            {
+                'employee_id': str(self.other_employee.id),
+                'project_id': str(self.project.id),
+                'week_start_date': self.past_week.isoformat(),
+                'hours': 0,
+                'stage': Stage.DETAIL_DESIGN,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_department_user_cannot_delete_assignment_in_past_week(self):
+        response = self.client.delete(
+            reverse('assignment-detail', args=[self.assignment.id])
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Assignment.objects.filter(id=self.assignment.id).exists())
+
+    def test_full_access_user_can_still_change_hours_in_past_week(self):
+        pm_user = User.objects.create_user(
+            username='pm-user',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(user=pm_user, department=UserDepartment.PM)
+        self.client.force_authenticate(user=pm_user)
+
+        response = self.client.patch(
+            reverse('assignment-detail', args=[self.assignment.id]),
+            {'hours': 9},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.hours, 9)
 
 
 class HeadEngineeringPermissionTests(APITestCase):
