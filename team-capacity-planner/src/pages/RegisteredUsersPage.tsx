@@ -73,11 +73,12 @@ export function RegisteredUsersPage() {
 
   const { language } = useLanguage();
   const t = useTranslation(language);
-  const { currentUserDepartment, currentUserOtherDepartment } = useAuth();
+  const { currentUserDepartment, currentUserOtherDepartment, isSuperuser } = useAuth();
 
+  // Mirrors the backend's _has_bi_management_access.
   const canManageRegisteredUsers =
-    currentUserDepartment === 'OTHER' &&
-    currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE';
+    isSuperuser ||
+    (currentUserDepartment === 'OTHER' && currentUserOtherDepartment === 'BUSINESS_INTELLIGENCE');
 
   const locale = language === 'es' ? 'es-MX' : 'en-US';
 

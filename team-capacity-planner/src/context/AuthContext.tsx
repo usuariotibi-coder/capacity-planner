@@ -26,6 +26,7 @@ interface AuthContextType {
   currentUserOtherDepartment: string | null;
   hasFullAccess: boolean;
   isReadOnly: boolean;
+  isSuperuser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,14 +40,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUserOtherDepartment, setCurrentUserOtherDepartment] = useState<string | null>(null);
   const [hasFullAccess, setHasFullAccess] = useState<boolean>(true);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
+  const [isSuperuser, setIsSuperuser] = useState<boolean>(false);
 
   const updateAccessFlags = (
     department: string | null,
     otherDepartment: string | null,
     isStaff = false,
-    isSuperuser = false
+    isSuperuserFlag = false
   ) => {
-    const full = isSuperuser
+    const full = isSuperuserFlag
       || isStaff
       || department === 'PM'
       || (department === 'OTHER' && otherDepartment === 'BUSINESS_INTELLIGENCE');
@@ -56,6 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       otherDepartment !== 'HEAD_ENGINEERING';
     setHasFullAccess(full);
     setIsReadOnly(readOnly);
+    setIsSuperuser(isSuperuserFlag);
   };
 
   // Extract user name from token
@@ -199,6 +202,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       currentUserOtherDepartment,
       hasFullAccess,
       isReadOnly,
+      isSuperuser,
     }}>
       {children}
     </AuthContext.Provider>
