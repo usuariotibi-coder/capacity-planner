@@ -1537,8 +1537,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
   const isPastingProjectCellRef = useRef(false);
   const isSyncingHorizontalScrollRef = useRef(false);
-  const pendingHorizontalSyncRef = useRef<{ progress: number; projectId?: string | null } | null>(null);
-  const horizontalSyncRafIdRef = useRef<number | null>(null);
   const syncedBaseScrollProgressRef = useRef(0);
   const activeSyncedProjectIdRef = useRef<string | null>(null);
   const [activeSyncedProjectId, setActiveSyncedProjectId] = useState<string | null>(null);
@@ -1985,12 +1983,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   );
 
   // The per-project "General" table appends 4 extra Summary columns (Qtd/Used/Fcst/Util)
-  // after the week columns; the top Capacity bar doesn't have those. This used to make
-  // projectAllWeeksData drop the last 4 weeks so both tables had equal total column counts,
-  // which the old percentage-based horizontal scroll sync required to line weeks up. Sync is
-  // now anchored to matching week columns directly (see getScrollProgress), so equal column
-  // counts are no longer required -- show every week instead of hiding the last 4.
-  const projectAllWeeksData = allWeeksData;
+  // after the week columns. The top Capacity bar doesn't have those. Both use the same
+  // percentage-based horizontal scroll sync (see syncHorizontalScrollToCanonical), which only
+  // lines weeks up correctly when both tables have the SAME total column count. So the
+  // project table shows 4 fewer week columns — dropped from the far (least relevant) end of
+  // the range — to make room for its Summary columns without changing its total width.
+  const PROJECT_TABLE_SUMMARY_COLUMN_COUNT = 4;
+  const projectAllWeeksData = useMemo(
+    () => allWeeksData.slice(0, Math.max(0, allWeeksData.length - PROJECT_TABLE_SUMMARY_COLUMN_COUNT)),
+    [allWeeksData]
+  );
   const projectMonthSpans = useMemo(
     () => computeMonthSpans(projectAllWeeksData),
     [projectAllWeeksData, locale]
@@ -2795,81 +2797,19 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setActiveSyncedProjectId(projectId);
   };
 
-  // The sticky left-hand label column (department/"People" name) visually
-  // overlays the start of the scrolled content regardless of scrollLeft, so
-  // its width has to be subtracted to land a target week just past it.
-  const getStickyLabelWidth = (container: HTMLDivElement): number => {
-    const labelEl = container.querySelector<HTMLElement>('.sticky');
-    return labelEl?.getBoundingClientRect().width ?? 0;
-  };
-
-  // One representative element per week index (first match wins -- header and
-  // body rows both carry data-week-index, but they share the same column
-  // position so any one of them is a valid anchor).
-  const getWeekIndexElements = (container: HTMLDivElement): Map<number, HTMLElement> => {
-    const map = new Map<number, HTMLElement>();
-    container.querySelectorAll<HTMLElement>('[data-week-index]').forEach((el) => {
-      const idx = Number(el.dataset.weekIndex);
-      if (!Number.isNaN(idx) && !map.has(idx)) {
-        map.set(idx, el);
-      }
-    });
-    return map;
-  };
-
-  // Returns a fractional week index (e.g. 5.3) for whichever week column
-  // currently sits just past the sticky label at this container's scroll
-  // position. Anchoring sync to an actual week column -- instead of a raw
-  // percentage of scrollWidth, as this used to do -- keeps containers aligned
-  // even when their total scrollable width differs (e.g. the Projects table
-  // has trailing Summary columns the Capacity bar doesn't), which previously
-  // caused percentage-based sync to drift further out of alignment the more
-  // you scrolled right.
   const getScrollProgress = (container: HTMLDivElement | null): number => {
     if (!container) return 0;
-    const cells = getWeekIndexElements(container);
-    if (cells.size === 0) return 0;
-    const indexes = Array.from(cells.keys()).sort((a, b) => a - b);
-    const containerRect = container.getBoundingClientRect();
-    const anchorLeft = containerRect.left + getStickyLabelWidth(container);
-
-    for (const idx of indexes) {
-      const rect = cells.get(idx)!.getBoundingClientRect();
-      if (rect.width <= 0) continue;
-      if (rect.left + rect.width > anchorLeft || idx === indexes[indexes.length - 1]) {
-        const fraction = (anchorLeft - rect.left) / rect.width;
-        return idx + Math.max(0, Math.min(1, fraction));
-      }
-    }
-    return 0;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    if (maxScrollLeft <= 0) return 0;
+    return Math.max(0, Math.min(1, container.scrollLeft / maxScrollLeft));
   };
 
-  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, weekPosition: number) => {
+  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, progress: number) => {
     if (!container) return;
-    const cells = getWeekIndexElements(container);
-    if (cells.size === 0) return;
-    const indexes = Array.from(cells.keys()).sort((a, b) => a - b);
-    const clampedPosition = Math.max(indexes[0], Math.min(indexes[indexes.length - 1], weekPosition));
-    const baseIndex = Math.min(indexes[indexes.length - 1], Math.floor(clampedPosition));
-    const el = cells.get(baseIndex);
-    if (!el) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const rect = el.getBoundingClientRect();
-    const cellLeftInContent = (rect.left - containerRect.left) + container.scrollLeft;
-    const fraction = clampedPosition - baseIndex;
-    const targetScrollLeft = Math.max(0, cellLeftInContent - getStickyLabelWidth(container) + fraction * rect.width);
-
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    const targetScrollLeft = maxScrollLeft > 0 ? maxScrollLeft * progress : 0;
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
-      // The project table containers have `scroll-behavior: smooth` (for the
-      // user's own manual scrolling); a bare `scrollLeft =` write there can
-      // animate too, so each intermediate scroll event mid-animation re-enters
-      // this function, re-measures the still-moving target cell, and computes
-      // a new target -- the animation never settles, which reads as the
-      // container being "frozen" (every user scroll gets fought immediately).
-      // `behavior: 'instant'` forces the programmatic sync itself to jump,
-      // regardless of that CSS.
-      container.scrollTo({ left: targetScrollLeft, behavior: 'instant' });
+      container.scrollLeft = targetScrollLeft;
     }
   };
 
@@ -2896,9 +2836,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
-    // A fractional week index now (see getScrollProgress), not a 0-1 percentage
-    // -- each target container clamps it against its own available week range.
-    const safeCanonicalProgress = Math.max(0, canonicalScrollProgress);
+    const safeCanonicalProgress = Math.max(0, Math.min(1, canonicalScrollProgress));
     syncedBaseScrollProgressRef.current = safeCanonicalProgress;
 
     if (isGeneralView) {
@@ -2907,57 +2845,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setScrollProgressIfNeeded(departmentCapacityScrollRef.current, safeCanonicalProgress);
     }
 
-    // Sync every currently-mounted (expanded) project row, not just the
-    // "active" one -- the General view can show several projects' tables at
-    // once, and each is an independent scroll container. Only using the
-    // single resolved project here used to leave every other visible project
-    // showing whatever scroll position it happened to mount at (typically 0),
-    // out of sync with the Capacity bar above.
-    projectTableRefs.current.forEach((container) => {
+    const syncProjectId = resolveSyncProjectId(targetProjectId);
+    if (!syncProjectId) return;
+    const container = projectTableRefs.current.get(syncProjectId);
+    if (container) {
       setScrollProgressIfNeeded(container, safeCanonicalProgress);
-    });
-    void targetProjectId; // kept in the signature for callers that still pass it; no longer needed to pick a single target
+    }
   };
 
-  // The General view can have dozens of expanded projects, each getting its own
-  // scrollTo() + a getBoundingClientRect() measurement in one sync pass. Doing
-  // that on every single 'scroll' event (which fire at high frequency during a
-  // scroll gesture) is expensive, and each of those scrollTo() calls fires its
-  // own native 'scroll' event asynchronously -- under that much simultaneous
-  // DOM work the browser can delay dispatching them past a single animation
-  // frame. The old guard released after just one rAF, reopening before all of
-  // those echo events had fired, so each got treated as a new user scroll and
-  // re-entered the sync -- a feedback cascade that fought any real scroll
-  // attempt and made these tables feel stuck (only really visible once there
-  // are enough expanded projects for the cascade to matter, which is why the
-  // department view, with far fewer, seemed fine).
-  //
-  // Fix: coalesce to at most one sync per animation frame (later calls before
-  // the frame runs just overwrite which position to sync to, they don't queue
-  // more work), and hold the re-entry guard for a short timeout afterward --
-  // comfortably longer than a frame -- so the whole batch of echo events has
-  // time to settle before a new user scroll is allowed to trigger another sync.
   const runSyncedHorizontalScroll = (
     canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
     if (isSyncingHorizontalScrollRef.current) return;
 
-    pendingHorizontalSyncRef.current = { progress: canonicalScrollProgress, projectId: targetProjectId };
-    if (horizontalSyncRafIdRef.current !== null) return;
+    isSyncingHorizontalScrollRef.current = true;
+    syncHorizontalScrollToCanonical(canonicalScrollProgress, targetProjectId);
 
-    horizontalSyncRafIdRef.current = requestAnimationFrame(() => {
-      horizontalSyncRafIdRef.current = null;
-      const pending = pendingHorizontalSyncRef.current;
-      pendingHorizontalSyncRef.current = null;
-      if (!pending) return;
-
-      isSyncingHorizontalScrollRef.current = true;
-      syncHorizontalScrollToCanonical(pending.progress, pending.projectId);
-
-      setTimeout(() => {
-        isSyncingHorizontalScrollRef.current = false;
-      }, 100);
+    requestAnimationFrame(() => {
+      isSyncingHorizontalScrollRef.current = false;
     });
   };
 
@@ -2978,6 +2884,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // On entering the Capacity Matrix (and whenever the department filter changes), scroll all
   // synced tables to start 3 weeks before the current week rather than the very first week.
+  // Requires a real DOM measurement (via data-week-index) rather than a known progress value.
   // Projects/assignments still finish loading asynchronously after mount, and the resulting
   // layout/width change makes the browser clamp scrollLeft back toward 0 — so this re-applies
   // itself (recomputing fresh each time, not reusing a stale offset) across a few animation
@@ -2989,11 +2896,25 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const applyInitialScroll = () => {
       const container = isGeneralView ? generalCapacityScrollRef.current : departmentCapacityScrollRef.current;
       if (!container) return;
-      // targetWeekIndex is already a week position (fraction 0 = its left edge);
-      // setScrollProgressIfNeeded/getWeekIndexElements handles finding that
-      // week's column and subtracting the sticky label width.
-      syncedBaseScrollProgressRef.current = targetWeekIndex;
-      syncHorizontalScrollToCanonical(targetWeekIndex, resolveSyncProjectId());
+      const targetEl = container.querySelector<HTMLElement>(`[data-week-index="${targetWeekIndex}"]`);
+      if (!targetEl) return;
+      // Measure via getBoundingClientRect (always viewport-relative) rather than offsetLeft,
+      // which is relative to offsetParent — not necessarily this scroll container — and gave
+      // inconsistent results here. The left-hand department/"People" label column is sticky and
+      // visually overlays the start of the scrolled content regardless of scrollLeft, so its
+      // width is subtracted to land the target week just past it, not partly hidden behind it.
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const labelEl = container.querySelector<HTMLElement>('.sticky');
+      const labelWidth = labelEl?.getBoundingClientRect().width ?? 0;
+      const scrollLeftDelta = (targetRect.left - containerRect.left) - labelWidth;
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      const desiredScrollLeft = container.scrollLeft + scrollLeftDelta;
+      const progress = maxScrollLeft > 0
+        ? Math.max(0, Math.min(1, desiredScrollLeft / maxScrollLeft))
+        : 0;
+      syncedBaseScrollProgressRef.current = progress;
+      syncHorizontalScrollToCanonical(progress, resolveSyncProjectId());
     };
 
     const rafA = requestAnimationFrame(applyInitialScroll);
@@ -11045,11 +10966,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
 
                   {/* Expandable content - includes hours panel AND table */}
                   {expandedProjects[proj.id] && (
-                    <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}>
+                    <>
 
                       <div
                         className="overflow-x-auto"
-                        style={{ scrollBehavior: 'smooth' }}
+                        style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
                         onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
                         ref={(el) => {
                           if (el) {
@@ -11376,7 +11297,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                         </tbody>
                       </table>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               )})}
