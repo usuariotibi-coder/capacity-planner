@@ -2859,7 +2859,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const targetScrollLeft = Math.max(0, cellLeftInContent - getStickyLabelWidth(container) + fraction * rect.width);
 
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
-      container.scrollLeft = targetScrollLeft;
+      // The project table containers have `scroll-behavior: smooth` (for the
+      // user's own manual scrolling); a bare `scrollLeft =` write there can
+      // animate too, so each intermediate scroll event mid-animation re-enters
+      // this function, re-measures the still-moving target cell, and computes
+      // a new target -- the animation never settles, which reads as the
+      // container being "frozen" (every user scroll gets fought immediately).
+      // `behavior: 'instant'` forces the programmatic sync itself to jump,
+      // regardless of that CSS.
+      container.scrollTo({ left: targetScrollLeft, behavior: 'instant' });
     }
   };
 
