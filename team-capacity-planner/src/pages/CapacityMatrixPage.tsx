@@ -1537,6 +1537,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
   const isPastingProjectCellRef = useRef(false);
   const isSyncingHorizontalScrollRef = useRef(false);
+  const pendingHorizontalSyncRef = useRef<{ progress: number; projectId?: string | null } | null>(null);
+  const horizontalSyncRafIdRef = useRef<number | null>(null);
   const syncedBaseScrollProgressRef = useRef(0);
   const activeSyncedProjectIdRef = useRef<string | null>(null);
   const [activeSyncedProjectId, setActiveSyncedProjectId] = useState<string | null>(null);
@@ -2917,17 +2919,45 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     void targetProjectId; // kept in the signature for callers that still pass it; no longer needed to pick a single target
   };
 
+  // The General view can have dozens of expanded projects, each getting its own
+  // scrollTo() + a getBoundingClientRect() measurement in one sync pass. Doing
+  // that on every single 'scroll' event (which fire at high frequency during a
+  // scroll gesture) is expensive, and each of those scrollTo() calls fires its
+  // own native 'scroll' event asynchronously -- under that much simultaneous
+  // DOM work the browser can delay dispatching them past a single animation
+  // frame. The old guard released after just one rAF, reopening before all of
+  // those echo events had fired, so each got treated as a new user scroll and
+  // re-entered the sync -- a feedback cascade that fought any real scroll
+  // attempt and made these tables feel stuck (only really visible once there
+  // are enough expanded projects for the cascade to matter, which is why the
+  // department view, with far fewer, seemed fine).
+  //
+  // Fix: coalesce to at most one sync per animation frame (later calls before
+  // the frame runs just overwrite which position to sync to, they don't queue
+  // more work), and hold the re-entry guard for a short timeout afterward --
+  // comfortably longer than a frame -- so the whole batch of echo events has
+  // time to settle before a new user scroll is allowed to trigger another sync.
   const runSyncedHorizontalScroll = (
     canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
     if (isSyncingHorizontalScrollRef.current) return;
 
-    isSyncingHorizontalScrollRef.current = true;
-    syncHorizontalScrollToCanonical(canonicalScrollProgress, targetProjectId);
+    pendingHorizontalSyncRef.current = { progress: canonicalScrollProgress, projectId: targetProjectId };
+    if (horizontalSyncRafIdRef.current !== null) return;
 
-    requestAnimationFrame(() => {
-      isSyncingHorizontalScrollRef.current = false;
+    horizontalSyncRafIdRef.current = requestAnimationFrame(() => {
+      horizontalSyncRafIdRef.current = null;
+      const pending = pendingHorizontalSyncRef.current;
+      pendingHorizontalSyncRef.current = null;
+      if (!pending) return;
+
+      isSyncingHorizontalScrollRef.current = true;
+      syncHorizontalScrollToCanonical(pending.progress, pending.projectId);
+
+      setTimeout(() => {
+        isSyncingHorizontalScrollRef.current = false;
+      }, 100);
     });
   };
 
