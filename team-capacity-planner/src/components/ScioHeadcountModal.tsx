@@ -113,8 +113,8 @@ export function ScioHeadcountModal({ isOpen, department, language, onClose, onSa
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose} />
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-[80]" onClick={onClose} />
+      <div className="fixed inset-0 flex items-center justify-center z-[90] p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col">
           {/* Header */}
           <div className="border-b border-[#e5e0eb] px-5 py-3 flex items-center justify-between flex-shrink-0">

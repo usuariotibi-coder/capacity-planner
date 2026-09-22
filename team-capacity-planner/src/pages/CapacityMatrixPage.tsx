@@ -9621,14 +9621,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     </div>
                   </div>
 
-                  <ScioHeadcountModal
-                    isOpen={isHeadcountModalOpen}
-                    department={dept}
-                    language={language}
-                    onClose={() => setIsHeadcountModalOpen(false)}
-                    onSaved={loadScioTeamCapacity}
-                  />
-
                   {/* Weekly occupancy calendar */}
                   {showDepartmentPanel && (
                     <div
@@ -12264,6 +12256,21 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
               </div>
             </div>
           </div>
+        )}
+
+        {/* SCIO Headcount Modal ("+ / - Staff") -- rendered here, outside the
+            sticky department panel, so its z-index isn't trapped inside that
+            panel's own stacking context (position: sticky + z-index create
+            one; a nested `fixed` modal can never paint above siblings outside
+            it no matter how high its own z-index goes). */}
+        {departmentFilter !== 'General' && (
+          <ScioHeadcountModal
+            isOpen={isHeadcountModalOpen}
+            department={departmentFilter as Department}
+            language={language}
+            onClose={() => setIsHeadcountModalOpen(false)}
+            onSaved={loadScioTeamCapacity}
+          />
         )}
 
         {/* PRG External Team Modal */}
