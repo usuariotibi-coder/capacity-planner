@@ -1194,7 +1194,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handleScioTeamChange = (dept: Department, weekDate: string, newCapacity: number) => {
-    if (!hasFullAccess) {
+    if (!canEditDepartment(dept)) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
@@ -1218,7 +1218,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handleScioPtoChange = (dept: Department, weekDate: string, newPto: number) => {
-    if (!hasFullAccess) {
+    if (!canEditDepartment(dept)) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
@@ -1240,7 +1240,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handleScioTrainingChange = (dept: Department, weekDate: string, newTraining: number) => {
-    if (!hasFullAccess) {
+    if (!canEditDepartment(dept)) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
@@ -1315,7 +1315,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const prgExternalSaveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleSubcontractedChange = (company: string, weekDate: string, newCount: number | undefined) => {
-    if (!hasFullAccess) {
+    if (!canEditDepartment('BUILD')) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
@@ -1395,7 +1395,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   };
 
   const handlePrgExternalChange = (teamName: string, weekDate: string, newCount: number | undefined) => {
-    if (!hasFullAccess) {
+    if (!canEditDepartment('PRG')) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
@@ -1427,10 +1427,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // Delete team handler
   const handleDeleteTeam = async () => {
-    if (!hasFullAccess) {
+    if (!deleteConfirmation.isOpen || !deleteConfirmation.teamName || !deleteConfirmation.type) {
       return;
     }
-    if (!deleteConfirmation.isOpen || !deleteConfirmation.teamName || !deleteConfirmation.type) {
+    if (!canEditDepartment(deleteConfirmation.type === 'prg' ? 'PRG' : 'BUILD')) {
       return;
     }
 
@@ -9602,7 +9602,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       <span>{dept} - {t.weeklyOccupancyTotal}</span>
                     </h2>
                     <div className="flex items-center gap-2">
-                      {hasFullAccess && (
+                      {canEditDepartment(dept) && (
                         <button
                           onClick={() => setIsHeadcountModalOpen(true)}
                           className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
@@ -9772,7 +9772,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 type="number"
                                 step="0.1"
                                 value={scioTeamMembers[dept]?.[weekData.date] || ''}
-                                disabled={!hasFullAccess}
+                                disabled={!canEditDepartment(dept)}
                                 onChange={(e) => {
                                   const newCapacity = parseFloat(e.target.value) || 0;
                                   handleScioTeamChange(dept, weekData.date, newCapacity);
@@ -9804,7 +9804,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 type="number"
                                 step="0.1"
                                 value={scioPto[dept]?.[weekData.date] || ''}
-                                disabled={!hasFullAccess}
+                                disabled={!canEditDepartment(dept)}
                                 onChange={(e) => {
                                   const newValue = parseFloat(e.target.value) || 0;
                                   handleScioPtoChange(dept, weekData.date, newValue);
@@ -9836,7 +9836,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 type="number"
                                 step="0.1"
                                 value={scioTraining[dept]?.[weekData.date] || ''}
-                                disabled={!hasFullAccess}
+                                disabled={!canEditDepartment(dept)}
                                 onChange={(e) => {
                                   const newValue = parseFloat(e.target.value) || 0;
                                   handleScioTrainingChange(dept, weekData.date, newValue);
@@ -9862,7 +9862,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               {/* Company Label with delete button */}
                               <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-violet-100 to-violet-50 text-violet-900 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={company}>{company}</span>
-                                {hasFullAccess && (
+                                {canEditDepartment(dept) && (
                                   <button
                                     onClick={() => {
                                       setDeleteConfirmation({
@@ -9896,7 +9896,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                         type="text"
                                         inputMode="decimal"
                                         value={subcontractedInputs[`${company}-${weekData.date}`] ?? (subcontractedPersonnel[company]?.[weekData.date] !== undefined && subcontractedPersonnel[company]?.[weekData.date] !== 0 ? subcontractedPersonnel[company][weekData.date] : '')}
-                                        disabled={!hasFullAccess}
+                                        disabled={!canEditDepartment(dept)}
                                         onChange={(e) => {
                                           const raw = e.target.value;
                                           const normalized = raw.replace(',', '.');
@@ -9927,7 +9927,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           ))}
 
                           {/* Add Team button - clicking label opens popup */}
-                          {hasFullAccess && (
+                          {canEditDepartment(dept) && (
                             <div className="flex gap-0 mb-0.5">
                               {/* Label column - clickable to open popup */}
                               <button
@@ -9951,7 +9951,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               {/* Team Label with delete button */}
                               <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
-                                {hasFullAccess && (
+                                {canEditDepartment(dept) && (
                                   <button
                                     onClick={() => {
                                       setDeleteConfirmation({
@@ -9985,7 +9985,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                         type="text"
                                         inputMode="decimal"
                                         value={prgExternalInputs[`${team}-${weekData.date}`] ?? (prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : '')}
-                                        disabled={!hasFullAccess}
+                                        disabled={!canEditDepartment(dept)}
                                         onChange={(e) => {
                                           const raw = e.target.value;
                                           const normalized = raw.replace(',', '.');
@@ -10016,7 +10016,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           ))}
 
                           {/* Add External Team button - clicking label opens popup */}
-                          {hasFullAccess && (
+                          {canEditDepartment(dept) && (
                             <div className="flex gap-0 mb-0.5">
                               {/* Label column - clickable to open popup */}
                               <button
@@ -12267,7 +12267,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         )}
 
         {/* PRG External Team Modal */}
-        {isPRGModalOpen && hasFullAccess && (
+        {isPRGModalOpen && canEditDepartment('PRG') && (
           <>
             {/* Backdrop */}
             <div
@@ -12375,7 +12375,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         )}
 
         {/* BUILD Subcontracted Team Modal */}
-        {isBuildModalOpen && hasFullAccess && (
+        {isBuildModalOpen && canEditDepartment('BUILD') && (
           <>
             {/* Backdrop */}
             <div

@@ -1372,7 +1372,12 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         self._ensure_week_is_editable(
             serializer.validated_data.get('week_start_date'), stage_only=zero_hours
         )
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError:
+            raise ValidationError(
+                'Ya existe una asignacion para este empleado, proyecto, semana y etapa.'
+            )
 
     def perform_update(self, serializer):
         employee_id = self.request.data.get('employee_id')
@@ -1404,7 +1409,12 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         # being moved to, so a past week can't be edited in place nor moved into.
         self._ensure_week_is_editable(instance.week_start_date, stage_only=stage_only)
         self._ensure_week_is_editable(new_week, stage_only=stage_only)
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError:
+            raise ValidationError(
+                'Ya existe una asignacion para este empleado, proyecto, semana y etapa.'
+            )
 
     def perform_destroy(self, instance):
         self._ensure_assignment_edit_permission(instance.employee, instance.department_override)
@@ -2242,9 +2252,13 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['department', 'week_start_date', 'capacity', 'pto', 'training']
     ordering = ['department', 'week_start_date']
 
-    def _ensure_full_access(self):
-        if not _has_full_access(self.request.user):
-            raise PermissionDenied("No permission to modify SCIO team capacity.")
+    def _ensure_can_edit_department(self, department):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not department or not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify SCIO team capacity for this department.")
 
     def create(self, request, *args, **kwargs):
         """
@@ -2252,11 +2266,11 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
         If a record with the same department+week_start_date exists, update it.
         Otherwise create a new one.
         """
-        self._ensure_full_access()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         department = serializer.validated_data.get('department')
+        self._ensure_can_edit_department(department)
         week_start_date = serializer.validated_data.get('week_start_date')
         capacity = serializer.validated_data.get('capacity')
         pto = serializer.validated_data.get('pto', 0)
@@ -2283,11 +2297,12 @@ class ScioTeamCapacityViewSet(viewsets.ModelViewSet):
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
-        self._ensure_full_access()
+        department = serializer.validated_data.get('department', serializer.instance.department)
+        self._ensure_can_edit_department(department)
         serializer.save()
 
     def perform_destroy(self, instance):
-        self._ensure_full_access()
+        self._ensure_can_edit_department(instance.department)
         instance.delete()
 
 
@@ -2352,25 +2367,34 @@ class ScioHeadcountEventViewSet(viewsets.ModelViewSet):
     ordering_fields = ['department', 'effective_date', 'created_at']
     ordering = ['department', 'effective_date']
 
-    def _ensure_full_access(self):
-        if not _has_full_access(self.request.user):
-            raise PermissionDenied("No permission to modify SCIO headcount events.")
+    def _ensure_can_edit_department(self, department):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not department or not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify SCIO headcount events for this department.")
 
     def perform_create(self, serializer):
-        self._ensure_full_access()
+        self._ensure_can_edit_department(serializer.validated_data.get('department'))
         instance = serializer.save(created_by=self.request.user)
         recompute_scio_capacity_from_events(instance.department)
 
     def perform_update(self, serializer):
-        self._ensure_full_access()
         previous_department = serializer.instance.department
+        new_department = serializer.validated_data.get('department', previous_department)
+        # A department move must be authorized against both the old and new
+        # department, so a manager can't pull an event out of or into a
+        # department they don't own.
+        self._ensure_can_edit_department(previous_department)
+        self._ensure_can_edit_department(new_department)
         instance = serializer.save()
         recompute_scio_capacity_from_events(previous_department)
         if instance.department != previous_department:
             recompute_scio_capacity_from_events(instance.department)
 
     def perform_destroy(self, instance):
-        self._ensure_full_access()
+        self._ensure_can_edit_department(instance.department)
         department = instance.department
         instance.delete()
         recompute_scio_capacity_from_events(department)
@@ -2395,8 +2419,14 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['company', 'week_start_date', 'capacity']
     ordering = ['company', 'week_start_date']
 
-    def _ensure_full_access(self):
-        if not _has_full_access(self.request.user):
+    def _ensure_can_edit(self):
+        # BUILD-only data (company subcontracted personnel), shared with MFG
+        # like every other BUILD-scoped edit.
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not _can_edit_department(self.request.user, Department.BUILD):
             raise PermissionDenied("No permission to modify subcontracted team capacity.")
 
     def create(self, request, *args, **kwargs):
@@ -2405,7 +2435,7 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
         If a record with the same company+week_start_date exists, update it.
         Otherwise create a new one.
         """
-        self._ensure_full_access()
+        self._ensure_can_edit()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -2426,11 +2456,11 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
-        self._ensure_full_access()
+        self._ensure_can_edit()
         serializer.save()
 
     def perform_destroy(self, instance):
-        self._ensure_full_access()
+        self._ensure_can_edit()
         instance.delete()
 
 
@@ -2453,8 +2483,12 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     ordering_fields = ['team_name', 'week_start_date', 'capacity']
     ordering = ['team_name', 'week_start_date']
 
-    def _ensure_full_access(self):
-        if not _has_full_access(self.request.user):
+    def _ensure_can_edit(self):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not _can_edit_department(self.request.user, Department.PRG):
             raise PermissionDenied("No permission to modify PRG external team capacity.")
 
     def create(self, request, *args, **kwargs):
@@ -2463,7 +2497,7 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
         If a record with the same team_name+week_start_date exists, update it.
         Otherwise create a new one.
         """
-        self._ensure_full_access()
+        self._ensure_can_edit()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -2484,11 +2518,11 @@ class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
-        self._ensure_full_access()
+        self._ensure_can_edit()
         serializer.save()
 
     def perform_destroy(self, instance):
-        self._ensure_full_access()
+        self._ensure_can_edit()
         instance.delete()
 
 

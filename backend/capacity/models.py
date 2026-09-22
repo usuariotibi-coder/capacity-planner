@@ -232,7 +232,12 @@ class Assignment(models.Model):
 
     class Meta:
         ordering = ['week_start_date', 'employee']
-        unique_together = ['employee', 'project', 'week_start_date']
+        # Includes `stage` so an employee can have multiple rows for the same
+        # project/week -- one per stage -- as the Capacity Matrix's stage
+        # planner requires (splitting a week's hours across stages). Without
+        # `stage` here, creating a second stage for a brand-new cell collided
+        # with the first insert and raised an uncaught IntegrityError.
+        unique_together = ['employee', 'project', 'week_start_date', 'stage']
         indexes = [
             models.Index(fields=['week_start_date']),
             models.Index(fields=['employee', 'week_start_date']),

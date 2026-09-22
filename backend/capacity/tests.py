@@ -15,9 +15,13 @@ from .models import (
     Employee,
     Facility,
     OtherDepartment,
+    PrgExternalTeamCapacity,
     Project,
     ProjectBudget,
+    ScioHeadcountEvent,
+    ScioTeamCapacity,
     Stage,
+    SubcontractedTeamCapacity,
     UserDepartment,
     UserProfile,
     UserSession,
@@ -369,6 +373,209 @@ class AssignmentPastWeekLockTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assignment.refresh_from_db()
         self.assertEqual(self.assignment.hours, 9)
+
+
+class AssignmentMultiStageTests(APITestCase):
+    """
+    An employee can split a single project/week across multiple stages (the
+    Capacity Matrix's stage planner). This requires one Assignment row per
+    stage for the same employee+project+week -- regression coverage for a bug
+    where `unique_together` omitted `stage`, so the second stage's create hit
+    the first row's constraint and raised an uncaught IntegrityError (500)
+    instead of succeeding.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='med-multistage-user',
+            password='test-password',
+            is_active=True,
+        )
+        UserProfile.objects.create(user=self.user, department=UserDepartment.MED)
+        self.client.force_authenticate(user=self.user)
+
+        self.employee = Employee.objects.create(
+            name='Multi Stage Tester',
+            role='Engineer',
+            department=Department.MED,
+            capacity=45,
+        )
+        self.project = Project.objects.create(
+            name='Multi Stage Project',
+            client='Internal',
+            start_date=date(2020, 1, 6),
+            end_date=date(2030, 12, 30),
+            facility=Facility.MX,
+            number_of_weeks=1,
+            visible_in_departments=[Department.MED],
+        )
+        today = timezone.localdate()
+        self.future_week = (today - timedelta(days=today.weekday())) + timedelta(weeks=2)
+
+    def _create(self, stage, hours):
+        return self.client.post(
+            reverse('assignment-list'),
+            {
+                'employee_id': str(self.employee.id),
+                'project_id': str(self.project.id),
+                'week_start_date': self.future_week.isoformat(),
+                'hours': hours,
+                'stage': stage,
+            },
+            format='json',
+        )
+
+    def test_can_create_two_stages_for_same_employee_project_week(self):
+        response1 = self._create(Stage.DETAIL_DESIGN, 5)
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+
+        response2 = self._create(Stage.CONCEPT, 1)
+        self.assertEqual(response2.status_code, status.HTTP_201_CREATED)
+
+        rows = Assignment.objects.filter(
+            employee=self.employee, project=self.project, week_start_date=self.future_week
+        )
+        self.assertEqual(rows.count(), 2)
+        self.assertEqual({row.stage for row in rows}, {Stage.DETAIL_DESIGN, Stage.CONCEPT})
+
+    def test_duplicate_stage_for_same_employee_project_week_is_rejected_cleanly(self):
+        response1 = self._create(Stage.DETAIL_DESIGN, 5)
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+
+        response2 = self._create(Stage.DETAIL_DESIGN, 2)
+        self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class DepartmentCapacityDelegationTests(APITestCase):
+    """
+    SCIO Team Members/PTO/Training, the headcount hire/departure ledger, and
+    BUILD/PRG's subcontracted/external team capacity used to be full-access
+    (PM/BI) only. They're now delegated per-department like Employees/
+    Assignments/Projects: a department manager can edit their own department's
+    numbers (with the usual BUILD<->MFG shared-edit exception), but not
+    another department's.
+    """
+
+    def _user_for(self, username, department, other_department=None):
+        user = User.objects.create_user(username=username, password='test-password', is_active=True)
+        UserProfile.objects.create(user=user, department=department, other_department=other_department)
+        return user
+
+    def setUp(self):
+        self.med_user = self._user_for('med-capacity-user', UserDepartment.MED)
+        self.hd_user = self._user_for('hd-capacity-user', UserDepartment.HD)
+        self.build_user = self._user_for('build-capacity-user', UserDepartment.BUILD)
+        self.mfg_user = self._user_for('mfg-capacity-user', UserDepartment.MFG)
+        self.prg_user = self._user_for('prg-capacity-user', UserDepartment.PRG)
+        self.readonly_user = self._user_for(
+            'readonly-capacity-user', UserDepartment.OTHER, OtherDepartment.OPERATIONS
+        )
+        today = timezone.localdate()
+        self.week = (today - timedelta(days=today.weekday())) + timedelta(weeks=2)
+
+    def test_department_user_can_set_own_department_scio_capacity(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('scio-team-capacity-list'),
+            {'department': Department.MED, 'week_start_date': self.week.isoformat(), 'capacity': 6},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            ScioTeamCapacity.objects.filter(department=Department.MED, week_start_date=self.week, capacity=6).exists()
+        )
+
+    def test_department_user_cannot_set_other_department_scio_capacity(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('scio-team-capacity-list'),
+            {'department': Department.HD, 'week_start_date': self.week.isoformat(), 'capacity': 6},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_build_and_mfg_can_edit_each_others_scio_capacity(self):
+        self.client.force_authenticate(user=self.build_user)
+        response = self.client.post(
+            reverse('scio-team-capacity-list'),
+            {'department': Department.MFG, 'week_start_date': self.week.isoformat(), 'capacity': 4},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(user=self.mfg_user)
+        response = self.client.post(
+            reverse('scio-team-capacity-list'),
+            {'department': Department.BUILD, 'week_start_date': self.week.isoformat(), 'capacity': 3},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_readonly_user_cannot_set_scio_capacity(self):
+        self.client.force_authenticate(user=self.readonly_user)
+        response = self.client.post(
+            reverse('scio-team-capacity-list'),
+            {'department': Department.MED, 'week_start_date': self.week.isoformat(), 'capacity': 6},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_department_user_can_log_own_department_headcount_event(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('scio-headcount-event-list'),
+            {'department': Department.MED, 'effective_date': self.week.isoformat(), 'delta': 2},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(ScioHeadcountEvent.objects.filter(department=Department.MED).exists())
+        # The recompute helper should have written ScioTeamCapacity for this week.
+        self.assertTrue(
+            ScioTeamCapacity.objects.filter(department=Department.MED, week_start_date=self.week, capacity=2).exists()
+        )
+
+    def test_department_user_cannot_log_other_department_headcount_event(self):
+        self.client.force_authenticate(user=self.hd_user)
+        response = self.client.post(
+            reverse('scio-headcount-event-list'),
+            {'department': Department.MED, 'effective_date': self.week.isoformat(), 'delta': 2},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_build_user_can_edit_subcontracted_capacity_med_user_cannot(self):
+        self.client.force_authenticate(user=self.build_user)
+        response = self.client.post(
+            reverse('subcontracted-team-capacity-list'),
+            {'company': 'AMI', 'week_start_date': self.week.isoformat(), 'capacity': 3},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('subcontracted-team-capacity-list'),
+            {'company': 'VICER', 'week_start_date': self.week.isoformat(), 'capacity': 2},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_prg_user_can_edit_external_capacity_med_user_cannot(self):
+        self.client.force_authenticate(user=self.prg_user)
+        response = self.client.post(
+            reverse('prg-external-team-capacity-list'),
+            {'team_name': 'External Team A', 'week_start_date': self.week.isoformat(), 'capacity': 3},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('prg-external-team-capacity-list'),
+            {'team_name': 'External Team B', 'week_start_date': self.week.isoformat(), 'capacity': 2},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class HeadEngineeringPermissionTests(APITestCase):
