@@ -11015,11 +11015,11 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
 
                   {/* Expandable content - includes hours panel AND table */}
                   {expandedProjects[proj.id] && (
-                    <>
+                    <div style={{ zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}>
 
                       <div
                         className="overflow-x-auto"
-                        style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
+                        style={{ scrollBehavior: 'smooth' }}
                         onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
                         ref={(el) => {
                           if (el) {
@@ -11346,7 +11346,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                         </tbody>
                       </table>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               )})}
