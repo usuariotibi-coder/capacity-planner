@@ -1982,17 +1982,17 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     [allWeeksData, locale]
   );
 
-  // The per-project "General" table appends 4 extra Summary columns (Qtd/Used/Fcst/Util)
-  // after the week columns. The top Capacity bar doesn't have those. Both use the same
-  // percentage-based horizontal scroll sync (see syncHorizontalScrollToCanonical), which only
-  // lines weeks up correctly when both tables have the SAME total column count. So the
-  // project table shows 4 fewer week columns — dropped from the far (least relevant) end of
-  // the range — to make room for its Summary columns without changing its total width.
-  const PROJECT_TABLE_SUMMARY_COLUMN_COUNT = 4;
-  const projectAllWeeksData = useMemo(
-    () => allWeeksData.slice(0, Math.max(0, allWeeksData.length - PROJECT_TABLE_SUMMARY_COLUMN_COUNT)),
-    [allWeeksData]
-  );
+  // The per-project tables append 4 extra Summary columns (Qtd/Used/Fcst/Util, 208px total)
+  // after the week columns; the Capacity bar / Weekly Occupancy Total panel don't have those.
+  // Both use the same percentage-based horizontal scroll sync (see
+  // syncHorizontalScrollToCanonical), which only lines weeks up correctly when both scrollable
+  // containers have the exact same total width. This used to drop the last 4 weeks here to
+  // compensate, but 4 weeks (320px) doesn't match 208px of Summary columns -- that 112px gap
+  // between the two containers' widths is exactly what showed up as roughly one week of drift
+  // at a moderate scroll position. Fixed properly now: every week is kept (exact 1:1 week
+  // correspondence with allWeeksData), and the Capacity bar / Weekly Occupancy Total panel each
+  // carry their own matching 208px spacer instead (see SUMMARY_COLUMN_WIDTH_PX usages).
+  const projectAllWeeksData = allWeeksData;
   const projectMonthSpans = useMemo(
     () => computeMonthSpans(projectAllWeeksData),
     [projectAllWeeksData, locale]
@@ -9440,6 +9440,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     </div>
                   );
                 })}
+                {/* Invisible spacer matching the Projects table's 4 trailing Summary
+                    columns (Qtd/Used/Fcst/Util, 52px each -- see SUMMARY_COLUMN_WIDTH_PX).
+                    This bar doesn't have those columns, but the percentage-based
+                    horizontal scroll sync (syncHorizontalScrollToCanonical) only lines
+                    weeks up correctly when both scrollable containers have the exact
+                    same total width; this keeps them equal without touching that sync
+                    logic itself. */}
+                <div className="flex-shrink-0" style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4 }} />
               </div>
             ))}
           </div>
@@ -9679,6 +9687,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             </div>
                           );
                         })}
+                        {/* Invisible spacer matching the Projects table's 4 trailing Summary
+                            columns (Qtd/Used/Fcst/Util, 52px each -- see
+                            SUMMARY_COLUMN_WIDTH_PX). This panel doesn't have those columns,
+                            but the percentage-based horizontal scroll sync
+                            (syncHorizontalScrollToCanonical) only lines weeks up correctly
+                            when both scrollable containers have the exact same total width;
+                            this keeps them equal without touching that sync logic itself. */}
+                        <div className="flex-shrink-0" style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4 }} />
                       </div>
 
                       {/* Total row - sum of occupied people in that week (or hours for MFG) */}
