@@ -1983,16 +1983,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   );
 
   // The per-project "General" table appends 4 extra Summary columns (Qtd/Used/Fcst/Util)
-  // after the week columns. The top Capacity bar doesn't have those. Both use the same
-  // percentage-based horizontal scroll sync (see syncHorizontalScrollToCanonical), which only
-  // lines weeks up correctly when both tables have the SAME total column count. So the
-  // project table shows 4 fewer week columns — dropped from the far (least relevant) end of
-  // the range — to make room for its Summary columns without changing its total width.
-  const PROJECT_TABLE_SUMMARY_COLUMN_COUNT = 4;
-  const projectAllWeeksData = useMemo(
-    () => allWeeksData.slice(0, Math.max(0, allWeeksData.length - PROJECT_TABLE_SUMMARY_COLUMN_COUNT)),
-    [allWeeksData]
-  );
+  // after the week columns; the top Capacity bar doesn't have those. This used to make
+  // projectAllWeeksData drop the last 4 weeks so both tables had equal total column counts,
+  // which the old percentage-based horizontal scroll sync required to line weeks up. Sync is
+  // now anchored to matching week columns directly (see getScrollProgress), so equal column
+  // counts are no longer required -- show every week instead of hiding the last 4.
+  const projectAllWeeksData = allWeeksData;
   const projectMonthSpans = useMemo(
     () => computeMonthSpans(projectAllWeeksData),
     [projectAllWeeksData, locale]
@@ -2901,12 +2897,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       setScrollProgressIfNeeded(departmentCapacityScrollRef.current, safeCanonicalProgress);
     }
 
-    const syncProjectId = resolveSyncProjectId(targetProjectId);
-    if (!syncProjectId) return;
-    const container = projectTableRefs.current.get(syncProjectId);
-    if (container) {
+    // Sync every currently-mounted (expanded) project row, not just the
+    // "active" one -- the General view can show several projects' tables at
+    // once, and each is an independent scroll container. Only using the
+    // single resolved project here used to leave every other visible project
+    // showing whatever scroll position it happened to mount at (typically 0),
+    // out of sync with the Capacity bar above.
+    projectTableRefs.current.forEach((container) => {
       setScrollProgressIfNeeded(container, safeCanonicalProgress);
-    }
+    });
+    void targetProjectId; // kept in the signature for callers that still pass it; no longer needed to pick a single target
   };
 
   const runSyncedHorizontalScroll = (
