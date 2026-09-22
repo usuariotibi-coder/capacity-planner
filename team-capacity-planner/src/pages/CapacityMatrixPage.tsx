@@ -2797,17 +2797,71 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setActiveSyncedProjectId(projectId);
   };
 
-  const getScrollProgress = (container: HTMLDivElement | null): number => {
-    if (!container) return 0;
-    const maxScrollLeft = container.scrollWidth - container.clientWidth;
-    if (maxScrollLeft <= 0) return 0;
-    return Math.max(0, Math.min(1, container.scrollLeft / maxScrollLeft));
+  // The sticky left-hand label column (department/"People" name) visually
+  // overlays the start of the scrolled content regardless of scrollLeft, so
+  // its width has to be subtracted to land a target week just past it.
+  const getStickyLabelWidth = (container: HTMLDivElement): number => {
+    const labelEl = container.querySelector<HTMLElement>('.sticky');
+    return labelEl?.getBoundingClientRect().width ?? 0;
   };
 
-  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, progress: number) => {
+  // One representative element per week index (first match wins -- header and
+  // body rows both carry data-week-index, but they share the same column
+  // position so any one of them is a valid anchor).
+  const getWeekIndexElements = (container: HTMLDivElement): Map<number, HTMLElement> => {
+    const map = new Map<number, HTMLElement>();
+    container.querySelectorAll<HTMLElement>('[data-week-index]').forEach((el) => {
+      const idx = Number(el.dataset.weekIndex);
+      if (!Number.isNaN(idx) && !map.has(idx)) {
+        map.set(idx, el);
+      }
+    });
+    return map;
+  };
+
+  // Returns a fractional week index (e.g. 5.3) for whichever week column
+  // currently sits just past the sticky label at this container's scroll
+  // position. Anchoring sync to an actual week column -- instead of a raw
+  // percentage of scrollWidth, as this used to do -- keeps containers aligned
+  // even when their total scrollable width differs (e.g. the Projects table
+  // has trailing Summary columns the Capacity bar doesn't), which previously
+  // caused percentage-based sync to drift further out of alignment the more
+  // you scrolled right.
+  const getScrollProgress = (container: HTMLDivElement | null): number => {
+    if (!container) return 0;
+    const cells = getWeekIndexElements(container);
+    if (cells.size === 0) return 0;
+    const indexes = Array.from(cells.keys()).sort((a, b) => a - b);
+    const containerRect = container.getBoundingClientRect();
+    const anchorLeft = containerRect.left + getStickyLabelWidth(container);
+
+    for (const idx of indexes) {
+      const rect = cells.get(idx)!.getBoundingClientRect();
+      if (rect.width <= 0) continue;
+      if (rect.left + rect.width > anchorLeft || idx === indexes[indexes.length - 1]) {
+        const fraction = (anchorLeft - rect.left) / rect.width;
+        return idx + Math.max(0, Math.min(1, fraction));
+      }
+    }
+    return 0;
+  };
+
+  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, weekPosition: number) => {
     if (!container) return;
-    const maxScrollLeft = container.scrollWidth - container.clientWidth;
-    const targetScrollLeft = maxScrollLeft > 0 ? maxScrollLeft * progress : 0;
+    const cells = getWeekIndexElements(container);
+    if (cells.size === 0) return;
+    const indexes = Array.from(cells.keys()).sort((a, b) => a - b);
+    const clampedPosition = Math.max(indexes[0], Math.min(indexes[indexes.length - 1], weekPosition));
+    const baseIndex = Math.min(indexes[indexes.length - 1], Math.floor(clampedPosition));
+    const el = cells.get(baseIndex);
+    if (!el) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    const cellLeftInContent = (rect.left - containerRect.left) + container.scrollLeft;
+    const fraction = clampedPosition - baseIndex;
+    const targetScrollLeft = Math.max(0, cellLeftInContent - getStickyLabelWidth(container) + fraction * rect.width);
+
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
       container.scrollLeft = targetScrollLeft;
     }
@@ -2836,7 +2890,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     canonicalScrollProgress: number,
     targetProjectId?: string | null
   ) => {
-    const safeCanonicalProgress = Math.max(0, Math.min(1, canonicalScrollProgress));
+    // A fractional week index now (see getScrollProgress), not a 0-1 percentage
+    // -- each target container clamps it against its own available week range.
+    const safeCanonicalProgress = Math.max(0, canonicalScrollProgress);
     syncedBaseScrollProgressRef.current = safeCanonicalProgress;
 
     if (isGeneralView) {
@@ -2884,7 +2940,6 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   // On entering the Capacity Matrix (and whenever the department filter changes), scroll all
   // synced tables to start 3 weeks before the current week rather than the very first week.
-  // Requires a real DOM measurement (via data-week-index) rather than a known progress value.
   // Projects/assignments still finish loading asynchronously after mount, and the resulting
   // layout/width change makes the browser clamp scrollLeft back toward 0 — so this re-applies
   // itself (recomputing fresh each time, not reusing a stale offset) across a few animation
@@ -2896,25 +2951,11 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const applyInitialScroll = () => {
       const container = isGeneralView ? generalCapacityScrollRef.current : departmentCapacityScrollRef.current;
       if (!container) return;
-      const targetEl = container.querySelector<HTMLElement>(`[data-week-index="${targetWeekIndex}"]`);
-      if (!targetEl) return;
-      // Measure via getBoundingClientRect (always viewport-relative) rather than offsetLeft,
-      // which is relative to offsetParent — not necessarily this scroll container — and gave
-      // inconsistent results here. The left-hand department/"People" label column is sticky and
-      // visually overlays the start of the scrolled content regardless of scrollLeft, so its
-      // width is subtracted to land the target week just past it, not partly hidden behind it.
-      const containerRect = container.getBoundingClientRect();
-      const targetRect = targetEl.getBoundingClientRect();
-      const labelEl = container.querySelector<HTMLElement>('.sticky');
-      const labelWidth = labelEl?.getBoundingClientRect().width ?? 0;
-      const scrollLeftDelta = (targetRect.left - containerRect.left) - labelWidth;
-      const maxScrollLeft = container.scrollWidth - container.clientWidth;
-      const desiredScrollLeft = container.scrollLeft + scrollLeftDelta;
-      const progress = maxScrollLeft > 0
-        ? Math.max(0, Math.min(1, desiredScrollLeft / maxScrollLeft))
-        : 0;
-      syncedBaseScrollProgressRef.current = progress;
-      syncHorizontalScrollToCanonical(progress, resolveSyncProjectId());
+      // targetWeekIndex is already a week position (fraction 0 = its left edge);
+      // setScrollProgressIfNeeded/getWeekIndexElements handles finding that
+      // week's column and subtracting the sticky label width.
+      syncedBaseScrollProgressRef.current = targetWeekIndex;
+      syncHorizontalScrollToCanonical(targetWeekIndex, resolveSyncProjectId());
     };
 
     const rafA = requestAnimationFrame(applyInitialScroll);
