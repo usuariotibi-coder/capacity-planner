@@ -43,6 +43,7 @@ from .models import (
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
     DepartmentWeeklyTotal,
+    DepartmentHourlyCost,
     EmailVerification,
     UserProfile,
     ProjectDepartmentWeeklyActual,
@@ -2031,6 +2032,25 @@ class DepartmentWeeklyTotalSerializer(serializers.ModelSerializer):
     class Meta:
         model = DepartmentWeeklyTotal
         fields = ('id', 'department', 'week_start_date', 'total_hours', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class DepartmentHourlyCostSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the global per-department hourly cost rate.
+
+    `department` is redeclared as a plain ChoiceField: the model's
+    `unique=True` on that field makes DRF auto-attach a UniqueValidator to it,
+    which would reject a second POST for a department that already has a rate
+    -- the ViewSet's create() upserts (update_or_create) instead, so that
+    per-field validator needs to not be there (get_validators() only strips
+    class-level/Meta validators, not this kind).
+    """
+    department = serializers.ChoiceField(choices=Department.choices)
+
+    class Meta:
+        model = DepartmentHourlyCost
+        fields = ('id', 'department', 'hourly_cost', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
 

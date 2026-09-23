@@ -6,6 +6,7 @@ assignments, and other capacity planning data.
 """
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.db import models
 from django.contrib.auth.models import User
@@ -475,6 +476,31 @@ class DepartmentWeeklyTotal(models.Model):
 
     def __str__(self):
         return f"{self.department} - {self.week_start_date}: {self.total_hours}h"
+
+
+class DepartmentHourlyCost(models.Model):
+    """
+    Global hourly cost rate per department (e.g. "MED costs $75/hr"), used for
+    project cost reporting. One row per department, not per week or per
+    project -- deliberately not scoped like ScioTeamCapacity/ProjectBudget:
+    staffing cost is an org-wide rate, not something that varies week to week
+    or project to project.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices, unique=True)
+    hourly_cost = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Cost per hour for this department's staff",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department']
+
+    def __str__(self):
+        return f"{self.department}: ${self.hourly_cost}/hr"
 
 
 class ProjectDepartmentWeeklyActual(models.Model):

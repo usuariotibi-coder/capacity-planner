@@ -21,6 +21,7 @@ from capacity.views import (
     SubcontractedTeamCapacityViewSet,
     PrgExternalTeamCapacityViewSet,
     DepartmentWeeklyTotalViewSet,
+    DepartmentHourlyCostViewSet,
     ProjectDepartmentWeeklyActualViewSet,
     FinanceImportViewSet,
     RegisteredUserViewSet,
@@ -45,6 +46,7 @@ router.register(r'scio-headcount-events', ScioHeadcountEventViewSet, basename='s
 router.register(r'subcontracted-team-capacity', SubcontractedTeamCapacityViewSet, basename='subcontracted-team-capacity')
 router.register(r'prg-external-team-capacity', PrgExternalTeamCapacityViewSet, basename='prg-external-team-capacity')
 router.register(r'department-weekly-total', DepartmentWeeklyTotalViewSet, basename='department-weekly-total')
+router.register(r'department-hourly-cost', DepartmentHourlyCostViewSet, basename='department-hourly-cost')
 router.register(r'project-department-weekly-actuals', ProjectDepartmentWeeklyActualViewSet, basename='project-department-weekly-actual')
 router.register(r'finance-imports', FinanceImportViewSet, basename='finance-import')
 router.register(r'registered-users', RegisteredUserViewSet, basename='registered-user')

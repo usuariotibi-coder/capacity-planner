@@ -6,10 +6,11 @@ import { ActivityLogPage } from './pages/ActivityLogPage';
 import { GuidePage } from './pages/GuidePage';
 import { RegisteredUsersPage } from './pages/RegisteredUsersPage';
 import { FinanceImportPage } from './pages/FinanceImportPage';
+import { DepartmentCostsPage } from './pages/DepartmentCostsPage';
 import LoginPage from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet } from 'lucide-react';
+import { Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet, DollarSign } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -17,7 +18,7 @@ import { useAuth } from './context/AuthContext';
 import { useDataLoader } from './hooks/useDataLoader';
 import { useInactivityLogout } from './hooks/useInactivityLogout';
 
-type Page = 'projects' | 'guide' | 'capacity' | 'activity-log' | 'registered-users' | 'finance-import';
+type Page = 'projects' | 'guide' | 'capacity' | 'activity-log' | 'registered-users' | 'finance-import' | 'department-costs';
 type DepartmentFilter = 'General' | Department;
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
@@ -100,6 +101,12 @@ function MainApp() {
 
   useEffect(() => {
     if (!hasFullAccess && currentPage === 'finance-import') {
+      setCurrentPage('capacity');
+    }
+  }, [hasFullAccess, currentPage]);
+
+  useEffect(() => {
+    if (!hasFullAccess && currentPage === 'department-costs') {
       setCurrentPage('capacity');
     }
   }, [hasFullAccess, currentPage]);
@@ -207,6 +214,11 @@ function MainApp() {
       label: language === 'es' ? 'Import Finanzas' : 'Finance Import',
       icon: <FileSpreadsheet size={14} />,
     });
+    navItems.push({
+      id: 'department-costs',
+      label: language === 'es' ? 'Costo por Hora' : 'Hourly Cost',
+      icon: <DollarSign size={14} />,
+    });
   }
 
   const departmentDisplayLabel = (() => {
@@ -236,6 +248,8 @@ function MainApp() {
         return <RegisteredUsersPage />;
       case 'finance-import':
         return <FinanceImportPage />;
+      case 'department-costs':
+        return <DepartmentCostsPage />;
       case 'capacity':
         return <CapacityMatrixPage departmentFilter={departmentFilter} />;
       default:

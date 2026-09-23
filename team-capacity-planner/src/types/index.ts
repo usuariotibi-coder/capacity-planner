@@ -210,6 +210,21 @@ export interface ScioHeadcountEvent {
 }
 
 /**
+ * DEPARTMENT HOURLY COST
+ * Global hourly cost rate for a department's staff (e.g. "MED costs $75/hr"),
+ * used for project cost reporting. One row per department -- not scoped to a
+ * project or a week, unlike ScioTeamCapacity/ProjectBudget: staffing cost is
+ * an org-wide rate here, not something that varies by project or over time.
+ */
+export interface DepartmentHourlyCost {
+  id: string;
+  department: Department;
+  hourlyCost: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
  * PROJECT DEPARTMENT WEEKLY ACTUAL
  * Real historical hours per project/department/week, sourced from the Finance
  * actuals report (no per-employee breakdown available). Past weeks are locked to

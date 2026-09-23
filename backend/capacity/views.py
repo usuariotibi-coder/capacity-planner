@@ -52,7 +52,7 @@ from .models import (
     Employee, Project, Assignment, DailyTimeEntry, TimeEntryType, DepartmentStageConfig,
     ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, ScioHeadcountEvent, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
-    DepartmentWeeklyTotal, UserDepartment, OtherDepartment,
+    DepartmentWeeklyTotal, DepartmentHourlyCost, UserDepartment, OtherDepartment,
     ProjectDepartmentWeeklyActual, FinanceJobCumulative, FinanceImportLog
 )
 from .serializers import (
@@ -63,6 +63,7 @@ from .serializers import (
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, ScioHeadcountEventSerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
+    DepartmentHourlyCostSerializer,
     RegisteredUserSerializer,
     ProjectDepartmentWeeklyActualSerializer, FinanceImportLogSerializer
 )
@@ -2549,6 +2550,54 @@ class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         self._ensure_full_access()
         serializer.save()
+
+    def perform_update(self, serializer):
+        self._ensure_full_access()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_full_access()
+        instance.delete()
+
+
+class DepartmentHourlyCostViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for the global per-department hourly cost rate.
+
+    One row per department (upsert on department, like ScioTeamCapacity):
+    posting for a department that already has a rate updates it instead of
+    erroring on the unique constraint. Full-access only (PM/BI) -- same
+    sensitivity as ProjectBudget/quoted hours.
+    """
+    queryset = DepartmentHourlyCost.objects.all()
+    serializer_class = DepartmentHourlyCostSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None  # Small, fixed dataset (one row per department)
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department']
+    ordering_fields = ['department', 'hourly_cost']
+    ordering = ['department']
+
+    def _ensure_full_access(self):
+        if not _has_full_access(self.request.user):
+            raise PermissionDenied("No permission to modify department hourly costs.")
+
+    def create(self, request, *args, **kwargs):
+        """Upsert: a second POST for the same department updates it instead of erroring."""
+        self._ensure_full_access()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        department = serializer.validated_data.get('department')
+        hourly_cost = serializer.validated_data.get('hourly_cost')
+
+        obj, created = DepartmentHourlyCost.objects.update_or_create(
+            department=department,
+            defaults={'hourly_cost': hourly_cost},
+        )
+
+        result_serializer = self.get_serializer(obj)
+        return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         self._ensure_full_access()

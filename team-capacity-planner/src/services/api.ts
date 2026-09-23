@@ -904,6 +904,34 @@ export const departmentWeeklyTotalApi = {
   },
 };
 
+// Department Hourly Cost API (global per-department rate; create() upserts on the backend)
+export const departmentHourlyCostApi = {
+  getAll: async () => {
+    const data = await apiFetch('/api/department-hourly-cost/');
+    return data.results || data;
+  },
+
+  create: async (cost: any) => {
+    return apiFetch('/api/department-hourly-cost/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(cost)),
+    });
+  },
+
+  update: async (id: string, cost: any) => {
+    return apiFetch(`/api/department-hourly-cost/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(cost)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/department-hourly-cost/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Project Budget API
 export const projectBudgetsApi = {
   getAll: async () => {

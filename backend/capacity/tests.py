@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from .models import (
     Assignment,
     Department,
+    DepartmentHourlyCost,
     DepartmentStageConfig,
     Employee,
     Facility,
@@ -573,6 +574,58 @@ class DepartmentCapacityDelegationTests(APITestCase):
         response = self.client.post(
             reverse('prg-external-team-capacity-list'),
             {'team_name': 'External Team B', 'week_start_date': self.week.isoformat(), 'capacity': 2},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DepartmentHourlyCostTests(APITestCase):
+    """Global per-department hourly cost rate: full-access (PM/BI) only, one row per department."""
+
+    def setUp(self):
+        self.pm_user = User.objects.create_user(
+            username='pm-cost-user', password='test-password', is_active=True,
+        )
+        UserProfile.objects.create(user=self.pm_user, department=UserDepartment.PM)
+
+        self.med_user = User.objects.create_user(
+            username='med-cost-user', password='test-password', is_active=True,
+        )
+        UserProfile.objects.create(user=self.med_user, department=UserDepartment.MED)
+
+    def test_full_access_user_can_set_hourly_cost(self):
+        self.client.force_authenticate(user=self.pm_user)
+        response = self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.MED, 'hourly_cost': '75.50'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            DepartmentHourlyCost.objects.filter(department=Department.MED, hourly_cost='75.50').exists()
+        )
+
+    def test_posting_same_department_again_updates_instead_of_erroring(self):
+        self.client.force_authenticate(user=self.pm_user)
+        self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.HD, 'hourly_cost': '60.00'},
+            format='json',
+        )
+        response = self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.HD, 'hourly_cost': '65.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(DepartmentHourlyCost.objects.filter(department=Department.HD).count(), 1)
+        self.assertEqual(str(DepartmentHourlyCost.objects.get(department=Department.HD).hourly_cost), '65.00')
+
+    def test_department_manager_cannot_set_hourly_cost(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.MED, 'hourly_cost': '75.50'},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
