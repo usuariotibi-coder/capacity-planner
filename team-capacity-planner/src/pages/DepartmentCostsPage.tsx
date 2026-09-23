@@ -38,12 +38,16 @@ export function DepartmentCostsPage() {
         const nextSaved: Partial<Record<Department, SavedInfo>> = {};
         const nextDraft: Partial<Record<Department, number | ''>> = {};
         for (const row of data) {
+          // DRF serializes DecimalField as a string (e.g. "20.00"); normalize
+          // to a number so later dirty-checks against the numeric draft state
+          // aren't comparing "20.00" !== 20 forever.
+          const numericCost = Number(row.hourlyCost);
           nextSaved[row.department] = {
-            hourlyCost: row.hourlyCost,
+            hourlyCost: numericCost,
             updatedByUsername: row.updatedByUsername,
             updatedAt: row.updatedAt,
           };
-          nextDraft[row.department] = row.hourlyCost;
+          nextDraft[row.department] = numericCost;
         }
         setSaved(nextSaved);
         setDraft(nextDraft);
@@ -91,7 +95,7 @@ export function DepartmentCostsPage() {
         const next = { ...prev };
         results.forEach((result: DepartmentHourlyCost) => {
           next[result.department] = {
-            hourlyCost: result.hourlyCost,
+            hourlyCost: Number(result.hourlyCost),
             updatedByUsername: result.updatedByUsername,
             updatedAt: result.updatedAt,
           };
