@@ -7,6 +7,11 @@ import type { Department, DepartmentHourlyCost } from '../types';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
 
+// Allow only what a decimal number looks like while typing it, including
+// intermediate states like "20." or "20.5" -- rejecting those would strip
+// the decimal point back out before the user can type digits after it.
+const DECIMAL_INPUT_PATTERN = /^\d*\.?\d{0,2}$/;
+
 type SavedInfo = {
   hourlyCost: number;
   updatedByUsername?: string | null;
@@ -21,8 +26,11 @@ export function DepartmentCostsPage() {
   // `saved` mirrors the backend (last persisted value + who/when); `draft` is
   // the in-progress edit shown in the inputs. They only merge back together
   // when the user explicitly presses Save -- no autosave on keystroke.
+  // `draft` holds the raw text the user typed (not a parsed number): storing
+  // it as a number would round-trip "20." back to "20" on every render,
+  // making it impossible to type a decimal point or trailing zero.
   const [saved, setSaved] = useState<Partial<Record<Department, SavedInfo>>>({});
-  const [draft, setDraft] = useState<Partial<Record<Department, number | ''>>>({});
+  const [draft, setDraft] = useState<Partial<Record<Department, string>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,18 +44,17 @@ export function DepartmentCostsPage() {
       try {
         const data: DepartmentHourlyCost[] = await departmentHourlyCostApi.getAll();
         const nextSaved: Partial<Record<Department, SavedInfo>> = {};
-        const nextDraft: Partial<Record<Department, number | ''>> = {};
+        const nextDraft: Partial<Record<Department, string>> = {};
         for (const row of data) {
           // DRF serializes DecimalField as a string (e.g. "20.00"); normalize
-          // to a number so later dirty-checks against the numeric draft state
-          // aren't comparing "20.00" !== 20 forever.
+          // to a number for the saved/dirty-check baseline.
           const numericCost = Number(row.hourlyCost);
           nextSaved[row.department] = {
             hourlyCost: numericCost,
             updatedByUsername: row.updatedByUsername,
             updatedAt: row.updatedAt,
           };
-          nextDraft[row.department] = numericCost;
+          nextDraft[row.department] = String(numericCost);
         }
         setSaved(nextSaved);
         setDraft(nextDraft);
@@ -61,22 +68,19 @@ export function DepartmentCostsPage() {
   }, [hasFullAccess]);
 
   const handleChange = (department: Department, value: string) => {
-    if (value === '') {
-      setDraft(prev => ({ ...prev, [department]: '' }));
-      return;
-    }
-    const numVal = parseFloat(value);
-    if (isNaN(numVal)) return;
-    setDraft(prev => ({ ...prev, [department]: Math.max(0, numVal) }));
+    if (!DECIMAL_INPUT_PATTERN.test(value)) return;
+    setDraft(prev => ({ ...prev, [department]: value }));
   };
 
   const dirtyDepartments = useMemo(
     () =>
       DEPARTMENTS.filter((dept) => {
         const draftVal = draft[dept];
-        if (draftVal === '' || draftVal === undefined) return false;
+        if (draftVal === undefined || draftVal === '' || draftVal === '.') return false;
+        const parsed = parseFloat(draftVal);
+        if (isNaN(parsed)) return false;
         const savedVal = saved[dept]?.hourlyCost;
-        return savedVal === undefined || draftVal !== savedVal;
+        return savedVal === undefined || parsed !== savedVal;
       }),
     [draft, saved]
   );
@@ -88,7 +92,7 @@ export function DepartmentCostsPage() {
     try {
       const results = await Promise.all(
         dirtyDepartments.map((dept) =>
-          departmentHourlyCostApi.create({ department: dept, hourlyCost: draft[dept] as number })
+          departmentHourlyCostApi.create({ department: dept, hourlyCost: parseFloat(draft[dept] as string) })
         )
       );
       setSaved(prev => {
