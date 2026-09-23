@@ -2047,11 +2047,12 @@ class DepartmentHourlyCostSerializer(serializers.ModelSerializer):
     class-level/Meta validators, not this kind).
     """
     department = serializers.ChoiceField(choices=Department.choices)
+    updated_by_username = serializers.CharField(source='updated_by.username', read_only=True, default=None)
 
     class Meta:
         model = DepartmentHourlyCost
-        fields = ('id', 'department', 'hourly_cost', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'department', 'hourly_cost', 'updated_by', 'updated_by_username', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'updated_by', 'updated_by_username', 'created_at', 'updated_at')
 
 
 class ProjectDepartmentWeeklyActualSerializer(serializers.ModelSerializer):

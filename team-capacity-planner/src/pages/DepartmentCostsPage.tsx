@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { DollarSign, Lock } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { DollarSign, Lock, Save } from 'lucide-react';
 import { departmentHourlyCostApi } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,16 +7,25 @@ import type { Department, DepartmentHourlyCost } from '../types';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
 
+type SavedInfo = {
+  hourlyCost: number;
+  updatedByUsername?: string | null;
+  updatedAt?: string;
+};
+
 export function DepartmentCostsPage() {
   const { language } = useLanguage();
   const isEs = language === 'es';
   const { hasFullAccess } = useAuth();
 
-  const [costs, setCosts] = useState<Partial<Record<Department, number | ''>>>({});
+  // `saved` mirrors the backend (last persisted value + who/when); `draft` is
+  // the in-progress edit shown in the inputs. They only merge back together
+  // when the user explicitly presses Save -- no autosave on keystroke.
+  const [saved, setSaved] = useState<Partial<Record<Department, SavedInfo>>>({});
+  const [draft, setDraft] = useState<Partial<Record<Department, number | ''>>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [savingDept, setSavingDept] = useState<Department | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const saveTimeouts = useRef<Partial<Record<Department, ReturnType<typeof setTimeout>>>>({});
 
   useEffect(() => {
     if (!hasFullAccess) {
@@ -26,11 +35,18 @@ export function DepartmentCostsPage() {
     (async () => {
       try {
         const data: DepartmentHourlyCost[] = await departmentHourlyCostApi.getAll();
-        const nextCosts: Partial<Record<Department, number | ''>> = {};
+        const nextSaved: Partial<Record<Department, SavedInfo>> = {};
+        const nextDraft: Partial<Record<Department, number | ''>> = {};
         for (const row of data) {
-          nextCosts[row.department] = row.hourlyCost;
+          nextSaved[row.department] = {
+            hourlyCost: row.hourlyCost,
+            updatedByUsername: row.updatedByUsername,
+            updatedAt: row.updatedAt,
+          };
+          nextDraft[row.department] = row.hourlyCost;
         }
-        setCosts(nextCosts);
+        setSaved(nextSaved);
+        setDraft(nextDraft);
       } catch (err) {
         console.error('[DepartmentCostsPage] Failed to load hourly costs:', err);
         setError(err instanceof Error ? err.message : String(err));
@@ -40,38 +56,66 @@ export function DepartmentCostsPage() {
     })();
   }, [hasFullAccess]);
 
-  const saveCost = async (department: Department, hourlyCost: number) => {
-    setSavingDept(department);
-    try {
-      await departmentHourlyCostApi.create({ department, hourlyCost });
-    } catch (err) {
-      console.error('[DepartmentCostsPage] Failed to save hourly cost:', err);
-      alert(
-        isEs
-          ? `Error al guardar el costo de ${department}: ${err instanceof Error ? err.message : String(err)}`
-          : `Error saving ${department} cost: ${err instanceof Error ? err.message : String(err)}`
-      );
-    } finally {
-      setSavingDept(current => (current === department ? null : current));
-    }
-  };
-
   const handleChange = (department: Department, value: string) => {
     if (value === '') {
-      setCosts(prev => ({ ...prev, [department]: '' }));
+      setDraft(prev => ({ ...prev, [department]: '' }));
       return;
     }
     const numVal = parseFloat(value);
     if (isNaN(numVal)) return;
-    const clamped = Math.max(0, numVal);
-    setCosts(prev => ({ ...prev, [department]: clamped }));
+    setDraft(prev => ({ ...prev, [department]: Math.max(0, numVal) }));
+  };
 
-    if (saveTimeouts.current[department]) {
-      clearTimeout(saveTimeouts.current[department]);
+  const dirtyDepartments = useMemo(
+    () =>
+      DEPARTMENTS.filter((dept) => {
+        const draftVal = draft[dept];
+        if (draftVal === '' || draftVal === undefined) return false;
+        const savedVal = saved[dept]?.hourlyCost;
+        return savedVal === undefined || draftVal !== savedVal;
+      }),
+    [draft, saved]
+  );
+
+  const handleSave = async () => {
+    if (dirtyDepartments.length === 0) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const results = await Promise.all(
+        dirtyDepartments.map((dept) =>
+          departmentHourlyCostApi.create({ department: dept, hourlyCost: draft[dept] as number })
+        )
+      );
+      setSaved(prev => {
+        const next = { ...prev };
+        results.forEach((result: DepartmentHourlyCost) => {
+          next[result.department] = {
+            hourlyCost: result.hourlyCost,
+            updatedByUsername: result.updatedByUsername,
+            updatedAt: result.updatedAt,
+          };
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('[DepartmentCostsPage] Failed to save hourly costs:', err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSaving(false);
     }
-    saveTimeouts.current[department] = setTimeout(() => {
-      saveCost(department, clamped);
-    }, 600);
+  };
+
+  const formatUpdatedAt = (iso?: string) => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleString(isEs ? 'es-MX' : 'en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    } catch {
+      return iso;
+    }
   };
 
   if (!hasFullAccess) {
@@ -95,16 +139,29 @@ export function DepartmentCostsPage() {
   return (
     <div className="h-full overflow-y-auto bg-[#f8f6fb] p-3 md:p-5">
       <div className="max-w-4xl mx-auto space-y-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#2e1a47] flex items-center gap-2">
-            <DollarSign size={22} />
-            {isEs ? 'Costo por Hora por Departamento' : 'Department Hourly Cost'}
-          </h1>
-          <p className="text-xs md:text-sm text-[#6c6480] mt-1">
-            {isEs
-              ? 'Tarifa global de costo por hora para el personal de cada departamento, usada en reportes de costos de proyecto.'
-              : 'Global hourly cost rate for each department\'s staff, used for project cost reporting.'}
-          </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-[#2e1a47] flex items-center gap-2">
+              <DollarSign size={22} />
+              {isEs ? 'Costo por Hora por Departamento' : 'Department Hourly Cost'}
+            </h1>
+            <p className="text-xs md:text-sm text-[#6c6480] mt-1">
+              {isEs
+                ? 'Tarifa global de costo por hora para el personal de cada departamento, usada en reportes de costos de proyecto.'
+                : 'Global hourly cost rate for each department\'s staff, used for project cost reporting.'}
+            </p>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={dirtyDepartments.length === 0 || isSaving}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#5b3d8f] hover:bg-[#4a3175] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Save size={16} />
+            {isSaving
+              ? (isEs ? 'Guardando…' : 'Saving…')
+              : (isEs ? 'Guardar cambios' : 'Save changes')}
+            {dirtyDepartments.length > 0 && !isSaving && ` (${dirtyDepartments.length})`}
+          </button>
         </div>
 
         {error && (
@@ -119,33 +176,48 @@ export function DepartmentCostsPage() {
               {isEs ? 'Cargando...' : 'Loading...'}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {DEPARTMENTS.map((dept) => (
-                <div key={dept}>
-                  <label className="block text-xs font-semibold mb-1 text-[#2e1a47]">
-                    {dept}
-                    {savingDept === dept && (
-                      <span className="ml-1.5 text-[10px] font-normal text-[#827691]">
-                        {isEs ? 'guardando…' : 'saving…'}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {DEPARTMENTS.map((dept) => {
+                const isDirty = dirtyDepartments.includes(dept);
+                const info = saved[dept];
+                const updatedAtLabel = formatUpdatedAt(info?.updatedAt);
+                return (
+                  <div key={dept}>
+                    <label className="block text-xs font-semibold mb-1 text-[#2e1a47]">
+                      {dept}
+                      {isDirty && (
+                        <span className="ml-1.5 text-[10px] font-normal text-amber-600">
+                          {isEs ? 'sin guardar' : 'unsaved'}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#827691]">$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={draft[dept] ?? ''}
+                        onChange={(e) => handleChange(dept, e.target.value)}
+                        placeholder="0.00"
+                        className={`w-full border rounded px-2 py-1.5 pl-5 focus:outline-none text-sm font-semibold ${
+                          isDirty
+                            ? 'border-amber-400 focus:border-amber-500'
+                            : 'border-[#e5e0eb] focus:border-[#8b7bb8]'
+                        }`}
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#827691]">
+                        /{isEs ? 'hr' : 'hr'}
                       </span>
+                    </div>
+                    {info?.updatedByUsername && updatedAtLabel && (
+                      <p className="text-[10px] text-[#9a91a8] mt-1 truncate">
+                        {isEs ? 'Últ. cambio: ' : 'Last changed: '}
+                        {info.updatedByUsername} · {updatedAtLabel}
+                      </p>
                     )}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#827691]">$</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={costs[dept] ?? ''}
-                      onChange={(e) => handleChange(dept, e.target.value)}
-                      placeholder="0.00"
-                      className="w-full border border-[#e5e0eb] rounded px-2 py-1.5 pl-5 focus:border-[#8b7bb8] focus:outline-none text-sm font-semibold"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#827691]">
-                      /{isEs ? 'hr' : 'hr'}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

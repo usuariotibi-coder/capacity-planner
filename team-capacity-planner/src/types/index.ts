@@ -220,6 +220,8 @@ export interface DepartmentHourlyCost {
   id: string;
   department: Department;
   hourlyCost: number;
+  updatedBy?: number | null;
+  updatedByUsername?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

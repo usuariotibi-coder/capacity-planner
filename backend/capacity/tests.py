@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import (
+    ActivityLog,
     Assignment,
     Department,
     DepartmentHourlyCost,
@@ -629,6 +630,51 @@ class DepartmentHourlyCostTests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_saving_records_updated_by_and_activity_log_history(self):
+        """
+        Every save is explicit (button-triggered, not autosave) and must leave
+        a durable trail: who changed the rate and when, both on the row
+        itself (updated_by) and as an accumulating ActivityLog history.
+        """
+        self.client.force_authenticate(user=self.pm_user)
+
+        response = self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.BUILD, 'hourly_cost': '60.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['updated_by_username'], 'pm-cost-user')
+
+        record = DepartmentHourlyCost.objects.get(department=Department.BUILD)
+        self.assertEqual(record.updated_by, self.pm_user)
+
+        logs_after_create = ActivityLog.objects.filter(
+            model_name='DepartmentHourlyCost', object_id=str(record.id)
+        ).order_by('created_at')
+        self.assertEqual(logs_after_create.count(), 1)
+        self.assertEqual(logs_after_create[0].action, 'created')
+        self.assertEqual(logs_after_create[0].user, self.pm_user)
+        self.assertEqual(logs_after_create[0].changes['old_hourly_cost'], None)
+        self.assertEqual(logs_after_create[0].changes['new_hourly_cost'], '60.00')
+
+        # A second save for the same department is a separate ledger entry,
+        # not an overwrite of the first -- history accumulates.
+        response = self.client.post(
+            reverse('department-hourly-cost-list'),
+            {'department': Department.BUILD, 'hourly_cost': '65.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        logs_after_update = ActivityLog.objects.filter(
+            model_name='DepartmentHourlyCost', object_id=str(record.id)
+        ).order_by('created_at')
+        self.assertEqual(logs_after_update.count(), 2)
+        self.assertEqual(logs_after_update[1].action, 'updated')
+        self.assertEqual(logs_after_update[1].changes['old_hourly_cost'], '60.00')
+        self.assertEqual(logs_after_update[1].changes['new_hourly_cost'], '65.00')
 
 
 class HeadEngineeringPermissionTests(APITestCase):

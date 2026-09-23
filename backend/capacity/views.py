@@ -2582,8 +2582,28 @@ class DepartmentHourlyCostViewSet(viewsets.ModelViewSet):
         if not _has_full_access(self.request.user):
             raise PermissionDenied("No permission to modify department hourly costs.")
 
+    def _log_change(self, action, obj, old_hourly_cost):
+        user = self.request.user if self.request.user.is_authenticated else None
+        ActivityLog.objects.create(
+            user=user,
+            action=action,
+            model_name='DepartmentHourlyCost',
+            object_id=str(obj.id),
+            changes={
+                'department': obj.department,
+                'old_hourly_cost': str(old_hourly_cost) if old_hourly_cost is not None else None,
+                'new_hourly_cost': str(obj.hourly_cost),
+            },
+        )
+
     def create(self, request, *args, **kwargs):
-        """Upsert: a second POST for the same department updates it instead of erroring."""
+        """
+        Upsert: a second POST for the same department updates it instead of
+        erroring. Each save is explicit (the frontend only calls this from a
+        "Save changes" button, not per-keystroke) and is recorded to
+        ActivityLog here so there's a durable history of who changed a
+        department's rate and when, in addition to updated_by/updated_at.
+        """
         self._ensure_full_access()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -2591,17 +2611,23 @@ class DepartmentHourlyCostViewSet(viewsets.ModelViewSet):
         department = serializer.validated_data.get('department')
         hourly_cost = serializer.validated_data.get('hourly_cost')
 
+        existing = DepartmentHourlyCost.objects.filter(department=department).first()
+        old_hourly_cost = existing.hourly_cost if existing else None
+
         obj, created = DepartmentHourlyCost.objects.update_or_create(
             department=department,
-            defaults={'hourly_cost': hourly_cost},
+            defaults={'hourly_cost': hourly_cost, 'updated_by': request.user},
         )
+        self._log_change('created' if created else 'updated', obj, old_hourly_cost)
 
         result_serializer = self.get_serializer(obj)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         self._ensure_full_access()
-        serializer.save()
+        old_hourly_cost = serializer.instance.hourly_cost
+        obj = serializer.save(updated_by=self.request.user)
+        self._log_change('updated', obj, old_hourly_cost)
 
     def perform_destroy(self, instance):
         self._ensure_full_access()

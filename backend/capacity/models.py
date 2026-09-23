@@ -485,6 +485,11 @@ class DepartmentHourlyCost(models.Model):
     project -- deliberately not scoped like ScioTeamCapacity/ProjectBudget:
     staffing cost is an org-wide rate, not something that varies week to week
     or project to project.
+
+    Saves are explicit (a button, not per-keystroke autosave) and each one is
+    also written to ActivityLog by the ViewSet, so there is a durable history
+    of who changed a department's rate and when, beyond just this row's
+    updated_by/updated_at snapshot of the latest change.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     department = models.CharField(max_length=10, choices=Department.choices, unique=True)
@@ -492,6 +497,11 @@ class DepartmentHourlyCost(models.Model):
         max_digits=10, decimal_places=2,
         validators=[MinValueValidator(Decimal('0'))],
         help_text="Cost per hour for this department's staff",
+    )
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='department_hourly_cost_changes',
+        help_text="User who made the most recent change to this rate",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
