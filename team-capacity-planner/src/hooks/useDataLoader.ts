@@ -4,7 +4,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useAuth } from '../context/AuthContext';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
-import { usePRGTeamsStore } from '../stores/prgTeamsStore';
+import { useExternalTeamsStore } from '../stores/externalTeamsStore';
 import { getAllWeeksWithNextYear, normalizeWeekStartDate } from '../utils/dateUtils';
 import {
   scioTeamCapacityApi,
@@ -26,7 +26,7 @@ export const useDataLoader = () => {
   const fetchProjects = useProjectStore((state) => state.fetchProjects);
   const fetchAssignments = useAssignmentStore((state) => state.fetchAssignments);
   const { setActiveTeams } = useBuildTeamsStore();
-  const { setActiveTeams: setPRGActiveTeams } = usePRGTeamsStore();
+  const { setTeamsForDepartment: setExternalTeamsForDepartment } = useExternalTeamsStore();
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -73,22 +73,29 @@ export const useDataLoader = () => {
               setActiveTeams(activeTeams);
             }
           }),
-        // Load PRG external team capacity from backend
+        // Load external team capacity from backend (MED/HD/MFG/PRG -- see externalTeamsStore.ts)
         prgExternalTeamCapacityApi.getAll()
           .then((results: CapacityItem[]) => {
             if (results && Array.isArray(results)) {
-              const prgExternal = results.reduce((acc: any, item: CapacityItem) => {
-                const teamName = item.teamName;
+              const externalPersonnel = results.reduce((acc: any, item: CapacityItem) => {
+                const key = `${item.department}::${item.teamName}`;
                 const weekDate = normalizeWeekStartDate(item.weekStartDate);
-                if (!acc[teamName]) acc[teamName] = {};
-                acc[teamName][weekDate] = item.capacity;
+                if (!acc[key]) acc[key] = {};
+                acc[key][weekDate] = item.capacity;
                 return acc;
               }, {});
-              localStorage.setItem('prgExternalPersonnel', JSON.stringify(prgExternal));
+              localStorage.setItem('prgExternalPersonnel', JSON.stringify(externalPersonnel));
 
-              // Extract active teams (as array, not Set)
-              const activeTeams = Array.from(new Set(results.map((item: CapacityItem) => item.teamName)));
-              setPRGActiveTeams(activeTeams);
+              // Group active teams by department
+              const teamsByDept: Record<string, Set<string>> = {};
+              results.forEach((item: CapacityItem) => {
+                if (!item.department || !item.teamName) return;
+                if (!teamsByDept[item.department]) teamsByDept[item.department] = new Set();
+                teamsByDept[item.department].add(item.teamName);
+              });
+              Object.entries(teamsByDept).forEach(([department, teams]) => {
+                setExternalTeamsForDepartment(department as any, Array.from(teams));
+              });
             }
           }),
         // Load department weekly totals from backend
@@ -109,5 +116,5 @@ export const useDataLoader = () => {
           }),
       ]).catch(console.error);
     }
-  }, [isLoggedIn, fetchEmployees, fetchProjects, fetchAssignments, setActiveTeams, setPRGActiveTeams]);
+  }, [isLoggedIn, fetchEmployees, fetchProjects, fetchAssignments, setActiveTeams, setExternalTeamsForDepartment]);
 };

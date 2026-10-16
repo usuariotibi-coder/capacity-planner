@@ -2,7 +2,7 @@ import { useEmployeeStore } from '../stores/employeeStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
-import { usePRGTeamsStore } from '../stores/prgTeamsStore';
+import { useExternalTeamsStore } from '../stores/externalTeamsStore';
 import { employeesApi, projectsApi, assignmentsApi } from '../services/api';
 
 export const useDeleteAllData = () => {
@@ -71,8 +71,8 @@ export const useDeleteAllData = () => {
         activeTeams: [],
       });
 
-      usePRGTeamsStore.setState({
-        activeTeams: [],
+      useExternalTeamsStore.setState({
+        teamsByDepartment: {},
       });
 
       // Clear localStorage

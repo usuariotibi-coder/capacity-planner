@@ -116,6 +116,7 @@ export interface Project {
   closedAt?: string | null;
   departmentStages?: Record<Department, DepartmentStageConfig[]>;
   departmentHoursAllocated?: Record<Department, number>; // Budget hours per department (presupuesto/cotizado)
+  departmentCostAllocated?: Partial<Record<Department, number | null>>; // Quoted amount in $ per department (only departments with one registered; null clears)
   departmentHoursUtilized?: Record<Department, number>; // Hours utilized/used per department (horas utilizadas - manually entered)
   departmentHoursForecast?: Record<Department, number>; // Forecasted hours per department (horas pronosticadas - manually entered)
   visibleInDepartments?: ProjectVisibilityScope[]; // Departments where this project is visible (GENERAL allows showing in General view too)
@@ -202,6 +203,24 @@ export interface Assignment {
 export interface ScioHeadcountEvent {
   id: string;
   department: Department;
+  effectiveDate: string; // ISO format YYYY-MM-DD
+  delta: number; // Signed headcount change, e.g. +1 for a hire, -2 for two departures
+  comment?: string;
+  createdByUsername?: string | null;
+  createdAt?: string;
+}
+
+/**
+ * EXTERNAL TEAM HEADCOUNT EVENT
+ * A hire or departure event for an external team/provider's headcount (the
+ * "+ / - External Staff" ledger, MED/HD/MFG/BUILD/PRG). Mirrors
+ * ScioHeadcountEvent but scoped to one (department, teamName) pair, and --
+ * unlike ScioHeadcountEvent -- effectiveDate can't be before the current week.
+ */
+export interface ExternalTeamHeadcountEvent {
+  id: string;
+  department: Department;
+  teamName: string;
   effectiveDate: string; // ISO format YYYY-MM-DD
   delta: number; // Signed headcount change, e.g. +1 for a hire, -2 for two departures
   comment?: string;

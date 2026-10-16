@@ -50,6 +50,15 @@ export const normalizeWeekStartDate = (dateStr: string): string => {
 };
 
 /**
+ * Adds N weeks (can be negative) to an ISO week-start date, returning the result as ISO too.
+ */
+export const addWeeksToISO = (dateStr: string, weeks: number): string => {
+  const date = parseISODate(dateStr);
+  date.setDate(date.getDate() + weeks * 7);
+  return formatToISO(date);
+};
+
+/**
  * Obtiene un array de strings con las fechas de inicio de semana en un rango
  */
 export const getWeeksInRange = (startDate: string, endDate: string): string[] => {

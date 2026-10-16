@@ -24,6 +24,7 @@ from functools import reduce
 from operator import or_
 import uuid
 import logging
+from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.models import User
 from django.db import IntegrityError
@@ -52,6 +53,7 @@ from .models import (
     Employee, Project, Assignment, DailyTimeEntry, TimeEntryType, DepartmentStageConfig,
     ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, ScioHeadcountEvent, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
+    ExternalTeamHeadcountEvent,
     DepartmentWeeklyTotal, DepartmentHourlyCost, UserDepartment, OtherDepartment,
     ProjectDepartmentWeeklyActual, FinanceJobCumulative, FinanceImportLog
 )
@@ -62,7 +64,7 @@ from .serializers import (
     DepartmentStageConfigSerializer,
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, ScioHeadcountEventSerializer, SubcontractedTeamCapacitySerializer,
-    PrgExternalTeamCapacitySerializer, DepartmentWeeklyTotalSerializer,
+    PrgExternalTeamCapacitySerializer, ExternalTeamHeadcountEventSerializer, DepartmentWeeklyTotalSerializer,
     DepartmentHourlyCostSerializer,
     RegisteredUserSerializer,
     ProjectDepartmentWeeklyActualSerializer, FinanceImportLogSerializer
@@ -894,11 +896,53 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         return False
 
+    def _cost_payload_changes_amounts(self, project, data):
+        """
+        True if the payload sets a quoted $ amount that differs from what is stored
+        (or any amount at all when creating). Quoted amounts are commercial data that
+        only full-access users (PM/BI) may register or change; department managers
+        editing hours for their own department never send this key.
+        """
+        costs, has_costs = self._get_first_present_value(
+            data,
+            ('department_cost_allocated', 'departmentCostAllocated'),
+        )
+        if not has_costs or not isinstance(costs, dict):
+            return False
+
+        existing = {}
+        if project is not None:
+            existing = {
+                budget.department: budget.cost_allocated
+                for budget in project.budgets.all()
+                if budget.cost_allocated is not None
+            }
+        for raw_department, raw_cost in costs.items():
+            department = self._normalize_department_code(raw_department)
+            if not department:
+                continue
+            current = existing.get(department)
+            if raw_cost is None or (isinstance(raw_cost, str) and raw_cost.strip() == ''):
+                if current is not None:
+                    return True
+                continue
+            try:
+                incoming = Decimal(str(raw_cost))
+            except InvalidOperation:
+                return True
+            if current is None or incoming != current:
+                return True
+        return False
+
     def _ensure_project_create_permission(self):
         if _has_full_access(self.request.user):
             return
         if _is_read_only_user(self.request.user):
             raise PermissionDenied("No permission to modify projects.")
+
+        create_data = self.request.data if isinstance(self.request.data, dict) else {}
+        if self._cost_payload_changes_amounts(None, create_data):
+            raise PermissionDenied("No permission to set quoted amounts.")
 
         request_data = self.request.data if isinstance(self.request.data, dict) else {}
         target_departments = self._extract_create_scope_departments(request_data)
@@ -916,6 +960,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         project = serializer.instance
         request_data = self.request.data if isinstance(self.request.data, dict) else {}
+
+        if self._cost_payload_changes_amounts(project, request_data):
+            raise PermissionDenied("No permission to set quoted amounts.")
 
         if self._shared_project_fields_modified(project, request_data):
             raise PermissionDenied("No permission to modify shared project fields.")
@@ -2467,64 +2514,193 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
 
 # ==================== PRG EXTERNAL TEAM CAPACITY VIEWSET ====================
 
+# Departments with the "add an external team/provider" feature (PM and PURCHASING don't).
+# Shared between PrgExternalTeamCapacityViewSet and ExternalTeamHeadcountEventViewSet.
+EXTERNAL_TEAM_CAPACITY_DEPARTMENTS = {Department.MED, Department.HD, Department.MFG, Department.BUILD, Department.PRG}
+
+
+def recompute_external_team_capacity_from_events(department, team_name):
+    """
+    Rebuild the external headcount capacity for one (department, team_name) from
+    its ExternalTeamHeadcountEvent ledger -- same cumulative-checkpoint approach as
+    recompute_scio_capacity_from_events, just scoped to a single team instead of a
+    whole department. BUILD writes to SubcontractedTeamCapacity (team_name used as
+    `company`, since that model predates and isn't scoped by `department`); every
+    other external-team department writes to PrgExternalTeamCapacity.
+    """
+    events = list(
+        ExternalTeamHeadcountEvent.objects.filter(
+            department=department, team_name=team_name
+        ).order_by('effective_date')
+    )
+    if not events:
+        return
+
+    checkpoints = {}
+    for event in events:
+        week = _week_start(event.effective_date)
+        checkpoints[week] = checkpoints.get(week, 0) + event.delta
+
+    sorted_weeks = sorted(checkpoints.keys())
+    earliest_week = sorted_weeks[0]
+    horizon = _week_start(max(datetime.now().date(), events[-1].effective_date)) + timedelta(weeks=104)
+
+    cumulative = 0.0
+    checkpoint_idx = 0
+    week = earliest_week
+    while week <= horizon:
+        while checkpoint_idx < len(sorted_weeks) and sorted_weeks[checkpoint_idx] <= week:
+            cumulative += checkpoints[sorted_weeks[checkpoint_idx]]
+            checkpoint_idx += 1
+        capacity = max(0.0, cumulative)
+        if department == Department.BUILD:
+            SubcontractedTeamCapacity.objects.update_or_create(
+                company=team_name,
+                week_start_date=week,
+                defaults={'capacity': capacity},
+            )
+        else:
+            PrgExternalTeamCapacity.objects.update_or_create(
+                department=department,
+                team_name=team_name,
+                week_start_date=week,
+                defaults={'capacity': capacity},
+            )
+        week += timedelta(weeks=1)
+
+
 class PrgExternalTeamCapacityViewSet(viewsets.ModelViewSet):
     """
-    API ViewSet for PRG External Team Capacity.
+    API ViewSet for the (no longer PRG-only, see model docstring) External Team
+    Capacity.
 
-    Provides CRUD operations for managing external team capacity for PRG department per week.
-    Supports upsert behavior: if a record with the same team+week exists, it will be updated.
+    Provides CRUD operations for managing external team capacity per department
+    and week, for the departments that have this "add an external team" feature:
+    MED, HD, MFG, BUILD, PRG (PM and PURCHASING don't). Supports upsert behavior:
+    if a record with the same department+team+week exists, it will be updated.
     Pagination disabled to return all records at once (small dataset).
     """
+    EXTERNAL_TEAM_DEPARTMENTS = EXTERNAL_TEAM_CAPACITY_DEPARTMENTS
+
     queryset = PrgExternalTeamCapacity.objects.all()
     serializer_class = PrgExternalTeamCapacitySerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None  # Disabled - return all records at once
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['team_name', 'week_start_date']
-    ordering_fields = ['team_name', 'week_start_date', 'capacity']
-    ordering = ['team_name', 'week_start_date']
+    filterset_fields = ['department', 'team_name', 'week_start_date']
+    ordering_fields = ['department', 'team_name', 'week_start_date', 'capacity']
+    ordering = ['department', 'team_name', 'week_start_date']
 
-    def _ensure_can_edit(self):
+    def _ensure_can_edit(self, department):
+        if department not in self.EXTERNAL_TEAM_DEPARTMENTS:
+            raise PermissionDenied("External team capacity is not available for this department.")
         if _has_full_access(self.request.user):
             return
         if _is_read_only_user(self.request.user):
             raise PermissionDenied("Read-only access.")
-        if not _can_edit_department(self.request.user, Department.PRG):
-            raise PermissionDenied("No permission to modify PRG external team capacity.")
+        if not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify external team capacity for this department.")
 
     def create(self, request, *args, **kwargs):
         """
         Override create to support upsert behavior.
-        If a record with the same team_name+week_start_date exists, update it.
+        If a record with the same department+team_name+week_start_date exists, update it.
         Otherwise create a new one.
         """
-        self._ensure_can_edit()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        department = serializer.validated_data.get('department')
         team_name = serializer.validated_data.get('team_name')
         week_start_date = serializer.validated_data.get('week_start_date')
         capacity = serializer.validated_data.get('capacity')
 
+        self._ensure_can_edit(department)
+
         obj, created = PrgExternalTeamCapacity.objects.update_or_create(
+            department=department,
             team_name=team_name,
             week_start_date=week_start_date,
             defaults={'capacity': capacity}
         )
 
-        print(f"[PrgExternalTeamCapacity] {'Created' if created else 'Updated'} record: {obj.id}, team={team_name}, week={week_start_date}, capacity={capacity}")
+        print(f"[ExternalTeamCapacity] {'Created' if created else 'Updated'} record: {obj.id}, dept={department}, team={team_name}, week={week_start_date}, capacity={capacity}")
 
         # Return the serialized object
         result_serializer = self.get_serializer(obj)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def perform_update(self, serializer):
-        self._ensure_can_edit()
+        self._ensure_can_edit(serializer.instance.department)
         serializer.save()
 
     def perform_destroy(self, instance):
-        self._ensure_can_edit()
+        self._ensure_can_edit(instance.department)
         instance.delete()
+
+
+class ExternalTeamHeadcountEventViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for external team/provider headcount hire/departure events
+    (MED/HD/MFG/BUILD/PRG -- the "+ / - External Staff" button). Each create/
+    update/delete recomputes and bulk-writes the affected (department,
+    team_name)'s capacity from the full event ledger -- see
+    recompute_external_team_capacity_from_events. Unlike SCIO headcount events,
+    effective_date can't be backdated before the current week.
+    """
+    queryset = ExternalTeamHeadcountEvent.objects.all()
+    serializer_class = ExternalTeamHeadcountEventSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department', 'team_name']
+    ordering_fields = ['department', 'team_name', 'effective_date', 'created_at']
+    ordering = ['department', 'team_name', 'effective_date']
+
+    def _ensure_can_edit(self, department):
+        if department not in EXTERNAL_TEAM_CAPACITY_DEPARTMENTS:
+            raise PermissionDenied("External team headcount is not available for this department.")
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify external team headcount for this department.")
+
+    def _ensure_not_backdated(self, effective_date):
+        current_week_start = _week_start(datetime.now().date())
+        if effective_date < current_week_start:
+            raise ValidationError({'effective_date': "Effective date can't be before the current week."})
+
+    def perform_create(self, serializer):
+        department = serializer.validated_data.get('department')
+        effective_date = serializer.validated_data.get('effective_date')
+        self._ensure_can_edit(department)
+        self._ensure_not_backdated(effective_date)
+        instance = serializer.save(created_by=self.request.user)
+        recompute_external_team_capacity_from_events(instance.department, instance.team_name)
+
+    def perform_update(self, serializer):
+        previous_department = serializer.instance.department
+        previous_team = serializer.instance.team_name
+        new_department = serializer.validated_data.get('department', previous_department)
+        new_team = serializer.validated_data.get('team_name', previous_team)
+        new_effective_date = serializer.validated_data.get('effective_date', serializer.instance.effective_date)
+        # A department/team move must be authorized against both the old and new
+        # pair, same reasoning as ScioHeadcountEventViewSet.perform_update.
+        self._ensure_can_edit(previous_department)
+        self._ensure_can_edit(new_department)
+        self._ensure_not_backdated(new_effective_date)
+        instance = serializer.save()
+        recompute_external_team_capacity_from_events(previous_department, previous_team)
+        if instance.department != previous_department or instance.team_name != previous_team:
+            recompute_external_team_capacity_from_events(instance.department, instance.team_name)
+
+    def perform_destroy(self, instance):
+        self._ensure_can_edit(instance.department)
+        department, team_name = instance.department, instance.team_name
+        instance.delete()
+        recompute_external_team_capacity_from_events(department, team_name)
 
 
 class DepartmentWeeklyTotalViewSet(viewsets.ModelViewSet):

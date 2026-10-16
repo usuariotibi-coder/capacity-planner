@@ -8,6 +8,7 @@ budgets, and activity logs with proper validation and nested relationships.
 
 import logging
 import json
+from decimal import Decimal, InvalidOperation
 import secrets
 import threading
 import re
@@ -42,6 +43,7 @@ from .models import (
     ScioHeadcountEvent,
     SubcontractedTeamCapacity,
     PrgExternalTeamCapacity,
+    ExternalTeamHeadcountEvent,
     DepartmentWeeklyTotal,
     DepartmentHourlyCost,
     EmailVerification,
@@ -489,6 +491,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     department_hours_allocated = serializers.SerializerMethodField(
         help_text="Budget hours per department as Record<Department, number>"
     )
+    department_cost_allocated = serializers.SerializerMethodField(
+        help_text="Quoted amount in $ per department as Record<Department, number> (only departments with one registered)"
+    )
     department_hours_utilized = serializers.SerializerMethodField(
         help_text="Utilized hours per department as Record<Department, number>"
     )
@@ -525,6 +530,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'active_assignments',
             'department_stages',
             'department_hours_allocated',
+            'department_cost_allocated',
             'department_hours_utilized',
             'department_hours_forecast',
             'visible_in_departments',
@@ -534,7 +540,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'created_at', 'updated_at', 'assignment_count',
             'active_assignments', 'department_stages',
-            'department_hours_allocated', 'department_hours_utilized',
+            'department_hours_allocated', 'department_cost_allocated',
+            'department_hours_utilized',
             'department_hours_forecast', 'project_manager_id',
             'is_hidden', 'hidden_at', 'closed_at'
         )
@@ -617,6 +624,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         for budget in obj.budgets.all():
             result[budget.department] = budget.hours_allocated
         return result
+
+    def get_department_cost_allocated(self, obj):
+        """
+        Get the quoted $ amount per department as Record<Department, number>.
+        Departments without a registered amount are omitted (so the UI can show
+        "not registered" instead of $0).
+        """
+        return {
+            budget.department: float(budget.cost_allocated)
+            for budget in obj.budgets.all()
+            if budget.cost_allocated is not None
+        }
 
     def get_department_hours_utilized(self, obj):
         """
@@ -715,6 +734,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             if department_hours and isinstance(department_hours, dict):
                 self._save_department_budgets(project, department_hours)
 
+            department_costs = self.initial_data.get('department_cost_allocated')
+            if department_costs and isinstance(department_costs, dict):
+                self._save_department_costs(project, department_costs)
+
         return project
 
     def _save_department_stages(self, project, department_stages):
@@ -798,6 +821,44 @@ class ProjectSerializer(serializers.ModelSerializer):
                 department__in=incoming_departments,
             ).delete()
 
+    def _save_department_costs(self, project, department_costs):
+        """
+        Save the quoted $ amount per department. Runs after _save_department_budgets
+        (which prunes rows for departments missing from the hours payload), and only
+        touches cost_allocated. An empty/None value clears the registered amount.
+        """
+        valid_departments = {code for code, _ in Department.choices}
+
+        for dept, raw_cost in department_costs.items():
+            normalized_dept = dept.strip().upper() if isinstance(dept, str) else str(dept)
+            if normalized_dept not in valid_departments:
+                continue
+
+            if raw_cost is None or (isinstance(raw_cost, str) and raw_cost.strip() == ''):
+                ProjectBudget.objects.filter(
+                    project=project, department=normalized_dept
+                ).update(cost_allocated=None)
+                continue
+
+            try:
+                cost_value = Decimal(str(raw_cost))
+            except InvalidOperation:
+                raise serializers.ValidationError(
+                    {"department_cost_allocated": f"Invalid amount for {normalized_dept}."}
+                )
+            if cost_value < 0:
+                raise serializers.ValidationError(
+                    {"department_cost_allocated": f"Amount for {normalized_dept} cannot be negative."}
+                )
+
+            budget, _ = ProjectBudget.objects.get_or_create(
+                project=project,
+                department=normalized_dept,
+                defaults={'hours_allocated': 0},
+            )
+            budget.cost_allocated = cost_value.quantize(Decimal('0.01'))
+            budget.save(update_fields=['cost_allocated', 'updated_at'])
+
     def update(self, instance, validated_data):
         manager_id = self.initial_data.get('project_manager_id')
         if manager_id is not None:
@@ -818,6 +879,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             department_hours = self.initial_data.get('department_hours_allocated')
             if department_hours and isinstance(department_hours, dict):
                 self._save_department_budgets(project, department_hours)
+
+            department_costs = self.initial_data.get('department_cost_allocated')
+            if department_costs and isinstance(department_costs, dict):
+                self._save_department_costs(project, department_costs)
 
         return project
 
@@ -2006,20 +2071,42 @@ class SubcontractedTeamCapacitySerializer(serializers.ModelSerializer):
 
 class PrgExternalTeamCapacitySerializer(serializers.ModelSerializer):
     """
-    Serializer for PRG External Team Capacity model.
+    Serializer for the (no longer PRG-only, see model docstring) External Team
+    Capacity model: MED, HD, MFG, BUILD, PRG can each register external teams.
 
-    Represents external team capacity for PRG department per week.
     Unique validation is disabled here because the ViewSet handles upsert logic.
     """
 
     class Meta:
         model = PrgExternalTeamCapacity
-        fields = ('id', 'team_name', 'week_start_date', 'capacity', 'created_at', 'updated_at')
+        fields = ('id', 'department', 'team_name', 'week_start_date', 'capacity', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
     def get_validators(self):
         """Remove unique_together validators to allow upsert behavior in ViewSet"""
         return []
+
+
+class ExternalTeamHeadcountEventSerializer(serializers.ModelSerializer):
+    """Serializer for an external team/provider's headcount hire/departure event."""
+
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = ExternalTeamHeadcountEvent
+        fields = (
+            'id',
+            'department',
+            'team_name',
+            'effective_date',
+            'delta',
+            'comment',
+            'created_by',
+            'created_by_username',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_by', 'created_by_username', 'created_at', 'updated_at')
 
 
 class DepartmentWeeklyTotalSerializer(serializers.ModelSerializer):

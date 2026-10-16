@@ -15,6 +15,7 @@ from .models import (
     DepartmentHourlyCost,
     DepartmentStageConfig,
     Employee,
+    ExternalTeamHeadcountEvent,
     Facility,
     OtherDepartment,
     PrgExternalTeamCapacity,
@@ -251,6 +252,80 @@ class ProjectDepartmentPermissionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_department_user_cannot_set_quoted_amount(self):
+        response = self.client.patch(
+            reverse('project-detail', args=[self.existing_project.id]),
+            {'department_cost_allocated': {Department.PRG: 1500}},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ProjectQuotedAmountTests(APITestCase):
+    """Quoted $ per department (Qtd $ in the Summary): full-access only, null = not registered."""
+
+    def setUp(self):
+        self.pm_user = User.objects.create_user(username='pm-quote-user', password='test-password', is_active=True)
+        UserProfile.objects.create(user=self.pm_user, department=UserDepartment.PM)
+        self.project = Project.objects.create(
+            name='Quoted Amount Project',
+            client='Internal',
+            start_date='2026-01-05',
+            end_date='2026-02-01',
+            facility=Facility.MX,
+            number_of_weeks=4,
+        )
+        ProjectBudget.objects.create(project=self.project, department=Department.MED, hours_allocated=40)
+        self.client.force_authenticate(user=self.pm_user)
+
+    def test_full_access_user_can_set_and_read_quoted_amount(self):
+        response = self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {
+                'department_hours_allocated': {Department.MED: 40},
+                'department_cost_allocated': {Department.MED: '1234.50'},
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['department_cost_allocated'], {Department.MED: 1234.5})
+        self.assertEqual(
+            ProjectBudget.objects.get(project=self.project, department=Department.MED).hours_allocated, 40
+        )
+
+    def test_departments_without_amount_are_omitted_and_empty_clears(self):
+        self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'department_cost_allocated': {Department.MED: 500}},
+            format='json',
+        )
+        detail = self.client.get(reverse('project-detail', args=[self.project.id]))
+        self.assertEqual(detail.data['department_cost_allocated'], {Department.MED: 500.0})
+
+        self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'department_cost_allocated': {Department.MED: ''}},
+            format='json',
+        )
+        detail = self.client.get(reverse('project-detail', args=[self.project.id]))
+        self.assertEqual(detail.data['department_cost_allocated'], {})
+
+    def test_updating_hours_alone_keeps_registered_amount(self):
+        self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'department_cost_allocated': {Department.MED: 500}},
+            format='json',
+        )
+        self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'department_hours_allocated': {Department.MED: 60}},
+            format='json',
+        )
+        budget = ProjectBudget.objects.get(project=self.project, department=Department.MED)
+        self.assertEqual(budget.hours_allocated, 60)
+        self.assertEqual(str(budget.cost_allocated), '500.00')
+
 
 class AssignmentPastWeekLockTests(APITestCase):
     """
@@ -464,6 +539,7 @@ class DepartmentCapacityDelegationTests(APITestCase):
         return user
 
     def setUp(self):
+        self.pm_user = self._user_for('pm-capacity-user', UserDepartment.PM)
         self.med_user = self._user_for('med-capacity-user', UserDepartment.MED)
         self.hd_user = self._user_for('hd-capacity-user', UserDepartment.HD)
         self.build_user = self._user_for('build-capacity-user', UserDepartment.BUILD)
@@ -562,11 +638,11 @@ class DepartmentCapacityDelegationTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_prg_user_can_edit_external_capacity_med_user_cannot(self):
+    def test_prg_user_can_edit_external_capacity_med_user_cannot_for_prg(self):
         self.client.force_authenticate(user=self.prg_user)
         response = self.client.post(
             reverse('prg-external-team-capacity-list'),
-            {'team_name': 'External Team A', 'week_start_date': self.week.isoformat(), 'capacity': 3},
+            {'department': Department.PRG, 'team_name': 'External Team A', 'week_start_date': self.week.isoformat(), 'capacity': 3},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -574,10 +650,199 @@ class DepartmentCapacityDelegationTests(APITestCase):
         self.client.force_authenticate(user=self.med_user)
         response = self.client.post(
             reverse('prg-external-team-capacity-list'),
-            {'team_name': 'External Team B', 'week_start_date': self.week.isoformat(), 'capacity': 2},
+            {'department': Department.PRG, 'team_name': 'External Team B', 'week_start_date': self.week.isoformat(), 'capacity': 2},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_med_user_can_edit_own_department_external_capacity(self):
+        """External team capacity was generalized from PRG-only to MED/HD/MFG/BUILD/PRG."""
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('prg-external-team-capacity-list'),
+            {'department': Department.MED, 'team_name': 'External Team C', 'week_start_date': self.week.isoformat(), 'capacity': 4},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            PrgExternalTeamCapacity.objects.filter(department=Department.MED, team_name='External Team C').exists()
+        )
+
+    def test_external_team_capacity_not_available_for_pm_or_purchasing(self):
+        """PM/PURCHASING don't get this feature, even for a full-access (PM) user."""
+        self.client.force_authenticate(user=self.pm_user)
+        response = self.client.post(
+            reverse('prg-external-team-capacity-list'),
+            {'department': Department.PM, 'team_name': 'Nope', 'week_start_date': self.week.isoformat(), 'capacity': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.client.post(
+            reverse('prg-external-team-capacity-list'),
+            {'department': Department.PURCHASING, 'team_name': 'Nope', 'week_start_date': self.week.isoformat(), 'capacity': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ExternalTeamHeadcountEventTests(APITestCase):
+    """
+    The "+ / - External Staff" ledger (ExternalTeamHeadcountEvent): same idea as
+    SCIO headcount events, but scoped to one (department, team_name) and, unlike
+    SCIO events, rejects backdated effective dates. MED/HD/MFG/PRG recompute
+    PrgExternalTeamCapacity; BUILD recomputes SubcontractedTeamCapacity instead.
+    """
+
+    def _user_for(self, username, department):
+        user = User.objects.create_user(username=username, password='test-password', is_active=True)
+        UserProfile.objects.create(user=user, department=department)
+        return user
+
+    def setUp(self):
+        self.pm_user = self._user_for('pm-extheadcount-user', UserDepartment.PM)
+        self.med_user = self._user_for('med-extheadcount-user', UserDepartment.MED)
+        self.hd_user = self._user_for('hd-extheadcount-user', UserDepartment.HD)
+        self.build_user = self._user_for('build-extheadcount-user', UserDepartment.BUILD)
+        today = timezone.localdate()
+        self.current_week = today - timedelta(days=today.weekday())
+        self.future_week = self.current_week + timedelta(weeks=2)
+        self.later_week = self.current_week + timedelta(weeks=5)
+        self.past_week = self.current_week - timedelta(weeks=4)
+
+    def test_department_user_can_log_own_external_team_event(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.MED,
+                'team_name': 'Provider A',
+                'effective_date': self.future_week.isoformat(),
+                'delta': 3,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            ExternalTeamHeadcountEvent.objects.filter(department=Department.MED, team_name='Provider A').exists()
+        )
+        self.assertTrue(
+            PrgExternalTeamCapacity.objects.filter(
+                department=Department.MED, team_name='Provider A',
+                week_start_date=self.future_week, capacity=3,
+            ).exists()
+        )
+        # Weeks before the event are untouched; the event's week and forward carry the headcount.
+        self.assertFalse(
+            PrgExternalTeamCapacity.objects.filter(
+                department=Department.MED, team_name='Provider A', week_start_date=self.current_week,
+            ).exists()
+        )
+
+    def test_events_accumulate_going_forward(self):
+        self.client.force_authenticate(user=self.med_user)
+        self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {'department': Department.MED, 'team_name': 'Provider A', 'effective_date': self.future_week.isoformat(), 'delta': 3},
+            format='json',
+        )
+        self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {'department': Department.MED, 'team_name': 'Provider A', 'effective_date': self.later_week.isoformat(), 'delta': -1},
+            format='json',
+        )
+        between_week = self.future_week + timedelta(weeks=1)
+        self.assertEqual(
+            PrgExternalTeamCapacity.objects.get(
+                department=Department.MED, team_name='Provider A', week_start_date=between_week,
+            ).capacity,
+            3,
+        )
+        self.assertEqual(
+            PrgExternalTeamCapacity.objects.get(
+                department=Department.MED, team_name='Provider A', week_start_date=self.later_week,
+            ).capacity,
+            2,
+        )
+
+    def test_build_event_recomputes_subcontracted_capacity_not_prg_model(self):
+        self.client.force_authenticate(user=self.build_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.BUILD,
+                'team_name': 'AMI',
+                'effective_date': self.future_week.isoformat(),
+                'delta': 4,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            SubcontractedTeamCapacity.objects.filter(
+                company='AMI', week_start_date=self.future_week, capacity=4,
+            ).exists()
+        )
+        self.assertFalse(
+            PrgExternalTeamCapacity.objects.filter(department=Department.BUILD).exists()
+        )
+
+    def test_department_user_cannot_log_other_department_external_event(self):
+        self.client.force_authenticate(user=self.hd_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.MED,
+                'team_name': 'Provider A',
+                'effective_date': self.future_week.isoformat(),
+                'delta': 1,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pm_department_not_available_even_for_full_access_user(self):
+        self.client.force_authenticate(user=self.pm_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.PM,
+                'team_name': 'Nope',
+                'effective_date': self.future_week.isoformat(),
+                'delta': 1,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_backdated_effective_date_is_rejected(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.MED,
+                'team_name': 'Provider A',
+                'effective_date': self.past_week.isoformat(),
+                'delta': 1,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ExternalTeamHeadcountEvent.objects.exists())
+
+    def test_current_week_effective_date_is_allowed(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('external-team-headcount-event-list'),
+            {
+                'department': Department.MED,
+                'team_name': 'Provider A',
+                'effective_date': self.current_week.isoformat(),
+                'delta': 1,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 class DepartmentHourlyCostTests(APITestCase):

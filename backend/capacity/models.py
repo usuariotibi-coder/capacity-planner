@@ -315,6 +315,11 @@ class ProjectBudget(models.Model):
     hours_allocated = models.FloatField(validators=[MinValueValidator(0)], help_text="Budget hours per department (presupuesto/cotizado)")
     hours_utilized = models.FloatField(default=0, validators=[MinValueValidator(0)], help_text="Hours utilized/used per department")
     hours_forecast = models.FloatField(default=0, validators=[MinValueValidator(0)], help_text="Forecasted hours per department")
+    cost_allocated = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Quoted amount in $ for this department on this project (null = not registered)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -439,8 +444,16 @@ class SubcontractedTeamCapacity(models.Model):
 
 
 class PrgExternalTeamCapacity(models.Model):
-    """External team capacity for PRG department per week"""
+    """
+    External team capacity per department and week.
+
+    Despite the name (kept to avoid an extra model-rename migration), this is no
+    longer PRG-only: `department` scopes each team to one of MED, HD, MFG, BUILD,
+    PRG (the only departments with this "add an external team/provider" feature --
+    BUILD keeps its own separate SubcontractedTeamCapacity instead of this model).
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices, help_text="Department this external team belongs to")
     team_name = models.CharField(max_length=100, help_text="External team name")
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
     capacity = models.FloatField(validators=[MinValueValidator(0)], help_text="Number of personnel from this team")
@@ -448,14 +461,49 @@ class PrgExternalTeamCapacity(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['team_name', 'week_start_date']
+        ordering = ['department', 'team_name', 'week_start_date']
         indexes = [
-            models.Index(fields=['team_name', 'week_start_date']),
+            models.Index(fields=['department', 'team_name', 'week_start_date']),
         ]
-        unique_together = ['team_name', 'week_start_date']
+        unique_together = ['department', 'team_name', 'week_start_date']
 
     def __str__(self):
-        return f"{self.team_name} - {self.week_start_date}: {self.capacity}"
+        return f"{self.department} - {self.team_name} - {self.week_start_date}: {self.capacity}"
+
+
+class ExternalTeamHeadcountEvent(models.Model):
+    """
+    A hire or departure event for an external team/provider's headcount. Mirrors
+    ScioHeadcountEvent (same ledger approach: log "+1 as of March 10" instead of
+    typing the number into every week by hand) but scoped to one (department,
+    team_name) pair instead of a whole department's internal SCIO headcount, and
+    covers every department with external providers: MED, HD, MFG, PRG (recomputes
+    PrgExternalTeamCapacity) and BUILD (recomputes SubcontractedTeamCapacity, keyed
+    by company name = team_name here) -- see
+    recompute_external_team_capacity_from_events in views.py.
+
+    Unlike ScioHeadcountEvent, effective_date can't be backdated before the
+    current week: external headcount changes are reported going forward only.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices)
+    team_name = models.CharField(max_length=100, help_text="External team/provider name (= company name for BUILD)")
+    effective_date = models.DateField(help_text="Calendar date the headcount change takes effect")
+    delta = models.FloatField(help_text="Signed headcount change, e.g. +1 for a hire, -2 for two departures")
+    comment = models.TextField(blank=True, help_text="Optional context, e.g. who joined/left and why")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='external_team_headcount_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'team_name', 'effective_date']
+        indexes = [
+            models.Index(fields=['department', 'team_name', 'effective_date']),
+        ]
+
+    def __str__(self):
+        sign = '+' if self.delta >= 0 else ''
+        return f"{self.department} - {self.team_name} - {self.effective_date}: {sign}{self.delta}"
 
 
 class DepartmentWeeklyTotal(models.Model):

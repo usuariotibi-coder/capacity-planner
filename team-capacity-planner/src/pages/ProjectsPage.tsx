@@ -100,6 +100,8 @@ export function ProjectsPage() {
     PRG: 0,
     PURCHASING: 0,
   });
+  // Quoted amount ($) per department, kept as the raw text typed so decimals like "1234." survive re-render.
+  const [deptCostAllocated, setDeptCostAllocated] = useState<Partial<Record<Department, string>>>({});
   const [selectedYear] = useState<number>(() => new Date().getFullYear());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
@@ -258,6 +260,14 @@ export function ProjectsPage() {
       configuredDepartments
     );
 
+    // Empty text clears the registered amount; otherwise send the number.
+    const departmentCostPayload: Partial<Record<Department, number | null>> = {};
+    DEPARTMENTS.forEach((dept) => {
+      const raw = (deptCostAllocated[dept] ?? '').trim();
+      const parsed = raw === '' ? null : Number(raw);
+      departmentCostPayload[dept] = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    });
+
     try {
       if (editingId) {
         console.log('[ProjectsPage] Updating project with budget hours:', deptHoursAllocated);
@@ -268,6 +278,7 @@ export function ProjectsPage() {
           projectManagerId: selectedProjectManagerId || undefined,
           departmentStages: calculatedDepartmentStages,
           departmentHoursAllocated: deptHoursAllocated,
+          departmentCostAllocated: departmentCostPayload,
           visibleInDepartments: visibilityScopesForSubmit,
         });
         console.log('[ProjectsPage] Project updated successfully');
@@ -290,6 +301,7 @@ export function ProjectsPage() {
         isHighProbability: !!formData.isHighProbability,
         departmentStages: calculatedDepartmentStages,
         departmentHoursAllocated: deptHoursAllocated,
+        departmentCostAllocated: departmentCostPayload,
         visibleInDepartments: visibilityScopesForSubmit,
       };
 
@@ -338,6 +350,7 @@ export function ProjectsPage() {
       setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
       setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
       setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+      setDeptCostAllocated({});
       setShowInGeneral(true);
       setIsFormOpen(false);
     } catch (error) {
@@ -411,6 +424,13 @@ export function ProjectsPage() {
       setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     }
 
+    const nextCosts: Partial<Record<Department, string>> = {};
+    DEPARTMENTS.forEach((dept) => {
+      const cost = proj.departmentCostAllocated?.[dept];
+      if (cost !== undefined && cost !== null) nextCosts[dept] = String(cost);
+    });
+    setDeptCostAllocated(nextCosts);
+
     // Load Project Manager if exists
     setSelectedProjectManagerId(proj.projectManagerId || null);
     setShowInGeneral(shouldProjectShowInGeneral(proj.visibleInDepartments));
@@ -427,6 +447,7 @@ export function ProjectsPage() {
     setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
     setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptCostAllocated({});
     setSelectedProjectManagerId(null);
     setShowInGeneral(true);
     setFormNotice(null);
@@ -728,6 +749,41 @@ export function ProjectsPage() {
                             className="w-full border border-green-200 rounded px-2 py-1.5 focus:border-green-400 focus:outline-none text-xs font-semibold"
                             placeholder="0"
                           />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quoted Amount ($) per Department -> Qtd $ in the Capacity Matrix Summary */}
+                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-3 rounded-lg border-l-4 border-teal-600">
+                    <h3 className="font-semibold mb-2 text-sm text-teal-900">
+                      {language === 'es' ? 'Monto cotizado ($) por departamento' : 'Quoted Amount ($) per Department'}
+                    </h3>
+                    <p className="text-xs text-teal-700 mb-2">
+                      {language === 'es'
+                        ? 'Opcional. Se muestra debajo de las horas en la columna Qtd del Summary.'
+                        : 'Optional. Shown under the hours in the Qtd column of the Summary.'}
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                      {DEPARTMENTS.map((dept) => (
+                        <div key={`cost-${dept}`}>
+                          <label className="block text-xs font-medium mb-0.5 text-gray-700">{dept}</label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-teal-700">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={deptCostAllocated[dept] ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (/^\d*\.?\d{0,2}$/.test(val)) {
+                                  setDeptCostAllocated({ ...deptCostAllocated, [dept]: val });
+                                }
+                              }}
+                              className="w-full border border-teal-200 rounded pl-5 pr-2 py-1.5 focus:border-teal-400 focus:outline-none text-xs font-semibold"
+                              placeholder="0.00"
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>

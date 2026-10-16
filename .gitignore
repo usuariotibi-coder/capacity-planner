@@ -4,6 +4,9 @@
 .env.production
 *.env
 
+# Local credentials - NEVER commit these
+CREDENCIALES_LOCALES.md
+
 # Database files
 *.sqlite3
 *.db

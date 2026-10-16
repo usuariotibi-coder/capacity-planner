@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
@@ -10,7 +10,7 @@ import { DepartmentCostsPage } from './pages/DepartmentCostsPage';
 import LoginPage from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Briefcase, Grid3x3, PanelLeftOpen, PanelLeftClose, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet, DollarSign } from 'lucide-react';
+import { Briefcase, Grid3x3, ChevronLeft, ChevronRight, LogOut, FileText, Lock, User, Moon, Sun, BookOpen, FileSpreadsheet, DollarSign, Layers, Building2 } from 'lucide-react';
 import type { Department } from './types';
 import { useLanguage } from './context/LanguageContext';
 import { useTranslation } from './utils/translations';
@@ -40,6 +40,23 @@ function MainApp() {
     }
     return true;
   });
+
+  // DOM node (rendered in the sidebar, after the department selector) that CapacityMatrixPage
+  // portals its year selector / current-week badge / export buttons into, so they live in the
+  // nav instead of the page's own top toolbar. State (not a plain ref) so mounting it triggers
+  // a re-render and the portal target is available on the same page CapacityMatrixPage reads it.
+  const [sidebarToolbarEl, setSidebarToolbarEl] = useState<HTMLDivElement | null>(null);
+  const sidebarToolbarRef = useCallback((el: HTMLDivElement | null) => {
+    setSidebarToolbarEl(el);
+  }, []);
+
+  // Same idea, but for the collapsed (icon rail) sidebar: just the year selector, portaled in
+  // as a compact icon-select so it stays usable while collapsed (General/department stay in
+  // App.tsx itself since departmentFilter lives here, not in CapacityMatrixPage).
+  const [sidebarToolbarCollapsedEl, setSidebarToolbarCollapsedEl] = useState<HTMLDivElement | null>(null);
+  const sidebarToolbarCollapsedRef = useCallback((el: HTMLDivElement | null) => {
+    setSidebarToolbarCollapsedEl(el);
+  }, []);
 
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>(() => {
     // Load department filter from localStorage if available
@@ -251,41 +268,42 @@ function MainApp() {
       case 'department-costs':
         return <DepartmentCostsPage />;
       case 'capacity':
-        return <CapacityMatrixPage departmentFilter={departmentFilter} />;
+        return <CapacityMatrixPage departmentFilter={departmentFilter} sidebarToolbarContainer={sidebarToolbarEl} sidebarToolbarCollapsedContainer={sidebarToolbarCollapsedEl} />;
       default:
-        return <CapacityMatrixPage departmentFilter={departmentFilter} />;
+        return <CapacityMatrixPage departmentFilter={departmentFilter} sidebarToolbarContainer={sidebarToolbarEl} sidebarToolbarCollapsedContainer={sidebarToolbarCollapsedEl} />;
     }
   };
 
   return (
     <div className="brand-app-shell flex h-[100dvh] overflow-hidden relative">
-      {/* Single floating toggle - always reachable, morphs position/icon with sidebar state */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className={`fixed top-3 z-[210] inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#2e1a47] hover:bg-[#3b2658] text-white border border-white/25 shadow-lg transition-all duration-300 ${
-          sidebarOpen ? 'left-[38px] md:left-[150px]' : 'left-3'
-        }`}
-        title={sidebarOpen ? t.hideSidebar : t.showSidebar}
-        aria-label={sidebarOpen ? t.hideSidebar : t.showSidebar}
-      >
-        {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
-      </button>
-
-      {/* Sidebar - inline flex, not overlay */}
+      {/* Sidebar - inline flex, not overlay. Collapsed = narrow icon-only rail (not hidden). */}
       <div
         className={`${
-          sidebarOpen ? 'w-12 md:w-40' : 'w-0'
-        } brand-sidebar -mt-px h-[calc(100%+1px)] text-white transition-all duration-300 overflow-hidden flex flex-col shadow-sm border-r border-white/15 flex-shrink-0 min-h-0`}
+          sidebarOpen ? 'w-44' : 'w-14'
+        } brand-sidebar -mt-px h-[calc(100%+1px)] text-white transition-all duration-300 overflow-visible flex flex-col shadow-sm border-r border-white/15 flex-shrink-0 min-h-0 relative`}
       >
+        {/* Small discrete toggle, attached to the sidebar's edge */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute top-3 -right-2.5 z-[210] inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2e1a47] hover:bg-[#3b2658] text-white border border-white/30 shadow-md transition-colors"
+          title={sidebarOpen ? t.hideSidebar : t.showSidebar}
+          aria-label={sidebarOpen ? t.hideSidebar : t.showSidebar}
+        >
+          {sidebarOpen ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+        </button>
+
+        <div className="overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="p-1.5 md:p-3 border-b border-white/15 flex-shrink-0">
-          <div className="flex items-center justify-center md:justify-start gap-2">
-            <div className="w-7 h-7 rounded-md bg-white/12 border border-white/30 flex items-center justify-center">
+          <div className={`flex items-center gap-2 ${sidebarOpen ? 'justify-start' : 'justify-center'}`}>
+            <div className="w-7 h-7 rounded-md bg-white/12 border border-white/30 flex items-center justify-center flex-shrink-0">
               <Grid3x3 size={14} className="text-white" />
             </div>
-            <div className="hidden md:block min-w-0">
-              <h1 className="text-[13px] font-semibold leading-tight tracking-tight truncate text-white">{t.teamCapacity}</h1>
-              <p className="text-[9px] text-[#d5d1da] mt-0.5 truncate">{t.plannerSubtitle}</p>
-            </div>
+            {sidebarOpen && (
+              <div className="min-w-0">
+                <h1 className="text-[13px] font-semibold leading-tight tracking-tight truncate text-white">{t.teamCapacity}</h1>
+                <p className="text-[9px] text-[#d5d1da] mt-0.5 truncate">{t.plannerSubtitle}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -298,7 +316,7 @@ function MainApp() {
               onClick={() => {
                 setCurrentPage(item.id);
               }}
-              className={`w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-0 md:gap-1.5 px-1 md:px-2.5 py-1.5 md:py-1.5 rounded-md border transition text-[8px] md:text-[11px] ${
+              className={`w-full flex items-center gap-0 ${sidebarOpen ? 'justify-start gap-1.5 px-2.5' : 'justify-center px-1'} py-1.5 rounded-md border transition text-[11px] ${
                 currentPage === item.id
                   ? 'bg-gradient-to-r from-[#827691] to-[#2E1A47] text-white border-[#9c92ab] shadow-[0_8px_16px_rgba(46,26,71,0.35)]'
                   : 'text-[#d8d2e5] border-transparent hover:bg-white/10 hover:border-white/20'
@@ -306,12 +324,12 @@ function MainApp() {
               title={item.label}
             >
               <span className="flex-shrink-0">{item.icon}</span>
-              <span className="font-medium text-center md:text-left leading-none">{item.label}</span>
+              {sidebarOpen && <span className="font-medium text-left leading-none truncate">{item.label}</span>}
             </button>
           ))}
         </nav>
 
-        {currentPage === 'capacity' && (
+        {currentPage === 'capacity' && sidebarOpen && (
           <div className="p-1.5 md:p-3 border-t border-white/15 space-y-1.5">
             <button
               onClick={() => {
@@ -324,11 +342,10 @@ function MainApp() {
               }`}
               title={t.general}
             >
-              <span className="md:hidden">{t.general}</span>
-              <span className="hidden md:inline">{t.general}</span>
+              {t.general}
             </button>
 
-            <label className="hidden md:block text-[9px] font-semibold text-[#d5d1da] tracking-wide">{t.viewDepartment}</label>
+            <label className="block text-[9px] font-semibold text-[#d5d1da] tracking-wide">{t.viewDepartment}</label>
             <select
               value={departmentFilter === 'General' ? '' : departmentFilter}
               onChange={(e) => {
@@ -343,6 +360,60 @@ function MainApp() {
                 </option>
               ))}
             </select>
+
+            {/* CapacityMatrixPage portals its year selector / current-week badge / export
+                buttons into this node, placed right after the department selector. */}
+            <div ref={sidebarToolbarRef} />
+          </div>
+        )}
+
+        {/* Collapsed rail: General / department / year stay usable as icon-sized controls
+            instead of disappearing with the rest of the expanded filter block. Department and
+            year are native <select>s made invisible (opacity-0) and overlaid on an icon so
+            the dropdown still opens and works, just without visible text. */}
+        {currentPage === 'capacity' && !sidebarOpen && (
+          <div className="p-1.5 border-t border-white/15 space-y-1.5 flex flex-col items-center">
+            <button
+              onClick={() => setDepartmentFilter('General')}
+              className={`w-9 h-9 flex items-center justify-center rounded-md border transition ${
+                departmentFilter === 'General'
+                  ? 'bg-gradient-to-r from-[#827691] to-[#2E1A47] border-[#9c92ab] text-white'
+                  : 'bg-white/10 border-white/20 text-[#d8d2e5] hover:bg-white/15'
+              }`}
+              title={t.general}
+              aria-label={t.general}
+            >
+              <Layers size={14} />
+            </button>
+
+            <div className="relative w-9 h-9">
+              <select
+                value={departmentFilter === 'General' ? '' : departmentFilter}
+                onChange={(e) => {
+                  setDepartmentFilter((e.target.value as DepartmentFilter) || 'General');
+                }}
+                className="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title={t.viewDepartment}
+                aria-label={t.viewDepartment}
+              >
+                <option value="" className="text-[#2e1a47] bg-white">{t.selectDepartment}</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept} className="text-[#2e1a47] bg-white">{dept}</option>
+                ))}
+              </select>
+              <div
+                className={`absolute inset-0 pointer-events-none rounded-md border flex items-center justify-center transition peer-focus:ring-2 peer-focus:ring-white/40 peer-hover:bg-white/15 ${
+                  departmentFilter !== 'General'
+                    ? 'bg-gradient-to-r from-[#827691] to-[#2E1A47] border-[#9c92ab] text-white'
+                    : 'bg-white/10 border-white/20 text-[#d8d2e5]'
+                }`}
+              >
+                <Building2 size={14} />
+              </div>
+            </div>
+
+            {/* CapacityMatrixPage portals a matching icon-select for the year here. */}
+            <div ref={sidebarToolbarCollapsedRef} />
           </div>
         )}
 
@@ -357,7 +428,7 @@ function MainApp() {
                 ref={userMenuTriggerRef}
                 type="button"
                 onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                className="w-full flex items-center justify-center md:justify-start gap-2 rounded-md border border-white/20 bg-white/10 hover:bg-white/15 transition px-1 md:px-2 py-1.5"
+                className={`w-full flex items-center gap-2 rounded-md border border-white/20 bg-white/10 hover:bg-white/15 transition px-1 md:px-2 py-1.5 ${sidebarOpen ? 'justify-start' : 'justify-center'}`}
                 title={userRoleLabel ? `${currentUser} - ${userRoleLabel}` : currentUser}
               >
                 <div className="h-7 w-7 rounded-full bg-white/15 border border-white/30 flex items-center justify-center flex-shrink-0">
@@ -366,14 +437,16 @@ function MainApp() {
                     {currentUser.split(' ').length > 1 ? currentUser.split(' ')[1].charAt(0).toUpperCase() : ''}
                   </span>
                 </div>
-                <div className="hidden md:block min-w-0 text-left">
-                  <p className="truncate text-[11px] font-semibold leading-none text-white">
-                    {currentUser}
-                  </p>
-                  <p className="mt-0.5 truncate text-[9px] leading-none text-[#d5d1da]">
-                    {userRoleLabel}
-                  </p>
-                </div>
+                {sidebarOpen && (
+                  <div className="min-w-0 text-left">
+                    <p className="truncate text-[11px] font-semibold leading-none text-white">
+                      {currentUser}
+                    </p>
+                    <p className="mt-0.5 truncate text-[9px] leading-none text-[#d5d1da]">
+                      {userRoleLabel}
+                    </p>
+                  </div>
+                )}
               </button>
               {isUserMenuOpen && (
                 <div
@@ -419,7 +492,7 @@ function MainApp() {
                 aria-label={t.dayMode}
               >
                 <Sun size={11} />
-                <span className="hidden md:inline">{t.dayMode}</span>
+                {sidebarOpen && <span>{t.dayMode}</span>}
               </button>
               <button
                 onClick={() => setTheme('night')}
@@ -430,41 +503,42 @@ function MainApp() {
                 aria-label={t.nightMode}
               >
                 <Moon size={11} />
-                <span className="hidden md:inline">{t.nightMode}</span>
+                {sidebarOpen && <span>{t.nightMode}</span>}
               </button>
             </div>
 
             {/* Language Selector */}
-            <div className="flex items-center gap-0.5 p-0.5 rounded-md border border-white/20 bg-white/10">
-              <button
-                onClick={() => setLanguage('es')}
-                className={`flex-1 px-1 py-1 rounded text-[9px] md:text-[10px] font-semibold transition ${
-                  language === 'es' ? 'bg-white/25 text-white' : 'text-[#d8d2e5] hover:bg-white/10'
-                }`}
-                title="Espanol"
-              >
-                ES
-              </button>
-              <button
-                onClick={() => setLanguage('en')}
-                className={`flex-1 px-1 py-1 rounded text-[9px] md:text-[10px] font-semibold transition ${
-                  language === 'en' ? 'bg-white/25 text-white' : 'text-[#d8d2e5] hover:bg-white/10'
-                }`}
-                title="English"
-              >
-                EN
-              </button>
-            </div>
+            {sidebarOpen && (
+              <div className="flex items-center gap-0.5 p-0.5 rounded-md border border-white/20 bg-white/10">
+                <button
+                  onClick={() => setLanguage('es')}
+                  className={`flex-1 px-1 py-1 rounded text-[9px] md:text-[10px] font-semibold transition ${
+                    language === 'es' ? 'bg-white/25 text-white' : 'text-[#d8d2e5] hover:bg-white/10'
+                  }`}
+                  title="Espanol"
+                >
+                  ES
+                </button>
+                <button
+                  onClick={() => setLanguage('en')}
+                  className={`flex-1 px-1 py-1 rounded text-[9px] md:text-[10px] font-semibold transition ${
+                    language === 'en' ? 'bg-white/25 text-white' : 'text-[#d8d2e5] hover:bg-white/10'
+                  }`}
+                  title="English"
+                >
+                  EN
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         </div>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col overflow-hidden min-h-0 ${sidebarOpen ? '-ml-px' : ''}`}>
-        {/* Reserved strip so page content never sits under the floating sidebar toggle */}
-        <div className="h-10 flex-shrink-0" aria-hidden="true" />
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0 -ml-px">
         <div className="flex-1 overflow-hidden min-h-0">
           {renderPage()}
         </div>

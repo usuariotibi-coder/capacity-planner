@@ -1,21 +1,25 @@
 ﻿import { useState, useEffect, useRef, useMemo, type CSSProperties, type DragEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
-import { usePRGTeamsStore } from '../stores/prgTeamsStore';
-import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi, projectDepartmentWeeklyActualsApi } from '../services/api';
-import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber, getWeeksInRange } from '../utils/dateUtils';
+import { useExternalTeamsStore } from '../stores/externalTeamsStore';
+import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi, projectDepartmentWeeklyActualsApi, departmentHourlyCostApi } from '../services/api';
+import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber, getWeeksInRange, addWeeksToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { generateId } from '../utils/id';
-import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, XCircle, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle, History } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronDown, ChevronUp, Pencil, Plus, Minus, X, XCircle, FolderPlus, ClipboardList, GripVertical, MessageCircle, AlertTriangle, History, Calendar } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../utils/translations';
 import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrder, ProjectDepartmentWeeklyActual } from '../types';
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 import { ScioHeadcountModal } from '../components/ScioHeadcountModal';
+import { ExternalStaffHeadcountModal } from '../components/ExternalStaffHeadcountModal';
+import { WeekSplitEditor, computeWeeklyHours, computeMatrixHours, SOLO_COLUMN } from '../components/WeekSplitEditor';
+import { MoveAssignmentWeeksModal } from '../components/MoveAssignmentWeeksModal';
 
 type DepartmentFilter = 'General' | Department;
 type LegendStage = Exclude<Stage, null>;
@@ -25,6 +29,16 @@ const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
 const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
 const SHARED_EDIT_DEPARTMENTS: Department[] = ['BUILD', 'MFG'];
 const HEAD_ENGINEERING_MANAGED_DEPARTMENTS: Department[] = ['MED', 'HD'];
+
+// Departments with the "add an external team" roster feature. BUILD has its own, separate
+// system (SubcontractedTeamCapacity/useBuildTeamsStore, company-named) -- these 4 share the
+// generalized external-team-capacity system instead (still served by the `PrgExternalTeamCapacity`
+// model/endpoint, kept its name, see that model's docstring).
+const EXTERNAL_TEAM_DEPARTMENTS: Department[] = ['MED', 'HD', 'MFG', 'PRG'];
+// Personnel/input/record-id maps below are keyed by team, but a team name isn't unique across
+// departments -- this composes a per-department key so e.g. MED's "Team A" and PRG's "Team A"
+// don't collide.
+const externalTeamKey = (department: Department, teamName: string) => `${department}::${teamName}`;
 
 const STAGE_OPTIONS: Record<Department, Exclude<Stage, null>[]> = {
   'HD': ['SWITCH_LAYOUT_REVISION', 'CONTROLS_DESIGN', 'RELEASE', 'RED_LINES', 'SUPPORT'],
@@ -98,6 +112,16 @@ interface ProjectCellClipboardState {
 
 interface CapacityMatrixPageProps {
   departmentFilter: DepartmentFilter;
+  // Sidebar DOM node (rendered by App.tsx, after the department selector) that the year
+  // selector, current-week badge, and export buttons portal into instead of sitting in the
+  // page's own top toolbar -- frees up the top bar's horizontal space. Null while the sidebar
+  // is collapsed (that node only exists when open), in which case those controls render
+  // nothing rather than reappearing elsewhere.
+  sidebarToolbarContainer?: HTMLDivElement | null;
+  // Same idea for the collapsed (icon rail) sidebar: a node to portal a compact, icon-only
+  // year selector into so it stays usable while collapsed, rendered right after the
+  // department icon-select App.tsx renders there itself.
+  sidebarToolbarCollapsedContainer?: HTMLDivElement | null;
 }
 
 interface StageHoursEntry {
@@ -110,6 +134,29 @@ interface StageHoursEntry {
   // relabels these rows' `stage` in place instead of the normal create/reset
   // flow (which would otherwise touch hours).
   assignmentIds?: string[];
+  // How many consecutive weeks (starting at the cell's own week) this stage entry's hours
+  // are spread across -- each Stage entry in the same cell can span a different number of
+  // weeks. 1 (the default) is the original single-week behavior, untouched.
+  weekCount: number;
+  // Raw text buffer for the week-count input, mirrored for BUILD/PRG entries only (see
+  // scioCellInputs below) -- HD/MED's WeekSplitEditor manages its own internal buffer since it
+  // owns a single pool, but BUILD/PRG shares one week count across two pools (SCIO/External)
+  // via hideWeekCountInput, so the buffer has to live out here instead.
+  weekCountInput: string;
+  weeklyEven: boolean;
+  weeklyHoursInputs: string[];
+  // BUILD/PRG-only: each stage entry has its own independent SCIO/External hour pools, each
+  // with its own per-person week x column breakdown (see WeekSplitEditor's `columns`). Left at
+  // their defaults and unused for every other department's stage entries (HD/MED just use
+  // `hours`/`hoursInput`/`weeklyEven`/`weeklyHoursInputs` above, unchanged).
+  scioHours: number;
+  scioHoursInput: string;
+  externalHours: number;
+  externalHoursInput: string;
+  scioWeeklyEven: boolean;
+  scioCellInputs: Record<string, string>;
+  externalWeeklyEven: boolean;
+  externalCellInputs: Record<string, string>;
 }
 
 interface StageResourceHoursEntry {
@@ -219,16 +266,17 @@ const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
 const TIMING_COMPACT_STICKY_WIDTHS = [72, 80, 56, 72, 56, 56, 56, 56] as const;
 // The per-project Summary section (Qtd/Used/Fcst/Util) is pinned to the right edge of the
-// table so it stays visible while scrolling through weeks. Each column is a fixed 52px so the
-// `right` offsets below stack correctly (rightmost = Util at right:0).
-const SUMMARY_COLUMN_WIDTH_PX = 52;
-const SUMMARY_COLUMNS: Array<{ key: 'qtd' | 'used' | 'fcst' | 'util'; rightOffset: number }> = [
-  { key: 'qtd', rightOffset: SUMMARY_COLUMN_WIDTH_PX * 3 },
-  { key: 'used', rightOffset: SUMMARY_COLUMN_WIDTH_PX * 2 },
-  { key: 'fcst', rightOffset: SUMMARY_COLUMN_WIDTH_PX * 1 },
-  { key: 'util', rightOffset: 0 },
-];
-const SUMMARY_COLUMN_LABELS: Record<'qtd' | 'used' | 'fcst' | 'util', { es: string; en: string }> = {
+// table so it stays visible while scrolling through weeks. Each column is a fixed 60px so the
+// `right` offsets stack correctly (rightmost column at right:0). Qtd/Used/Fcst show hours with
+// the $ amount underneath; Util shows current % over the % including forecast.
+const SUMMARY_COLUMN_WIDTH_PX = 60;
+const SUMMARY_COLUMN_KEYS = ['qtd', 'used', 'fcst', 'util'] as const;
+type SummaryColumnKey = (typeof SUMMARY_COLUMN_KEYS)[number];
+const SUMMARY_COLUMNS: Array<{ key: SummaryColumnKey; rightOffset: number }> = SUMMARY_COLUMN_KEYS.map(
+  (key, idx) => ({ key, rightOffset: (SUMMARY_COLUMN_KEYS.length - 1 - idx) * SUMMARY_COLUMN_WIDTH_PX })
+);
+const SUMMARY_TOTAL_WIDTH_PX = SUMMARY_COLUMN_WIDTH_PX * SUMMARY_COLUMN_KEYS.length;
+const SUMMARY_COLUMN_LABELS: Record<SummaryColumnKey, { es: string; en: string }> = {
   qtd: { es: 'Cot', en: 'Qtd' },
   used: { es: 'Usa', en: 'Used' },
   fcst: { es: 'Pron', en: 'Fcst' },
@@ -384,7 +432,7 @@ const projectHasDepartmentRangeOverlap = (project: Project, rangeStart: string, 
   return false;
 };
 
-export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps) {
+export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, sidebarToolbarCollapsedContainer }: CapacityMatrixPageProps) {
   const employees = useEmployeeStore((state) => state.employees);
   const addEmployee = useEmployeeStore((state) => state.addEmployee);
   const assignments = useAssignmentStore((state) => state.assignments);
@@ -422,15 +470,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const [editingCell, setEditingCell] = useState<CellEditState | null>(null);
   const [editingHours, setEditingHours] = useState<number>(0);
-  const [editingScioHours, setEditingScioHours] = useState<number>(0);
-  const [initialScioHours, setInitialScioHours] = useState<number>(0);
-  const [editingExternalHours, setEditingExternalHours] = useState<number>(0);
   const [editingHoursInput, setEditingHoursInput] = useState<string>('');
-  const [editingScioHoursInput, setEditingScioHoursInput] = useState<string>('');
-  const [editingExternalHoursInput, setEditingExternalHoursInput] = useState<string>('');
   const [editingStage, setEditingStage] = useState<Stage>(null);
   const [editingStageEntries, setEditingStageEntries] = useState<StageHoursEntry[]>([]);
   const [editingStageResourceHours, setEditingStageResourceHours] = useState<Record<string, StageResourceHoursEntry>>({});
+  // "Divide this activity across N weeks" -- generic Hours field only (PM/PURCHASING/MFG: no
+  // Stage planner, no SCIO/External split). Departments WITH a Stage planner (HD/MED/BUILD/PRG)
+  // use the matching weekCount/weeklyEven/weeklyHoursInputs (and, for BUILD/PRG, the
+  // scio*/external* pool fields) on each StageHoursEntry instead, since each stage entry can
+  // span its own number of weeks.
+  const [editingWeekCount, setEditingWeekCount] = useState<number>(1);
+  // Raw text buffer for the generic Hours field's "Split across weeks" input, mirroring
+  // WeekSplitEditor's own internal buffer (see its comment) so the field can be cleared and
+  // retyped instead of snapping back to "1" on every keystroke.
+  const [editingWeekCountInput, setEditingWeekCountInput] = useState<string>('1');
+  const [editingWeeklyEven, setEditingWeeklyEven] = useState<boolean>(true);
+  const [editingWeeklyHoursInputs, setEditingWeeklyHoursInputs] = useState<string[]>([]);
   const [assignToChangeOrder, setAssignToChangeOrder] = useState<boolean>(false);
   const [selectedChangeOrderId, setSelectedChangeOrderId] = useState<string>('');
   const [editingComment, setEditingComment] = useState<string>('');
@@ -443,6 +498,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [showGlobalPanel, setShowGlobalPanel] = useState<boolean>(true);
   const [showDepartmentPanel, setShowDepartmentPanel] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [showMoveWeeksModal, setShowMoveWeeksModal] = useState<boolean>(false);
   const [highProbabilityConfirmProject, setHighProbabilityConfirmProject] = useState<Project | null>(null);
   const [isClearingHighProbability, setIsClearingHighProbability] = useState<boolean>(false);
   const [isDeletingHighProbabilityProject, setIsDeletingHighProbabilityProject] = useState<boolean>(false);
@@ -453,18 +509,37 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const createStageHoursEntry = (
     stage: Exclude<Stage, null> | '' = '',
     hours = 0,
-    assignmentIds?: string[]
+    assignmentIds?: string[],
+    scioHours = 0,
+    externalHours = 0
   ): StageHoursEntry => ({
     id: generateId(),
     stage,
     hours,
     hoursInput: hours > 0 ? `${hours}` : '',
     assignmentIds,
+    weekCount: 1,
+    weekCountInput: '1',
+    weeklyEven: true,
+    weeklyHoursInputs: [],
+    scioHours,
+    scioHoursInput: scioHours > 0 ? `${scioHours}` : '',
+    externalHours,
+    externalHoursInput: externalHours > 0 ? `${externalHours}` : '',
+    scioWeeklyEven: true,
+    scioCellInputs: {},
+    externalWeeklyEven: true,
+    externalCellInputs: {},
   });
 
   const createStageResourceKey = (stageEntryId: string, employeeId: string) => `${stageEntryId}::${employeeId}`;
 
   const roundHours = (value: number) => Math.round((value || 0) * 100) / 100;
+  // A BUILD/PRG resource pool (SCIO or External) stores its single-column ("fewer than 2 people
+  // selected") weekly values in the same cellInputs map as its grid mode, under SOLO_COLUMN --
+  // WeekSplitEditor's single-list rendering wants them back out as a plain array, one per week.
+  const deriveSoloWeeklyInputs = (cellInputs: Record<string, string>, weekCount: number): string[] =>
+    Array.from({ length: Math.max(1, weekCount) }, (_, i) => cellInputs[`${SOLO_COLUMN}::${i}`] ?? '');
   const minYearOption = 2024;
   const maxYearOption = new Date().getFullYear() + 10;
   const yearOptions = Array.from(
@@ -482,14 +557,14 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     setEditingHours(0);
     setEditingComment('');
     setEditingHoursInput('');
-    setEditingScioHours(0);
-    setEditingScioHoursInput('');
-    setEditingExternalHours(0);
-    setEditingExternalHoursInput('');
-    setInitialScioHours(0);
     setSelectedEmployees(new Set());
     setSupportEmployeeToAdd('');
     setShowDeleteConfirm(false);
+    setShowMoveWeeksModal(false);
+    setEditingWeekCount(1);
+    setEditingWeekCountInput('1');
+    setEditingWeeklyEven(true);
+    setEditingWeeklyHoursInputs([]);
   };
 
   const stageEntriesTotalHours = useMemo(
@@ -499,9 +574,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const stageResourceTotalHours = useMemo(() => {
     if (!editingCell) return 0;
-    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    const hasStagePlanner = STAGE_OPTIONS[editingCell.department].length > 0;
     if (!hasStagePlanner) return 0;
+
+    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+    if (isBuildOrPRGDept) {
+      // BUILD/PRG keeps each entry's own scioHours+externalHours as the source of truth --
+      // per-employee allocation lives in the entry's own week x person grids (WeekSplitEditor's
+      // `columns`), not in editingStageResourceHours (that mechanism is HD/MED-only).
+      return stageEntriesTotalHours;
+    }
 
     const selectedIds = Array.from(selectedEmployees).filter((employeeId) => {
       const emp = employees.find((candidate) => candidate.id === employeeId);
@@ -535,8 +617,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   useEffect(() => {
     if (!editingCell) return;
-    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    const hasStagePlanner = STAGE_OPTIONS[editingCell.department].length > 0;
     if (!hasStagePlanner) return;
 
     setEditingHours(stageResourceTotalHours);
@@ -545,8 +626,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   useEffect(() => {
     if (!editingCell) return;
-    const isBuildOrPRGDept = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-    const hasStagePlanner = !isBuildOrPRGDept && STAGE_OPTIONS[editingCell.department].length > 0;
+    const hasStagePlanner = STAGE_OPTIONS[editingCell.department].length > 0;
     if (!hasStagePlanner) return;
 
     const activeEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
@@ -603,14 +683,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Structure: { `${company}-${weekDate}`: recordId }
   const [subcontractedRecordIds, setSubcontractedRecordIds] = useState<Record<string, string>>({});
 
-  // Track API record IDs for PRG External Team Capacity (for deletion)
-  // Structure: { `${teamName}-${weekDate}`: recordId }
+  // Track API record IDs for External Team Capacity (for deletion)
+  // Structure: { `${externalTeamKey(department, teamName)}-${weekDate}`: recordId }
   const [prgExternalRecordIds, setPrgExternalRecordIds] = useState<Record<string, string>>({});
 
   // Delete confirmation state
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
-    type: 'subcontracted' | 'prg' | null;
+    type: 'subcontracted' | 'external' | null;
+    department?: Department;
     teamName: string;
     teamData?: any;
   }>({ isOpen: false, type: null, teamName: '' });
@@ -653,11 +734,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   // Active subcontracted teams for BUILD department - Use global store and subscribe to changes
   const { activeTeams, setActiveTeams } = useBuildTeamsStore();
 
-  // Active external teams for PRG department - Use global store and subscribe to changes
-  const { activeTeams: prgActiveTeams, setActiveTeams: setPRGActiveTeams } = usePRGTeamsStore();
+  // Active external teams for MED/HD/MFG/PRG - Use global store and subscribe to changes
+  const { teamsByDepartment: externalTeamsByDepartment, setTeamsForDepartment: setExternalTeamsForDepartment } = useExternalTeamsStore();
+  const getExternalTeamsFor = (department: Department): string[] => externalTeamsByDepartment[department] || [];
 
-  // External Personnel state for PRG department
-  // Structure: { teamName: { weekDate: count } }
+  // External Personnel state for MED/HD/MFG/PRG, keyed by externalTeamKey(department, teamName)
+  // Structure: { [externalTeamKey(department, teamName)]: { weekDate: count } }
   // Use lazy initialization to load from localStorage on first render
   const [prgExternalPersonnel, setPRGExternalPersonnel] = useState<Record<string, Record<string, number | undefined>>>(() => {
     const saved = localStorage.getItem('prgExternalPersonnel');
@@ -685,16 +767,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
   const [prgExternalInputs, setPrgExternalInputs] = useState<Record<string, string>>({});
 
-  // Modal state for adding PRG external teams
-  const [isPRGModalOpen, setIsPRGModalOpen] = useState(false);
-  const [prgTeamName, setPRGTeamName] = useState('');
+  // Modal state for adding an external team (MED/HD/MFG/PRG) -- which department's "Add"
+  // button was clicked, or null when the modal is closed.
+  const [externalTeamModalDept, setExternalTeamModalDept] = useState<Department | null>(null);
+  const [externalTeamName, setExternalTeamName] = useState('');
+  const [externalTeamHeadcount, setExternalTeamHeadcount] = useState('');
 
   // Modal state for adding BUILD subcontracted teams
   const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
   const [buildTeamName, setBuildTeamName] = useState('');
+  const [buildTeamHeadcount, setBuildTeamHeadcount] = useState('');
 
   // Modal state for logging SCIO headcount hires/departures
   const [isHeadcountModalOpen, setIsHeadcountModalOpen] = useState(false);
+
+  // Modal state for logging external staff hires/departures (MED/HD/MFG/BUILD/PRG)
+  const [isExternalStaffModalOpen, setIsExternalStaffModalOpen] = useState(false);
 
   // Per-project zoom levels
   const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
@@ -763,6 +851,34 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>(
     projects.reduce((acc, proj) => ({ ...acc, [proj.id]: false }), {})
   );
+
+  // Current (latest-saved) hourly cost per department, from the Department Hourly Cost page.
+  // Used for the "$ Fcst" Summary column. The backend keeps one row per department holding the
+  // most recent value (older values live in the ActivityLog history), so no "pick the latest" is
+  // needed here.
+  const [departmentHourlyCosts, setDepartmentHourlyCosts] = useState<Partial<Record<Department, number>>>({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows: Array<{ department: Department; hourlyCost: number | string }> =
+          await departmentHourlyCostApi.getAll();
+        if (cancelled) return;
+        const next: Partial<Record<Department, number>> = {};
+        rows.forEach((row) => {
+          // DRF serializes DecimalField as a string ("25.36").
+          const rate = Number(row.hourlyCost);
+          if (Number.isFinite(rate)) next[row.department] = rate;
+        });
+        setDepartmentHourlyCosts(next);
+      } catch (error) {
+        console.error('[CapacityMatrix] Failed to load department hourly costs:', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [projectOrderByScope, setProjectOrderByScope] = useState<Record<string, string[]>>(() => {
     try {
       const raw = localStorage.getItem(PROJECT_ORDER_STORAGE_KEY);
@@ -909,19 +1025,20 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     loadChangeOrders();
   }, []);
 
-  // Load BUILD and PRG teams from API, and load subcontracted/external personnel capacity data
-  useEffect(() => {
-    const loadTeamsData = async () => {
+  // Load BUILD and PRG teams from API, and load subcontracted/external personnel capacity data.
+  // Hoisted out of the mount effect (like loadScioTeamCapacity above) so the external staff
+  // headcount modal can trigger a refresh after logging a hire/departure.
+  const loadTeamsData = async () => {
       try {
         // Load active BUILD teams
         const buildStore = useBuildTeamsStore.getState();
         await buildStore.loadActiveTeams();
         console.log('[CapacityMatrix] BUILD teams loaded, activeTeams =', buildStore.activeTeams);
 
-        // Load active PRG teams
-        const prgStore = usePRGTeamsStore.getState();
-        await prgStore.loadActiveTeams();
-        console.log('[CapacityMatrix] PRG teams loaded, activeTeams =', prgStore.activeTeams);
+        // Load active external teams (MED/HD/MFG/PRG)
+        const externalTeamsStore = useExternalTeamsStore.getState();
+        await externalTeamsStore.loadActiveTeams();
+        console.log('[CapacityMatrix] External teams loaded, teamsByDepartment =', externalTeamsStore.teamsByDepartment);
 
         // Load subcontracted team capacity data
         console.log('[CapacityMatrix] Loading Subcontracted Team Capacity from API...');
@@ -980,20 +1097,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         setSubcontractedRecordIds(prev => ({ ...prev, ...newSubcontractedRecordIds }));
         console.log('[CapacityMatrix] Subcontracted Team Capacity loaded');
 
-        // Load PRG external team capacity data
-        console.log('[CapacityMatrix] Loading PRG External Team Capacity from API...');
+        // Load external team capacity data (MED/HD/MFG/PRG)
+        console.log('[CapacityMatrix] Loading External Team Capacity from API...');
         const prgExternalData = await prgExternalTeamCapacityApi.getAll();
         const newPrgExternalPersonnel: Record<string, Record<string, number | undefined>> = {};
         const newPrgExternalRecordIds: Record<string, string> = {};
         const prgExternalLatestByKey: Record<string, number> = {};
 
         for (const record of prgExternalData) {
+          const department = record.department as Department;
           const teamName = record.teamName;
           const weekDate = normalizeWeekStartDate(record.weekStartDate);
           const capacity = record.capacity;
 
-          if (teamName && weekDate) {
-            const recordKey = `${teamName}-${weekDate}`;
+          if (department && teamName && weekDate) {
+            const team = externalTeamKey(department, teamName);
+            const recordKey = `${team}-${weekDate}`;
             const timestampSource = record.updatedAt || record.createdAt;
             const recordTimestamp = timestampSource ? new Date(timestampSource).getTime() : 0;
             const safeTimestamp = Number.isNaN(recordTimestamp) ? 0 : recordTimestamp;
@@ -1001,10 +1120,10 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
             if (existingTimestamp !== undefined && safeTimestamp < existingTimestamp) {
               continue;
             }
-            if (!newPrgExternalPersonnel[teamName]) {
-              newPrgExternalPersonnel[teamName] = {};
+            if (!newPrgExternalPersonnel[team]) {
+              newPrgExternalPersonnel[team] = {};
             }
-            newPrgExternalPersonnel[teamName][weekDate] = capacity;
+            newPrgExternalPersonnel[team][weekDate] = capacity;
             newPrgExternalRecordIds[recordKey] = record.id;
             prgExternalLatestByKey[recordKey] = safeTimestamp;
           }
@@ -1033,8 +1152,9 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
       } catch (error) {
         console.error('[CapacityMatrix] Error loading teams data:', error);
       }
-    };
+  };
 
+  useEffect(() => {
     loadTeamsData();
   }, []);
 
@@ -1345,20 +1465,22 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     }, 500);
   };
 
-  // Save PRG External Team Capacity to API
-  const savePrgExternalCapacity = async (teamName: string, weekDate: string, capacity: number | undefined) => {
+  // Save External Team Capacity to API (MED/HD/MFG/PRG)
+  const savePrgExternalCapacity = async (department: Department, teamName: string, weekDate: string, capacity: number | undefined) => {
     const normalizedWeek = normalizeWeekStartDate(weekDate);
-    console.log('[CapacityMatrix] savePrgExternalCapacity called:', { teamName, weekDate: normalizedWeek, capacity });
+    const team = externalTeamKey(department, teamName);
+    console.log('[CapacityMatrix] savePrgExternalCapacity called:', { department, teamName, weekDate: normalizedWeek, capacity });
 
     try {
       if (capacity === undefined) {
-        console.log('[CapacityMatrix] Skipping PRG External save - capacity is undefined');
+        console.log('[CapacityMatrix] Skipping External Team save - capacity is undefined');
         return;
       }
 
-      console.log('[CapacityMatrix] Saving PRG External capacity:', teamName, normalizedWeek, capacity);
+      console.log('[CapacityMatrix] Saving External Team capacity:', department, teamName, normalizedWeek, capacity);
       console.log('[CapacityMatrix] Sending CREATE request to API...');
       const result = await prgExternalTeamCapacityApi.create({
+        department,
         teamName,
         weekStartDate: normalizedWeek,
         capacity,
@@ -1369,15 +1491,15 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
       setPRGExternalPersonnel(prev => ({
         ...prev,
-        [teamName]: {
-          ...(prev[teamName] || {}),
+        [team]: {
+          ...(prev[team] || {}),
           [resultWeek]: capacity,
         },
       }));
 
       setPrgExternalRecordIds(prev => ({
         ...prev,
-        [`${teamName}-${resultWeek}`]: result.id,
+        [`${team}-${resultWeek}`]: result.id,
       }));
 
       // Log activity
@@ -1385,42 +1507,43 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         'updated',
         'PrgExternalTeamCapacity',
         result.id,
-        { teamName, weekStartDate: resultWeek, capacity }
+        { department, teamName, weekStartDate: resultWeek, capacity }
       );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] ERROR saving PRG External capacity:', errorMsg);
-      alert(`Error al guardar capacidad PRG (${teamName} - ${normalizedWeek}): ${errorMsg}`);
+      console.error('[CapacityMatrix] ERROR saving External Team capacity:', errorMsg);
+      alert(`Error al guardar capacidad externa (${department} - ${teamName} - ${normalizedWeek}): ${errorMsg}`);
     }
   };
 
-  const handlePrgExternalChange = (teamName: string, weekDate: string, newCount: number | undefined) => {
-    if (!canEditDepartment('PRG')) {
+  const handlePrgExternalChange = (department: Department, teamName: string, weekDate: string, newCount: number | undefined) => {
+    if (!canEditDepartment(department)) {
       return;
     }
     const normalizedWeek = normalizeWeekStartDate(weekDate);
-    console.log('[CapacityMatrix] handlePrgExternalChange called:', { teamName, weekDate: normalizedWeek, newCount });
+    const team = externalTeamKey(department, teamName);
+    console.log('[CapacityMatrix] handlePrgExternalChange called:', { department, teamName, weekDate: normalizedWeek, newCount });
 
     // Update local state immediately
     setPRGExternalPersonnel(prev => ({
       ...prev,
-      [teamName]: {
-        ...(prev[teamName] || {}),
+      [team]: {
+        ...(prev[team] || {}),
         [normalizedWeek]: newCount,
       },
     }));
 
     // Debounce the API call
-    const timeoutKey = `${teamName}-${normalizedWeek}`;
+    const timeoutKey = `${team}-${normalizedWeek}`;
     if (prgExternalSaveTimeouts.current[timeoutKey]) {
-      console.log('[CapacityMatrix] Clearing previous PRG External timeout for key:', timeoutKey);
+      console.log('[CapacityMatrix] Clearing previous External Team timeout for key:', timeoutKey);
       clearTimeout(prgExternalSaveTimeouts.current[timeoutKey]);
     }
-    console.log('[CapacityMatrix] Setting PRG External debounce timeout for key:', timeoutKey);
+    console.log('[CapacityMatrix] Setting External Team debounce timeout for key:', timeoutKey);
     prgExternalSaveTimeouts.current[timeoutKey] = setTimeout(() => {
-      console.log('[CapacityMatrix] PRG External debounce timeout fired for key:', timeoutKey);
+      console.log('[CapacityMatrix] External Team debounce timeout fired for key:', timeoutKey);
       if (newCount !== undefined) {
-        savePrgExternalCapacity(teamName, normalizedWeek, newCount);
+        savePrgExternalCapacity(department, teamName, normalizedWeek, newCount);
       }
     }, 500);
   };
@@ -1430,7 +1553,8 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     if (!deleteConfirmation.isOpen || !deleteConfirmation.teamName || !deleteConfirmation.type) {
       return;
     }
-    if (!canEditDepartment(deleteConfirmation.type === 'prg' ? 'PRG' : 'BUILD')) {
+    const deleteDepartment = deleteConfirmation.type === 'external' ? deleteConfirmation.department : 'BUILD';
+    if (!deleteDepartment || !canEditDepartment(deleteDepartment)) {
       return;
     }
 
@@ -1473,10 +1597,13 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
 
         // Remove from active teams
         setActiveTeams(activeTeams.filter(team => team !== teamName));
-      } else if (type === 'prg') {
+      } else if (type === 'external' && deleteConfirmation.department) {
+        const department = deleteConfirmation.department;
+        const team = externalTeamKey(department, teamName);
+
         // Delete all records for this team from database
         const recordsToDelete = Object.keys(prgExternalRecordIds).filter(
-          key => key.startsWith(`${teamName}-`)
+          key => key.startsWith(`${team}-`)
         );
         deletedRecordId = recordsToDelete.length > 0 ? prgExternalRecordIds[recordsToDelete[0]] : undefined;
 
@@ -1488,7 +1615,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         // Update local state
         setPRGExternalPersonnel(prev => {
           const newState = { ...prev };
-          delete newState[teamName];
+          delete newState[team];
           return newState;
         });
 
@@ -1496,7 +1623,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         setPrgExternalRecordIds(prev => {
           const newIds = { ...prev };
           Object.keys(newIds).forEach(key => {
-            if (key.startsWith(`${teamName}-`)) {
+            if (key.startsWith(`${team}-`)) {
               delete newIds[key];
             }
           });
@@ -1504,7 +1631,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
         });
 
         // Remove from active teams
-        setPRGActiveTeams(prgActiveTeams.filter(team => team !== teamName));
+        setExternalTeamsForDepartment(department, getExternalTeamsFor(department).filter(t => t !== teamName));
       }
 
       console.log(`[CapacityMatrix] Deleted ${type} team: ${teamName}`);
@@ -1515,7 +1642,7 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
           'deleted',
           type === 'subcontracted' ? 'SubcontractedTeamCapacity' : 'PrgExternalTeamCapacity',
           deletedRecordId,
-          { type, teamName }
+          { type, department: deleteConfirmation.department, teamName }
         );
       }
 
@@ -1982,16 +2109,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     [allWeeksData, locale]
   );
 
-  // The per-project tables append 4 extra Summary columns (Qtd/Used/Fcst/Util, 208px total)
+  // The per-project tables append the Summary columns (Qtd/Used/Fcst/Util, SUMMARY_TOTAL_WIDTH_PX total)
   // after the week columns; the Capacity bar / Weekly Occupancy Total panel don't have those.
   // Both use the same percentage-based horizontal scroll sync (see
   // syncHorizontalScrollToCanonical), which only lines weeks up correctly when both scrollable
   // containers have the exact same total width. This used to drop the last 4 weeks here to
-  // compensate, but 4 weeks (320px) doesn't match 208px of Summary columns -- that 112px gap
+  // compensate, but 4 weeks (320px) never matched the Summary columns width (208px at the time) -- that gap
   // between the two containers' widths is exactly what showed up as roughly one week of drift
   // at a moderate scroll position. Fixed properly now: every week is kept (exact 1:1 week
   // correspondence with allWeeksData), and the Capacity bar / Weekly Occupancy Total panel each
-  // carry their own matching 208px spacer instead (see SUMMARY_COLUMN_WIDTH_PX usages).
+  // carry their own matching SUMMARY_TOTAL_WIDTH_PX spacer instead.
   const projectAllWeeksData = allWeeksData;
   const projectMonthSpans = useMemo(
     () => computeMonthSpans(projectAllWeeksData),
@@ -2425,41 +2552,30 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     selectedExportProjectIds,
   ]);
 
+  // Accordion behavior: only one project is open at a time, because having
+  // several expanded project tables scroll-synced together makes horizontal
+  // scrolling lag. (PDF export sets expandedProjects directly, so it can still
+  // expand several at once.)
   const toggleProjectExpanded = (projectId: string) => {
-    setExpandedProjects((prev) => ({
-      ...prev,
-      [projectId]: !prev[projectId],
-    }));
+    setExpandedProjects((prev) => {
+      if (prev[projectId]) {
+        return { ...prev, [projectId]: false };
+      }
+      const next: Record<string, boolean> = {};
+      Object.keys(prev).forEach((id) => {
+        next[id] = false;
+      });
+      next[projectId] = true;
+      return next;
+    });
   };
 
+  // Still matches legacy "DEPT Placeholder" employees that existing historical assignments may
+  // reference (filtered out of Available Resources, etc.) -- saving no longer creates new ones
+  // (see the no-resources-selected lock in handleSaveCell), but old data can still have them.
   function isPlaceholderEmployee(emp?: Employee | null) {
     return !!emp && (emp.role === 'Placeholder' || emp.name.endsWith('Placeholder'));
   }
-
-  const getOrCreatePlaceholderEmployee = async (department: Department) => {
-    const placeholderName = `${department} Placeholder`;
-    let placeholder = employees.find(
-      (emp) => emp.department === department && emp.name === placeholderName
-    );
-
-    if (!placeholder) {
-      try {
-        placeholder = await addEmployee({
-          name: placeholderName,
-          role: 'Placeholder',
-          department,
-          capacity: 0,
-          isActive: false,
-          isSubcontractedMaterial: false,
-        });
-      } catch (error) {
-        console.error('[CapacityMatrix] Failed to create placeholder employee:', error);
-        return null;
-      }
-    }
-
-    return placeholder;
-  };
 
   const handleCreateQuickProject = () => {
     if (departmentFilter === 'General' || departmentFilter === 'PM') {
@@ -2809,7 +2925,12 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const maxScrollLeft = container.scrollWidth - container.clientWidth;
     const targetScrollLeft = maxScrollLeft > 0 ? maxScrollLeft * progress : 0;
     if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
-      container.scrollLeft = targetScrollLeft;
+      // The scroll containers have `scroll-behavior: smooth`, which makes a plain
+      // `scrollLeft = x` animate. In Chrome that animation fires its own scroll events
+      // that get synced back to the other table (dragging it toward the animating
+      // table's stale position), so the sync lags and fights the user's scroll.
+      // Programmatic sync writes must be instant.
+      container.scrollTo({ left: targetScrollLeft, behavior: 'instant' });
     }
   };
 
@@ -3011,6 +3132,16 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return Math.round((totalPlanned / totalQuoted) * 100);
   };
 
+  // Utilization counting only hours already used (no forecast), same rules as getUtilizationPercent.
+  const getCurrentUtilizationPercent = (department: Department, projectId: string): number => {
+    const project = projectById.get(projectId);
+    if (!project) return 0;
+    const utilizedHoursValue = getUtilizedHours(department, projectId);
+    const totalQuoted = (project.departmentHoursAllocated?.[department] || 0) + getQuotedChangeOrders(department, projectId);
+    if (totalQuoted === 0) return utilizedHoursValue > 0 ? 100 : 0;
+    return Math.round((utilizedHoursValue / totalQuoted) * 100);
+  };
+
   // Get utilized hours (calculated) for a department in a project
   const getUtilizedHours = (department: Department, projectId: string): number => {
     const key = `${projectId}-${department}`;
@@ -3067,10 +3198,24 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     return `${formatHours(value)}h`;
   };
 
-  // Renders the 4 summary cells (Qtd/Used/Fcst/Util) for one department row, to be placed
-  // as the last cells of that row. No department badge or per-cell label here — the row's
-  // own left-hand department name already identifies it, and the column headers (added to
-  // the week header row) already label Qtd/Used/Fcst/Util once for the whole section.
+  const formatCurrencyFull = (value: number): string => {
+    if (!Number.isFinite(value)) return '$0.00';
+    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  // Compact currency for the 60px-wide Summary cells: $850, $12,345, $123.5k, $1.2M.
+  const formatSummaryCurrency = (value: number): string => {
+    if (!Number.isFinite(value)) return '$0';
+    const absValue = Math.abs(value);
+    if (absValue >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (absValue >= 100_000) return `$${(value / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    return `$${Math.round(value).toLocaleString('en-US')}`;
+  };
+
+  // Renders the 4 summary cells (Qtd/Used/Fcst/Util) for one department row, placed as the last
+  // cells of that row. Qtd/Used/Fcst: hours on top, $ underneath. Util: current % on top and the
+  // % including forecast underneath, each half colored by its own level. The row's own department
+  // label and the column headers already identify what each cell is, so no per-cell labels here.
   const renderProjectDepartmentSummaryCells = (projectId: string, dept: Department) => {
     const quotedHoursValue = getQuotedHours(dept, projectId);
     const quotedChangeOrdersValue = getQuotedChangeOrders(dept, projectId);
@@ -3078,38 +3223,67 @@ export function CapacityMatrixPage({ departmentFilter }: CapacityMatrixPageProps
     const utilizedHoursValue = getUtilizedHours(dept, projectId);
     const forecastedHoursValue = getForecastedHours(dept, projectId);
     const utilizationPercent = getUtilizationPercent(dept, projectId);
-    const utilizationColorInfo = getUtilizationColor(utilizationPercent);
+    const currentUtilizationPercent = getCurrentUtilizationPercent(dept, projectId);
     const deptLabel = getDepartmentLabel(dept, t);
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
+
+    // $ amounts. Qtd $ is the quoted amount registered on the project (null = not registered);
+    // Used $ is a placeholder until its calculation is defined; Fcst $ = forecast hours x the
+    // department's current hourly cost (null when that department has no rate registered).
+    const quotedCostValue = projectById.get(projectId)?.departmentCostAllocated?.[dept] ?? null;
+    const usedCostValue = 0;
+    const hourlyCostRate = departmentHourlyCosts[dept];
+    const forecastCostValue = hourlyCostRate === undefined ? null : forecastedHoursValue * hourlyCostRate;
+
+    const noValue = language === 'es' ? 'no registrado' : 'not registered';
+    const noRate = language === 'es' ? 'sin costo por hora' : 'no hourly cost';
+    const utilHint = language === 'es' ? 'actual → con forecast' : 'current → with forecast';
     const tooltip = `${departmentTitleLabel}
-${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h)
-${t.usedLabel}: ${formatHours(utilizedHoursValue)}h
-${t.pronosticado}: ${formatHours(forecastedHoursValue)}h
-${t.utilizationLabel}: ${utilizationPercent}%`;
-    const valueByKey: Record<'qtd' | 'used' | 'fcst' | 'util', string> = {
-      qtd: formatSummaryHours(totalQuotedHoursValue),
-      used: formatSummaryHours(utilizedHoursValue),
-      fcst: formatSummaryHours(forecastedHoursValue),
-      util: `${utilizationPercent}%`,
-    };
+${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h) · ${quotedCostValue === null ? noValue : formatCurrencyFull(quotedCostValue)}
+${t.usedLabel}: ${formatHours(utilizedHoursValue)}h · ${formatCurrencyFull(usedCostValue)}
+${t.pronosticado}: ${formatHours(forecastedHoursValue)}h · ${forecastCostValue === null ? noRate : formatCurrencyFull(forecastCostValue)}
+${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% (${utilHint})`;
+
+    const cellClass = 'border border-gray-300 px-0.5 py-0.5 text-center align-middle w-[60px] min-w-[60px] max-w-[60px] sticky z-[15] bg-white';
+    const twoLines = (key: SummaryColumnKey, rightOffset: number, hoursLabel: string, cost: number | null) => (
+      <td key={key} style={{ right: rightOffset }} className={cellClass} title={tooltip}>
+        <div className="text-[11px] font-bold leading-tight text-slate-700 whitespace-nowrap">{hoursLabel}</div>
+        <div className={`text-[10px] font-semibold leading-tight whitespace-nowrap ${cost === null ? 'text-gray-400' : 'text-teal-700'}`}>
+          {cost === null ? '—' : formatSummaryCurrency(cost)}
+        </div>
+      </td>
+    );
 
     return (
       <>
         {SUMMARY_COLUMNS.map(({ key, rightOffset }) => {
-          const isUtil = key === 'util';
+          if (key === 'qtd') return twoLines(key, rightOffset, formatSummaryHours(totalQuotedHoursValue), quotedCostValue);
+          if (key === 'used') return twoLines(key, rightOffset, formatSummaryHours(utilizedHoursValue), usedCostValue);
+          if (key === 'fcst') return twoLines(key, rightOffset, formatSummaryHours(forecastedHoursValue), forecastCostValue);
+          const currentColor = getUtilizationColor(currentUtilizationPercent);
+          const projectedColor = getUtilizationColor(utilizationPercent);
           return (
             <td
               key={key}
               style={{ right: rightOffset }}
-              className={`border border-gray-300 px-0.5 py-1 text-center align-middle w-[52px] min-w-[52px] max-w-[52px] sticky z-10 ${
-                isUtil ? `${utilizationColorInfo.bg} ${utilizationColorInfo.text}` : 'bg-gradient-to-br from-blue-50 to-indigo-50'
-              }`}
+              className="border border-gray-300 p-0 text-center align-middle w-[60px] min-w-[60px] max-w-[60px] sticky z-[15] bg-white"
               title={tooltip}
             >
-              <span className={`whitespace-nowrap ${isUtil ? 'text-[10px] font-black' : 'text-[10px] font-bold text-slate-700'}`}>
-                {valueByKey[key]}
-              </span>
+              {/* Each half fills the cell with its own color. The >=100% pulse animates opacity, so
+                  color + pulse live on inner layers and the td's white background stays opaque. */}
+              <div className="relative py-0.5">
+                <div aria-hidden className={`absolute inset-0 ${currentColor.bg}`} />
+                <span className={`relative text-[11px] leading-tight whitespace-nowrap ${currentColor.text}`}>
+                  {currentUtilizationPercent}%
+                </span>
+              </div>
+              <div className="relative py-0.5 border-t border-white/60">
+                <div aria-hidden className={`absolute inset-0 ${projectedColor.bg}`} />
+                <span className={`relative text-[10.5px] leading-tight whitespace-nowrap ${projectedColor.text}`}>
+                  → {utilizationPercent}%
+                </span>
+              </div>
             </td>
           );
         })}
@@ -6335,9 +6509,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
       return effectiveScioCapacity + activeTeamCapacity + predefinedInactiveCapacity;
     }
 
-    if (department === 'PRG') {
-      const externalTeamCapacity = prgActiveTeams.reduce((sum, team) => {
-        return sum + (prgExternalPersonnel[team]?.[weekDate] || 0);
+    if (EXTERNAL_TEAM_DEPARTMENTS.includes(department)) {
+      const externalTeamCapacity = getExternalTeamsFor(department).reduce((sum, team) => {
+        const teamKey = externalTeamKey(department, team);
+        return sum + (prgExternalPersonnel[teamKey]?.[weekDate] || 0);
       }, 0);
       return effectiveScioCapacity + externalTeamCapacity;
     }
@@ -7499,43 +7674,58 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
       }
     });
 
-    // For BUILD and PRG departments, initialize SCIO and external hours separately.
-    // Use the whole cell totals (sum of assignments), not only first assignment.
-    let totalScioHours = 0;
-    let totalExternalHours = 0;
-    const canUseStagePlanner = !(department === 'BUILD' || department === 'PRG') && STAGE_OPTIONS[department].length > 0;
+    // Stage entries: HD/MED/BUILD/PRG all have Stage options (PM/PURCHASING/MFG don't -- see
+    // STAGE_OPTIONS -- so there's no "stage" concept to group by for them). BUILD/PRG entries
+    // additionally carry their own SCIO/External split per stage, grouped from the assignments'
+    // scioHours/externalHours fields; HD/MED entries just use plain hours.
+    const canUseStagePlanner = STAGE_OPTIONS[department].length > 0;
+    const isBuildOrPRGDept = department === 'BUILD' || department === 'PRG';
     let initialStageEntries: StageHoursEntry[] = [];
     let initialStageResourceHours: Record<string, StageResourceHoursEntry> = {};
 
-    if ((department === 'BUILD' || department === 'PRG') && deptAssignments.length > 0) {
-      const summedScioHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.scioHours || 0), 0);
-      const summedExternalHours = deptAssignments.reduce((sum, assignment) => sum + (assignment.externalHours || 0), 0);
-      const summedSplitHours = summedScioHours + summedExternalHours;
-
-      if (summedSplitHours > 0) {
-        totalScioHours = Math.round(summedScioHours * 100) / 100;
-        totalExternalHours = Math.round(summedExternalHours * 100) / 100;
-      } else {
-        // Legacy data (before split fields existed): treat all stored hours as SCIO.
-        totalScioHours = totalHours;
-        totalExternalHours = 0;
-      }
-    } else if (canUseStagePlanner) {
+    if (canUseStagePlanner) {
       const stageTotals = new Map<Exclude<Stage, null> | '', number>();
+      const stageScioTotals = new Map<Exclude<Stage, null> | '', number>();
+      const stageExternalTotals = new Map<Exclude<Stage, null> | '', number>();
       const stageAssignmentIds = new Map<Exclude<Stage, null> | '', string[]>();
       deptAssignments.forEach((assignment) => {
         const stageKey = (assignment.stage as Exclude<Stage, null> | null) || '';
         const assignmentHours = typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0);
         stageTotals.set(stageKey, roundHours((stageTotals.get(stageKey) || 0) + assignmentHours));
+        if (isBuildOrPRGDept) {
+          stageScioTotals.set(stageKey, roundHours((stageScioTotals.get(stageKey) || 0) + (assignment.scioHours || 0)));
+          stageExternalTotals.set(stageKey, roundHours((stageExternalTotals.get(stageKey) || 0) + (assignment.externalHours || 0)));
+        }
         stageAssignmentIds.set(stageKey, [...(stageAssignmentIds.get(stageKey) || []), assignment.id]);
       });
 
       if (stageTotals.size > 0) {
-        initialStageEntries = Array.from(stageTotals.entries()).map(([stageKey, hoursValue]) =>
-          createStageHoursEntry(stageKey, hoursValue, stageAssignmentIds.get(stageKey))
-        );
+        initialStageEntries = Array.from(stageTotals.entries()).map(([stageKey, hoursValue]) => {
+          let scioVal = 0;
+          let extVal = 0;
+          if (isBuildOrPRGDept) {
+            const summedScio = stageScioTotals.get(stageKey) || 0;
+            const summedExternal = stageExternalTotals.get(stageKey) || 0;
+            if (summedScio + summedExternal > 0) {
+              scioVal = summedScio;
+              extVal = summedExternal;
+            } else {
+              // Legacy data (before split fields existed): treat all stored hours as SCIO.
+              scioVal = hoursValue;
+            }
+          }
+          return createStageHoursEntry(stageKey, hoursValue, stageAssignmentIds.get(stageKey), scioVal, extVal);
+        });
       } else if (totalHours > 0) {
-        initialStageEntries = [createStageHoursEntry(initialStage as Exclude<Stage, null> | '', roundHours(totalHours))];
+        initialStageEntries = [
+          createStageHoursEntry(
+            (initialStage as Exclude<Stage, null> | '') || '',
+            roundHours(totalHours),
+            undefined,
+            isBuildOrPRGDept ? roundHours(totalHours) : 0,
+            0
+          ),
+        ];
       }
 
       if (initialStageEntries.length > 0 && assignedEmployeeIds.size > 0) {
@@ -7561,12 +7751,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
 
     setEditingCell({ department, weekStart, projectId });
     setEditingHours(totalHours);
-    setEditingScioHours(totalScioHours);
-    setInitialScioHours(totalScioHours);
-    setEditingExternalHours(totalExternalHours);
     setEditingHoursInput(totalHours ? totalHours.toString() : '');
-    setEditingScioHoursInput(totalScioHours ? totalScioHours.toString() : '');
-    setEditingExternalHoursInput(totalExternalHours ? totalExternalHours.toString() : '');
     setEditingStage(initialStage);
     setEditingStageEntries(initialStageEntries);
     setEditingStageResourceHours(initialStageResourceHours);
@@ -7580,6 +7765,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     setSelectedEmployees(assignedEmployeeIds);
     setSupportEmployeeToAdd('');
     setShowDeleteConfirm(false);
+    // Week-split always starts fresh at 1 week when a cell is (re)opened: it's a "going
+    // forward from here" action, not a saved attribute of existing assignments. Each stage
+    // entry built above already got weekCount: 1 from createStageHoursEntry.
+    setEditingWeekCount(1);
+    setEditingWeekCountInput('1');
+    setEditingWeeklyEven(true);
+    setEditingWeeklyHoursInputs([]);
   };
 
   const handleSaveCell = async () => {
@@ -7593,35 +7785,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     // those inputs above), so skip the normal create/reset-to-zero flow
     // entirely -- it would touch hours by design. Just relabel the `stage` in
     // place on the existing assignment row(s) captured when the modal opened.
+    // (The week-split feature is forward-only and its controls are disabled
+    // whenever the cell's own week is locked, so this never needs to loop.)
     if (isWeekLocked(editingCell.weekStart)) {
-      const isBuildOrPRGLocked = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-      if (isBuildOrPRGLocked) {
-        const { assignments: lockedDeptAssignments } = getDepartmentWeekData(
-          editingCell.department,
-          editingCell.weekStart,
-          editingCell.projectId
-        );
-        await Promise.all(
-          lockedDeptAssignments.map((assignment) =>
-            updateAssignment(assignment.id, { stage: editingStage, comment: editingComment || undefined }, { skipRefetch: true })
+      // Stage entries now cover HD/MED/BUILD/PRG alike (PM/PURCHASING/MFG have no stage
+      // concept, so editingStageEntries stays empty for them and this is a no-op, same as
+      // before), so the old BUILD/PRG-specific single-stage relabel branch is gone.
+      await Promise.all(
+        editingStageEntries.flatMap((entry) =>
+          (entry.assignmentIds || []).map((assignmentId) =>
+            updateAssignment(assignmentId, { stage: entry.stage || null, comment: editingComment || undefined }, { skipRefetch: true })
           )
-        );
-      } else {
-        await Promise.all(
-          editingStageEntries.flatMap((entry) =>
-            (entry.assignmentIds || []).map((assignmentId) =>
-              updateAssignment(assignmentId, { stage: entry.stage || null, comment: editingComment || undefined }, { skipRefetch: true })
-            )
-          )
-        );
-      }
+        )
+      );
       closeEditModal();
       void fetchAssignments(true);
       return;
     }
 
     const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-    const hasStagePlanner = !isBuildOrPRG && STAGE_OPTIONS[editingCell.department].length > 0;
+    const hasStagePlanner = STAGE_OPTIONS[editingCell.department].length > 0;
     // When a selected employee's home department differs from this cell's row, mark the
     // assignment as a cross-department support: hours still count toward THIS row/department.
     const departmentOverrideFor = (employeeId: string): Department | undefined => {
@@ -7638,151 +7821,188 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
       return;
     }
 
+    // Company-placeholder employees (name === subcontractCompany, capacity 0) are no longer
+    // excluded here: they're a legitimate, explicitly-selectable Available Resources entry
+    // now (the external provider itself), and excluding them here would silently drop the
+    // selection on save even though the checkbox showed it as selected.
     const targetEmployeeIds = Array.from(selectedEmployees).filter((employeeId) => {
       const emp = employeeById.get(employeeId);
       return !!emp &&
         emp.isActive &&
-        !isPlaceholderEmployee(emp) &&
-        !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
+        !isPlaceholderEmployee(emp);
     });
 
-    const normalizedStageEntries = hasStagePlanner
-      ? Array.from(
-          editingStageEntries.reduce((acc, entry) => {
-            const normalizedHours = roundHours(Math.max(0, entry.hours || 0));
-            if (normalizedHours <= 0) return acc;
-            const stageKey = entry.stage || '';
-            acc.set(stageKey, roundHours((acc.get(stageKey) || 0) + normalizedHours));
-            return acc;
-          }, new Map<Exclude<Stage, null> | '', number>()).entries()
-        ).map(([stageKey, stageHours]) => ({
-          stage: (stageKey || null) as Stage,
-          hours: stageHours,
-        }))
-      : [];
-
-    const stagePlanByEmployee = new Map<string, { stage: Stage; hours: number }[]>();
-    if (hasStagePlanner && targetEmployeeIds.length > 0) {
-      const employeeStageMap = new Map<string, Map<Exclude<Stage, null> | '', number>>();
-      targetEmployeeIds.forEach((employeeId) => employeeStageMap.set(employeeId, new Map()));
-
-      editingStageEntries.forEach((entry) => {
-        const stageKey = (entry.stage || '') as Exclude<Stage, null> | '';
-        targetEmployeeIds.forEach((employeeId) => {
-          const hoursKey = createStageResourceKey(entry.id, employeeId);
-          const specificHours = roundHours(Math.max(0, editingStageResourceHours[hoursKey]?.hours || 0));
-          if (specificHours <= 0) return;
-          const employeeMap = employeeStageMap.get(employeeId);
-          if (!employeeMap) return;
-          employeeMap.set(stageKey, roundHours((employeeMap.get(stageKey) || 0) + specificHours));
-        });
-      });
-
-      employeeStageMap.forEach((stageMap, employeeId) => {
-        stagePlanByEmployee.set(
-          employeeId,
-          Array.from(stageMap.entries()).map(([stageKey, hours]) => ({
-            stage: (stageKey || null) as Stage,
-            hours,
-          }))
-        );
-      });
-    }
-
-    const totalHours = hasStagePlanner
-      ? (
-          targetEmployeeIds.length > 0
-            ? roundHours(
-                Array.from(stagePlanByEmployee.values()).reduce(
-                  (sum, plan) => sum + plan.reduce((entrySum, entry) => entrySum + entry.hours, 0),
-                  0
-                )
-              )
-            : roundHours(normalizedStageEntries.reduce((sum, entry) => sum + entry.hours, 0))
-        )
-      : (isBuildOrPRG ? (editingScioHours + editingExternalHours) : editingHours);
-
-    if (totalHours === 0) {
-      closeEditModal();
+    // Lock: hours always have to belong to an explicitly selected resource (internal or
+    // external) now -- no more silently falling back to an auto-created "DEPT Placeholder"
+    // employee when nobody's picked. The Save button mirrors this (disabled while nothing's
+    // selected); this is the actual enforcement in case Save is still reached some other way
+    // (e.g. pressing Enter in an hours field).
+    if (targetEmployeeIds.length === 0) {
+      alert(language === 'es'
+        ? 'Selecciona al menos un recurso (interno o externo) antes de guardar.'
+        : 'Select at least one resource (internal or external) before saving.');
       return;
     }
 
-    const { assignments: deptAssignments } = getDepartmentWeekData(
-      editingCell.department,
-      editingCell.weekStart,
-      editingCell.projectId
-    );
+    // Mirrors the identically-named computation in renderEditModal (used there to decide what
+    // columns to draw in the SCIO/External grids) -- recomputed here since handleSaveCell and
+    // renderEditModal are separate closures, but must agree on who's "internal" vs "external"
+    // for buildWeekPlans's per-employee split to land on the same people the grid showed.
+    const internalSelectedColumns = targetEmployeeIds
+      .map((id) => employeeById.get(id))
+      .filter((emp): emp is Employee => !!emp && !(emp.isSubcontractedMaterial && emp.subcontractCompany))
+      .map((emp) => ({ id: emp.id, label: emp.name }));
+    const externalSelectedColumns = targetEmployeeIds
+      .map((id) => employeeById.get(id))
+      .filter((emp): emp is Employee => !!emp && !!(emp.isSubcontractedMaterial && emp.subcontractCompany))
+      .map((emp) => ({ id: emp.id, label: emp.name }));
+    // Classifies a stage entry's per-employee hours as SCIO vs External on save -- determined
+    // by whether the employee is an internal staffer or an external/subcontracted provider,
+    // same as the non-stage-planner BUILD/PRG path always did.
+    const externalEmployeeIdSet = new Set(externalSelectedColumns.map((c) => c.id));
 
-    const resetAssignmentsToZero = async (assignmentsToReset: Assignment[]) => {
-      if (assignmentsToReset.length === 0) return;
-      const resetPayload: any = {
-        hours: 0,
-        stage: null,
-        comment: '',
-        changeOrderId: null,
-      };
-      if (isBuildOrPRG) {
-        resetPayload.scioHours = 0;
-        resetPayload.externalHours = 0;
-      }
-      await Promise.all(
-        assignmentsToReset.map((assign) =>
-          updateAssignment(assign.id, resetPayload, { skipRefetch: true })
-        )
-      );
-    };
-
-    const upsertStageAssignmentsForEmployee = async (
-      employeeId: string,
-      stagePlan: { stage: Stage; hours: number }[],
-      sourceAssignments: Assignment[],
-      assignmentsToResetCollector: Assignment[]
+    // Saves ONE week's worth of hours using exactly the original (pre-week-split) single-week
+    // logic, just parameterized by which week and which hour totals apply to it. The week-split
+    // feature ("divide this activity across N weeks") works by calling this once per week with
+    // that week's share of the hours instead of rewriting this logic to be week-aware itself --
+    // see buildWeekPlans below for how each week's shares are computed.
+    const saveCellForWeek = async (
+      weekStartDate: string,
+      hoursForWeek: number,
+      stageEntriesForWeek: StageHoursEntry[],
+      stageResourceHoursForWeek: Record<string, StageResourceHoursEntry>
     ) => {
-      const stageKeyFor = (stage: Stage) => (stage || '');
-      const existingByStage = new Map<string, Assignment[]>();
+      if (!editingCell) return;
 
-      sourceAssignments
-        .filter((assignment) => assignment.employeeId === employeeId)
-        .forEach((assignment) => {
-          const key = stageKeyFor((assignment.stage || null) as Stage);
-          const bucket = existingByStage.get(key) || [];
-          bucket.push(assignment);
-          existingByStage.set(key, bucket);
+      const stagePlanByEmployee = new Map<string, { stage: Stage; hours: number }[]>();
+      if (hasStagePlanner) {
+        const employeeStageMap = new Map<string, Map<Exclude<Stage, null> | '', number>>();
+        targetEmployeeIds.forEach((employeeId) => employeeStageMap.set(employeeId, new Map()));
+
+        stageEntriesForWeek.forEach((entry) => {
+          const stageKey = (entry.stage || '') as Exclude<Stage, null> | '';
+          targetEmployeeIds.forEach((employeeId) => {
+            const hoursKey = createStageResourceKey(entry.id, employeeId);
+            const specificHours = roundHours(Math.max(0, stageResourceHoursForWeek[hoursKey]?.hours || 0));
+            if (specificHours <= 0) return;
+            const employeeMap = employeeStageMap.get(employeeId);
+            if (!employeeMap) return;
+            employeeMap.set(stageKey, roundHours((employeeMap.get(stageKey) || 0) + specificHours));
+          });
         });
 
-      for (const entry of stagePlan) {
-        const stageKey = stageKeyFor(entry.stage);
-        const desiredHours = roundHours(entry.hours);
-        const existingBucket = existingByStage.get(stageKey) || [];
-        const existingAssign = existingBucket.shift();
-        existingByStage.set(stageKey, existingBucket);
-
-        const payload: any = {
-          hours: desiredHours,
-          stage: entry.stage,
-          comment: editingComment || undefined,
-          changeOrderId: changeOrderIdToPersist,
-        };
-
-        if (existingAssign) {
-          await updateAssignment(existingAssign.id, payload, { skipRefetch: true });
-        } else if (editingCell.projectId) {
-          await addAssignment({
+        employeeStageMap.forEach((stageMap, employeeId) => {
+          stagePlanByEmployee.set(
             employeeId,
-            projectId: editingCell.projectId,
-            weekStartDate: editingCell.weekStart,
-            departmentOverride: departmentOverrideFor(employeeId),
-            ...payload,
-          } as any);
-        }
+            Array.from(stageMap.entries()).map(([stageKey, hours]) => ({
+              stage: (stageKey || null) as Stage,
+              hours,
+            }))
+          );
+        });
       }
 
-      existingByStage.forEach((remaining) => {
-        remaining.forEach((assignment) => assignmentsToResetCollector.push(assignment));
-      });
-    };
+      const totalHours = hasStagePlanner
+        ? roundHours(
+            Array.from(stagePlanByEmployee.values()).reduce(
+              (sum, plan) => sum + plan.reduce((entrySum, entry) => entrySum + entry.hours, 0),
+              0
+            )
+          )
+        : roundHours(hoursForWeek);
 
-    if (targetEmployeeIds.length > 0) {
+      // Nothing entered for this week: leave whatever was already saved there untouched
+      // (matches the original single-week behavior -- saving a blank cell doesn't reset it).
+      if (totalHours === 0) return;
+
+      const { assignments: deptAssignments } = getDepartmentWeekData(
+        editingCell.department,
+        weekStartDate,
+        editingCell.projectId
+      );
+
+      const resetAssignmentsToZero = async (assignmentsToReset: Assignment[]) => {
+        if (assignmentsToReset.length === 0) return;
+        const resetPayload: any = {
+          hours: 0,
+          stage: null,
+          comment: '',
+          changeOrderId: null,
+        };
+        if (isBuildOrPRG) {
+          resetPayload.scioHours = 0;
+          resetPayload.externalHours = 0;
+        }
+        await Promise.all(
+          assignmentsToReset.map((assign) =>
+            updateAssignment(assign.id, resetPayload, { skipRefetch: true })
+          )
+        );
+      };
+
+      const upsertStageAssignmentsForEmployee = async (
+        employeeId: string,
+        stagePlan: { stage: Stage; hours: number }[],
+        sourceAssignments: Assignment[],
+        assignmentsToResetCollector: Assignment[]
+      ) => {
+        const stageKeyFor = (stage: Stage) => (stage || '');
+        const existingByStage = new Map<string, Assignment[]>();
+
+        sourceAssignments
+          .filter((assignment) => assignment.employeeId === employeeId)
+          .forEach((assignment) => {
+            const key = stageKeyFor((assignment.stage || null) as Stage);
+            const bucket = existingByStage.get(key) || [];
+            bucket.push(assignment);
+            existingByStage.set(key, bucket);
+          });
+
+        for (const entry of stagePlan) {
+          const stageKey = stageKeyFor(entry.stage);
+          const desiredHours = roundHours(entry.hours);
+          const existingBucket = existingByStage.get(stageKey) || [];
+          const existingAssign = existingBucket.shift();
+          existingByStage.set(stageKey, existingBucket);
+
+          const payload: any = {
+            hours: desiredHours,
+            stage: entry.stage,
+            comment: editingComment || undefined,
+            changeOrderId: changeOrderIdToPersist,
+          };
+
+          if (isBuildOrPRG) {
+            // Classified by whether this employee is an internal staffer or an external/
+            // subcontracted provider -- not a user choice, the SCIO/External split just
+            // follows from who the hours belong to.
+            const isExternalEmployee = externalEmployeeIdSet.has(employeeId);
+            payload.scioHours = isExternalEmployee ? 0 : desiredHours;
+            payload.externalHours = isExternalEmployee ? desiredHours : 0;
+          }
+
+          if (existingAssign) {
+            await updateAssignment(existingAssign.id, payload, { skipRefetch: true });
+          } else if (editingCell.projectId) {
+            await addAssignment({
+              employeeId,
+              projectId: editingCell.projectId,
+              weekStartDate,
+              departmentOverride: departmentOverrideFor(employeeId),
+              ...payload,
+            } as any);
+          }
+        }
+
+        existingByStage.forEach((remaining) => {
+          remaining.forEach((assignment) => assignmentsToResetCollector.push(assignment));
+        });
+      };
+
+      // targetEmployeeIds is never empty here -- handleSaveCell blocks the save entirely before
+      // reaching buildWeekPlans/saveCellForWeek when nothing's selected (see the lock above), so
+      // the auto-created "DEPT Placeholder" fallback that used to live here for that case is
+      // gone; every save now always belongs to an explicitly selected resource.
       if (hasStagePlanner) {
         const assignmentsToReset: Assignment[] = [];
         for (const employeeId of targetEmployeeIds) {
@@ -7802,16 +8022,12 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
 
         await resetAssignmentsToZero(assignmentsToReset);
       } else {
+        // Only reached by departments with no Stage planner at all (PM/PURCHASING/MFG --
+        // isBuildOrPRG is always caught by the hasStagePlanner branch above now), which still
+        // divide their single Hours total evenly across whoever's selected, unchanged.
         const upsertPromises = targetEmployeeIds.map(async (employeeId) => {
           const existingAssign = deptAssignments.find((assignment) => assignment.employeeId === employeeId);
           const hoursPerEmployee = roundHours(totalHours / targetEmployeeIds.length);
-
-          let scioHours = editingScioHours;
-          let externalHours = editingExternalHours;
-          if (targetEmployeeIds.length > 1) {
-            scioHours = roundHours(editingScioHours / targetEmployeeIds.length);
-            externalHours = roundHours(editingExternalHours / targetEmployeeIds.length);
-          }
 
           const updateData: any = {
             hours: hoursPerEmployee,
@@ -7820,18 +8036,13 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
             changeOrderId: changeOrderIdToPersist,
           };
 
-          if (isBuildOrPRG) {
-            updateData.scioHours = scioHours;
-            updateData.externalHours = externalHours;
-          }
-
           if (existingAssign) {
             await updateAssignment(existingAssign.id, updateData, { skipRefetch: true });
           } else if (editingCell.projectId) {
             await addAssignment({
               employeeId,
               projectId: editingCell.projectId,
-              weekStartDate: editingCell.weekStart,
+              weekStartDate,
               departmentOverride: departmentOverrideFor(employeeId),
               ...updateData,
             } as any);
@@ -7842,61 +8053,144 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         const assignmentsToDelete = deptAssignments.filter((assignment) => !targetEmployeeIds.includes(assignment.employeeId));
         await resetAssignmentsToZero(assignmentsToDelete);
       }
-    } else {
-      const availableEmployee = await getOrCreatePlaceholderEmployee(editingCell.department);
-      if (!availableEmployee) {
-        console.error('[CapacityMatrix] No placeholder employee available for department:', editingCell.department);
-        alert('No se pudo crear un recurso automatico para guardar estas horas. Intenta de nuevo.');
-        return;
-      }
+    };
 
-      if (!editingCell.projectId) {
-        console.error('[CapacityMatrix] No project ID available');
-        alert('Error: No se encontro el ID del proyecto.');
-        return;
-      }
-
-      const existingPlaceholderAssignments = deptAssignments.filter((assignment) => {
-        const emp = employeeById.get(assignment.employeeId) || assignment.employee;
-        return !!emp && isPlaceholderEmployee(emp);
-      });
-      const assignmentsToReset = deptAssignments.filter((assignment) => !existingPlaceholderAssignments.includes(assignment));
+    // Resolves the "divide across N weeks" settings (per-Stage-entry for departments with a
+    // Stage planner -- HD/MED/BUILD/PRG -- cell-level for the generic Hours case) into one plan
+    // per week: which date, and which stage entries/resource hours apply there. weekCount 1
+    // everywhere (the default) always yields exactly the original single-week plan.
+    const buildWeekPlans = (): Array<{
+      weekStartDate: string;
+      hours: number;
+      stageEntries: StageHoursEntry[];
+      stageResourceHours: Record<string, StageResourceHoursEntry>;
+    }> => {
+      if (!editingCell) return [];
 
       if (hasStagePlanner) {
-        await upsertStageAssignmentsForEmployee(
-          availableEmployee.id,
-          normalizedStageEntries,
-          existingPlaceholderAssignments,
-          assignmentsToReset
-        );
-      } else {
-        const existingPlaceholderAssignment = existingPlaceholderAssignments[0];
-        const placeholderUpdateData: any = {
-          hours: totalHours,
-          stage: editingStage,
-          comment: editingComment || undefined,
-          changeOrderId: changeOrderIdToPersist,
+        const internalIds = internalSelectedColumns.map((c) => c.id);
+        const externalIds = externalSelectedColumns.map((c) => c.id);
+        // Match WeekSplitEditor's own threshold exactly (see its `activeColumns`): below 2
+        // people, the UI rendered its plain single-list view and stored everything under
+        // SOLO_COLUMN there, so the lookup here has to agree with where the data actually is.
+        const scioColumnIds = internalIds.length >= 2 ? internalIds : [];
+        const externalColumnIds = externalIds.length >= 2 ? externalIds : [];
+
+        const poolWeekTotal = (matrix: Record<string, number>, columnIds: string[], w: number): number =>
+          columnIds.length >= 2
+            ? roundHours(columnIds.reduce((sum, id) => sum + (matrix[`${id}::${w}`] || 0), 0))
+            : roundHours(matrix[`${SOLO_COLUMN}::${w}`] || 0);
+
+        const poolPerEmployee = (matrix: Record<string, number>, ids: string[], w: number): Record<string, number> => {
+          const result: Record<string, number> = {};
+          if (ids.length >= 2) {
+            ids.forEach((id) => { result[id] = roundHours(matrix[`${id}::${w}`] || 0); });
+          } else if (ids.length === 1) {
+            result[ids[0]] = roundHours(matrix[`${SOLO_COLUMN}::${w}`] || 0);
+          }
+          return result;
         };
 
-        if (isBuildOrPRG) {
-          placeholderUpdateData.scioHours = editingScioHours;
-          placeholderUpdateData.externalHours = editingExternalHours;
-        }
+        // HD/MED: one combined weekly total per entry, split across employees by a fixed
+        // ratio (resourceTotal / entryTotal, both typed once up front) -- unchanged.
+        const entryEffectiveTotal = (entry: StageHoursEntry) =>
+          targetEmployeeIds.length > 0
+            ? roundHours(
+                targetEmployeeIds.reduce(
+                  (sum, employeeId) => sum + (editingStageResourceHours[createStageResourceKey(entry.id, employeeId)]?.hours || 0),
+                  0
+                )
+              )
+            : roundHours(entry.hours || 0);
+        const perEntryWeekly = new Map<string, number[]>();
+        // BUILD/PRG: two independent week x person matrices per entry (SCIO, External),
+        // mirroring the old cell-level pools but scoped to this one stage entry.
+        const perEntryScioMatrix = new Map<string, Record<string, number>>();
+        const perEntryExternalMatrix = new Map<string, Record<string, number>>();
 
-        if (existingPlaceholderAssignment) {
-          await updateAssignment(existingPlaceholderAssignment.id, placeholderUpdateData, { skipRefetch: true });
-          existingPlaceholderAssignments.slice(1).forEach((assignment) => assignmentsToReset.push(assignment));
-        } else {
-          await addAssignment({
-            employeeId: availableEmployee.id,
-            projectId: editingCell.projectId,
-            weekStartDate: editingCell.weekStart,
-            ...placeholderUpdateData,
-          } as any);
-        }
+        editingStageEntries.forEach((entry) => {
+          if (isBuildOrPRG) {
+            perEntryScioMatrix.set(
+              entry.id,
+              computeMatrixHours(roundHours(entry.scioHours || 0), entry.weekCount, scioColumnIds, entry.scioWeeklyEven, entry.scioCellInputs || {})
+            );
+            perEntryExternalMatrix.set(
+              entry.id,
+              computeMatrixHours(roundHours(entry.externalHours || 0), entry.weekCount, externalColumnIds, entry.externalWeeklyEven, entry.externalCellInputs || {})
+            );
+          } else {
+            perEntryWeekly.set(
+              entry.id,
+              computeWeeklyHours(entryEffectiveTotal(entry), entry.weekCount, entry.weeklyEven, entry.weeklyHoursInputs)
+            );
+          }
+        });
+
+        const weekSpan = Math.max(1, ...editingStageEntries.map((entry) => entry.weekCount));
+
+        return Array.from({ length: weekSpan }).map((_, w) => {
+          const stageEntriesForWeek: StageHoursEntry[] = [];
+          const stageResourceHoursForWeek: Record<string, StageResourceHoursEntry> = {};
+
+          editingStageEntries.forEach((entry) => {
+            if (w >= entry.weekCount) return;
+
+            if (isBuildOrPRG) {
+              const scioMatrix = perEntryScioMatrix.get(entry.id) || {};
+              const externalMatrix = perEntryExternalMatrix.get(entry.id) || {};
+              const scioWeekTotal = poolWeekTotal(scioMatrix, scioColumnIds, w);
+              const externalWeekTotal = poolWeekTotal(externalMatrix, externalColumnIds, w);
+              stageEntriesForWeek.push({ ...entry, hours: roundHours(scioWeekTotal + externalWeekTotal) });
+
+              const scioPerEmployee = poolPerEmployee(scioMatrix, internalIds, w);
+              const externalPerEmployee = poolPerEmployee(externalMatrix, externalIds, w);
+              [...internalIds, ...externalIds].forEach((employeeId) => {
+                const hoursForEmployee = roundHours((scioPerEmployee[employeeId] || 0) + (externalPerEmployee[employeeId] || 0));
+                if (hoursForEmployee > 0) {
+                  stageResourceHoursForWeek[createStageResourceKey(entry.id, employeeId)] = {
+                    hours: hoursForEmployee,
+                    hoursInput: `${hoursForEmployee}`,
+                  };
+                }
+              });
+            } else {
+              const weekHours = roundHours((perEntryWeekly.get(entry.id) || [])[w] || 0);
+              stageEntriesForWeek.push({ ...entry, hours: weekHours });
+
+              const entryTotal = entryEffectiveTotal(entry);
+              targetEmployeeIds.forEach((employeeId) => {
+                const key = createStageResourceKey(entry.id, employeeId);
+                const resourceTotal = editingStageResourceHours[key]?.hours || 0;
+                const ratio = entryTotal > 0 ? resourceTotal / entryTotal : 0;
+                const scaled = roundHours(ratio * weekHours);
+                if (scaled > 0) {
+                  stageResourceHoursForWeek[key] = { hours: scaled, hoursInput: `${scaled}` };
+                }
+              });
+            }
+          });
+
+          return {
+            weekStartDate: addWeeksToISO(editingCell.weekStart, w),
+            hours: roundHours(stageEntriesForWeek.reduce((sum, e) => sum + (e.hours || 0), 0)),
+            stageEntries: stageEntriesForWeek,
+            stageResourceHours: stageResourceHoursForWeek,
+          };
+        });
       }
 
-      await resetAssignmentsToZero(assignmentsToReset);
+      const weeklyHours = computeWeeklyHours(roundHours(editingHours), editingWeekCount, editingWeeklyEven, editingWeeklyHoursInputs);
+      return weeklyHours.map((weekHours, w) => ({
+        weekStartDate: addWeeksToISO(editingCell.weekStart, w),
+        hours: roundHours(weekHours),
+        stageEntries: [],
+        stageResourceHours: {},
+      }));
+    };
+
+    const weekPlans = buildWeekPlans();
+    for (const plan of weekPlans) {
+      await saveCellForWeek(plan.weekStartDate, plan.hours, plan.stageEntries, plan.stageResourceHours);
     }
 
     closeEditModal();
@@ -8386,12 +8680,15 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     const stageOptions = STAGE_OPTIONS[editingCell.department] || [];
     const isNotCompanyPlaceholder = (emp: Employee) =>
       !(emp.isSubcontractedMaterial && emp.subcontractCompany === emp.name && emp.capacity === 0);
-    // Filter employees: exclude company entries (where name === subcontractCompany and capacity === 0)
-    // These are company placeholders used in "Ocupacion semanal total", not actual resources
+    // Available Resources for the cell's own department intentionally DOES include the
+    // company-placeholder employee (name === subcontractCompany, capacity 0): that's the
+    // external provider itself, selectable as a single assignable resource representing
+    // their whole (anonymous) headcount -- see handleSaveCell's targetEmployeeIds, which no
+    // longer excludes it either. The cross-department "support" picker below still excludes
+    // it: borrowing an external provider from another department isn't offered there.
     const nativeDeptEmployees = employees.filter(emp =>
       emp.department === editingCell.department &&
-      emp.isActive &&
-      isNotCompanyPlaceholder(emp)
+      emp.isActive
     );
     // Employees from OTHER departments already added to this cell as cross-department support.
     const supportEmployeesSelected = employees.filter(emp =>
@@ -8412,36 +8709,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
     ).sort((a, b) => a.name.localeCompare(b.name));
     const deptEmployees = [...nativeDeptEmployees, ...supportEmployeesSelected];
     const isBuildOrPRGDepartment = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
-    const hasStagePlanner = !isBuildOrPRGDepartment && stageOptions.length > 0;
+    const hasStagePlanner = stageOptions.length > 0;
     const selectedEmployeeList = Array.from(selectedEmployees)
       .map((empId) => employees.find((e) => e.id === empId))
       .filter((emp): emp is Employee =>
         Boolean(
           emp &&
           emp.isActive &&
-          !isPlaceholderEmployee(emp) &&
-          isNotCompanyPlaceholder(emp)
+          !isPlaceholderEmployee(emp)
         )
       );
-    const hasExternalSelected = isBuildOrPRGDepartment && selectedEmployeeList.some(
-      (emp) => !!(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
-    );
-    const hasInternalSelected = selectedEmployeeList.some(
-      (emp) => !(emp?.isSubcontractedMaterial && emp?.subcontractCompany)
-    );
     const selectedResourcesCount = selectedEmployeeList.length;
-    const scioInputLocked = selectedEmployeeList.length > 0 && hasExternalSelected && !hasInternalSelected && initialScioHours === 0;
+    // BUILD/PRG's two independent per-person breakdown columns: SCIO hours split across
+    // selected internal staff, External hours split across selected external providers.
+    // WeekSplitEditor only switches into its week x column grid once a pool has 2+ of these.
+    const internalSelectedColumns = selectedEmployeeList
+      .filter((emp) => !(emp.isSubcontractedMaterial && emp.subcontractCompany))
+      .map((emp) => ({ id: emp.id, label: emp.name }));
+    const externalSelectedColumns = selectedEmployeeList
+      .filter((emp) => !!(emp.isSubcontractedMaterial && emp.subcontractCompany))
+      .map((emp) => ({ id: emp.id, label: emp.name }));
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
     const availableChangeOrders = getChangeOrdersForProjectDept(editingCell.department, editingCell.projectId);
     const canAssignToChangeOrder = !!editingCell.projectId && availableChangeOrders.length > 0;
     const selectedChangeOrder = availableChangeOrders.find((order) => order.id === selectedChangeOrderId) || null;
-    const modalTotalHours = roundHours(
-      isBuildOrPRGDepartment
-        ? (editingScioHours + editingExternalHours)
-        : editingHours
-    );
+    const modalTotalHours = roundHours(editingHours);
     // Locked (past) week: hours are read-only (Finance actuals), but the stage
     // label can still be relabeled. Full-access users are exempt (see isWeekLocked).
     const isLockedWeek = isWeekLocked(editingCell.weekStart);
@@ -8510,93 +8804,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
             )}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3.5 md:gap-4 items-start">
           {/* Hours and Stage block */}
-          {isBuildOrPRGDepartment ? (
-            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-              {/* SCIO Hours input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.scioHours}</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={editingScioHoursInput}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const normalized = raw.replace(',', '.');
-                    if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
-                      setEditingScioHoursInput(raw);
-                      const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
-                      setEditingScioHours(num);
-                      setEditingHours(num + editingExternalHours);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSaveCell();
-                    }
-                  }}
-                  disabled={scioInputLocked || isLockedWeek}
-                  autoFocus
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
-                  placeholder="0"
-                />
-              </div>
-
-              {/* External Hours input - conditionally shown based on selected external resource */}
-              {selectedEmployeeList.length > 0 && hasExternalSelected && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.enterExternalHours}</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={editingExternalHoursInput}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const normalized = raw.replace(',', '.');
-                      if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
-                        setEditingExternalHoursInput(raw);
-                        const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
-                        setEditingExternalHours(num);
-                        setEditingHours(editingScioHours + num);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSaveCell();
-                      }
-                    }}
-                    disabled={isLockedWeek}
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
-                    placeholder="0"
-                  />
-                </div>
-              )}
-
-              {stageOptions.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.stage}</label>
-                  <select
-                    value={(editingStage || '') as string}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setEditingStage(value === '' ? null : (value as Stage));
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">{t.noStage}</option>
-                    {stageOptions.map((stage) => (
-                      <option key={stage} value={stage}>
-                        {getStageLabel(stage, t as Record<string, string>)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          ) : hasStagePlanner ? (
+          {hasStagePlanner ? (
             <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.hours}</label>
@@ -8622,13 +8830,207 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     + {t.add || 'Add'}
                   </button>
                 </div>
-                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 rounded-lg border border-gray-200 bg-white p-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 rounded-lg border border-gray-200 bg-white p-2">
                   {editingStageEntries.length === 0 && (
                     <div className="text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
                       {t.noStage}
                     </div>
                   )}
                   {editingStageEntries.map((entry) => {
+                    // BUILD/PRG: each stage entry gets its own independent SCIO/External pools
+                    // (own totals, own week-split, own per-person columns) instead of the plain
+                    // single hours field HD/MED use below.
+                    if (isBuildOrPRGDepartment) {
+                      return (
+                        <div key={entry.id} className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-2">
+                          <div className="grid grid-cols-[1fr_36px] gap-2 items-center">
+                            <select
+                              value={entry.stage}
+                              onChange={(e) => {
+                                const value = e.target.value as Exclude<Stage, null> | '';
+                                setEditingStageEntries((prev) => prev.map((row) => (
+                                  row.id === entry.id ? { ...row, stage: value } : row
+                                )));
+                              }}
+                              className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">{t.noStage}</option>
+                              {stageOptions.map((stage) => (
+                                <option key={stage} value={stage}>
+                                  {getStageLabel(stage, t as Record<string, string>)}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setEditingStageEntries((prev) => prev.filter((row) => row.id !== entry.id))}
+                              disabled={isLockedWeek}
+                              className="text-red-600 hover:text-red-700 bg-red-50 border border-red-200 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={t.delete}
+                            >
+                              <X size={14} className="mx-auto" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">{t.scioHours}</label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={entry.scioHoursInput}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const normalized = raw.replace(',', '.');
+                                  if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                    const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                                    setEditingStageEntries((prev) => prev.map((row) => (
+                                      row.id === entry.id
+                                        ? { ...row, scioHours: num, scioHoursInput: raw, hours: roundHours(num + (row.externalHours || 0)) }
+                                        : row
+                                    )));
+                                  }
+                                }}
+                                disabled={isLockedWeek}
+                                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">{t.enterExternalHours}</label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={entry.externalHoursInput}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const normalized = raw.replace(',', '.');
+                                  if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
+                                    const num = normalized === '' ? 0 : Math.max(0, parseFloat(normalized) || 0);
+                                    setEditingStageEntries((prev) => prev.map((row) => (
+                                      row.id === entry.id
+                                        ? { ...row, externalHours: num, externalHoursInput: raw, hours: roundHours((row.scioHours || 0) + num) }
+                                        : row
+                                    )));
+                                  }
+                                }}
+                                disabled={isLockedWeek}
+                                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                              {language === 'es' ? 'Dividir en semanas' : 'Split across weeks'}
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={entry.weekCountInput}
+                              disabled={isLockedWeek}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === '' || /^\d{0,3}$/.test(raw)) {
+                                  setEditingStageEntries((prev) => prev.map((row) => {
+                                    if (row.id !== entry.id) return row;
+                                    let weekCount = row.weekCount;
+                                    if (raw !== '') {
+                                      const parsed = parseInt(raw, 10);
+                                      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 52) {
+                                        weekCount = parsed;
+                                      }
+                                    }
+                                    return { ...row, weekCountInput: raw, weekCount };
+                                  }));
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const parsed = parseInt(e.target.value, 10);
+                                const safe = Number.isFinite(parsed) ? Math.max(1, Math.min(52, parsed)) : 1;
+                                setEditingStageEntries((prev) => prev.map((row) => (
+                                  row.id === entry.id ? { ...row, weekCountInput: String(safe), weekCount: safe } : row
+                                )));
+                              }}
+                              className="w-16 border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                            />
+                          </div>
+
+                          {/* SCIO pool: one column per selected internal person once there are 2+. */}
+                          <WeekSplitEditor
+                            weekStartDate={editingCell.weekStart}
+                            totalHours={roundHours(entry.scioHours || 0)}
+                            weekCount={entry.weekCount}
+                            onWeekCountChange={(count) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, weekCount: count, weekCountInput: String(count) } : row
+                            )))}
+                            hideWeekCountInput
+                            isEven={entry.scioWeeklyEven}
+                            onIsEvenChange={(even) => setEditingStageEntries((prev) => prev.map((row) => {
+                              if (row.id !== entry.id) return row;
+                              if (!even) {
+                                const colIds = internalSelectedColumns.map((c) => c.id);
+                                const evenMatrix = computeMatrixHours(roundHours(row.scioHours || 0), row.weekCount, colIds, true, {});
+                                const primed: Record<string, string> = {};
+                                Object.entries(evenMatrix).forEach(([key, value]) => { primed[key] = `${Math.round(value * 100) / 100}`; });
+                                return { ...row, scioWeeklyEven: even, scioCellInputs: primed };
+                              }
+                              return { ...row, scioWeeklyEven: even };
+                            }))}
+                            weeklyInputs={deriveSoloWeeklyInputs(entry.scioCellInputs, entry.weekCount)}
+                            onWeeklyInputChange={(index, value) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, scioCellInputs: { ...row.scioCellInputs, [`${SOLO_COLUMN}::${index}`]: value } } : row
+                            )))}
+                            columns={internalSelectedColumns}
+                            cellInputs={entry.scioCellInputs}
+                            onCellInputChange={(columnId, weekIndex, value) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, scioCellInputs: { ...row.scioCellInputs, [`${columnId}::${weekIndex}`]: value } } : row
+                            )))}
+                            language={language}
+                            disabled={isLockedWeek}
+                          />
+
+                          {/* External pool: one column per selected external provider once there are 2+. */}
+                          <WeekSplitEditor
+                            weekStartDate={editingCell.weekStart}
+                            totalHours={roundHours(entry.externalHours || 0)}
+                            weekCount={entry.weekCount}
+                            onWeekCountChange={(count) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, weekCount: count, weekCountInput: String(count) } : row
+                            )))}
+                            hideWeekCountInput
+                            isEven={entry.externalWeeklyEven}
+                            onIsEvenChange={(even) => setEditingStageEntries((prev) => prev.map((row) => {
+                              if (row.id !== entry.id) return row;
+                              if (!even) {
+                                const colIds = externalSelectedColumns.map((c) => c.id);
+                                const evenMatrix = computeMatrixHours(roundHours(row.externalHours || 0), row.weekCount, colIds, true, {});
+                                const primed: Record<string, string> = {};
+                                Object.entries(evenMatrix).forEach(([key, value]) => { primed[key] = `${Math.round(value * 100) / 100}`; });
+                                return { ...row, externalWeeklyEven: even, externalCellInputs: primed };
+                              }
+                              return { ...row, externalWeeklyEven: even };
+                            }))}
+                            weeklyInputs={deriveSoloWeeklyInputs(entry.externalCellInputs, entry.weekCount)}
+                            onWeeklyInputChange={(index, value) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, externalCellInputs: { ...row.externalCellInputs, [`${SOLO_COLUMN}::${index}`]: value } } : row
+                            )))}
+                            columns={externalSelectedColumns}
+                            cellInputs={entry.externalCellInputs}
+                            onCellInputChange={(columnId, weekIndex, value) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, externalCellInputs: { ...row.externalCellInputs, [`${columnId}::${weekIndex}`]: value } } : row
+                            )))}
+                            language={language}
+                            disabled={isLockedWeek}
+                          />
+                        </div>
+                      );
+                    }
+
                     const stageRowTotal = selectedResourcesCount > 0
                       ? roundHours(
                           selectedEmployeeList.reduce((sum, resource) => {
@@ -8649,7 +9051,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                 row.id === entry.id ? { ...row, stage: value } : row
                               )));
                             }}
-                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             <option value="">{t.noStage}</option>
                             {stageOptions.map((stage) => (
@@ -8678,7 +9080,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             }}
                             readOnly={selectedResourcesCount > 0 || isLockedWeek}
                             disabled={selectedResourcesCount > 0 || isLockedWeek}
-                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
+                            className="border border-gray-300 bg-white rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700 disabled:font-semibold"
                             placeholder="0"
                           />
                           <button
@@ -8690,6 +9092,39 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           >
                             <X size={14} className="mx-auto" />
                           </button>
+                        </div>
+
+                        <div className="ml-1 pl-2 border-l-2 border-gray-200">
+                          <WeekSplitEditor
+                            weekStartDate={editingCell.weekStart}
+                            totalHours={stageRowTotal}
+                            weekCount={entry.weekCount}
+                            onWeekCountChange={(count) => setEditingStageEntries((prev) => prev.map((row) => (
+                              row.id === entry.id ? { ...row, weekCount: count } : row
+                            )))}
+                            isEven={entry.weeklyEven}
+                            onIsEvenChange={(even) => setEditingStageEntries((prev) => prev.map((row) => {
+                              if (row.id !== entry.id) return row;
+                              if (!even) {
+                                const primed = computeWeeklyHours(stageRowTotal, row.weekCount, true, []);
+                                return {
+                                  ...row,
+                                  weeklyEven: even,
+                                  weeklyHoursInputs: primed.map((v) => `${Math.round(v * 100) / 100}`),
+                                };
+                              }
+                              return { ...row, weeklyEven: even };
+                            }))}
+                            weeklyInputs={entry.weeklyHoursInputs}
+                            onWeeklyInputChange={(index, value) => setEditingStageEntries((prev) => prev.map((row) => {
+                              if (row.id !== entry.id) return row;
+                              const next = [...row.weeklyHoursInputs];
+                              next[index] = value;
+                              return { ...row, weeklyHoursInputs: next };
+                            }))}
+                            language={language}
+                            disabled={isLockedWeek}
+                          />
                         </div>
 
                         {selectedResourcesCount > 0 && (
@@ -8722,7 +9157,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                     }}
                                     readOnly={isLockedWeek}
                                     disabled={isLockedWeek}
-                                    className="border border-gray-300 rounded-md px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700"
+                                    className="border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-700"
                                     placeholder="0"
                                   />
                                 </div>
@@ -8761,9 +9196,36 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                 }}
                 autoFocus
                 disabled={isLockedWeek}
-                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 placeholder="0"
               />
+
+              <div className="mt-3">
+                <WeekSplitEditor
+                  weekStartDate={editingCell.weekStart}
+                  totalHours={roundHours(editingHours)}
+                  weekCount={editingWeekCount}
+                  onWeekCountChange={setEditingWeekCount}
+                  isEven={editingWeeklyEven}
+                  onIsEvenChange={(even) => {
+                    if (!even) {
+                      const primed = computeWeeklyHours(roundHours(editingHours), editingWeekCount, true, []);
+                      setEditingWeeklyHoursInputs(primed.map((v) => `${Math.round(v * 100) / 100}`));
+                    }
+                    setEditingWeeklyEven(even);
+                  }}
+                  weeklyInputs={editingWeeklyHoursInputs}
+                  onWeeklyInputChange={(index, value) => {
+                    setEditingWeeklyHoursInputs((prev) => {
+                      const next = [...prev];
+                      next[index] = value;
+                      return next;
+                    });
+                  }}
+                  language={language}
+                  disabled={isLockedWeek}
+                />
+              </div>
             </div>
           )}
 
@@ -8854,11 +9316,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
               <label className="block text-sm font-medium text-gray-700 mb-1.5">{t.availableResources} ({deptEmployees.length})</label>
               <div className="space-y-1.5 min-h-[120px] max-h-[34vh] overflow-y-auto bg-white p-1.5 rounded-lg border border-gray-200">
                 {deptEmployees.map((emp) => {
-                  const isExternal = emp.isSubcontractedMaterial && emp.subcontractCompany;
-                  const isBuildOrPRG = editingCell.department === 'BUILD' || editingCell.department === 'PRG';
+                  const isExternal = !!(emp.isSubcontractedMaterial && emp.subcontractCompany);
                   const isSelected = selectedEmployees.has(emp.id);
                   return (
-                    <label key={emp.id} className={`block cursor-pointer p-1.5 rounded-md transition border ${isExternal && isBuildOrPRG ? 'hover:bg-violet-50 bg-violet-50/50 border-violet-100' : 'hover:bg-blue-50 border-transparent hover:border-blue-100'}`}>
+                    <label key={emp.id} className={`block cursor-pointer p-1.5 rounded-md transition border ${isExternal ? 'hover:bg-violet-50 bg-violet-50/50 border-violet-100' : 'hover:bg-blue-50 border-transparent hover:border-blue-100'}`}>
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -8873,21 +9334,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               newSelected.delete(emp.id);
                             }
                             setSelectedEmployees(newSelected);
-
-                            // BUILD/PRG: external hours field should only exist when an external is selected.
-                            if (isBuildOrPRGDepartment) {
-                              const updatedSelectedList = Array.from(newSelected)
-                                .map((empId) => employees.find((e) => e.id === empId))
-                                .filter(Boolean);
-                              const stillHasExternal = updatedSelectedList.some(
-                                (selectedEmp) => !!(selectedEmp?.isSubcontractedMaterial && selectedEmp?.subcontractCompany)
-                              );
-                              if (!stillHasExternal) {
-                                setEditingExternalHours(0);
-                                setEditingExternalHoursInput('');
-                                setEditingHours(editingScioHours);
-                              }
-                            }
                           }}
                           className="w-4 h-4 text-blue-500 rounded cursor-pointer"
                         />
@@ -8901,22 +9347,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             🤝 {emp.department}
                           </span>
                         )}
-                        {/* Badge showing Internal or Company name */}
-                        {isBuildOrPRG && (
-                          isExternal ? (
-                            <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
-                              Ext {emp.subcontractCompany}
-                            </span>
-                          ) : (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                              Interno
-                            </span>
-                          )
+                        {/* Badge showing Internal staff vs. an external provider -- Available Resources
+                            only ever shows one or the other per row (never both broken down). */}
+                        {isExternal ? (
+                          <span className="text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
+                            {language === 'es' ? 'Externo' : 'External'}
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            Interno
+                          </span>
                         )}
-                        <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
+                        {/* Internal staff show their fixed weekly capacity; an external provider's
+                            headcount isn't on Employee.capacity (see +/- External Staff instead),
+                            so there's no real per-resource number to show here. */}
+                        {!isExternal && (
+                          <span className="text-xs text-gray-500 ml-auto">45{t.hoursPerSemWeek}</span>
+                        )}
                       </div>
 
-                      {hasStagePlanner && isSelected && (
+                      {hasStagePlanner && !isBuildOrPRGDepartment && isSelected && (
                         <div className="pl-6 pt-1 flex flex-wrap gap-1.5">
                           {editingStageEntries
                             .map((entry) => {
@@ -9050,14 +9500,28 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2.5 justify-between p-3 md:px-4 border-t border-gray-200 flex-shrink-0 bg-white">
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={isLockedWeek}
-              title={isLockedWeek ? (language === 'es' ? 'Semana bloqueada: no se puede eliminar' : 'Locked week: cannot be deleted') : undefined}
-              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {t.delete}
-            </button>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isLockedWeek}
+                title={isLockedWeek ? (language === 'es' ? 'Semana bloqueada: no se puede eliminar' : 'Locked week: cannot be deleted') : undefined}
+                className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition border border-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {t.delete}
+              </button>
+              {editingCell.projectId && (
+                <button
+                  onClick={() => setShowMoveWeeksModal(true)}
+                  disabled={isLockedWeek}
+                  title={isLockedWeek
+                    ? (language === 'es' ? 'Semana bloqueada: no se puede mover' : 'Locked week: cannot be moved')
+                    : (language === 'es' ? 'Mover estas horas a otra(s) semana(s)' : 'Move these hours to another week')}
+                  className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {language === 'es' ? 'Mover semanas' : 'Move weeks'}
+                </button>
+              )}
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={closeEditModal}
@@ -9067,13 +9531,42 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
               </button>
               <button
                 onClick={handleSaveCell}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition"
+                disabled={!isLockedWeek && selectedEmployees.size === 0}
+                title={!isLockedWeek && selectedEmployees.size === 0
+                  ? (language === 'es'
+                    ? 'Selecciona al menos un recurso (interno o externo) antes de guardar.'
+                    : 'Select at least one resource (internal or external) before saving.')
+                  : undefined}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 {t.save}
               </button>
             </div>
           </div>
         </div>
+        {showMoveWeeksModal && editingCell.projectId && (
+          <MoveAssignmentWeeksModal
+            department={editingCell.department}
+            projectId={editingCell.projectId}
+            originWeekStart={editingCell.weekStart}
+            assignments={assignments}
+            getAssignmentDepartment={getAssignmentDepartment}
+            employeeById={employeeById}
+            stageOptions={stageOptions}
+            getStageLabel={getStageLabel}
+            t={t as Record<string, string>}
+            language={language}
+            onClose={() => setShowMoveWeeksModal(false)}
+            onMoved={() => {
+              setShowMoveWeeksModal(false);
+              closeEditModal();
+            }}
+            addAssignment={addAssignment}
+            updateAssignment={updateAssignment}
+            deleteAssignment={deleteAssignment}
+            fetchAssignments={fetchAssignments}
+          />
+        )}
       </>
     );
   };
@@ -9440,14 +9933,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     </div>
                   );
                 })}
-                {/* Invisible spacer matching the Projects table's 4 trailing Summary
-                    columns (Qtd/Used/Fcst/Util, 52px each -- see SUMMARY_COLUMN_WIDTH_PX).
+                {/* Invisible spacer matching the Projects table's trailing Summary
+                    columns (60px each -- see SUMMARY_TOTAL_WIDTH_PX).
                     This bar doesn't have those columns, but the percentage-based
                     horizontal scroll sync (syncHorizontalScrollToCanonical) only lines
                     weeks up correctly when both scrollable containers have the exact
                     same total width; this keeps them equal without touching that sync
                     logic itself. */}
-                <div className="flex-shrink-0" style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4 }} />
+                <div className="flex-shrink-0" style={{ width: SUMMARY_TOTAL_WIDTH_PX }} />
               </div>
             ))}
           </div>
@@ -9461,41 +9954,118 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
         </button>
       )}
 
-      {/* Sticky Header - Responsive */}
-      <div className="sticky top-0 z-50 brand-page-header">
-        <div className="px-1 py-1 flex flex-wrap items-center gap-1">
-          {/* Year selector - ultra compact */}
+      {/* Year selector, current-week badge, and export buttons live in the sidebar now (after
+          the department selector) to free up the top toolbar's horizontal space -- portaled
+          into the container App.tsx renders there. That container only exists while the
+          sidebar is open (same rule as the department selector right above it), so these
+          render nothing while the sidebar is collapsed rather than falling back into the main
+          content area with mismatched (dark sidebar) styling. */}
+      {sidebarToolbarContainer && (() => {
+        const sidebarToolbarContent = (
+          <div className="space-y-1.5">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="w-full bg-white/10 text-white text-[9px] md:text-[11px] rounded-md px-2 py-1 border border-white/20 hover:border-[#d5d1da] transition leading-tight"
+            >
+              {yearOptions.map((year) => (
+                <option key={year} value={year} className="text-[#2e1a47] bg-white">{year}</option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setShowLegend(!showLegend)}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[9px] md:text-[10px] font-semibold rounded-md transition border ${
+                showLegend
+                  ? 'bg-[#4f3a70] text-white border-[#6d5a94]'
+                  : 'bg-white/10 hover:bg-white/15 text-white border-white/20'
+              }`}
+              title={t.toggleLegend}
+            >
+              <span className="font-bold">{showLegend ? '-' : '+'}</span>
+              <span>{t.legend}</span>
+            </button>
+
+            {canManageProjectsInCurrentDepartment && (
+              <button
+                onClick={() => setShowQuickProjectModal(true)}
+                className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/15 text-white text-[9px] md:text-[10px] font-semibold rounded-md transition border border-white/20"
+                title={t.createProject || 'Create Project'}
+              >
+                <Plus size={10} />
+                <span>{t.createProject || 'Create'}</span>
+              </button>
+            )}
+
+            {currentDateWeekIndex >= 0 && (
+              <div className="w-full text-center bg-gradient-to-r from-stone-600 to-zinc-700 text-white px-2 py-1 rounded-md shadow-md text-[10px] font-bold">
+                W{allWeeksData[currentDateWeekIndex]?.weekNum}
+              </div>
+            )}
+
+            <button
+              onClick={handleExportTimelineExcel}
+              disabled={isExportingExcel || projectsVisibleInCurrentView.length === 0}
+              className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] md:text-[10px] font-semibold rounded-md transition"
+              title={
+                projectsVisibleInCurrentView.length === 0
+                  ? (language === 'es' ? 'Selecciona un proyecto para exportar en Excel' : 'Select a project to export to Excel')
+                  : (language === 'es' ? 'Exportar timeline en Excel' : 'Export timeline to Excel')
+              }
+            >
+              <span>XLSX</span>
+              <span>
+                {isExportingExcel
+                  ? (language === 'es' ? 'Exportando...' : 'Exporting...')
+                  : (language === 'es' ? 'Exportar' : 'Export')}
+              </span>
+            </button>
+
+            <button
+              onClick={openExportPdfModal}
+              disabled={projectsVisibleInCurrentView.length === 0}
+              className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-[#ce0037] hover:bg-[#ba0032] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] md:text-[10px] font-semibold rounded-md transition"
+              title={
+                projectsVisibleInCurrentView.length === 0
+                  ? (language === 'es' ? 'Selecciona un proyecto para exportar en PDF' : 'Select a project to export to PDF')
+                  : (language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF')
+              }
+            >
+              <span>PDF</span>
+              <span>{language === 'es' ? 'Exportar' : 'Export'}</span>
+            </button>
+          </div>
+        );
+        return createPortal(sidebarToolbarContent, sidebarToolbarContainer);
+      })()}
+
+      {/* Compact icon-select year picker for the collapsed sidebar rail -- same selectedYear
+          state as above, just a different (icon-only) presentation. The <select> itself is
+          invisible (opacity-0) and overlaid on the calendar icon so the native dropdown still
+          opens and works without showing text in this narrow rail. */}
+      {sidebarToolbarCollapsedContainer && createPortal(
+        <div className="relative w-9 h-9">
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="cm-toolbar-select border border-[#d5d1da] rounded px-1 py-0.5 text-[9px] font-semibold text-[#2e1a47] bg-[#f4f1f8] hover:bg-[#ebe6f2] transition flex-shrink-0"
+            className="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            title={String(selectedYear)}
+            aria-label={language === 'es' ? 'Año' : 'Year'}
           >
             {yearOptions.map((year) => (
-              <option key={year} value={year}>{year}</option>
+              <option key={year} value={year} className="text-[#2e1a47] bg-white">{year}</option>
             ))}
           </select>
+          <div className="absolute inset-0 pointer-events-none rounded-md border border-white/20 bg-white/10 flex items-center justify-center peer-focus:ring-2 peer-focus:ring-white/40 peer-hover:bg-white/15 transition">
+            <Calendar size={14} className="text-white" />
+          </div>
+        </div>,
+        sidebarToolbarCollapsedContainer
+      )}
 
-          {/* Current Week Info - ultra compact */}
-          {currentDateWeekIndex >= 0 && (
-            <div className="bg-gradient-to-r from-stone-600 to-zinc-700 text-white px-1.5 py-0.5 rounded-md shadow-md text-[9px] flex-shrink-0">
-              <span className="font-bold">W{currentDateWeekIndex >= 0 ? allWeeksData[currentDateWeekIndex]?.weekNum : '-'}</span>
-            </div>
-          )}
-
-          {/* Legend Toggle Button - ultra compact */}
-          <button
-            onClick={() => setShowLegend(!showLegend)}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
-              showLegend
-                ? 'bg-[#4f3a70] text-white border-[#2e1a47]'
-                : 'bg-[#2e1a47] hover:bg-[#3a2556] text-white border-[#2e1a47]'
-            }`}
-            title={t.toggleLegend}
-          >
-            <span className="font-bold">{showLegend ? '-' : '+'}</span>
-            <span className="hidden sm:inline">{t.legend}</span>
-          </button>
-
+      {/* Sticky Header - Responsive */}
+      <div className="sticky top-0 z-50 brand-page-header">
+        <div className="px-1 py-1 flex flex-wrap items-center gap-1">
           {projectsVisibleInCurrentView.length > 0 && (
             <button
               onClick={() => setProjectCellViewMode((prev) => (prev === 'detailed' ? 'compact' : 'detailed'))}
@@ -9528,18 +10098,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
             </button>
           )}
 
-          {/* Create Project Button - Only in department view (except PM) */}
-          {canManageProjectsInCurrentDepartment && (
-            <button
-              onClick={() => setShowQuickProjectModal(true)}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#4f3a70] hover:bg-[#3f2d5d] text-white text-[9px] font-semibold rounded transition flex-shrink-0"
-              title={t.createProject || 'Create Project'}
-            >
-              <Plus size={10} />
-              <span className="hidden sm:inline">{t.createProject || 'Create'}</span>
-            </button>
-          )}
-
           {/* Import Existing Project Button - Available in department views, including PM */}
           {canImportProjectsInCurrentView && getAvailableProjectsForImport().length > 0 && (
             <button
@@ -9551,38 +10109,6 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
               <span className="hidden sm:inline">{t.importProject || 'Import'}</span>
             </button>
           )}
-
-          <button
-            onClick={handleExportTimelineExcel}
-            disabled={isExportingExcel || projectsVisibleInCurrentView.length === 0}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
-            title={
-              projectsVisibleInCurrentView.length === 0
-                ? (language === 'es' ? 'Selecciona un proyecto para exportar en Excel' : 'Select a project to export to Excel')
-                : (language === 'es' ? 'Exportar timeline en Excel' : 'Export timeline to Excel')
-            }
-          >
-            <span>XLSX</span>
-            <span className="hidden sm:inline">
-              {isExportingExcel
-                ? (language === 'es' ? 'Exportando...' : 'Exporting...')
-                : (language === 'es' ? 'Exportar' : 'Export')}
-            </span>
-          </button>
-
-          <button
-            onClick={openExportPdfModal}
-            disabled={projectsVisibleInCurrentView.length === 0}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#ce0037] hover:bg-[#ba0032] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[9px] font-semibold rounded transition flex-shrink-0"
-            title={
-              projectsVisibleInCurrentView.length === 0
-                ? (language === 'es' ? 'Selecciona un proyecto para exportar en PDF' : 'Select a project to export to PDF')
-                : (language === 'es' ? 'Exportar timeline en PDF' : 'Export timeline as PDF')
-            }
-          >
-            <span>PDF</span>
-            <span className="hidden sm:inline">{language === 'es' ? 'Exportar' : 'Export'}</span>
-          </button>
         </div>
       </div>
 
@@ -9610,6 +10136,33 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       <span>{dept} - {t.weeklyOccupancyTotal}</span>
                     </h2>
                     <div className="flex items-center gap-2">
+                      {dept === 'BUILD' && canEditDepartment(dept) && (
+                        <button
+                          onClick={() => setIsBuildModalOpen(true)}
+                          className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
+                          title={t.clickToAddSubcontractedTeam}
+                        >
+                          {language === 'es' ? '+ Externo' : '+ External'}
+                        </button>
+                      )}
+                      {EXTERNAL_TEAM_DEPARTMENTS.includes(dept) && canEditDepartment(dept) && (
+                        <button
+                          onClick={() => setExternalTeamModalDept(dept)}
+                          className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
+                          title={t.clickToAddExternalTeam}
+                        >
+                          {language === 'es' ? '+ Externo' : '+ External'}
+                        </button>
+                      )}
+                      {(dept === 'BUILD' || EXTERNAL_TEAM_DEPARTMENTS.includes(dept)) && canEditDepartment(dept) && (
+                        <button
+                          onClick={() => setIsExternalStaffModalOpen(true)}
+                          className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
+                          title={t.logExternalStaffTitle}
+                        >
+                          {t.externalStaffButton}
+                        </button>
+                      )}
                       {canEditDepartment(dept) && (
                         <button
                           onClick={() => setIsHeadcountModalOpen(true)}
@@ -9687,14 +10240,14 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             </div>
                           );
                         })}
-                        {/* Invisible spacer matching the Projects table's 4 trailing Summary
-                            columns (Qtd/Used/Fcst/Util, 52px each -- see
-                            SUMMARY_COLUMN_WIDTH_PX). This panel doesn't have those columns,
+                        {/* Invisible spacer matching the Projects table's trailing Summary
+                            columns (60px each -- see
+                            SUMMARY_TOTAL_WIDTH_PX). This panel doesn't have those columns,
                             but the percentage-based horizontal scroll sync
                             (syncHorizontalScrollToCanonical) only lines weeks up correctly
                             when both scrollable containers have the exact same total width;
                             this keeps them equal without touching that sync logic itself. */}
-                        <div className="flex-shrink-0" style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4 }} />
+                        <div className="flex-shrink-0" style={{ width: SUMMARY_TOTAL_WIDTH_PX }} />
                       </div>
 
                       {/* Total row - sum of occupied people in that week (or hours for MFG) */}
@@ -9861,7 +10414,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                         </div>
                       </div>
 
-                      {/* Subcontracted Personnel rows - Only for BUILD department */}
+                      {/* Subcontracted Personnel rows - Only for BUILD department. The "Add" button that
+                          used to live here moved to the panel header, next to "+/- Staff". */}
                       {dept === 'BUILD' && (
                         <>
                           {/* Company rows - Only show active teams */}
@@ -9933,29 +10487,16 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               </div>
                             </div>
                           ))}
-
-                          {/* Add Team button - clicking label opens popup */}
-                          {canEditDepartment(dept) && (
-                            <div className="flex gap-0 mb-0.5">
-                              {/* Label column - clickable to open popup */}
-                              <button
-                                onClick={() => setIsBuildModalOpen(true)}
-                                className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-800 hover:from-indigo-200 hover:to-indigo-100 cursor-pointer transition-all`}
-                                title={t.clickToAddSubcontractedTeam}
-                              >
-                                {t.addButton}
-                              </button>
-                            </div>
-                          )}
                         </>
                       )}
 
-                      {/* Add External Team button row - Only for PRG department */}
-                      {dept === 'PRG' && (
+                      {/* External team rows - MED/HD/MFG/PRG. The "Add" button that used to live
+                          here moved to the panel header, next to "+/- Staff". */}
+                      {EXTERNAL_TEAM_DEPARTMENTS.includes(dept) && (
                         <>
                           {/* Team rows - Only show active teams */}
-                          {prgActiveTeams.map((team) => (
-                            <div key={`prg-external-${team}`} className="flex gap-0 mb-0.5 group">
+                          {getExternalTeamsFor(dept).map((team) => (
+                            <div key={`external-team-${dept}-${team}`} className="flex gap-0 mb-0.5 group">
                               {/* Team Label with delete button */}
                               <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center relative text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-cyan-100 to-cyan-50 text-cyan-900 shadow-sm hover:shadow-md transition-all`}>
                                 <span className="truncate max-w-[40px]" title={team}>{team}</span>
@@ -9964,7 +10505,8 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                     onClick={() => {
                                       setDeleteConfirmation({
                                         isOpen: true,
-                                        type: 'prg',
+                                        type: 'external',
+                                        department: dept,
                                         teamName: team,
                                       });
                                     }}
@@ -9980,9 +10522,10 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               <div className="flex gap-0">
                                 {allWeeksData.map((weekData, idx) => {
                                   const isCurrentWeek = idx === currentDateWeekIndex;
+                                  const teamKey = externalTeamKey(dept, team);
                                   return (
                                     <div
-                                      key={`prg-external-${team}-${weekData.date}`}
+                                      key={`external-team-${dept}-${team}-${weekData.date}`}
                                       className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 border-1.5 border-black rounded-none py-0.5 flex items-center justify-center transition-all ${
                                         isCurrentWeek
                                           ? CURRENT_WEEK_EDITABLE_CLASS
@@ -9992,7 +10535,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                       <input
                                         type="text"
                                         inputMode="decimal"
-                                        value={prgExternalInputs[`${team}-${weekData.date}`] ?? (prgExternalPersonnel[team] && prgExternalPersonnel[team][weekData.date] !== undefined && prgExternalPersonnel[team][weekData.date] !== 0 ? prgExternalPersonnel[team][weekData.date] : '')}
+                                        value={prgExternalInputs[`${teamKey}-${weekData.date}`] ?? (prgExternalPersonnel[teamKey] && prgExternalPersonnel[teamKey][weekData.date] !== undefined && prgExternalPersonnel[teamKey][weekData.date] !== 0 ? prgExternalPersonnel[teamKey][weekData.date] : '')}
                                         disabled={!canEditDepartment(dept)}
                                         onChange={(e) => {
                                           const raw = e.target.value;
@@ -10000,7 +10543,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                           if (normalized === '' || /^\d*\.?\d*$/.test(normalized)) {
                                             setPrgExternalInputs(prev => ({
                                               ...prev,
-                                              [`${team}-${weekData.date}`]: raw,
+                                              [`${teamKey}-${weekData.date}`]: raw,
                                             }));
                                             let newCount: number | undefined;
                                             if (normalized === '' || normalized === '.') {
@@ -10008,7 +10551,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                             } else {
                                               newCount = parseFloat(normalized);
                                             }
-                                            handlePrgExternalChange(team, weekData.date, newCount);
+                                            handlePrgExternalChange(dept, team, weekData.date, newCount);
                                           }
                                         }}
                                         className="w-8 text-[9px] font-bold bg-transparent focus:outline-none text-center border-none text-cyan-900 disabled:cursor-not-allowed disabled:text-gray-400"
@@ -10022,56 +10565,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               </div>
                             </div>
                           ))}
-
-                          {/* Add External Team button - clicking label opens popup */}
-                          {canEditDepartment(dept) && (
-                            <div className="flex gap-0 mb-0.5">
-                              {/* Label column - clickable to open popup */}
-                              <button
-                                onClick={() => setIsPRGModalOpen(true)}
-                                className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-teal-100 to-teal-50 text-teal-800 hover:from-teal-200 hover:to-teal-100 cursor-pointer transition-all`}
-                                title={t.clickToAddExternalTeam}
-                              >
-                                {t.addButton}
-                              </button>
-                            </div>
-                          )}
                         </>
-                      )}
-
-                      {/* External Hours row - For BUILD and PRG departments only */}
-                      {(dept === 'BUILD' || dept === 'PRG') && (
-                        <div className="flex gap-0 mb-0.5">
-                          {/* Label */}
-                          <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[9px] font-bold px-1 py-0.5 rounded-none border-2 border-black bg-gradient-to-br from-purple-100 to-purple-50 text-purple-800`}>
-                            {dept === 'BUILD' ? 'Ext' : 'Ext'}
-                          </div>
-
-                          {/* Week cells */}
-                          {allWeeksData.map((weekData, idx) => {
-                            const isCurrentWeek = idx === currentDateWeekIndex;
-
-                            // Calculate total external hours for this week across ALL projects
-                            const deptWeekKey = `${dept}|${weekData.date}`;
-                            const totalExternalHours = assignmentIndex.deptWeekExternalTotals.get(deptWeekKey) || 0;
-
-                            return (
-                              <div
-                                key={`external-${dept}-${weekData.date}`}
-                                className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-none border-1.5 border-black text-[9px] font-bold text-purple-700 transition-all ${
-                                  totalExternalHours > 0
-                                    ? 'bg-purple-200 shadow-sm'
-                                    : 'bg-purple-50'
-                                } ${isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''}`}
-                                title={`Horas externas - ${totalExternalHours}h`}
-                              >
-                                <div className="font-black text-[10px]">
-                                  {totalExternalHours > 0 ? totalExternalHours : '-'}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
                       )}
 
                       {/* Capacity row - department capacity minus occupied (hours for MFG, people for others) */}
@@ -10489,9 +10983,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             );
                           })}
                           <th
-                            colSpan={4}
+                            colSpan={SUMMARY_COLUMNS.length}
                             className={`border-2 px-2 py-0.5 text-center font-bold text-xs ${MONTH_HEADER_PRIMARY_CLASS} sticky right-0 z-20`}
-                            style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4, minWidth: SUMMARY_COLUMN_WIDTH_PX * 4 }}
+                            style={{ width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX }}
                           >
                             {language === 'es' ? 'Resumen' : 'Summary'}
                           </th>
@@ -10523,7 +11017,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                             <th
                               key={key}
                               style={{ right: rightOffset }}
-                              className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[52px] min-w-[52px] max-w-[52px] sticky z-20"
+                              className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px] sticky z-20"
                             >
                               {SUMMARY_COLUMN_LABELS[key][language]}
                             </th>
@@ -10559,7 +11053,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           <td
                             key={key}
                             style={{ right: rightOffset }}
-                            className="border border-gray-300 bg-slate-50 sticky w-[52px] min-w-[52px] max-w-[52px] z-10"
+                            className="border border-gray-300 bg-slate-50 sticky w-[60px] min-w-[60px] max-w-[60px] z-[15]"
                           ></td>
                         ))}
                       </tr>
@@ -10627,7 +11121,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                                   : 'border-gray-300'
                               } ${
                                 isSelectedCell
-                                  ? 'after:absolute after:inset-0 after:border-2 after:border-blue-600 after:rounded-none after:pointer-events-none after:z-20'
+                                  ? 'after:absolute after:inset-0 after:border-2 after:border-blue-600 after:rounded-none after:pointer-events-none after:z-[11]'
                                   : ''
                               }`}
                             >
@@ -11028,9 +11522,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               );
                             })}
                             <th
-                              colSpan={4}
+                              colSpan={SUMMARY_COLUMNS.length}
                               className={`border-2 px-2 py-0.5 text-center font-bold text-[9px] ${MONTH_HEADER_PRIMARY_CLASS} sticky right-0 z-20`}
-                              style={{ width: SUMMARY_COLUMN_WIDTH_PX * 4, minWidth: SUMMARY_COLUMN_WIDTH_PX * 4 }}
+                              style={{ width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX }}
                             >
                               {language === 'es' ? 'Resumen' : 'Summary'}
                             </th>
@@ -11062,7 +11556,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               <th
                                 key={key}
                                 style={{ right: rightOffset }}
-                                className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[52px] min-w-[52px] max-w-[52px] sticky z-20"
+                                className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px] sticky z-20"
                               >
                                 {SUMMARY_COLUMN_LABELS[key][language]}
                               </th>
@@ -11096,7 +11590,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                               <td
                                 key={key}
                                 style={{ right: rightOffset }}
-                                className="border border-gray-300 bg-slate-50 sticky w-[52px] min-w-[52px] max-w-[52px] z-10"
+                                className="border border-gray-300 bg-slate-50 sticky w-[60px] min-w-[60px] max-w-[60px] z-[15]"
                               ></td>
                             ))}
                           </tr>
@@ -12289,15 +12783,29 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
           />
         )}
 
-        {/* PRG External Team Modal */}
-        {isPRGModalOpen && canEditDepartment('PRG') && (
+        {/* External Staff Headcount Modal ("+ / - External Staff") -- same reasoning as the
+            SCIO modal above for rendering it outside the sticky department panel. */}
+        {departmentFilter !== 'General' && (
+          <ExternalStaffHeadcountModal
+            isOpen={isExternalStaffModalOpen}
+            department={departmentFilter as Department}
+            teams={departmentFilter === 'BUILD' ? activeTeams : getExternalTeamsFor(departmentFilter as Department)}
+            language={language}
+            onClose={() => setIsExternalStaffModalOpen(false)}
+            onSaved={loadTeamsData}
+          />
+        )}
+
+        {/* External Team Modal (MED/HD/MFG/PRG) */}
+        {externalTeamModalDept && canEditDepartment(externalTeamModalDept) && (
           <>
             {/* Backdrop */}
             <div
               className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
               onClick={() => {
-                setIsPRGModalOpen(false);
-                setPRGTeamName('');
+                setExternalTeamModalDept(null);
+                setExternalTeamName('');
+                setExternalTeamHeadcount('');
               }}
             />
             {/* Modal */}
@@ -12308,8 +12816,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                   <h2 className="text-lg font-semibold text-gray-800">{t.addPrgTeam}</h2>
                   <button
                     onClick={() => {
-                      setIsPRGModalOpen(false);
-                      setPRGTeamName('');
+                      setExternalTeamModalDept(null);
+                      setExternalTeamName('');
+                      setExternalTeamHeadcount('');
                     }}
                     className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
                     title={t.close}
@@ -12322,36 +12831,41 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (prgTeamName.trim()) {
+                    const department = externalTeamModalDept;
+                    const initialHeadcount = Math.max(0, parseFloat(externalTeamHeadcount) || 0);
+                    if (externalTeamName.trim() && department) {
                       try {
-                        // Create employee as subcontracted material for PRG department
+                        // Create employee as subcontracted material for this department
                         await addEmployee({
-                          name: prgTeamName.trim(),
+                          name: externalTeamName.trim(),
                           role: 'External Team',
-                          department: 'PRG',
+                          department,
                           capacity: 0, // External teams don't have internal capacity
                           isActive: true,
                           isSubcontractedMaterial: true,
-                          subcontractCompany: prgTeamName.trim(),
+                          subcontractCompany: externalTeamName.trim(),
                         });
 
-                        // Create initial PrgExternalTeamCapacity record to persist the team
+                        // Create initial PrgExternalTeamCapacity record to persist the team,
+                        // seeded with the staff headcount entered here (0 if left blank).
                         // This ensures the team appears after page refresh
                         const currentWeekStart = formatToISO(getWeekStart(new Date()));
                         await prgExternalTeamCapacityApi.create({
-                          teamName: prgTeamName.trim(),
+                          department,
+                          teamName: externalTeamName.trim(),
                           weekStartDate: currentWeekStart,
-                          capacity: 0,
+                          capacity: initialHeadcount,
                         });
-                        console.log('[CapacityMatrix] Created initial PrgExternalTeamCapacity for:', prgTeamName.trim());
+                        console.log('[CapacityMatrix] Created initial ExternalTeamCapacity for:', department, externalTeamName.trim(), 'capacity:', initialHeadcount);
 
                         // Add to active teams array
-                        const newTeams = [...prgActiveTeams, prgTeamName.trim()];
-                        setPRGActiveTeams([...new Set(newTeams)]);
-                        setPRGTeamName('');
-                        setIsPRGModalOpen(false);
+                        const newTeams = [...getExternalTeamsFor(department), externalTeamName.trim()];
+                        setExternalTeamsForDepartment(department, [...new Set(newTeams)]);
+                        setExternalTeamName('');
+                        setExternalTeamHeadcount('');
+                        setExternalTeamModalDept(null);
                       } catch (error) {
-                        console.error('Error adding PRG team:', error);
+                        console.error('Error adding external team:', error);
                         alert('Error al agregar equipo');
                       }
                     }
@@ -12363,11 +12877,26 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     <label className="block text-sm font-medium text-gray-700 mb-2">{t.providerName}</label>
                     <input
                       type="text"
-                      value={prgTeamName}
-                      onChange={(e) => setPRGTeamName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      value={externalTeamName}
+                      onChange={(e) => setExternalTeamName(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       placeholder={t.egProviderAbc}
                       autoFocus
+                    />
+                  </div>
+
+                  {/* Initial headcount Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.5"
+                      value={externalTeamHeadcount}
+                      onChange={(e) => setExternalTeamHeadcount(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder={t.availableStaffPlaceholder}
                     />
                   </div>
 
@@ -12376,8 +12905,9 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     <button
                       type="button"
                       onClick={() => {
-                        setIsPRGModalOpen(false);
-                        setPRGTeamName('');
+                        setExternalTeamModalDept(null);
+                        setExternalTeamName('');
+                        setExternalTeamHeadcount('');
                       }}
                       className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                     >
@@ -12385,7 +12915,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     </button>
                     <button
                       type="submit"
-                      disabled={!prgTeamName.trim()}
+                      disabled={!externalTeamName.trim()}
                       className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
                     >
                       {t.addButton}
@@ -12406,6 +12936,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
               onClick={() => {
                 setIsBuildModalOpen(false);
                 setBuildTeamName('');
+                setBuildTeamHeadcount('');
               }}
             />
             {/* Modal */}
@@ -12418,6 +12949,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                     onClick={() => {
                       setIsBuildModalOpen(false);
                       setBuildTeamName('');
+                      setBuildTeamHeadcount('');
                     }}
                     className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
                     title={t.close}
@@ -12430,6 +12962,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    const initialHeadcount = Math.max(0, parseFloat(buildTeamHeadcount) || 0);
                     if (buildTeamName.trim()) {
                       try {
                         // Create employee as subcontracted material for BUILD department
@@ -12443,20 +12976,22 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                           subcontractCompany: buildTeamName.trim(),
                         });
 
-                        // Create initial SubcontractedTeamCapacity record to persist the team
+                        // Create initial SubcontractedTeamCapacity record to persist the team,
+                        // seeded with the staff headcount entered here (0 if left blank).
                         // This ensures the team appears after page refresh
                         const currentWeekStart = formatToISO(getWeekStart(new Date()));
                         await subcontractedTeamCapacityApi.create({
                           company: buildTeamName.trim(),
                           weekStartDate: currentWeekStart,
-                          capacity: 0,
+                          capacity: initialHeadcount,
                         });
-                        console.log('[CapacityMatrix] Created initial SubcontractedTeamCapacity for:', buildTeamName.trim());
+                        console.log('[CapacityMatrix] Created initial SubcontractedTeamCapacity for:', buildTeamName.trim(), 'capacity:', initialHeadcount);
 
                         // Add to active teams array
                         const newTeams = [...activeTeams, buildTeamName.trim()];
                         setActiveTeams([...new Set(newTeams)]);
                         setBuildTeamName('');
+                        setBuildTeamHeadcount('');
                         setIsBuildModalOpen(false);
                       } catch (error) {
                         console.error('Error adding BUILD team:', error);
@@ -12473,9 +13008,24 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       type="text"
                       value={buildTeamName}
                       onChange={(e) => setBuildTeamName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder={t.egCompanyXyz}
                       autoFocus
+                    />
+                  </div>
+
+                  {/* Initial headcount Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.5"
+                      value={buildTeamHeadcount}
+                      onChange={(e) => setBuildTeamHeadcount(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder={t.availableStaffPlaceholder}
                     />
                   </div>
 
@@ -12486,6 +13036,7 @@ ${t.utilizationLabel}: ${utilizationPercent}%`;
                       onClick={() => {
                         setIsBuildModalOpen(false);
                         setBuildTeamName('');
+                        setBuildTeamHeadcount('');
                       }}
                       className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
                     >

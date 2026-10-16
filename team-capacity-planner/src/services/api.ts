@@ -203,7 +203,10 @@ const transformKeysToCamel = (obj: any): any => {
 };
 
 // Keys that should NOT have their nested keys transformed (they contain department codes like PM, MED, etc.)
-const PRESERVE_NESTED_KEYS = ['departmentHoursAllocated', 'department_hours_allocated'];
+const PRESERVE_NESTED_KEYS = [
+  'departmentHoursAllocated', 'department_hours_allocated',
+  'departmentCostAllocated', 'department_cost_allocated',
+];
 
 // Transform object keys from camelCase to snake_case
 const transformKeysToSnake = (obj: any, preserveNestedKeys = false): any => {
@@ -808,6 +811,40 @@ export const scioHeadcountEventsApi = {
   },
 };
 
+// External Team Headcount Events API (the "+ / - External Staff" ledger, for
+// MED/HD/MFG/BUILD/PRG's external providers; mirrors scioHeadcountEventsApi but
+// scoped to a (department, teamName) pair instead of a whole department)
+export const externalTeamHeadcountEventsApi = {
+  getAll: async (department?: string, teamName?: string) => {
+    const params = new URLSearchParams();
+    if (department) params.set('department', department);
+    if (teamName) params.set('team_name', teamName);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const data = await apiFetch(`/api/external-team-headcount-events/${query}`);
+    return data.results || data;
+  },
+
+  create: async (event: any) => {
+    return apiFetch('/api/external-team-headcount-events/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(event)),
+    });
+  },
+
+  update: async (id: string, event: any) => {
+    return apiFetch(`/api/external-team-headcount-events/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(event)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/external-team-headcount-events/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Subcontracted Team Capacity API
 export const subcontractedTeamCapacityApi = {
   getAll: async () => {
@@ -841,6 +878,9 @@ export const subcontractedTeamCapacityApi = {
 };
 
 // PRG External Team Capacity API
+// External team capacity (MED/HD/MFG/BUILD's own SubcontractedTeamCapacity is separate/
+// PRG): still served from /prg-external-team-capacity/ (model kept its name, see its
+// docstring) but no longer PRG-only -- create()/update() payloads now need `department`.
 export const prgExternalTeamCapacityApi = {
   getAll: async () => {
     const data = await apiFetch('/api/prg-external-team-capacity/');
