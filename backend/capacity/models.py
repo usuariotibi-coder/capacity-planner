@@ -147,6 +147,15 @@ class Project(models.Model):
     facility = models.CharField(max_length=10, choices=Facility.choices)
     number_of_weeks = models.IntegerField(validators=[MinValueValidator(1)])
     project_manager = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name='managed_projects')
+    parent_project = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='change_order_projects',
+        help_text=(
+            "Set when this project IS a Change Order registered as its own full project "
+            "(Projects page CO action, 'Método 2') -- points back at the original project "
+            "it extends. Unrelated to ProjectChangeOrder, which is the other way to register "
+            "a CO (just widening an existing project's budget, no new Project row)."
+        ),
+    )
     visible_in_departments = models.JSONField(default=list, blank=True, help_text="Departments where this project is visible (for quick-created projects)")
     is_high_probability = models.BooleanField(
         default=False,
@@ -196,14 +205,6 @@ class Assignment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='assignments')
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='assignments')
-    change_order = models.ForeignKey(
-        'ProjectChangeOrder',
-        on_delete=models.SET_NULL,
-        related_name='assignments',
-        null=True,
-        blank=True,
-        help_text="Optional Change Order this assignment belongs to"
-    )
     week_start_date = models.DateField(help_text="Start date of the week (ISO format YYYY-MM-DD)")
     hours = models.FloatField(validators=[MinValueValidator(0)], help_text="Total hours allocated")
     scio_hours = models.FloatField(null=True, blank=True, validators=[MinValueValidator(0)], help_text="Internal SCIO hours (BUILD/PRG only)")
@@ -339,12 +340,28 @@ class ProjectBudget(models.Model):
 
 
 class ProjectChangeOrder(models.Model):
-    """Change order quoted hours per project and department"""
+    """
+    A Change Order's quoted hours/$ for one project + department, registered from the
+    Projects page (not the Capacity Matrix -- see ProjectsPage's "CO" action, "Método 1":
+    expand an existing project's budget). One CO (identified by `name`, e.g. "CO01") can
+    touch several departments at once -- each department gets its own row here sharing that
+    same name, since `unique_together` is (project, department, name). The project's
+    effective Qtd hours/$ for a department is its ProjectBudget total PLUS the sum of all
+    ProjectChangeOrder rows for that (project, department).
+
+    Hours worked are no longer tagged to a specific CO (that per-assignment linking was
+    removed) -- a CO only widens the department's available budget going forward.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='change_orders')
     department = models.CharField(max_length=10, choices=Department.choices)
     name = models.CharField(max_length=50, help_text="Change order name (e.g., CO01)")
     hours_quoted = models.FloatField(validators=[MinValueValidator(0)], help_text="Quoted hours for this change order")
+    cost_quoted = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Quoted amount in $ for this change order (null = not registered)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -559,6 +576,63 @@ class DepartmentHourlyCost(models.Model):
 
     def __str__(self):
         return f"{self.department}: ${self.hourly_cost}/hr"
+
+
+class ExternalProviderRate(models.Model):
+    """
+    An effective-dated hourly rate for an external/subcontracted provider's work,
+    optionally broken down per Stage (per-activity pricing) -- e.g. a BUILD
+    subcontractor might charge a different $/hour for Commissioning than for
+    Cabinets/Frames. A provider's rate can change over time: saving a new row
+    here does NOT overwrite the old one, it takes effect going forward from
+    `effective_date` -- the rate "as of" a given date is the most recent row at
+    or before that date (see _lookup_provider_rate in views.py, used by the
+    assignment summary-by-project-dept endpoint to compute $ cost). This mirrors the
+    ScioHeadcountEvent/ExternalTeamHeadcountEvent ledger pattern used elsewhere
+    for values that change over time, except each row here is a direct value
+    (not a signed delta to accumulate), so there's no recompute/materialize
+    step -- the lookup just reads the ledger directly.
+
+    Unlike ExternalTeamHeadcountEvent, `effective_date` CAN be backdated: a
+    rate is often set or corrected after the fact (e.g. a contract signed with
+    a retroactive date), so there's no "can't be before the current week"
+    restriction here.
+
+    `provider_name` matches whatever identifies the provider in that
+    department's own system: Employee.subcontract_company (also
+    SubcontractedTeamCapacity.company for BUILD, or
+    PrgExternalTeamCapacity.team_name for MED/HD/MFG/PRG).
+
+    `stage` is null for departments with no Stage concept (MFG) -- a single
+    flat rate applies there instead of one per activity.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.CharField(max_length=10, choices=Department.choices)
+    provider_name = models.CharField(max_length=100, help_text="External provider/team name (= company name for BUILD)")
+    stage = models.CharField(max_length=50, choices=Stage.choices, null=True, blank=True, help_text="Null for departments with no Stage concept (MFG)")
+    effective_date = models.DateField(help_text="Calendar date this rate takes effect, can be in the past")
+    rate = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Cost per hour for this provider's work (per stage, when applicable)",
+    )
+    comment = models.CharField(max_length=255, null=True, blank=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='external_provider_rate_changes',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['department', 'provider_name', 'stage', '-effective_date']
+        indexes = [
+            models.Index(fields=['department', 'provider_name', 'stage']),
+        ]
+        unique_together = ['department', 'provider_name', 'stage', 'effective_date']
+
+    def __str__(self):
+        return f"{self.department}/{self.provider_name}/{self.stage or 'ALL'}: ${self.rate}/hr from {self.effective_date}"
 
 
 class ProjectDepartmentWeeklyActual(models.Model):

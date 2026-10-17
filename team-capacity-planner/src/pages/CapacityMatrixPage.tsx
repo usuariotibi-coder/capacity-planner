@@ -5,7 +5,7 @@ import { useAssignmentStore } from '../stores/assignmentStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useBuildTeamsStore } from '../stores/buildTeamsStore';
 import { useExternalTeamsStore } from '../stores/externalTeamsStore';
-import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi, projectDepartmentWeeklyActualsApi, departmentHourlyCostApi } from '../services/api';
+import { scioTeamCapacityApi, subcontractedTeamCapacityApi, prgExternalTeamCapacityApi, changeOrdersApi, assignmentsApi, activityLogApi, projectDepartmentWeeklyActualsApi, externalProviderRatesApi } from '../services/api';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate, getWeekStart, normalizeWeekStartDate, getWeekNumber, getWeeksInRange, addWeeksToISO } from '../utils/dateUtils';
 import { calculateTalent, getStageColor, getStageLabel, getUtilizationColor } from '../utils/stageColors';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
@@ -18,6 +18,7 @@ import type { Department, Stage, Project, Assignment, Employee, ProjectChangeOrd
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
 import { ScioHeadcountModal } from '../components/ScioHeadcountModal';
 import { ExternalStaffHeadcountModal } from '../components/ExternalStaffHeadcountModal';
+import { ExternalProviderRateModal } from '../components/ExternalProviderRateModal';
 import { WeekSplitEditor, computeWeeklyHours, computeMatrixHours, SOLO_COLUMN } from '../components/WeekSplitEditor';
 import { MoveAssignmentWeeksModal } from '../components/MoveAssignmentWeeksModal';
 
@@ -102,7 +103,6 @@ interface ProjectCellClipboardEntry {
   comment?: string;
   scioHours?: number;
   externalHours?: number;
-  changeOrderId?: string | null;
 }
 
 interface ProjectCellClipboardState {
@@ -480,14 +480,8 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   // scio*/external* pool fields) on each StageHoursEntry instead, since each stage entry can
   // span its own number of weeks.
   const [editingWeekCount, setEditingWeekCount] = useState<number>(1);
-  // Raw text buffer for the generic Hours field's "Split across weeks" input, mirroring
-  // WeekSplitEditor's own internal buffer (see its comment) so the field can be cleared and
-  // retyped instead of snapping back to "1" on every keystroke.
-  const [editingWeekCountInput, setEditingWeekCountInput] = useState<string>('1');
   const [editingWeeklyEven, setEditingWeeklyEven] = useState<boolean>(true);
   const [editingWeeklyHoursInputs, setEditingWeeklyHoursInputs] = useState<string[]>([]);
-  const [assignToChangeOrder, setAssignToChangeOrder] = useState<boolean>(false);
-  const [selectedChangeOrderId, setSelectedChangeOrderId] = useState<string>('');
   const [editingComment, setEditingComment] = useState<string>('');
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [supportEmployeeToAdd, setSupportEmployeeToAdd] = useState<string>('');
@@ -552,8 +546,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     setEditingStage(null);
     setEditingStageEntries([]);
     setEditingStageResourceHours({});
-    setAssignToChangeOrder(false);
-    setSelectedChangeOrderId('');
     setEditingHours(0);
     setEditingComment('');
     setEditingHoursInput('');
@@ -562,7 +554,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     setShowDeleteConfirm(false);
     setShowMoveWeeksModal(false);
     setEditingWeekCount(1);
-    setEditingWeekCountInput('1');
     setEditingWeeklyEven(true);
     setEditingWeeklyHoursInputs([]);
   };
@@ -772,11 +763,16 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   const [externalTeamModalDept, setExternalTeamModalDept] = useState<Department | null>(null);
   const [externalTeamName, setExternalTeamName] = useState('');
   const [externalTeamHeadcount, setExternalTeamHeadcount] = useState('');
+  // Per-stage hourly rate entered at creation time, keyed by stage (or '' when the department
+  // has no Stage concept, e.g. MFG -- a single flat rate). Required for every stage shown,
+  // same as adding the provider itself.
+  const [externalTeamRateInputs, setExternalTeamRateInputs] = useState<Record<string, string>>({});
 
   // Modal state for adding BUILD subcontracted teams
   const [isBuildModalOpen, setIsBuildModalOpen] = useState(false);
   const [buildTeamName, setBuildTeamName] = useState('');
   const [buildTeamHeadcount, setBuildTeamHeadcount] = useState('');
+  const [buildTeamRateInputs, setBuildTeamRateInputs] = useState<Record<string, string>>({});
 
   // Modal state for logging SCIO headcount hires/departures
   const [isHeadcountModalOpen, setIsHeadcountModalOpen] = useState(false);
@@ -784,16 +780,20 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   // Modal state for logging external staff hires/departures (MED/HD/MFG/BUILD/PRG)
   const [isExternalStaffModalOpen, setIsExternalStaffModalOpen] = useState(false);
 
+  // Modal state for managing external provider rates (MED/HD/MFG/BUILD/PRG). Bumping
+  // providerRateVersion re-runs the project cost summary fetch below (its own mutation
+  // tracking is assignment-only, so a rate change elsewhere needs this nudge to show up
+  // in the Qtd/Used/Fcst $ figures without a full page reload).
+  const [isProviderRateModalOpen, setIsProviderRateModalOpen] = useState(false);
+  const [providerRateVersion, setProviderRateVersion] = useState(0);
+
   // Per-project zoom levels
   const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
 
-  // Change Orders state (quoted hours per project/department)
+  // Change Orders (quoted hours/$ per project/department) are now registered from the
+  // Projects page, not here -- this page only reads them (read-only) to fold their quoted
+  // hours/$ into the Qtd totals shown in the Summary columns. See getQuotedChangeOrders.
   const [changeOrders, setChangeOrders] = useState<ProjectChangeOrder[]>([]);
-  const [isChangeOrderModalOpen, setIsChangeOrderModalOpen] = useState(false);
-  const [changeOrderContext, setChangeOrderContext] = useState<{ projectId: string; department: Department } | null>(null);
-  const [changeOrderForm, setChangeOrderForm] = useState({ name: '', hoursQuoted: '' });
-  const [editingChangeOrderId, setEditingChangeOrderId] = useState<string | null>(null);
-  const [isSavingChangeOrder, setIsSavingChangeOrder] = useState(false);
 
   // Utilized/Forecast hours are calculated automatically from assignments
 
@@ -852,33 +852,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     projects.reduce((acc, proj) => ({ ...acc, [proj.id]: false }), {})
   );
 
-  // Current (latest-saved) hourly cost per department, from the Department Hourly Cost page.
-  // Used for the "$ Fcst" Summary column. The backend keeps one row per department holding the
-  // most recent value (older values live in the ActivityLog history), so no "pick the latest" is
-  // needed here.
-  const [departmentHourlyCosts, setDepartmentHourlyCosts] = useState<Partial<Record<Department, number>>>({});
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const rows: Array<{ department: Department; hourlyCost: number | string }> =
-          await departmentHourlyCostApi.getAll();
-        if (cancelled) return;
-        const next: Partial<Record<Department, number>> = {};
-        rows.forEach((row) => {
-          // DRF serializes DecimalField as a string ("25.36").
-          const rate = Number(row.hourlyCost);
-          if (Number.isFinite(rate)) next[row.department] = rate;
-        });
-        setDepartmentHourlyCosts(next);
-      } catch (error) {
-        console.error('[CapacityMatrix] Failed to load department hourly costs:', error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const [projectOrderByScope, setProjectOrderByScope] = useState<Record<string, string[]>>(() => {
     try {
       const raw = localStorage.getItem(PROJECT_ORDER_STORAGE_KEY);
@@ -1009,6 +982,7 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
               department: row.department,
               name: row.name || '',
               hoursQuoted: Number(row.hoursQuoted ?? 0),
+              costQuoted: row.costQuoted !== null && row.costQuoted !== undefined ? Number(row.costQuoted) : null,
               createdAt: row.createdAt,
               updatedAt: row.updatedAt,
             };
@@ -1857,12 +1831,13 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
       .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime());
   }, [timingChangesByProject]);
   const changeOrderSummaryByProjectDept = useMemo(() => {
-    const map = new Map<string, { totalHours: number; count: number; orders: ProjectChangeOrder[] }>();
+    const map = new Map<string, { totalHours: number; totalCost: number; count: number; orders: ProjectChangeOrder[] }>();
 
     changeOrders.forEach((order) => {
       const key = `${order.projectId}|${order.department}`;
-      const entry = map.get(key) || { totalHours: 0, count: 0, orders: [] };
+      const entry = map.get(key) || { totalHours: 0, totalCost: 0, count: 0, orders: [] };
       entry.totalHours += order.hoursQuoted || 0;
+      entry.totalCost += order.costQuoted || 0;
       entry.count += 1;
       entry.orders.push(order);
       map.set(key, entry);
@@ -2167,7 +2142,7 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     return map;
   }, [assignments, employeeDeptMap, currentWeekStart]);
 
-  const [hoursByProjectDeptAll, setHoursByProjectDeptAll] = useState<Record<string, { utilized: number; forecast: number }>>({});
+  const [hoursByProjectDeptAll, setHoursByProjectDeptAll] = useState<Record<string, { utilized: number; forecast: number; utilizedCost: number | null; forecastCost: number | null }>>({});
 
   useEffect(() => {
     const projectIds = projects.map((p) => p.id).filter(Boolean);
@@ -2179,12 +2154,14 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
 
     assignmentsApi.getSummaryByProjectDept({ projectIds, department, currentWeekStart })
       .then((rows: any[]) => {
-        const map: Record<string, { utilized: number; forecast: number }> = {};
+        const map: Record<string, { utilized: number; forecast: number; utilizedCost: number | null; forecastCost: number | null }> = {};
         (rows || []).forEach((row) => {
           if (!row?.projectId || !row?.department) return;
           map[`${row.projectId}-${row.department}`] = {
             utilized: row.utilized || 0,
             forecast: row.forecast || 0,
+            utilizedCost: row.utilizedCost ?? null,
+            forecastCost: row.forecastCost ?? null,
           };
         });
         setHoursByProjectDeptAll(map);
@@ -2197,7 +2174,7 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
         console.error('[CapacityMatrix] Error loading assignment summary (keeping last good values):', error);
         // Do not clear hoursByProjectDeptAll here; fallback will still work and we preserve last good values.
       });
-  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion]);
+  }, [projects, departmentFilter, currentWeekStart, assignmentMutationVersion, providerRateVersion]);
 
   // Real historical hours for past weeks (no per-employee breakdown), sourced from
   // the Finance actuals import. Merged into assignmentIndex below so every cell/
@@ -3154,6 +3131,21 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     return (hoursByProjectDeptAll[key]?.forecast ?? hoursByProjectDeptFallback[key]?.forecast ?? 0);
   };
 
+  // $ cost for utilized/forecast hours, blending the flat department rate (internal hours)
+  // with each external provider's own per-stage rate (see the backend's
+  // summary-by-project-dept computation) -- null when nothing has a rate registered yet,
+  // distinct from a genuine $0. No client-side fallback: this is only available from the
+  // server-computed summary (hoursByProjectDeptFallback has no per-employee/rate detail).
+  const getUtilizedCost = (department: Department, projectId: string): number | null => {
+    const key = `${projectId}-${department}`;
+    return hoursByProjectDeptAll[key]?.utilizedCost ?? null;
+  };
+
+  const getForecastedCost = (department: Department, projectId: string): number | null => {
+    const key = `${projectId}-${department}`;
+    return hoursByProjectDeptAll[key]?.forecastCost ?? null;
+  };
+
   // Get quoted hours (budget) for a department in a project
   const getQuotedHours = (department: Department, projectId: string): number => {
     const project = projectById.get(projectId);
@@ -3172,13 +3164,12 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     return summary?.totalHours || 0;
   };
 
-  const getChangeOrderSummary = (department: Department, projectId: string) => {
-    return changeOrderSummaryByProjectDept.get(`${projectId}|${department}`) || { totalHours: 0, count: 0, orders: [] as ProjectChangeOrder[] };
-  };
-
-  const getChangeOrdersForProjectDept = (department: Department, projectId?: string) => {
-    if (!projectId) return [] as ProjectChangeOrder[];
-    return getChangeOrderSummary(department, projectId).orders || [];
+  // $ counterpart of getQuotedChangeOrders, folded into the Qtd $ Summary figure alongside
+  // departmentCostAllocated -- null when nothing (budget or CO) has a $ amount registered,
+  // same "not registered" convention as quotedCostValue elsewhere.
+  const getQuotedChangeOrdersCost = (department: Department, projectId: string): number => {
+    const summary = changeOrderSummaryByProjectDept.get(`${projectId}|${department}`);
+    return summary?.totalCost || 0;
   };
 
   const formatHours = (value: number): string => {
@@ -3228,20 +3219,25 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     const showDepartmentLongLabel = departmentFilter !== 'General';
     const departmentTitleLabel = showDepartmentLongLabel ? deptLabel : dept;
 
-    // $ amounts. Qtd $ is the quoted amount registered on the project (null = not registered);
-    // Used $ is a placeholder until its calculation is defined; Fcst $ = forecast hours x the
-    // department's current hourly cost (null when that department has no rate registered).
-    const quotedCostValue = projectById.get(projectId)?.departmentCostAllocated?.[dept] ?? null;
-    const usedCostValue = 0;
-    const hourlyCostRate = departmentHourlyCosts[dept];
-    const forecastCostValue = hourlyCostRate === undefined ? null : forecastedHoursValue * hourlyCostRate;
+    // $ amounts. Qtd $ is the project's registered budget plus any Change Orders' quoted $
+    // (null only when NEITHER has an amount registered); Used $/Fcst $ come from the backend's
+    // summary-by-project-dept, which blends the flat department hourly cost (internal hours)
+    // with each external provider's own per-stage rate (see _lookup_provider_rate server-side)
+    // -- null when nothing has a rate registered.
+    const baseCostValue = projectById.get(projectId)?.departmentCostAllocated?.[dept] ?? null;
+    const quotedChangeOrdersCostValue = getQuotedChangeOrdersCost(dept, projectId);
+    const quotedCostValue = baseCostValue === null && quotedChangeOrdersCostValue === 0
+      ? null
+      : (baseCostValue || 0) + quotedChangeOrdersCostValue;
+    const usedCostValue = getUtilizedCost(dept, projectId);
+    const forecastCostValue = getForecastedCost(dept, projectId);
 
     const noValue = language === 'es' ? 'no registrado' : 'not registered';
     const noRate = language === 'es' ? 'sin costo por hora' : 'no hourly cost';
     const utilHint = language === 'es' ? 'actual → con forecast' : 'current → with forecast';
     const tooltip = `${departmentTitleLabel}
 ${t.quotedLabel}: ${formatHours(totalQuotedHoursValue)}h (CO ${formatHours(quotedChangeOrdersValue)}h) · ${quotedCostValue === null ? noValue : formatCurrencyFull(quotedCostValue)}
-${t.usedLabel}: ${formatHours(utilizedHoursValue)}h · ${formatCurrencyFull(usedCostValue)}
+${t.usedLabel}: ${formatHours(utilizedHoursValue)}h · ${usedCostValue === null ? noRate : formatCurrencyFull(usedCostValue)}
 ${t.pronosticado}: ${formatHours(forecastedHoursValue)}h · ${forecastCostValue === null ? noRate : formatCurrencyFull(forecastCostValue)}
 ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% (${utilHint})`;
 
@@ -7536,93 +7532,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     setShowDeleteConfirm(false);
   }, [editingCell, hasFullAccess, isReadOnly, currentUserDepartment]);
 
-  const openChangeOrderModal = (projectId: string, department: Department) => {
-    setChangeOrderContext({ projectId, department });
-    setChangeOrderForm({ name: '', hoursQuoted: '' });
-    setEditingChangeOrderId(null);
-    setIsChangeOrderModalOpen(true);
-  };
-
-  const closeChangeOrderModal = () => {
-    setIsChangeOrderModalOpen(false);
-    setChangeOrderContext(null);
-    setChangeOrderForm({ name: '', hoursQuoted: '' });
-    setEditingChangeOrderId(null);
-    setIsSavingChangeOrder(false);
-  };
-
-  const startEditingChangeOrder = (order: ProjectChangeOrder) => {
-    setEditingChangeOrderId(order.id);
-    setChangeOrderForm({
-      name: order.name,
-      hoursQuoted: `${order.hoursQuoted}`,
-    });
-  };
-
-  const handleSaveChangeOrder = async () => {
-    if (!changeOrderContext) return;
-    const name = changeOrderForm.name.trim();
-    if (!name) {
-      alert(t.changeOrderName || 'Change Order Name is required');
-      return;
-    }
-    const hoursValue = Number(changeOrderForm.hoursQuoted);
-    if (Number.isNaN(hoursValue) || hoursValue < 0) {
-      alert(t.changeOrderQuotedHours || 'Quoted Hours must be a valid number');
-      return;
-    }
-
-    try {
-      setIsSavingChangeOrder(true);
-      if (editingChangeOrderId) {
-        const updated = await changeOrdersApi.update(editingChangeOrderId, {
-          name,
-          hoursQuoted: hoursValue,
-        });
-        setChangeOrders((prev) =>
-          prev.map((order) =>
-            order.id === editingChangeOrderId
-              ? {
-                  ...order,
-                  name: (updated as any)?.name || name,
-                  hoursQuoted: Number((updated as any)?.hoursQuoted ?? hoursValue),
-                  updatedAt: (updated as any)?.updatedAt || order.updatedAt,
-                }
-              : order
-          )
-        );
-      } else {
-        const created = await changeOrdersApi.create({
-          projectId: changeOrderContext.projectId,
-          department: changeOrderContext.department,
-          name,
-          hoursQuoted: hoursValue,
-        });
-        const projectId = (created as any)?.projectId || (created as any)?.project?.id || changeOrderContext.projectId;
-        setChangeOrders((prev) => [
-          ...prev,
-          {
-            id: (created as any)?.id,
-            projectId,
-            department: (created as any)?.department || changeOrderContext.department,
-            name: (created as any)?.name || name,
-            hoursQuoted: Number((created as any)?.hoursQuoted ?? hoursValue),
-            createdAt: (created as any)?.createdAt,
-            updatedAt: (created as any)?.updatedAt,
-          },
-        ]);
-      }
-      setChangeOrderForm({ name: '', hoursQuoted: '' });
-      setEditingChangeOrderId(null);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('[CapacityMatrix] Error saving Change Order:', errorMsg);
-      alert(`Error al guardar Change Order: ${errorMsg}`);
-    } finally {
-      setIsSavingChangeOrder(false);
-    }
-  };
-
   // Check if a week is within a project's date range
   const isWeekInProjectRange = (weekStart: string, project: typeof projects[0]) => {
     return weekStart >= project.startDate && weekStart <= project.endDate;
@@ -7652,10 +7561,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     const initialComment = (cellComment ?? deptAssignments.find(
       (assignment) => typeof assignment.comment === 'string' && assignment.comment.trim().length > 0
     )?.comment) || '';
-    const availableChangeOrders = getChangeOrdersForProjectDept(department, projectId);
-    const initialChangeOrderId = deptAssignments.find((assignment) => assignment.changeOrderId)?.changeOrderId || '';
-    const shouldAssignToChangeOrder = !!initialChangeOrderId;
-
     // Note: no `emp.department === department` check here — deptAssignments is already
     // scoped to this row's EFFECTIVE department (see getAssignmentDepartment), so an
     // employee supporting this department from elsewhere is legitimately selectable too.
@@ -7681,7 +7586,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     const canUseStagePlanner = STAGE_OPTIONS[department].length > 0;
     const isBuildOrPRGDept = department === 'BUILD' || department === 'PRG';
     let initialStageEntries: StageHoursEntry[] = [];
-    let initialStageResourceHours: Record<string, StageResourceHoursEntry> = {};
+    const initialStageResourceHours: Record<string, StageResourceHoursEntry> = {};
 
     if (canUseStagePlanner) {
       const stageTotals = new Map<Exclude<Stage, null> | '', number>();
@@ -7755,12 +7660,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     setEditingStage(initialStage);
     setEditingStageEntries(initialStageEntries);
     setEditingStageResourceHours(initialStageResourceHours);
-    setAssignToChangeOrder(shouldAssignToChangeOrder);
-    setSelectedChangeOrderId(
-      shouldAssignToChangeOrder
-        ? initialChangeOrderId
-        : (availableChangeOrders.length === 1 ? availableChangeOrders[0].id : '')
-    );
     setEditingComment(initialComment);
     setSelectedEmployees(assignedEmployeeIds);
     setSupportEmployeeToAdd('');
@@ -7769,7 +7668,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     // forward from here" action, not a saved attribute of existing assignments. Each stage
     // entry built above already got weekCount: 1 from createStageHoursEntry.
     setEditingWeekCount(1);
-    setEditingWeekCountInput('1');
     setEditingWeeklyEven(true);
     setEditingWeeklyHoursInputs([]);
   };
@@ -7811,16 +7709,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
       const emp = employeeById.get(employeeId);
       return emp && emp.department !== editingCell.department ? editingCell.department : undefined;
     };
-    const availableChangeOrders = getChangeOrdersForProjectDept(editingCell.department, editingCell.projectId);
-    const changeOrderIdToPersist = assignToChangeOrder ? (selectedChangeOrderId || null) : null;
-
-    if (assignToChangeOrder && availableChangeOrders.length > 0 && !selectedChangeOrderId) {
-      alert(language === 'es'
-        ? 'Selecciona un Change Order para continuar.'
-        : 'Please select a Change Order to continue.');
-      return;
-    }
-
     // Company-placeholder employees (name === subcontractCompany, capacity 0) are no longer
     // excluded here: they're a legitimate, explicitly-selectable Available Resources entry
     // now (the external provider itself), and excluding them here would silently drop the
@@ -7927,7 +7815,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           hours: 0,
           stage: null,
           comment: '',
-          changeOrderId: null,
         };
         if (isBuildOrPRG) {
           resetPayload.scioHours = 0;
@@ -7969,7 +7856,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             hours: desiredHours,
             stage: entry.stage,
             comment: editingComment || undefined,
-            changeOrderId: changeOrderIdToPersist,
           };
 
           if (isBuildOrPRG) {
@@ -8033,7 +7919,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             hours: hoursPerEmployee,
             stage: editingStage,
             comment: editingComment || undefined,
-            changeOrderId: changeOrderIdToPersist,
           };
 
           if (existingAssign) {
@@ -8225,7 +8110,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           comment: assignment.comment || '',
           scioHours: typeof assignment.scioHours === 'number' ? roundHours(assignment.scioHours) : undefined,
           externalHours: typeof assignment.externalHours === 'number' ? roundHours(assignment.externalHours) : undefined,
-          changeOrderId: assignment.changeOrderId ?? null,
         };
       })
       .filter((entry) => entry.hours > 0 || (entry.scioHours || 0) > 0 || (entry.externalHours || 0) > 0);
@@ -8256,16 +8140,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     isPastingProjectCellRef.current = true;
     try {
       const isBuildOrPRG = selectedProjectCell.department === 'BUILD' || selectedProjectCell.department === 'PRG';
-      const sourceIsSameProject = projectCellClipboard.source.projectId === targetProjectId;
-      const availableTargetChangeOrderIds = new Set(
-        getChangeOrdersForProjectDept(selectedProjectCell.department, targetProjectId).map((order) => order.id)
-      );
-
-      const resolveTargetChangeOrderId = (incomingId?: string | null): string | null => {
-        if (!incomingId) return null;
-        if (!sourceIsSameProject) return null;
-        return availableTargetChangeOrderIds.has(incomingId) ? incomingId : null;
-      };
 
       const normalizedEntries = new Map<string, ProjectCellClipboardEntry>();
       projectCellClipboard.entries.forEach((entry) => {
@@ -8279,9 +8153,8 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
 
         if (hours <= 0 && scioHours <= 0 && externalHours <= 0) return;
 
-        const resolvedChangeOrderId = resolveTargetChangeOrderId(entry.changeOrderId);
         const stageKey = entry.stage || '';
-        const mapKey = `${entry.employeeId}|${stageKey}|${resolvedChangeOrderId || ''}`;
+        const mapKey = `${entry.employeeId}|${stageKey}`;
         const existing = normalizedEntries.get(mapKey);
 
         if (existing) {
@@ -8299,7 +8172,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           comment: entry.comment || '',
           scioHours: isBuildOrPRG ? scioHours : undefined,
           externalHours: isBuildOrPRG ? externalHours : undefined,
-          changeOrderId: resolvedChangeOrderId,
         });
       });
 
@@ -8311,7 +8183,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
 
       const existingByKey = new Map<string, Assignment[]>();
       targetAssignments.forEach((assignment) => {
-        const key = `${assignment.employeeId}|${assignment.stage || ''}|${assignment.changeOrderId || ''}`;
+        const key = `${assignment.employeeId}|${assignment.stage || ''}`;
         const bucket = existingByKey.get(key) || [];
         bucket.push(assignment);
         existingByKey.set(key, bucket);
@@ -8326,7 +8198,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           hours: entry.hours,
           stage: entry.stage,
           comment: entry.comment || undefined,
-          changeOrderId: entry.changeOrderId ?? null,
         };
 
         if (isBuildOrPRG) {
@@ -8353,7 +8224,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           hours: 0,
           stage: null,
           comment: '',
-          changeOrderId: null,
         };
         if (isBuildOrPRG) {
           resetPayload.scioHours = 0;
@@ -8732,39 +8602,9 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     const weekData = weekDataByDate.get(editingCell.weekStart);
     const weekNum = weekData?.weekNum || 1;
     const year = weekData?.isNextYear ? selectedYear + 1 : selectedYear;
-    const availableChangeOrders = getChangeOrdersForProjectDept(editingCell.department, editingCell.projectId);
-    const canAssignToChangeOrder = !!editingCell.projectId && availableChangeOrders.length > 0;
-    const selectedChangeOrder = availableChangeOrders.find((order) => order.id === selectedChangeOrderId) || null;
-    const modalTotalHours = roundHours(editingHours);
     // Locked (past) week: hours are read-only (Finance actuals), but the stage
     // label can still be relabeled. Full-access users are exempt (see isWeekLocked).
     const isLockedWeek = isWeekLocked(editingCell.weekStart);
-    const currentCellAssignments = getDepartmentWeekData(
-      editingCell.department,
-      editingCell.weekStart,
-      editingCell.projectId
-    ).assignments;
-    const currentCellSelectedCOHours = roundHours(
-      currentCellAssignments.reduce((sum, assignment) => {
-        if (!selectedChangeOrderId || assignment.changeOrderId !== selectedChangeOrderId) return sum;
-        return sum + (typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0));
-      }, 0)
-    );
-    const selectedCOUsedHours = roundHours(
-      assignments.reduce((sum, assignment) => {
-        if (!selectedChangeOrderId) return sum;
-        if (assignment.projectId !== editingCell.projectId) return sum;
-        if (getAssignmentDepartment(assignment) !== editingCell.department) return sum;
-        if (assignment.changeOrderId !== selectedChangeOrderId) return sum;
-        return sum + (typeof assignment.totalHours === 'number' ? assignment.totalHours : (assignment.hours || 0));
-      }, 0)
-    );
-    const projectedCOUsedHours = roundHours(
-      assignToChangeOrder && selectedChangeOrderId
-        ? (selectedCOUsedHours - currentCellSelectedCOHours + modalTotalHours)
-        : selectedCOUsedHours
-    );
-    const projectedCORemainingHours = roundHours((selectedChangeOrder?.hoursQuoted || 0) - projectedCOUsedHours);
 
     return (
       <>
@@ -9229,87 +9069,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             </div>
           )}
 
-          {canAssignToChangeOrder && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2.5">
-              <label className="flex items-center gap-2 text-sm font-semibold text-amber-900 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={assignToChangeOrder}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAssignToChangeOrder(checked);
-                    if (checked) {
-                      if (!selectedChangeOrderId || !availableChangeOrders.some((order) => order.id === selectedChangeOrderId)) {
-                        setSelectedChangeOrderId(availableChangeOrders[0]?.id || '');
-                      }
-                    } else {
-                      setSelectedChangeOrderId('');
-                    }
-                  }}
-                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
-                />
-                <span>
-                  {language === 'es' ? 'Asignar horas a Change Order' : 'Assign hours to Change Order'}
-                </span>
-              </label>
-
-              {assignToChangeOrder && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-amber-900 mb-1">
-                      {language === 'es' ? 'Selecciona Change Order' : 'Select Change Order'}
-                    </label>
-                    <select
-                      value={selectedChangeOrderId}
-                      onChange={(e) => setSelectedChangeOrderId(e.target.value)}
-                      className="w-full border border-amber-300 rounded-lg px-2.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    >
-                      <option value="">
-                        {language === 'es' ? '-- Selecciona Change Order --' : '-- Select Change Order --'}
-                      </option>
-                      {availableChangeOrders.map((order) => (
-                        <option key={order.id} value={order.id}>
-                          {order.name} ({formatHours(order.hoursQuoted)}h)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {selectedChangeOrder && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg border border-gray-200 bg-white px-2 py-2">
-                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
-                          {language === 'es' ? 'Cotizado CO' : 'CO Quoted'}
-                        </div>
-                        <div className="text-sm font-bold text-gray-800">{formatHours(selectedChangeOrder.hoursQuoted)}h</div>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 bg-white px-2 py-2">
-                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
-                          {language === 'es' ? 'Usado CO' : 'CO Used'}
-                        </div>
-                        <div className="text-sm font-bold text-gray-800">{formatHours(selectedCOUsedHours)}h</div>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 bg-white px-2 py-2">
-                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
-                          {language === 'es' ? 'Usado (guardando)' : 'Used (after save)'}
-                        </div>
-                        <div className="text-sm font-bold text-gray-800">{formatHours(projectedCOUsedHours)}h</div>
-                      </div>
-                      <div className={`rounded-lg border px-2 py-2 ${projectedCORemainingHours < 0 ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'}`}>
-                        <div className={`text-[10px] uppercase tracking-wide ${projectedCORemainingHours < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                          {language === 'es' ? 'Restante CO' : 'CO Remaining'}
-                        </div>
-                        <div className={`text-sm font-bold ${projectedCORemainingHours < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                          {formatHours(projectedCORemainingHours)}h
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
           {/* Employee selection - Hide for MFG department */}
           {deptEmployees.length > 0 && editingCell.department !== 'MFG' && (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -9738,126 +9497,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     <div className="brand-page-shell capacity-matrix-page h-full flex flex-col">
       {/* Edit Cell Modal */}
       {renderEditModal()}
-      {/* Change Order Modal */}
-      {isChangeOrderModalOpen && changeOrderContext && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[80] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border-2 border-emerald-200 w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b border-emerald-100">
-              <div>
-                <h3 className="text-lg font-bold text-emerald-800">{t.addChangeOrderBudget}</h3>
-                <p className="text-xs text-gray-500">
-                  {projectById.get(changeOrderContext.projectId)?.name || 'Project'} | {changeOrderContext.department}
-                </p>
-              </div>
-              <button
-                onClick={closeChangeOrderModal}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded"
-                title={t.close || 'Close'}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              {editingChangeOrderId && (
-                <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <span className="text-xs font-semibold text-emerald-800">
-                    {language === 'es' ? 'Editando Change Order existente' : 'Editing existing change order'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingChangeOrderId(null);
-                      setChangeOrderForm({ name: '', hoursQuoted: '' });
-                    }}
-                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
-                  >
-                    {language === 'es' ? 'Cancelar edicion' : 'Cancel edit'}
-                  </button>
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">{t.changeOrderName}</label>
-                <input
-                  type="text"
-                  value={changeOrderForm.name}
-                  onChange={(e) => setChangeOrderForm({ ...changeOrderForm, name: e.target.value })}
-                  placeholder={t.changeOrderNamePlaceholder}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">{t.changeOrderQuotedHours}</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={changeOrderForm.hoursQuoted}
-                  onChange={(e) => setChangeOrderForm({ ...changeOrderForm, hoursQuoted: e.target.value })}
-                  placeholder={t.changeOrderHoursPlaceholder}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={closeChangeOrderModal}
-                  className="px-3 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  onClick={handleSaveChangeOrder}
-                  disabled={isSavingChangeOrder}
-                  className="px-3 py-2 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 transition disabled:opacity-60"
-                >
-                  {isSavingChangeOrder
-                    ? (language === 'es' ? 'Guardando...' : 'Saving...')
-                    : (editingChangeOrderId ? (t.update || 'Update') : (t.addButton || 'Agregar'))}
-                </button>
-              </div>
-
-              <div className="border-t border-gray-100 pt-3">
-                {(() => {
-                  const summary = getChangeOrderSummary(changeOrderContext.department, changeOrderContext.projectId);
-                  const sortedOrders = [...summary.orders].sort((a, b) => a.name.localeCompare(b.name));
-                  return (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-700">{t.changeOrdersSummary}</span>
-                        <span className="text-xs text-gray-500">CO: {summary.count}</span>
-                      </div>
-                      {summary.count === 0 ? (
-                        <div className="text-xs text-gray-400 italic">{t.noChangeOrders}</div>
-                      ) : (
-                        <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-md">
-                          {sortedOrders.map((order) => (
-                            <button
-                              key={order.id}
-                              type="button"
-                              onClick={() => startEditingChangeOrder(order)}
-                              className={`flex w-full items-center justify-between px-2 py-1 text-xs border-b border-gray-100 last:border-b-0 text-left transition hover:bg-emerald-50 ${
-                                editingChangeOrderId === order.id ? 'bg-emerald-100' : ''
-                              }`}
-                            >
-                              <span className="font-semibold text-gray-700">{order.name}</span>
-                              <span className="text-emerald-700 font-bold">{formatHours(order.hoursQuoted)}h</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between mt-2 text-xs font-semibold text-emerald-700">
-                        <span>{t.changeOrderTotalHours}</span>
-                        <span>{formatHours(summary.totalHours)}h</span>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {departmentFilter === 'General' && showGlobalPanel && (
         <div className="capacity-bar-top flex-shrink-0 mx-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-none p-0.5 shadow-sm">
           <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
@@ -10161,6 +9800,15 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                           title={t.logExternalStaffTitle}
                         >
                           {t.externalStaffButton}
+                        </button>
+                      )}
+                      {(dept === 'BUILD' || EXTERNAL_TEAM_DEPARTMENTS.includes(dept)) && canEditDepartment(dept) && (
+                        <button
+                          onClick={() => setIsProviderRateModalOpen(true)}
+                          className="text-[9px] md:text-[10px] font-semibold text-[#4f3a70] hover:text-[#2e1a47] border border-[#d5d1da] hover:border-[#4f3a70] rounded px-1.5 py-0.5 transition"
+                          title={language === 'es' ? 'Gestionar rates de proveedores externos' : 'Manage external provider rates'}
+                        >
+                          {language === 'es' ? '$ Rates' : '$ Rates'}
                         </button>
                       )}
                       {canEditDepartment(dept) && (
@@ -10670,7 +10318,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             {filteredDepartmentProjects.map((proj) => {
               const dept = departmentFilter as Department;
               const scopeKey = getProjectOrderScopeKey(departmentFilter);
-              const changeOrderSummary = getChangeOrderSummary(dept, proj.id);
               const isHighProbabilityProject = !!proj.isHighProbability;
               const projectHeaderClass = isHighProbabilityProject
                 ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 border-b border-amber-300'
@@ -10772,26 +10419,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                               </span>
                             </>
                           )}
-                          <span className="text-gray-400">•</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (canEditDepartment(dept)) {
-                                openChangeOrderModal(proj.id, dept);
-                              }
-                            }}
-                            disabled={!canEditDepartment(dept)}
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition ${
-                              canEditDepartment(dept)
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                            }`}
-                            title={`${t.addChangeOrderBudget} | CO: ${changeOrderSummary.count} | ${formatHours(changeOrderSummary.totalHours)}h`}
-                          >
-                            <ClipboardList size={10} />
-                            <span>CO {changeOrderSummary.count}</span>
-                            <span>{formatHours(changeOrderSummary.totalHours)}h</span>
-                          </button>
                         </div>
                       </div>
                       {/* Desktop: Zoom controls inline */}
@@ -12796,265 +12423,343 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           />
         )}
 
-        {/* External Team Modal (MED/HD/MFG/PRG) */}
-        {externalTeamModalDept && canEditDepartment(externalTeamModalDept) && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
-              onClick={() => {
-                setExternalTeamModalDept(null);
-                setExternalTeamName('');
-                setExternalTeamHeadcount('');
-              }}
-            />
-            {/* Modal */}
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
-              <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 rounded-t-lg">
-                  <h2 className="text-lg font-semibold text-gray-800">{t.addPrgTeam}</h2>
-                  <button
-                    onClick={() => {
-                      setExternalTeamModalDept(null);
-                      setExternalTeamName('');
-                      setExternalTeamHeadcount('');
-                    }}
-                    className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                    title={t.close}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Form Content */}
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const department = externalTeamModalDept;
-                    const initialHeadcount = Math.max(0, parseFloat(externalTeamHeadcount) || 0);
-                    if (externalTeamName.trim() && department) {
-                      try {
-                        // Create employee as subcontracted material for this department
-                        await addEmployee({
-                          name: externalTeamName.trim(),
-                          role: 'External Team',
-                          department,
-                          capacity: 0, // External teams don't have internal capacity
-                          isActive: true,
-                          isSubcontractedMaterial: true,
-                          subcontractCompany: externalTeamName.trim(),
-                        });
-
-                        // Create initial PrgExternalTeamCapacity record to persist the team,
-                        // seeded with the staff headcount entered here (0 if left blank).
-                        // This ensures the team appears after page refresh
-                        const currentWeekStart = formatToISO(getWeekStart(new Date()));
-                        await prgExternalTeamCapacityApi.create({
-                          department,
-                          teamName: externalTeamName.trim(),
-                          weekStartDate: currentWeekStart,
-                          capacity: initialHeadcount,
-                        });
-                        console.log('[CapacityMatrix] Created initial ExternalTeamCapacity for:', department, externalTeamName.trim(), 'capacity:', initialHeadcount);
-
-                        // Add to active teams array
-                        const newTeams = [...getExternalTeamsFor(department), externalTeamName.trim()];
-                        setExternalTeamsForDepartment(department, [...new Set(newTeams)]);
-                        setExternalTeamName('');
-                        setExternalTeamHeadcount('');
-                        setExternalTeamModalDept(null);
-                      } catch (error) {
-                        console.error('Error adding external team:', error);
-                        alert('Error al agregar equipo');
-                      }
-                    }
-                  }}
-                  className="p-4 space-y-4"
-                >
-                  {/* Team Name Field */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.providerName}</label>
-                    <input
-                      type="text"
-                      value={externalTeamName}
-                      onChange={(e) => setExternalTeamName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder={t.egProviderAbc}
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Initial headcount Field */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.5"
-                      value={externalTeamHeadcount}
-                      onChange={(e) => setExternalTeamHeadcount(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder={t.availableStaffPlaceholder}
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExternalTeamModalDept(null);
-                        setExternalTeamName('');
-                        setExternalTeamHeadcount('');
-                      }}
-                      className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
-                    >
-                      {t.cancel}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!externalTeamName.trim()}
-                      className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-                    >
-                      {t.addButton}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </>
+        {/* External Provider Rate Modal ("$ Rates") -- same reasoning as the modals above for
+            rendering it outside the sticky department panel. */}
+        {departmentFilter !== 'General' && (
+          <ExternalProviderRateModal
+            isOpen={isProviderRateModalOpen}
+            department={departmentFilter as Department}
+            teams={departmentFilter === 'BUILD' ? activeTeams : getExternalTeamsFor(departmentFilter as Department)}
+            stageOptions={STAGE_OPTIONS[departmentFilter as Department]}
+            getStageLabel={getStageLabel}
+            language={language}
+            onClose={() => setIsProviderRateModalOpen(false)}
+            onSaved={() => setProviderRateVersion((v) => v + 1)}
+          />
         )}
+
+        {/* External Team Modal (MED/HD/MFG/PRG) */}
+        {externalTeamModalDept && canEditDepartment(externalTeamModalDept) && (() => {
+          const rateStageKeys = STAGE_OPTIONS[externalTeamModalDept].length > 0 ? STAGE_OPTIONS[externalTeamModalDept] : [''];
+          const closeModal = () => {
+            setExternalTeamModalDept(null);
+            setExternalTeamName('');
+            setExternalTeamHeadcount('');
+            setExternalTeamRateInputs({});
+          };
+          const allRatesValid = rateStageKeys.every((stageKey) => {
+            const num = parseFloat(externalTeamRateInputs[stageKey]);
+            return Number.isFinite(num) && num >= 0;
+          });
+
+          return (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-[80]" onClick={closeModal} />
+              {/* Modal */}
+              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
+                <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96 max-h-[85vh] overflow-y-auto">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-teal-100 rounded-t-lg sticky top-0">
+                    <h2 className="text-lg font-semibold text-gray-800">{t.addPrgTeam}</h2>
+                    <button onClick={closeModal} className="p-1 text-gray-600 hover:bg-gray-200 rounded transition" title={t.close}>
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Form Content */}
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const department = externalTeamModalDept;
+                      const initialHeadcount = Math.max(0, parseFloat(externalTeamHeadcount) || 0);
+                      if (externalTeamName.trim() && department && allRatesValid) {
+                        try {
+                          // Create employee as subcontracted material for this department
+                          await addEmployee({
+                            name: externalTeamName.trim(),
+                            role: 'External Team',
+                            department,
+                            capacity: 0, // External teams don't have internal capacity
+                            isActive: true,
+                            isSubcontractedMaterial: true,
+                            subcontractCompany: externalTeamName.trim(),
+                          });
+
+                          // Create initial PrgExternalTeamCapacity record to persist the team,
+                          // seeded with the staff headcount entered here (0 if left blank).
+                          // This ensures the team appears after page refresh
+                          const currentWeekStart = formatToISO(getWeekStart(new Date()));
+                          await prgExternalTeamCapacityApi.create({
+                            department,
+                            teamName: externalTeamName.trim(),
+                            weekStartDate: currentWeekStart,
+                            capacity: initialHeadcount,
+                          });
+                          console.log('[CapacityMatrix] Created initial ExternalTeamCapacity for:', department, externalTeamName.trim(), 'capacity:', initialHeadcount);
+
+                          // One hourly rate per stage of this department (a single flat rate,
+                          // keyed '', when the department has no Stage concept -- see MFG).
+                          await Promise.all(rateStageKeys.map((stageKey) => externalProviderRatesApi.create({
+                            department,
+                            providerName: externalTeamName.trim(),
+                            stage: stageKey || null,
+                            effectiveDate: currentWeekStart,
+                            rate: parseFloat(externalTeamRateInputs[stageKey]),
+                          })));
+
+                          // Add to active teams array
+                          const newTeams = [...getExternalTeamsFor(department), externalTeamName.trim()];
+                          setExternalTeamsForDepartment(department, [...new Set(newTeams)]);
+                          setProviderRateVersion((v) => v + 1);
+                          closeModal();
+                        } catch (error) {
+                          console.error('Error adding external team:', error);
+                          alert('Error al agregar equipo');
+                        }
+                      }
+                    }}
+                    className="p-4 space-y-4"
+                  >
+                    {/* Team Name Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{t.providerName}</label>
+                      <input
+                        type="text"
+                        value={externalTeamName}
+                        onChange={(e) => setExternalTeamName(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        placeholder={t.egProviderAbc}
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Initial headcount Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.5"
+                        value={externalTeamHeadcount}
+                        onChange={(e) => setExternalTeamHeadcount(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        placeholder={t.availableStaffPlaceholder}
+                      />
+                    </div>
+
+                    {/* Per-stage hourly rate fields -- a provider's rate can differ by activity,
+                        and can change later from the "$ Rates" button. */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {language === 'es' ? 'Rate por hora ($/hr)' : 'Hourly rate ($/hr)'}
+                      </label>
+                      <div className="space-y-2">
+                        {rateStageKeys.map((stageKey) => (
+                          <div key={stageKey || 'flat'} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600 flex-1 truncate">
+                              {stageKey ? getStageLabel(stageKey as Exclude<Stage, null>, t as Record<string, string>) : (language === 'es' ? 'Rate general' : 'Flat rate')}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.5"
+                              value={externalTeamRateInputs[stageKey] ?? ''}
+                              onChange={(e) => setExternalTeamRateInputs((prev) => ({ ...prev, [stageKey]: e.target.value }))}
+                              className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                      >
+                        {t.cancel}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!externalTeamName.trim() || !allRatesValid}
+                        className="flex-1 px-4 py-2 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+                      >
+                        {t.addButton}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* BUILD Subcontracted Team Modal */}
-        {isBuildModalOpen && canEditDepartment('BUILD') && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-[80]"
-              onClick={() => {
-                setIsBuildModalOpen(false);
-                setBuildTeamName('');
-                setBuildTeamHeadcount('');
-              }}
-            />
-            {/* Modal */}
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
-              <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg">
-                  <h2 className="text-lg font-semibold text-gray-800">{t.addBuildTeam}</h2>
-                  <button
-                    onClick={() => {
-                      setIsBuildModalOpen(false);
-                      setBuildTeamName('');
-                      setBuildTeamHeadcount('');
-                    }}
-                    className="p-1 text-gray-600 hover:bg-gray-200 rounded transition"
-                    title={t.close}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+        {isBuildModalOpen && canEditDepartment('BUILD') && (() => {
+          const rateStageKeys = STAGE_OPTIONS.BUILD;
+          const closeModal = () => {
+            setIsBuildModalOpen(false);
+            setBuildTeamName('');
+            setBuildTeamHeadcount('');
+            setBuildTeamRateInputs({});
+          };
+          const allRatesValid = rateStageKeys.every((stageKey) => {
+            const num = parseFloat(buildTeamRateInputs[stageKey]);
+            return Number.isFinite(num) && num >= 0;
+          });
 
-                {/* Form Content */}
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const initialHeadcount = Math.max(0, parseFloat(buildTeamHeadcount) || 0);
-                    if (buildTeamName.trim()) {
-                      try {
-                        // Create employee as subcontracted material for BUILD department
-                        await addEmployee({
-                          name: buildTeamName.trim(),
-                          role: 'Subcontracted Team',
-                          department: 'BUILD',
-                          capacity: 0, // Subcontracted teams don't have internal capacity
-                          isActive: true,
-                          isSubcontractedMaterial: true,
-                          subcontractCompany: buildTeamName.trim(),
-                        });
+          return (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-[80]" onClick={closeModal} />
+              {/* Modal */}
+              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[90]">
+                <div className="bg-white rounded-lg shadow-2xl border border-gray-300 w-96 max-h-[85vh] overflow-y-auto">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-t-lg sticky top-0">
+                    <h2 className="text-lg font-semibold text-gray-800">{t.addBuildTeam}</h2>
+                    <button onClick={closeModal} className="p-1 text-gray-600 hover:bg-gray-200 rounded transition" title={t.close}>
+                      <X size={20} />
+                    </button>
+                  </div>
 
-                        // Create initial SubcontractedTeamCapacity record to persist the team,
-                        // seeded with the staff headcount entered here (0 if left blank).
-                        // This ensures the team appears after page refresh
-                        const currentWeekStart = formatToISO(getWeekStart(new Date()));
-                        await subcontractedTeamCapacityApi.create({
-                          company: buildTeamName.trim(),
-                          weekStartDate: currentWeekStart,
-                          capacity: initialHeadcount,
-                        });
-                        console.log('[CapacityMatrix] Created initial SubcontractedTeamCapacity for:', buildTeamName.trim(), 'capacity:', initialHeadcount);
+                  {/* Form Content */}
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const initialHeadcount = Math.max(0, parseFloat(buildTeamHeadcount) || 0);
+                      if (buildTeamName.trim() && allRatesValid) {
+                        try {
+                          // Create employee as subcontracted material for BUILD department
+                          await addEmployee({
+                            name: buildTeamName.trim(),
+                            role: 'Subcontracted Team',
+                            department: 'BUILD',
+                            capacity: 0, // Subcontracted teams don't have internal capacity
+                            isActive: true,
+                            isSubcontractedMaterial: true,
+                            subcontractCompany: buildTeamName.trim(),
+                          });
 
-                        // Add to active teams array
-                        const newTeams = [...activeTeams, buildTeamName.trim()];
-                        setActiveTeams([...new Set(newTeams)]);
-                        setBuildTeamName('');
-                        setBuildTeamHeadcount('');
-                        setIsBuildModalOpen(false);
-                      } catch (error) {
-                        console.error('Error adding BUILD team:', error);
-                        alert('Error al agregar equipo');
+                          // Create initial SubcontractedTeamCapacity record to persist the team,
+                          // seeded with the staff headcount entered here (0 if left blank).
+                          // This ensures the team appears after page refresh
+                          const currentWeekStart = formatToISO(getWeekStart(new Date()));
+                          await subcontractedTeamCapacityApi.create({
+                            company: buildTeamName.trim(),
+                            weekStartDate: currentWeekStart,
+                            capacity: initialHeadcount,
+                          });
+                          console.log('[CapacityMatrix] Created initial SubcontractedTeamCapacity for:', buildTeamName.trim(), 'capacity:', initialHeadcount);
+
+                          // One hourly rate per BUILD stage.
+                          await Promise.all(rateStageKeys.map((stageKey) => externalProviderRatesApi.create({
+                            department: 'BUILD',
+                            providerName: buildTeamName.trim(),
+                            stage: stageKey,
+                            effectiveDate: currentWeekStart,
+                            rate: parseFloat(buildTeamRateInputs[stageKey]),
+                          })));
+
+                          // Add to active teams array
+                          const newTeams = [...activeTeams, buildTeamName.trim()];
+                          setActiveTeams([...new Set(newTeams)]);
+                          setProviderRateVersion((v) => v + 1);
+                          closeModal();
+                        } catch (error) {
+                          console.error('Error adding BUILD team:', error);
+                          alert('Error al agregar equipo');
+                        }
                       }
-                    }
-                  }}
-                  className="p-4 space-y-4"
-                >
-                  {/* Team Name Field */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.subcontractorName}</label>
-                    <input
-                      type="text"
-                      value={buildTeamName}
-                      onChange={(e) => setBuildTeamName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder={t.egCompanyXyz}
-                      autoFocus
-                    />
-                  </div>
+                    }}
+                    className="p-4 space-y-4"
+                  >
+                    {/* Team Name Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{t.subcontractorName}</label>
+                      <input
+                        type="text"
+                        value={buildTeamName}
+                        onChange={(e) => setBuildTeamName(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder={t.egCompanyXyz}
+                        autoFocus
+                      />
+                    </div>
 
-                  {/* Initial headcount Field */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.5"
-                      value={buildTeamHeadcount}
-                      onChange={(e) => setBuildTeamHeadcount(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder={t.availableStaffPlaceholder}
-                    />
-                  </div>
+                    {/* Initial headcount Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{t.availableStaffLabel}</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.5"
+                        value={buildTeamHeadcount}
+                        onChange={(e) => setBuildTeamHeadcount(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder={t.availableStaffPlaceholder}
+                      />
+                    </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsBuildModalOpen(false);
-                        setBuildTeamName('');
-                        setBuildTeamHeadcount('');
-                      }}
-                      className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
-                    >
-                      {t.cancel}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!buildTeamName.trim()}
-                      className="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-                    >
-                      {t.addButton}
-                    </button>
-                  </div>
-                </form>
+                    {/* Per-stage hourly rate fields -- a provider's rate can differ by activity,
+                        and can change later from the "$ Rates" button. */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {language === 'es' ? 'Rate por hora ($/hr)' : 'Hourly rate ($/hr)'}
+                      </label>
+                      <div className="space-y-2">
+                        {rateStageKeys.map((stageKey) => (
+                          <div key={stageKey} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600 flex-1 truncate">
+                              {getStageLabel(stageKey, t as Record<string, string>)}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.5"
+                              value={buildTeamRateInputs[stageKey] ?? ''}
+                              onChange={(e) => setBuildTeamRateInputs((prev) => ({ ...prev, [stageKey]: e.target.value }))}
+                              className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition"
+                      >
+                        {t.cancel}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!buildTeamName.trim() || !allRatesValid}
+                        className="flex-1 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+                      >
+                        {t.addButton}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          );
+        })()}
 
         {/* Comment View Modal for General View */}
         {viewingComment && (

@@ -944,6 +944,40 @@ export const departmentWeeklyTotalApi = {
   },
 };
 
+// External Provider Rate API (effective-dated $/hour per (department, provider, stage) --
+// a ledger like externalTeamHeadcountEventsApi, except each row is a direct value, not a
+// delta, and effectiveDate CAN be backdated).
+export const externalProviderRatesApi = {
+  getAll: async (department?: string, providerName?: string) => {
+    const params = new URLSearchParams();
+    if (department) params.set('department', department);
+    if (providerName) params.set('provider_name', providerName);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const data = await apiFetch(`/api/external-provider-rates/${query}`);
+    return data.results || data;
+  },
+
+  create: async (rate: any) => {
+    return apiFetch('/api/external-provider-rates/', {
+      method: 'POST',
+      body: JSON.stringify(transformKeysToSnake(rate)),
+    });
+  },
+
+  update: async (id: string, rate: any) => {
+    return apiFetch(`/api/external-provider-rates/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(transformKeysToSnake(rate)),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiFetch(`/api/external-provider-rates/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // Department Hourly Cost API (global per-department rate; create() upserts on the backend)
 export const departmentHourlyCostApi = {
   getAll: async () => {

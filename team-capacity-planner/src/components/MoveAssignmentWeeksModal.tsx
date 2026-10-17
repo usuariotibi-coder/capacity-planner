@@ -125,10 +125,10 @@ export function MoveAssignmentWeeksModal({
     `${t.weekAbbr || 'CW'} ${getWeekNumber(weekStart)} (${weekStart})`;
 
   const setRow = (weekStart: string, patch: Partial<RowState>) => {
-    setRows((prev) => ({
-      ...prev,
-      [weekStart]: { selected: false, destWeekStart: '', touched: false, ...prev[weekStart], ...patch },
-    }));
+    setRows((prev) => {
+      const existing = prev[weekStart] || { selected: false, destWeekStart: '', touched: false };
+      return { ...prev, [weekStart]: { ...existing, ...patch } };
+    });
   };
 
   const toggleRowSelected = (weekStart: string, selected: boolean) => {
@@ -179,7 +179,6 @@ export function MoveAssignmentWeeksModal({
     externalHours: number;
     hours: number;
     comment?: string;
-    changeOrderId?: string | null;
     departmentOverride?: Department | null;
     sourceAssignmentIds: string[];
   };
@@ -209,7 +208,6 @@ export function MoveAssignmentWeeksModal({
             externalHours: roundHours(a.externalHours || 0),
             hours: roundHours(hours),
             comment: a.comment,
-            changeOrderId: a.changeOrderId ?? null,
             departmentOverride: a.departmentOverride ?? null,
             sourceAssignmentIds: [a.id],
           });
@@ -263,9 +261,8 @@ export function MoveAssignmentWeeksModal({
             externalHours: bucket.externalHours,
             stage: bucket.stage,
             comment: bucket.comment,
-            changeOrderId: bucket.changeOrderId,
             departmentOverride: bucket.departmentOverride || undefined,
-          } as any);
+          });
         }
 
         for (const sourceId of bucket.sourceAssignmentIds) {

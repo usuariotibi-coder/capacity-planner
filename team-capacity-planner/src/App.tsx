@@ -1,12 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { CapacityMatrixPage } from './pages/CapacityMatrixPage';
-import { ActivityLogPage } from './pages/ActivityLogPage';
-import { GuidePage } from './pages/GuidePage';
-import { RegisteredUsersPage } from './pages/RegisteredUsersPage';
-import { FinanceImportPage } from './pages/FinanceImportPage';
-import { DepartmentCostsPage } from './pages/DepartmentCostsPage';
+// Lazy-loaded: only one of these renders at a time (see renderPage's switch below), so there's
+// no reason to ship every page's JS in the initial bundle -- CapacityMatrixPage alone is huge.
+// Each import() becomes its own chunk, fetched only when the user actually navigates there.
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then((m) => ({ default: m.ProjectsPage })));
+const CapacityMatrixPage = lazy(() => import('./pages/CapacityMatrixPage').then((m) => ({ default: m.CapacityMatrixPage })));
+const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage').then((m) => ({ default: m.ActivityLogPage })));
+const GuidePage = lazy(() => import('./pages/GuidePage').then((m) => ({ default: m.GuidePage })));
+const RegisteredUsersPage = lazy(() => import('./pages/RegisteredUsersPage').then((m) => ({ default: m.RegisteredUsersPage })));
+const FinanceImportPage = lazy(() => import('./pages/FinanceImportPage').then((m) => ({ default: m.FinanceImportPage })));
+const DepartmentCostsPage = lazy(() => import('./pages/DepartmentCostsPage').then((m) => ({ default: m.DepartmentCostsPage })));
 import LoginPage from './pages/LoginPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -540,7 +543,15 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0 -ml-px">
         <div className="flex-1 overflow-hidden min-h-0">
-          {renderPage()}
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#d5d1da]"></div>
+              </div>
+            }
+          >
+            {renderPage()}
+          </Suspense>
         </div>
       </div>
     </div>

@@ -109,6 +109,8 @@ export interface Project {
   facility: Facility;
   numberOfWeeks: number;
   projectManagerId?: string; // ID of the assigned Project Manager (PM department)
+  parentProjectId?: string | null; // Set when this project IS a Change Order registered as its own project (Projects page "CO" action) -- points back at the original project it extends
+  parentProjectName?: string | null; // Read-only: name of the original project, when parentProjectId is set
   isHighProbability?: boolean; // Marks projects with high execution probability
   isHidden?: boolean;
   hiddenAt?: string | null;
@@ -124,12 +126,12 @@ export interface Project {
 
 /**
  * PROJECT CHANGE ORDER INTERFACE
- * Represents quoted change order hours per project and department
- * @property id - Unique identifier (UUID)
- * @property projectId - Reference to Project
- * @property department - Department assignment
- * @property name - Change order name (e.g., CO01)
- * @property hoursQuoted - Quoted hours for this change order
+ * A Change Order's quoted hours/$ for one project + department, registered from the
+ * Projects page ("CO" action, "widen an existing project's budget"). One CO (identified
+ * by `name`, e.g. "CO01") can span several departments -- each gets its own row sharing
+ * that name. A project's effective quoted hours/$ for a department = its budget
+ * (departmentHoursAllocated/departmentCostAllocated) + the sum of its ProjectChangeOrder
+ * rows for that department.
  */
 export interface ProjectChangeOrder {
   id: string;
@@ -137,6 +139,7 @@ export interface ProjectChangeOrder {
   department: Department;
   name: string;
   hoursQuoted: number;
+  costQuoted?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -176,7 +179,6 @@ export interface Assignment {
   id: string;
   employeeId: string;
   projectId: string;
-  changeOrderId?: string | null;
   department?: Department; // Effective department: departmentOverride if set, otherwise the employee's own
   homeDepartment?: Department; // The employee's own department, regardless of any support override
   departmentOverride?: Department | null; // Set when this employee is supporting a department other than their own
@@ -243,6 +245,28 @@ export interface DepartmentHourlyCost {
   updatedByUsername?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * EXTERNAL PROVIDER RATE
+ * An effective-dated hourly rate for an external/subcontracted provider's work
+ * (optionally broken down per Stage/activity -- `stage` is null for departments
+ * with no Stage concept, e.g. MFG, meaning a single flat rate). Mirrors
+ * ExternalTeamHeadcountEvent's ledger shape, except each row here is a direct
+ * value (not a signed delta): the rate "as of" a date is the most recent row
+ * at or before it. Unlike ExternalTeamHeadcountEvent, effectiveDate CAN be
+ * backdated.
+ */
+export interface ExternalProviderRate {
+  id: string;
+  department: Department;
+  providerName: string; // = Employee.subcontractCompany / SubcontractedTeamCapacity.company / PrgExternalTeamCapacity.teamName
+  stage: Stage;
+  effectiveDate: string; // ISO format YYYY-MM-DD, can be in the past
+  rate: number; // $/hour
+  comment?: string;
+  createdByUsername?: string | null;
+  createdAt?: string;
 }
 
 /**

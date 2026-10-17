@@ -15,12 +15,14 @@ from .models import (
     DepartmentHourlyCost,
     DepartmentStageConfig,
     Employee,
+    ExternalProviderRate,
     ExternalTeamHeadcountEvent,
     Facility,
     OtherDepartment,
     PrgExternalTeamCapacity,
     Project,
     ProjectBudget,
+    ProjectChangeOrder,
     ScioHeadcountEvent,
     ScioTeamCapacity,
     Stage,
@@ -325,6 +327,112 @@ class ProjectQuotedAmountTests(APITestCase):
         budget = ProjectBudget.objects.get(project=self.project, department=Department.MED)
         self.assertEqual(budget.hours_allocated, 60)
         self.assertEqual(str(budget.cost_allocated), '500.00')
+
+
+class ChangeOrderRegistrationTests(APITestCase):
+    """
+    Change Orders are now registered from the Projects page, two ways:
+    (1) ProjectChangeOrder rows that widen an existing project's budget (hours + $,
+        per department, grouped under a shared `name`); (2) a brand-new Project with
+        `parent_project` pointing back at the original. Department-level edit access
+        (same as editing assignments), not full-access-only.
+    """
+
+    def setUp(self):
+        self.med_user = User.objects.create_user(username='med-co-user', password='test-password', is_active=True)
+        UserProfile.objects.create(user=self.med_user, department=UserDepartment.MED)
+        self.build_user = User.objects.create_user(username='build-co-user', password='test-password', is_active=True)
+        UserProfile.objects.create(user=self.build_user, department=UserDepartment.BUILD)
+
+        self.project = Project.objects.create(
+            name='Original Project',
+            client='Internal',
+            start_date='2026-01-05',
+            end_date='2026-02-01',
+            facility=Facility.MX,
+            number_of_weeks=4,
+        )
+        ProjectBudget.objects.create(project=self.project, department=Department.MED, hours_allocated=40)
+
+    def test_department_user_can_register_co_with_hours_and_cost_for_own_department(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('project-change-order-list'),
+            {
+                'project_id': str(self.project.id),
+                'department': Department.MED,
+                'name': 'CO01',
+                'hours_quoted': 10,
+                'cost_quoted': '750.00',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['cost_quoted'], '750.00')
+        self.assertTrue(
+            ProjectChangeOrder.objects.filter(project=self.project, department=Department.MED, name='CO01').exists()
+        )
+
+    def test_department_user_cannot_register_co_for_other_department(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('project-change-order-list'),
+            {
+                'project_id': str(self.project.id),
+                'department': Department.BUILD,
+                'name': 'CO01',
+                'hours_quoted': 10,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_one_co_name_can_span_multiple_departments(self):
+        self.client.force_authenticate(user=self.med_user)
+        self.client.post(
+            reverse('project-change-order-list'),
+            {'project_id': str(self.project.id), 'department': Department.MED, 'name': 'CO01', 'hours_quoted': 10},
+            format='json',
+        )
+        self.client.force_authenticate(user=self.build_user)
+        self.client.post(
+            reverse('project-change-order-list'),
+            {'project_id': str(self.project.id), 'department': Department.BUILD, 'name': 'CO01', 'hours_quoted': 5},
+            format='json',
+        )
+        self.assertEqual(
+            ProjectChangeOrder.objects.filter(project=self.project, name='CO01').count(), 2
+        )
+
+    def test_co_registered_as_new_project_links_back_to_parent(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('project-list'),
+            {
+                'name': 'Original Project - CO01',
+                'client': 'Internal',
+                'start_date': '2026-02-01',
+                'end_date': '2026-03-01',
+                'facility': Facility.MX,
+                'number_of_weeks': 4,
+                'parent_project_id': str(self.project.id),
+                'department_hours_allocated': {Department.MED: 10},
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['parent_project_name'], 'Original Project')
+        created = Project.objects.get(id=response.data['id'])
+        self.assertEqual(created.parent_project_id, self.project.id)
+
+    def test_project_cannot_be_its_own_parent(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'parent_project_id': str(self.project.id)},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class AssignmentPastWeekLockTests(APITestCase):
@@ -940,6 +1048,183 @@ class DepartmentHourlyCostTests(APITestCase):
         self.assertEqual(logs_after_update[1].action, 'updated')
         self.assertEqual(logs_after_update[1].changes['old_hourly_cost'], '60.00')
         self.assertEqual(logs_after_update[1].changes['new_hourly_cost'], '65.00')
+
+
+class ExternalProviderRateTests(APITestCase):
+    """
+    Effective-dated hourly rate per (department, provider, stage): department-level edit
+    access (same as adding the provider itself), not full-access-only like
+    DepartmentHourlyCost, and rates can be backdated (unlike ExternalTeamHeadcountEvent).
+    """
+
+    def setUp(self):
+        self.build_user = User.objects.create_user(
+            username='build-rate-user', password='test-password', is_active=True,
+        )
+        UserProfile.objects.create(user=self.build_user, department=UserDepartment.BUILD)
+
+        self.med_user = User.objects.create_user(
+            username='med-rate-user', password='test-password', is_active=True,
+        )
+        UserProfile.objects.create(user=self.med_user, department=UserDepartment.MED)
+
+    def test_department_user_can_set_rate_for_own_department(self):
+        self.client.force_authenticate(user=self.build_user)
+        response = self.client.post(
+            reverse('external-provider-rate-list'),
+            {
+                'department': Department.BUILD,
+                'provider_name': 'AMI',
+                'stage': Stage.CABINETS_FRAMES,
+                'effective_date': str(date.today()),
+                'rate': '45.00',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            ExternalProviderRate.objects.filter(
+                department=Department.BUILD, provider_name='AMI', stage=Stage.CABINETS_FRAMES
+            ).exists()
+        )
+
+    def test_department_user_cannot_set_rate_for_other_department(self):
+        self.client.force_authenticate(user=self.med_user)
+        response = self.client.post(
+            reverse('external-provider-rate-list'),
+            {
+                'department': Department.BUILD,
+                'provider_name': 'AMI',
+                'stage': Stage.CABINETS_FRAMES,
+                'effective_date': str(date.today()),
+                'rate': '45.00',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_rate_can_be_backdated(self):
+        self.client.force_authenticate(user=self.build_user)
+        past_date = date.today() - timedelta(days=90)
+        response = self.client.post(
+            reverse('external-provider-rate-list'),
+            {
+                'department': Department.BUILD,
+                'provider_name': 'AMI',
+                'stage': Stage.CABINETS_FRAMES,
+                'effective_date': str(past_date),
+                'rate': '40.00',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_new_rate_adds_to_history_instead_of_overwriting(self):
+        self.client.force_authenticate(user=self.build_user)
+        self.client.post(
+            reverse('external-provider-rate-list'),
+            {
+                'department': Department.BUILD, 'provider_name': 'AMI', 'stage': Stage.CABINETS_FRAMES,
+                'effective_date': str(date.today() - timedelta(days=30)), 'rate': '40.00',
+            },
+            format='json',
+        )
+        self.client.post(
+            reverse('external-provider-rate-list'),
+            {
+                'department': Department.BUILD, 'provider_name': 'AMI', 'stage': Stage.CABINETS_FRAMES,
+                'effective_date': str(date.today()), 'rate': '45.00',
+            },
+            format='json',
+        )
+        self.assertEqual(
+            ExternalProviderRate.objects.filter(
+                department=Department.BUILD, provider_name='AMI', stage=Stage.CABINETS_FRAMES
+            ).count(),
+            2,
+        )
+
+
+class ProjectCostSummaryWithProviderRatesTests(APITestCase):
+    """
+    summary-by-project-dept's $ cost computation: internal hours use the department's flat
+    DepartmentHourlyCost, external/subcontracted hours use the provider's own per-stage rate
+    as of the assignment's week (the most recent ExternalProviderRate at or before it).
+    """
+
+    def setUp(self):
+        self.pm_user = User.objects.create_user(
+            username='cost-summary-pm', password='test-password', is_active=True, is_staff=True,
+        )
+        self.client.force_authenticate(user=self.pm_user)
+
+        self.project = Project.objects.create(
+            name='Cost Summary Project',
+            client='Internal',
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=28),
+            facility=Facility.MX,
+            number_of_weeks=4,
+        )
+
+        self.internal_employee = Employee.objects.create(
+            name='Internal Builder', role='Build Tech', department=Department.BUILD, capacity=40,
+        )
+        self.external_employee = Employee.objects.create(
+            name='AMI', role='Subcontracted Team', department=Department.BUILD, capacity=0,
+            is_subcontracted_material=True, subcontract_company='AMI',
+        )
+
+        DepartmentHourlyCost.objects.create(department=Department.BUILD, hourly_cost='50.00')
+        ExternalProviderRate.objects.create(
+            department=Department.BUILD, provider_name='AMI', stage=Stage.CABINETS_FRAMES,
+            effective_date=date.today() - timedelta(days=365), rate='30.00',
+        )
+
+        current_week_start = date.today() - timedelta(days=date.today().weekday())
+        self.current_week_start = current_week_start
+
+        # Internal: 10h this week @ $50/hr flat -> $500 forecast.
+        Assignment.objects.create(
+            employee=self.internal_employee, project=self.project,
+            week_start_date=current_week_start, hours=10, stage=Stage.CABINETS_FRAMES,
+        )
+        # External: 10h this week @ $30/hr provider rate -> $300 forecast.
+        Assignment.objects.create(
+            employee=self.external_employee, project=self.project,
+            week_start_date=current_week_start, hours=10, stage=Stage.CABINETS_FRAMES,
+            scio_hours=0, external_hours=10,
+        )
+
+    def _get_summary_row(self):
+        response = self.client.get(
+            reverse('assignment-summary-by-project-dept'),
+            {'project_ids': str(self.project.id), 'department': Department.BUILD},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows = [row for row in response.data if row['department'] == Department.BUILD]
+        self.assertEqual(len(rows), 1)
+        return rows[0]
+
+    def test_forecast_cost_blends_flat_and_provider_rates(self):
+        row = self._get_summary_row()
+        self.assertEqual(row['forecast'], 20.0)
+        self.assertEqual(row['forecast_cost'], 800.0)  # $500 internal + $300 external
+
+    def test_cost_is_null_when_no_rate_registered_anywhere(self):
+        DepartmentHourlyCost.objects.all().delete()
+        ExternalProviderRate.objects.all().delete()
+        row = self._get_summary_row()
+        self.assertIsNone(row['forecast_cost'])
+
+    def test_provider_rate_change_only_applies_going_forward(self):
+        # A newer rate effective starting next week shouldn't affect this week's cost.
+        ExternalProviderRate.objects.create(
+            department=Department.BUILD, provider_name='AMI', stage=Stage.CABINETS_FRAMES,
+            effective_date=self.current_week_start + timedelta(days=7), rate='999.00',
+        )
+        row = self._get_summary_row()
+        self.assertEqual(row['forecast_cost'], 800.0)
 
 
 class HeadEngineeringPermissionTests(APITestCase):

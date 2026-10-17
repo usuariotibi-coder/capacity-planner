@@ -46,6 +46,7 @@ from .models import (
     ExternalTeamHeadcountEvent,
     DepartmentWeeklyTotal,
     DepartmentHourlyCost,
+    ExternalProviderRate,
     EmailVerification,
     UserProfile,
     ProjectDepartmentWeeklyActual,
@@ -506,6 +507,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         default=list,
         help_text="Departments where this project is visible"
     )
+    parent_project_id = serializers.PrimaryKeyRelatedField(
+        source='parent_project',
+        queryset=Project.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="Set when this project IS a Change Order registered as its own project -- points back at the original project it extends.",
+    )
+    parent_project_name = serializers.CharField(
+        source='parent_project.name', read_only=True, default=None,
+        help_text="Name of the original project, when this one is a Change Order registered as its own project.",
+    )
 
     class Meta:
         model = Project
@@ -521,6 +533,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'number_of_weeks',
             'project_manager',
             'project_manager_id',
+            'parent_project_id',
+            'parent_project_name',
             'is_high_probability',
             'is_hidden',
             'hidden_at',
@@ -543,6 +557,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'department_hours_allocated', 'department_cost_allocated',
             'department_hours_utilized',
             'department_hours_forecast', 'project_manager_id',
+            'parent_project_name',
             'is_hidden', 'hidden_at', 'closed_at'
         )
 
@@ -688,6 +703,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"end_date": "End date must be after start date."}
             )
+
+        parent_project = data.get('parent_project')
+        if parent_project is not None and self.instance is not None and parent_project.id == self.instance.id:
+            raise serializers.ValidationError(
+                {"parent_project_id": "A project cannot be its own parent."}
+            )
+
         return data
 
     def validate_number_of_weeks(self, value):
@@ -905,13 +927,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
     project_id = serializers.SerializerMethodField(
         help_text="UUID of the project"
     )
-    change_order_id = serializers.PrimaryKeyRelatedField(
-        source='change_order',
-        queryset=ProjectChangeOrder.objects.all(),
-        required=False,
-        allow_null=True,
-        help_text="Optional Change Order UUID for this assignment"
-    )
     stage_display = serializers.CharField(
         source='get_stage_display',
         read_only=True,
@@ -943,7 +958,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
             'employee_id',
             'project',
             'project_id',
-            'change_order_id',
             'week_start_date',
             'week_number',
             'hours',
@@ -1059,7 +1073,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
         hours = data.get('hours')
         scio_hours = data.get('scio_hours')
         external_hours = data.get('external_hours')
-        change_order = data.get('change_order', getattr(self.instance, 'change_order', None))
 
         employee = data.get('employee', getattr(self.instance, 'employee', None))
         project = data.get('project', getattr(self.instance, 'project', None))
@@ -1084,31 +1097,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
                             f"Total hours ({hours}) must equal "
                             f"scio_hours ({scio_hours}) + "
                             f"external_hours ({external_hours})"
-                        )
-                    }
-                )
-
-        if change_order is not None:
-            if project and str(change_order.project_id) != str(project.id):
-                raise serializers.ValidationError(
-                    {
-                        "change_order_id": (
-                            "Selected Change Order does not belong to this project."
-                        )
-                    }
-                )
-
-            department_override = data.get(
-                'department_override',
-                getattr(self.instance, 'department_override', None)
-            )
-            effective_department = department_override or (employee.department if employee else None)
-            if employee and change_order.department != effective_department:
-                raise serializers.ValidationError(
-                    {
-                        "change_order_id": (
-                            "Selected Change Order department does not match this assignment's "
-                            "effective department (employee department, or department_override if set)."
                         )
                     }
                 )
@@ -1245,7 +1233,6 @@ class AssignmentListSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.UUIDField(read_only=True)
     project_id = serializers.UUIDField(read_only=True)
-    change_order_id = serializers.UUIDField(read_only=True)
     department = serializers.SerializerMethodField()
     home_department = serializers.CharField(source='employee.department', read_only=True)
 
@@ -1255,7 +1242,6 @@ class AssignmentListSerializer(serializers.ModelSerializer):
             'id',
             'employee_id',
             'project_id',
-            'change_order_id',
             'department',
             'home_department',
             'department_override',
@@ -1699,6 +1685,7 @@ class ProjectChangeOrderSerializer(serializers.ModelSerializer):
             'department_display',
             'name',
             'hours_quoted',
+            'cost_quoted',
             'created_at',
             'updated_at',
         )
@@ -1707,6 +1694,11 @@ class ProjectChangeOrderSerializer(serializers.ModelSerializer):
     def validate_hours_quoted(self, value):
         if value < 0:
             raise serializers.ValidationError("Quoted hours cannot be negative.")
+        return value
+
+    def validate_cost_quoted(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Quoted amount cannot be negative.")
         return value
 
     def create(self, validated_data):
@@ -2140,6 +2132,29 @@ class DepartmentHourlyCostSerializer(serializers.ModelSerializer):
         model = DepartmentHourlyCost
         fields = ('id', 'department', 'hourly_cost', 'updated_by', 'updated_by_username', 'created_at', 'updated_at')
         read_only_fields = ('id', 'updated_by', 'updated_by_username', 'created_at', 'updated_at')
+
+
+class ExternalProviderRateSerializer(serializers.ModelSerializer):
+    """Serializer for an external provider's effective-dated hourly rate (per stage)."""
+
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = ExternalProviderRate
+        fields = (
+            'id',
+            'department',
+            'provider_name',
+            'stage',
+            'effective_date',
+            'rate',
+            'comment',
+            'created_by',
+            'created_by_username',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_by', 'created_by_username', 'created_at', 'updated_at')
 
 
 class ProjectDepartmentWeeklyActualSerializer(serializers.ModelSerializer):

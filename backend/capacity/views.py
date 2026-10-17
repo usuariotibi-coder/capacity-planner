@@ -54,7 +54,7 @@ from .models import (
     ProjectBudget, ProjectChangeOrder, ActivityLog, Department, Facility, Stage,
     ScioTeamCapacity, ScioHeadcountEvent, SubcontractedTeamCapacity, PrgExternalTeamCapacity,
     ExternalTeamHeadcountEvent,
-    DepartmentWeeklyTotal, DepartmentHourlyCost, UserDepartment, OtherDepartment,
+    DepartmentWeeklyTotal, DepartmentHourlyCost, ExternalProviderRate, UserDepartment, OtherDepartment,
     ProjectDepartmentWeeklyActual, FinanceJobCumulative, FinanceImportLog
 )
 from .serializers import (
@@ -65,7 +65,7 @@ from .serializers import (
     ProjectBudgetSerializer, ProjectChangeOrderSerializer, ActivityLogSerializer,
     ScioTeamCapacitySerializer, ScioHeadcountEventSerializer, SubcontractedTeamCapacitySerializer,
     PrgExternalTeamCapacitySerializer, ExternalTeamHeadcountEventSerializer, DepartmentWeeklyTotalSerializer,
-    DepartmentHourlyCostSerializer,
+    DepartmentHourlyCostSerializer, ExternalProviderRateSerializer,
     RegisteredUserSerializer,
     ProjectDepartmentWeeklyActualSerializer, FinanceImportLogSerializer
 )
@@ -1282,7 +1282,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = (
         Assignment.objects
         .all()
-        .select_related('employee', 'project', 'change_order')
+        .select_related('employee', 'project')
     )
     serializer_class = AssignmentSerializer
     permission_classes = [IsAuthenticated]
@@ -1559,8 +1559,53 @@ class AssignmentViewSet(viewsets.ModelViewSet):
                 'forecast': float(row['forecast'] or 0),
             }
 
-        # Past weeks are additionally sourced from Finance actuals (real hours by
-        # project/department/week, with no per-employee breakdown). These are always
+        # $ cost per project/department, split the same way as hours (utilized vs forecast).
+        # Internal hours use the department's flat DepartmentHourlyCost; hours attributed to
+        # an external/subcontracted placeholder employee (see Employee.is_subcontracted_material/
+        # subcontract_company) use that provider's own rate for the assignment's stage, as of
+        # the assignment's week -- see _lookup_provider_rate. A bucket stays null (not 0) when
+        # nothing in it ever resolved a rate, so the UI can distinguish "no rate registered"
+        # from a genuine $0 total.
+        dept_hourly_cost = {
+            row['department']: row['hourly_cost']
+            for row in DepartmentHourlyCost.objects.values('department', 'hourly_cost')
+        }
+        rate_ledger = _load_provider_rate_ledger(department)
+        cost_totals = {}
+        rate_resolved_keys = set()
+
+        for row in qs.values(
+            'project_id', 'effective_department', 'stage', 'hours', 'week_start_date',
+            'employee__is_subcontracted_material', 'employee__subcontract_company',
+        ):
+            dept = row['effective_department']
+            hours = float(row['hours'] or 0)
+            if not dept or hours == 0:
+                continue
+
+            is_external = bool(row['employee__is_subcontracted_material']) and bool(row['employee__subcontract_company'])
+            if is_external:
+                rate = _lookup_provider_rate(
+                    rate_ledger, dept, row['employee__subcontract_company'], row['stage'], row['week_start_date']
+                )
+            else:
+                rate = dept_hourly_cost.get(dept)
+
+            if rate is None:
+                continue
+
+            key = (str(row['project_id']), dept)
+            entry = cost_totals.setdefault(key, {'utilized': 0.0, 'forecast': 0.0})
+            rate_resolved_keys.add(key)
+            cost = hours * float(rate)
+            if row['week_start_date'] < split_date:
+                entry['utilized'] += cost
+            else:
+                entry['forecast'] += cost
+
+        # Past weeks additionally sourced from Finance actuals (real hours by project/
+        # department/week, with no per-employee breakdown, so only the flat department rate
+        # can apply here -- there's no provider to attribute them to). These are always
         # "utilized" since actuals only ever cover closed/past weeks.
         actuals_qs = ProjectDepartmentWeeklyActual.objects.filter(
             project_id__in=project_ids,
@@ -1577,15 +1622,25 @@ class AssignmentViewSet(viewsets.ModelViewSet):
             entry = totals.setdefault(key, {'utilized': 0.0, 'forecast': 0.0})
             entry['utilized'] += float(row['actual_hours'] or 0)
 
-        results = [
-            {
+            actuals_rate = dept_hourly_cost.get(row['department'])
+            if actuals_rate is not None:
+                cost_entry = cost_totals.setdefault(key, {'utilized': 0.0, 'forecast': 0.0})
+                rate_resolved_keys.add(key)
+                cost_entry['utilized'] += float(row['actual_hours'] or 0) * float(actuals_rate)
+
+        results = []
+        for (project_id, dept), value in totals.items():
+            key = (project_id, dept)
+            cost_value = cost_totals.get(key)
+            has_cost = key in rate_resolved_keys
+            results.append({
                 'project_id': project_id,
                 'department': dept,
                 'utilized': value['utilized'],
                 'forecast': value['forecast'],
-            }
-            for (project_id, dept), value in totals.items()
-        ]
+                'utilized_cost': cost_value['utilized'] if has_cost else None,
+                'forecast_cost': cost_value['forecast'] if has_cost else None,
+            })
 
         return Response(results)
 
@@ -2519,6 +2574,44 @@ class SubcontractedTeamCapacityViewSet(viewsets.ModelViewSet):
 EXTERNAL_TEAM_CAPACITY_DEPARTMENTS = {Department.MED, Department.HD, Department.MFG, Department.BUILD, Department.PRG}
 
 
+def _load_provider_rate_ledger(department=None):
+    """
+    Preloads ExternalProviderRate into {(department, provider_name, stage): [(effective_date,
+    rate), ...]} sorted ascending by effective_date, for cheap repeated lookups across many
+    assignment rows (see _lookup_provider_rate) without a query per row.
+    """
+    qs = ExternalProviderRate.objects.all()
+    if department:
+        qs = qs.filter(department=department)
+    ledger = {}
+    for row in qs.values_list('department', 'provider_name', 'stage', 'effective_date', 'rate'):
+        dept, provider_name, stage, effective_date, rate = row
+        key = (dept, provider_name, stage)
+        ledger.setdefault(key, []).append((effective_date, rate))
+    for entries in ledger.values():
+        entries.sort(key=lambda pair: pair[0])
+    return ledger
+
+
+def _lookup_provider_rate(ledger, department, provider_name, stage, as_of_date):
+    """
+    The rate in effect for (department, provider_name, stage) as of a given date: the most
+    recent ledger row at or before that date. `stage` can be None (department has no Stage
+    concept, e.g. MFG -- a single flat rate was registered under stage=None at creation).
+    Returns None when nothing has been registered for that combination yet.
+    """
+    entries = ledger.get((department, provider_name, stage))
+    if not entries:
+        return None
+    applicable = None
+    for effective_date, rate in entries:
+        if effective_date <= as_of_date:
+            applicable = rate
+        else:
+            break
+    return applicable
+
+
 def recompute_external_team_capacity_from_events(department, team_name):
     """
     Rebuild the external headcount capacity for one (department, team_name) from
@@ -2807,6 +2900,51 @@ class DepartmentHourlyCostViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         self._ensure_full_access()
+        instance.delete()
+
+
+class ExternalProviderRateViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for an external provider's effective-dated hourly rate (per
+    stage, when the department has stages). A ledger, not an upsert: saving a
+    new rate for a (department, provider, stage) adds a new row effective from
+    its own date instead of overwriting history -- see _lookup_provider_rate
+    below for how "the current rate" is looked up from this ledger. Gated the
+    same way as adding the provider
+    itself (department-level edit access, see _can_edit_department), not
+    restricted to full-access like DepartmentHourlyCost, since this is meant
+    to be filled in from the same "Add Team" flow.
+    """
+    queryset = ExternalProviderRate.objects.all()
+    serializer_class = ExternalProviderRateSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['department', 'provider_name', 'stage']
+    ordering_fields = ['department', 'provider_name', 'stage', 'effective_date', 'created_at']
+    ordering = ['department', 'provider_name', 'stage', '-effective_date']
+
+    def _ensure_can_edit(self, department):
+        if _has_full_access(self.request.user):
+            return
+        if _is_read_only_user(self.request.user):
+            raise PermissionDenied("Read-only access.")
+        if not _can_edit_department(self.request.user, department):
+            raise PermissionDenied("No permission to modify external provider rates for this department.")
+
+    def perform_create(self, serializer):
+        department = serializer.validated_data.get('department')
+        self._ensure_can_edit(department)
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        self._ensure_can_edit(serializer.instance.department)
+        new_department = serializer.validated_data.get('department', serializer.instance.department)
+        self._ensure_can_edit(new_department)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_can_edit(instance.department)
         instance.delete()
 
 

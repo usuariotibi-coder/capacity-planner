@@ -3,15 +3,16 @@ import { useProjectStore } from '../stores/projectStore';
 import { useMemo } from 'react';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
-import type { Project, Department, DepartmentStageConfig, ProjectVisibilityScope } from '../types';
+import type { Project, Department, DepartmentStageConfig, ProjectChangeOrder, ProjectVisibilityScope } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
-import { CheckCircle2, Plus, Trash2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ClipboardList, GitBranch, Plus, Trash2, X, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
+import { changeOrdersApi } from '../services/api';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
 const FACILITIES = ['AL', 'MI', 'MX'] as const;
@@ -108,12 +109,72 @@ export function ProjectsPage() {
   const [showInGeneral, setShowInGeneral] = useState<boolean>(true);
   const [formNotice, setFormNotice] = useState<{ type: FormNoticeType; message: string } | null>(null);
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  // Set while the create/edit form is open specifically to register a Change Order as its own
+  // full project ("Método 2") -- included in the create payload as parentProjectId so it links
+  // back. null for every other use of the same form (plain create/edit).
+  const [parentProjectIdForNewProject, setParentProjectIdForNewProject] = useState<string | null>(null);
+
+  // Change Orders: registered two ways from the "CO" row action -- (1) widen an existing
+  // project's budget (ProjectChangeOrder rows, handled here) or (2) register as a brand-new
+  // project linked via parentProjectId (reuses the create-project form above).
+  const [changeOrders, setChangeOrders] = useState<ProjectChangeOrder[]>([]);
+  const [coChooserProjectId, setCoChooserProjectId] = useState<string | null>(null);
+  const [coExpandProjectId, setCoExpandProjectId] = useState<string | null>(null);
+  const [coName, setCoName] = useState('');
+  const [coHoursByDept, setCoHoursByDept] = useState<Partial<Record<Department, string>>>({});
+  const [coCostByDept, setCoCostByDept] = useState<Partial<Record<Department, string>>>({});
+  const [coEditingName, setCoEditingName] = useState<string | null>(null);
+  const [isSavingCo, setIsSavingCo] = useState(false);
 
   useEffect(() => {
     if (!formNotice) return;
     const timeout = setTimeout(() => setFormNotice(null), 4200);
     return () => clearTimeout(timeout);
   }, [formNotice]);
+
+  useEffect(() => {
+    let cancelled = false;
+    changeOrdersApi.getAll()
+      .then((data: any[]) => {
+        if (cancelled) return;
+        const normalized: ProjectChangeOrder[] = (Array.isArray(data) ? data : [])
+          .map((row: any): ProjectChangeOrder | null => {
+            const projectId = row?.projectId || row?.project?.id;
+            if (!row?.id || !projectId || !row?.department) return null;
+            return {
+              id: row.id,
+              projectId,
+              department: row.department,
+              name: row.name || '',
+              hoursQuoted: Number(row.hoursQuoted ?? 0),
+              costQuoted: row.costQuoted !== null && row.costQuoted !== undefined ? Number(row.costQuoted) : null,
+              createdAt: row.createdAt,
+              updatedAt: row.updatedAt,
+            };
+          })
+          .filter((row): row is ProjectChangeOrder => Boolean(row));
+        setChangeOrders(normalized);
+      })
+      .catch((error) => console.error('[ProjectsPage] Error loading Change Orders:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const changeOrdersForProject = (projectId: string) => changeOrders.filter((co) => co.projectId === projectId);
+
+  // One row per distinct CO name for a project, with its hours/$ summed across whichever
+  // departments it touches -- what the "existing COs" list in the expand modal shows.
+  const changeOrderNamesForProject = (projectId: string) => {
+    const byName = new Map<string, { totalHours: number; totalCost: number }>();
+    changeOrdersForProject(projectId).forEach((co) => {
+      const entry = byName.get(co.name) || { totalHours: 0, totalCost: 0 };
+      entry.totalHours += co.hoursQuoted || 0;
+      entry.totalCost += co.costQuoted || 0;
+      byName.set(co.name, entry);
+    });
+    return Array.from(byName.entries()).map(([name, totals]) => ({ name, ...totals }));
+  };
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = projectSearchTerm.trim().toLowerCase();
@@ -298,6 +359,7 @@ export function ProjectsPage() {
         facility: formData.facility,
         numberOfWeeks,
         projectManagerId: selectedProjectManagerId || undefined,
+        parentProjectId: parentProjectIdForNewProject || undefined,
         isHighProbability: !!formData.isHighProbability,
         departmentStages: calculatedDepartmentStages,
         departmentHoursAllocated: deptHoursAllocated,
@@ -353,6 +415,7 @@ export function ProjectsPage() {
       setDeptCostAllocated({});
       setShowInGeneral(true);
       setIsFormOpen(false);
+      setParentProjectIdForNewProject(null);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[ProjectsPage] Error saving project:', errorMsg);
@@ -365,6 +428,7 @@ export function ProjectsPage() {
 
   const handleEditProject = (proj: Project) => {
     if (!hasFullAccess) return;
+    setParentProjectIdForNewProject(null);
     setFormData(proj);
     setEditingId(proj.id);
     setNumberOfWeeks(proj.numberOfWeeks);
@@ -451,6 +515,166 @@ export function ProjectsPage() {
     setSelectedProjectManagerId(null);
     setShowInGeneral(true);
     setFormNotice(null);
+    setParentProjectIdForNewProject(null);
+  };
+
+  // Change Order "Método 2": reuses the create-project form above, pre-filled with the parent's
+  // client/facility (convenience, not a shortcut -- every other field still needs filling in)
+  // and a parentProjectId that links the two once created.
+  const openCoAsNewProject = (project: Project) => {
+    setCoChooserProjectId(null);
+    setParentProjectIdForNewProject(project.id);
+    setEditingId(null);
+    setFormData({ name: '', client: project.client, startDate: '', facility: project.facility, isHighProbability: false });
+    setNumberOfWeeks(4);
+    setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
+    setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptCostAllocated({});
+    setSelectedProjectManagerId(null);
+    setShowInGeneral(true);
+    setFormNotice(null);
+    setIsFormOpen(true);
+  };
+
+  // Change Order "Método 1": widens an existing project's budget. One CO name can touch
+  // several departments at once -- each becomes its own ProjectChangeOrder row sharing that
+  // name (see changeOrderNamesForProject).
+  const resetCoExpandForm = () => {
+    setCoExpandProjectId(null);
+    setCoName('');
+    setCoHoursByDept({});
+    setCoCostByDept({});
+    setCoEditingName(null);
+    setIsSavingCo(false);
+  };
+
+  const openCoExpand = (projectId: string) => {
+    setCoChooserProjectId(null);
+    setCoExpandProjectId(projectId);
+    setCoName('');
+    setCoHoursByDept({});
+    setCoCostByDept({});
+    setCoEditingName(null);
+  };
+
+  const startEditingCoName = (projectId: string, name: string) => {
+    const rows = changeOrdersForProject(projectId).filter((co) => co.name === name);
+    const hours: Partial<Record<Department, string>> = {};
+    const cost: Partial<Record<Department, string>> = {};
+    rows.forEach((row) => {
+      hours[row.department] = row.hoursQuoted ? String(row.hoursQuoted) : '';
+      cost[row.department] = row.costQuoted !== null && row.costQuoted !== undefined ? String(row.costQuoted) : '';
+    });
+    setCoName(name);
+    setCoHoursByDept(hours);
+    setCoCostByDept(cost);
+    setCoEditingName(name);
+  };
+
+  const handleSaveCoExpand = async () => {
+    if (!coExpandProjectId) return;
+    const name = coName.trim();
+    if (!name) {
+      setFormNotice({
+        type: 'warning',
+        message: language === 'es' ? 'Indica un nombre para el Change Order.' : 'Enter a name for the Change Order.',
+      });
+      return;
+    }
+
+    // Departments with an hours and/or $ value entered -- the ones this CO actually touches.
+    const deptsToSave = DEPARTMENTS.filter((dept) => {
+      const h = parseFloat(coHoursByDept[dept] || '');
+      const c = parseFloat(coCostByDept[dept] || '');
+      return (Number.isFinite(h) && h > 0) || (Number.isFinite(c) && c > 0);
+    });
+
+    if (deptsToSave.length === 0) {
+      setFormNotice({
+        type: 'warning',
+        message: language === 'es' ? 'Ingresa horas o $ para al menos un departamento.' : 'Enter hours or $ for at least one department.',
+      });
+      return;
+    }
+
+    // When editing an existing CO, match its current rows by the name it was loaded under
+    // (coEditingName) -- renaming is just a field change, not a new identity.
+    const matchRows = coEditingName
+      ? changeOrdersForProject(coExpandProjectId).filter((co) => co.name === coEditingName)
+      : [];
+
+    setIsSavingCo(true);
+    try {
+      const savedRows: ProjectChangeOrder[] = [];
+      for (const dept of deptsToSave) {
+        const hoursVal = Math.max(0, parseFloat(coHoursByDept[dept] || '') || 0);
+        const costRaw = (coCostByDept[dept] || '').trim();
+        const costVal = costRaw === '' ? null : Math.max(0, parseFloat(costRaw) || 0);
+        const existingRow = matchRows.find((co) => co.department === dept);
+        if (existingRow) {
+          const updated: any = await changeOrdersApi.update(existingRow.id, { name, hoursQuoted: hoursVal, costQuoted: costVal });
+          savedRows.push({
+            ...existingRow,
+            name: updated?.name || name,
+            hoursQuoted: Number(updated?.hoursQuoted ?? hoursVal),
+            costQuoted: updated?.costQuoted !== null && updated?.costQuoted !== undefined ? Number(updated.costQuoted) : costVal,
+            updatedAt: updated?.updatedAt || existingRow.updatedAt,
+          });
+        } else {
+          const created: any = await changeOrdersApi.create({
+            projectId: coExpandProjectId,
+            department: dept,
+            name,
+            hoursQuoted: hoursVal,
+            costQuoted: costVal,
+          });
+          savedRows.push({
+            id: created?.id,
+            projectId: created?.projectId || created?.project?.id || coExpandProjectId,
+            department: created?.department || dept,
+            name: created?.name || name,
+            hoursQuoted: Number(created?.hoursQuoted ?? hoursVal),
+            costQuoted: created?.costQuoted !== null && created?.costQuoted !== undefined ? Number(created.costQuoted) : costVal,
+            createdAt: created?.createdAt,
+            updatedAt: created?.updatedAt,
+          });
+        }
+      }
+
+      // Departments that were part of the CO being edited but got cleared out -> remove them.
+      const rowsToDelete = matchRows.filter((co) => !deptsToSave.includes(co.department));
+      for (const row of rowsToDelete) {
+        await changeOrdersApi.delete(row.id);
+      }
+
+      setChangeOrders((prev) => {
+        const staleIds = new Set([...matchRows.map((r) => r.id)]);
+        const withoutStale = prev.filter((co) => !staleIds.has(co.id));
+        return [...withoutStale, ...savedRows];
+      });
+
+      setFormNotice({
+        type: 'success',
+        message: language === 'es' ? 'Change Order guardado exitosamente.' : 'Change Order saved successfully.',
+      });
+      resetCoExpandForm();
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      setFormNotice({
+        type: 'error',
+        message: `${language === 'es' ? 'Error al guardar Change Order' : 'Error saving Change Order'}: ${errorMsg}`,
+      });
+    } finally {
+      setIsSavingCo(false);
+    }
+  };
+
+  const formatHours = (value: number): string => {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value * 100) / 100;
+    return rounded.toFixed(2).replace(/\.?0+$/, '');
   };
 
   const formatDate = (dateStr: string) => {
@@ -479,6 +703,7 @@ export function ProjectsPage() {
             if (!hasFullAccess) return;
             setFormNotice(null);
             setShowInGeneral(true);
+            setParentProjectIdForNewProject(null);
             setIsFormOpen(true);
           }}
           disabled={!hasFullAccess}
@@ -570,9 +795,21 @@ export function ProjectsPage() {
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-2 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded"></div>
                 <h2 className="brand-title text-2xl font-bold">
-                  {editingId ? t.editProject : t.createNewProject}
+                  {editingId
+                    ? t.editProject
+                    : parentProjectIdForNewProject
+                      ? (language === 'es' ? 'Nuevo proyecto (Change Order)' : 'New project (Change Order)')
+                      : t.createNewProject}
                 </h2>
               </div>
+
+              {parentProjectIdForNewProject && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  <GitBranch size={14} />
+                  {language === 'es' ? 'Se registrará como Change Order de: ' : 'Will be registered as a Change Order of: '}
+                  {projects.find((p) => p.id === parentProjectIdForNewProject)?.name || parentProjectIdForNewProject}
+                </div>
+              )}
 
                 <form onSubmit={handleSubmit} className="space-y-3">
                   {/* Row 1: Job and Customer */}
@@ -874,6 +1111,181 @@ export function ProjectsPage() {
         </div>
       )}
 
+      {/* CO chooser: pick one of the two ways to register a Change Order */}
+      {coChooserProjectId && (() => {
+        const project = projects.find((p) => p.id === coChooserProjectId);
+        if (!project) return null;
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4" onClick={() => setCoChooserProjectId(null)}>
+            <div
+              className="bg-white rounded-xl shadow-2xl border-2 border-emerald-200 w-full max-w-md p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-bold text-emerald-800">{language === 'es' ? 'Registrar Change Order' : 'Register Change Order'}</h3>
+                <button onClick={() => setCoChooserProjectId(null)} className="text-gray-500 hover:text-gray-700 p-1 rounded">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">{project.name}</p>
+
+              <div className="space-y-2.5">
+                <button
+                  onClick={() => openCoExpand(project.id)}
+                  className="w-full text-left p-3 rounded-lg border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition"
+                >
+                  <div className="font-bold text-sm text-emerald-900">
+                    {language === 'es' ? 'Ampliar presupuesto de este proyecto' : 'Expand this project\'s budget'}
+                  </div>
+                  <div className="text-xs text-emerald-700 mt-0.5">
+                    {language === 'es'
+                      ? 'Agrega horas y $ por departamento, que se suman al presupuesto original.'
+                      : 'Add hours and $ per department, added on top of the original budget.'}
+                  </div>
+                </button>
+                <button
+                  onClick={() => openCoAsNewProject(project)}
+                  className="w-full text-left p-3 rounded-lg border-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition"
+                >
+                  <div className="font-bold text-sm text-indigo-900">
+                    {language === 'es' ? 'Registrar como proyecto nuevo' : 'Register as a new project'}
+                  </div>
+                  <div className="text-xs text-indigo-700 mt-0.5">
+                    {language === 'es'
+                      ? 'Crea un proyecto completo (fechas, horas, $) vinculado a este como su origen.'
+                      : 'Creates a full project (dates, hours, $) linked back to this one.'}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* CO "Método 1": widen an existing project's budget */}
+      {coExpandProjectId && (() => {
+        const project = projects.find((p) => p.id === coExpandProjectId);
+        if (!project) return null;
+        const existingNames = changeOrderNamesForProject(coExpandProjectId);
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 overflow-y-auto">
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-2xl border-2 border-emerald-200 w-full max-w-3xl p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-lg font-bold text-emerald-800">
+                    {language === 'es' ? 'Ampliar presupuesto' : 'Expand budget'}
+                  </h3>
+                  <button onClick={resetCoExpandForm} className="text-gray-500 hover:text-gray-700 p-1 rounded">
+                    <X size={16} />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">{project.name}</p>
+
+                {existingNames.length > 0 && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      {language === 'es' ? 'Change Orders existentes (clic para editar)' : 'Existing Change Orders (click to edit)'}
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {existingNames.map((co) => (
+                        <button
+                          key={co.name}
+                          type="button"
+                          onClick={() => startEditingCoName(coExpandProjectId, co.name)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
+                            coEditingName === co.name
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {co.name} · {formatHours(co.totalHours)}h
+                        </button>
+                      ))}
+                      {coEditingName && (
+                        <button
+                          type="button"
+                          onClick={() => { setCoName(''); setCoHoursByDept({}); setCoCostByDept({}); setCoEditingName(null); }}
+                          className="px-2.5 py-1 rounded-full text-xs font-semibold border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
+                        >
+                          + {language === 'es' ? 'Nuevo' : 'New'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    {language === 'es' ? 'Nombre del Change Order' : 'Change Order name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={coName}
+                    onChange={(e) => setCoName(e.target.value)}
+                    placeholder="CO01"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-2">
+                    {language === 'es' ? 'Horas y $ a agregar por departamento' : 'Hours and $ to add per department'}
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {DEPARTMENTS.map((dept) => (
+                      <div key={dept} className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                        <div className="text-xs font-bold text-gray-700 mb-1">{dept}</div>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={coHoursByDept[dept] ?? ''}
+                          onChange={(e) => {
+                            if (/^\d*\.?\d*$/.test(e.target.value)) setCoHoursByDept({ ...coHoursByDept, [dept]: e.target.value });
+                          }}
+                          placeholder={language === 'es' ? 'Horas' : 'Hours'}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs mb-1 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        />
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">$</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={coCostByDept[dept] ?? ''}
+                            onChange={(e) => {
+                              if (/^\d*\.?\d{0,2}$/.test(e.target.value)) setCoCostByDept({ ...coCostByDept, [dept]: e.target.value });
+                            }}
+                            placeholder="0.00"
+                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    onClick={resetCoExpandForm}
+                    className="px-4 py-2 text-sm font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={handleSaveCoExpand}
+                    disabled={isSavingCo}
+                    className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-60"
+                  >
+                    {isSavingCo
+                      ? (language === 'es' ? 'Guardando...' : 'Saving...')
+                      : (coEditingName ? (t.update || 'Update') : (language === 'es' ? 'Agregar' : 'Add'))}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="flex-1 min-h-0 overflow-auto px-6 pb-6">
       <div className="mb-4 flex flex-col gap-2 rounded-lg border border-[#d5d1da] bg-white px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
         <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-[#4f3a70]">
@@ -914,12 +1326,21 @@ export function ProjectsPage() {
             {filteredProjects.map((proj, idx) => (
               <tr key={proj.id} className={`projects-row transition hover:shadow-md ${idx % 2 === 0 ? 'bg-white projects-row-even' : 'bg-[#f4f1f8] projects-row-odd'}`}>
                 <td className="projects-cell-main border px-4 py-3 font-semibold text-[#2e1a47]">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span>{proj.name}</span>
                     {proj.isClosed && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
                         <XCircle size={12} />
                         {language === 'es' ? 'Cerrado' : 'Closed'}
+                      </span>
+                    )}
+                    {proj.parentProjectId && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700"
+                        title={language === 'es' ? `Change Order de ${proj.parentProjectName || ''}` : `Change Order of ${proj.parentProjectName || ''}`}
+                      >
+                        <GitBranch size={10} />
+                        {language === 'es' ? 'CO de' : 'CO of'} {proj.parentProjectName || '—'}
                       </span>
                     )}
                   </div>
@@ -960,6 +1381,18 @@ export function ProjectsPage() {
                         title={t.edit}
                       >
                         ✎
+                      </button>
+                      <button
+                        onClick={() => hasFullAccess && setCoChooserProjectId(proj.id)}
+                        disabled={!hasFullAccess}
+                        className={`project-action-btn p-2 rounded-lg transition transform shadow-sm ${
+                          hasFullAccess
+                            ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:scale-110'
+                            : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                        }`}
+                        title={language === 'es' ? 'Registrar Change Order' : 'Register Change Order'}
+                      >
+                        <ClipboardList size={18} />
                       </button>
                       <button
                         onClick={async () => {
