@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('capacity', '0029_scioheadcountevent'),
+        ('capacity', '0039_dedupe_duplicate_assignments'),
     ]
 
     operations = [
