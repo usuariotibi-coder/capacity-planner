@@ -3,7 +3,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useMemo } from 'react';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
-import type { Project, Department, DepartmentStageConfig, ProjectChangeOrder, ProjectVisibilityScope } from '../types';
+import type { Project, Department, DepartmentStageConfig, ProjectChangeOrder, ProjectVisibilityScope, Stage } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
@@ -12,12 +12,42 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
 import { WeekNumberDatePicker } from '../components/WeekNumberDatePicker';
-import { changeOrdersApi } from '../services/api';
+import { changeOrdersApi, projectsApi } from '../services/api';
 
 const DEPARTMENTS: Department[] = ['PM', 'MED', 'HD', 'MFG', 'BUILD', 'PRG', 'PURCHASING'];
 const FACILITIES = ['AL', 'MI', 'MX'] as const;
 const GENERAL_VISIBILITY_SCOPE = 'GENERAL' as const;
 const DEPARTMENT_SET = new Set<Department>(DEPARTMENTS);
+
+// A department's weeks are normally configured as a single Start Date + Duration.
+// BUILD and PRG are split into named sub-phases instead -- each gets its own Start
+// Date + Duration, purely so the project's weeks can be dated per sub-phase. This
+// has no effect on department-level budget hours, which stay a single value per
+// department (Qtd/Usado/Fcst flow is untouched).
+const DEFAULT_PHASE = '__default__';
+interface SubphaseDef {
+  key: string; // Stage value sent to the backend, or DEFAULT_PHASE for an unsplit department
+  label: string; // Shown above the fields when a department has more than one sub-phase
+}
+const DEPARTMENT_SUBPHASES: Partial<Record<Department, SubphaseDef[]>> = {
+  BUILD: [
+    { key: 'ASSEMBLY', label: 'Assembly' },
+    { key: 'COMMISSIONING', label: 'Commissioning' },
+  ],
+  PRG: [
+    { key: 'OFFLINE', label: 'Offline' },
+    { key: 'ONLINE', label: 'Online' },
+    { key: 'DEBUG', label: 'Debug' },
+  ],
+};
+const getSubphasesForDept = (dept: Department): SubphaseDef[] =>
+  DEPARTMENT_SUBPHASES[dept] || [{ key: DEFAULT_PHASE, label: '' }];
+const emptyDeptPhaseDates = (): Record<Department, Record<string, string>> => ({
+  PM: {}, MED: {}, HD: {}, MFG: {}, BUILD: {}, PRG: {}, PURCHASING: {},
+});
+const emptyDeptPhaseDurations = (): Record<Department, Record<string, number>> => ({
+  PM: {}, MED: {}, HD: {}, MFG: {}, BUILD: {}, PRG: {}, PURCHASING: {},
+});
 
 const getDepartmentScopesFromVisibility = (scopes?: ProjectVisibilityScope[]): Department[] => {
   const rawScopes = scopes || [];
@@ -49,7 +79,7 @@ interface HoursPerDepartment {
 type FormNoticeType = 'success' | 'warning' | 'error';
 
 export function ProjectsPage() {
-  const { projects, addProject, deleteProject, updateProject } = useProjectStore();
+  const { projects, addProject, deleteProject, updateProject, fetchProjects } = useProjectStore();
   const { addAssignment, assignments } = useAssignmentStore();
   const { employees } = useEmployeeStore();
   const { language } = useLanguage();
@@ -74,24 +104,9 @@ export function ProjectsPage() {
     PRG: 0,
     PURCHASING: 0,
   });
-  const [deptStartDates, setDeptStartDates] = useState<Record<Department, string>>({
-    PM: '',
-    MED: '',
-    HD: '',
-    MFG: '',
-    BUILD: '',
-    PRG: '',
-    PURCHASING: '',
-  });
-  const [deptDurations, setDeptDurations] = useState<Record<Department, number>>({
-    PM: 0,
-    MED: 0,
-    HD: 0,
-    MFG: 0,
-    BUILD: 0,
-    PRG: 0,
-    PURCHASING: 0,
-  });
+  // Keyed by department, then by sub-phase key (DEFAULT_PHASE for unsplit departments).
+  const [deptStartDates, setDeptStartDates] = useState<Record<Department, Record<string, string>>>(emptyDeptPhaseDates());
+  const [deptDurations, setDeptDurations] = useState<Record<Department, Record<string, number>>>(emptyDeptPhaseDurations());
   const [deptHoursAllocated, setDeptHoursAllocated] = useState<Record<Department, number>>({
     PM: 0,
     MED: 0,
@@ -125,6 +140,10 @@ export function ProjectsPage() {
   const [coCostByDept, setCoCostByDept] = useState<Partial<Record<Department, string>>>({});
   const [coEditingName, setCoEditingName] = useState<string | null>(null);
   const [isSavingCo, setIsSavingCo] = useState(false);
+  // Set while the create-project form is pre-filled to "promote" a merged CO (Método 1)
+  // into its own project (Método 2) -- see openPromoteChangeOrder/handleSubmit.
+  const [promotingChangeOrder, setPromotingChangeOrder] = useState<{ sourceProjectId: string; name: string } | null>(null);
+  const [isMergingProjectId, setIsMergingProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!formNotice) return;
@@ -132,28 +151,35 @@ export function ProjectsPage() {
     return () => clearTimeout(timeout);
   }, [formNotice]);
 
+  const normalizeChangeOrders = (data: any[]): ProjectChangeOrder[] =>
+    (Array.isArray(data) ? data : [])
+      .map((row: any): ProjectChangeOrder | null => {
+        const projectId = row?.projectId || row?.project?.id;
+        if (!row?.id || !projectId || !row?.department) return null;
+        return {
+          id: row.id,
+          projectId,
+          department: row.department,
+          name: row.name || '',
+          hoursQuoted: Number(row.hoursQuoted ?? 0),
+          costQuoted: row.costQuoted !== null && row.costQuoted !== undefined ? Number(row.costQuoted) : null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      })
+      .filter((row): row is ProjectChangeOrder => Boolean(row));
+
+  const reloadChangeOrders = async () => {
+    const data = await changeOrdersApi.getAll();
+    setChangeOrders(normalizeChangeOrders(data));
+  };
+
   useEffect(() => {
     let cancelled = false;
     changeOrdersApi.getAll()
       .then((data: any[]) => {
         if (cancelled) return;
-        const normalized: ProjectChangeOrder[] = (Array.isArray(data) ? data : [])
-          .map((row: any): ProjectChangeOrder | null => {
-            const projectId = row?.projectId || row?.project?.id;
-            if (!row?.id || !projectId || !row?.department) return null;
-            return {
-              id: row.id,
-              projectId,
-              department: row.department,
-              name: row.name || '',
-              hoursQuoted: Number(row.hoursQuoted ?? 0),
-              costQuoted: row.costQuoted !== null && row.costQuoted !== undefined ? Number(row.costQuoted) : null,
-              createdAt: row.createdAt,
-              updatedAt: row.updatedAt,
-            };
-          })
-          .filter((row): row is ProjectChangeOrder => Boolean(row));
-        setChangeOrders(normalized);
+        setChangeOrders(normalizeChangeOrders(data));
       })
       .catch((error) => console.error('[ProjectsPage] Error loading Change Orders:', error));
     return () => {
@@ -175,6 +201,74 @@ export function ProjectsPage() {
     });
     return Array.from(byName.entries()).map(([name, totals]) => ({ name, ...totals }));
   };
+
+  // A Change Order name can only be registered once across a project's whole family --
+  // merged into a budget (Método 1) or as its own project (Método 2), never both, never
+  // twice. These mirror the backend's authoritative check (see views.py
+  // _resolve_co_family_root/_used_co_names_in_family) for upfront client-side validation.
+  const coSuffixFromNumber = (candidate: string | undefined, parent: Project): string | null => {
+    const base = (parent.projectNumber || parent.name || '').trim();
+    const value = (candidate || '').trim();
+    if (!base || !value) return null;
+    const pattern = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(CO\\d+)$`, 'i');
+    const match = pattern.exec(value);
+    return match ? match[1].toUpperCase() : null;
+  };
+
+  const resolveCoFamilyRoot = (project: Project): Project => {
+    let current = project;
+    const seenIds = new Set<string>();
+    while (current.parentProjectId && !seenIds.has(current.id)) {
+      seenIds.add(current.id);
+      const parent = projects.find((p) => p.id === current.parentProjectId);
+      if (!parent) break;
+      current = parent;
+    }
+    return current;
+  };
+
+  type CoNameClaim = { kind: 'merged' | 'project'; projectId: string };
+
+  const usedCoNamesForProject = (project: Project): Map<string, CoNameClaim> => {
+    const root = resolveCoFamilyRoot(project);
+    const members = [root];
+    const seenIds = new Set([root.id]);
+    let frontier = [root];
+    for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
+      const nextFrontier: Project[] = [];
+      frontier.forEach((member) => {
+        projects.forEach((p) => {
+          if (p.parentProjectId === member.id && !seenIds.has(p.id)) {
+            seenIds.add(p.id);
+            members.push(p);
+            nextFrontier.push(p);
+          }
+        });
+      });
+      frontier = nextFrontier;
+    }
+
+    const used = new Map<string, CoNameClaim>();
+    changeOrders
+      .filter((co) => seenIds.has(co.projectId))
+      .forEach((co) => {
+        const key = co.name.trim().toUpperCase();
+        if (key && !used.has(key)) used.set(key, { kind: 'merged', projectId: co.projectId });
+      });
+    members.forEach((member) => {
+      if (member.id === root.id || !member.parentProjectId) return;
+      const parent = projects.find((p) => p.id === member.parentProjectId);
+      if (!parent) return;
+      const suffix = coSuffixFromNumber(member.projectNumber || member.name, parent);
+      if (suffix && !used.has(suffix)) used.set(suffix, { kind: 'project', projectId: member.id });
+    });
+    return used;
+  };
+
+  const describeCoNameClaim = (claim: CoNameClaim): string =>
+    claim.kind === 'merged'
+      ? (language === 'es' ? 'fusionado en el presupuesto de otro proyecto' : 'merged into another project\'s budget')
+      : (language === 'es' ? 'registrado como proyecto independiente' : 'registered as its own project');
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = projectSearchTerm.trim().toLowerCase();
@@ -270,6 +364,23 @@ export function ProjectsPage() {
       return;
     }
 
+    // Registering this project as a new Change Order (not promoting an existing merged
+    // one) -- block it if its number already claims a CO slot taken elsewhere in the family.
+    if (parentProjectIdForNewProject && !promotingChangeOrder) {
+      const parent = projects.find((p) => p.id === parentProjectIdForNewProject);
+      const suffix = parent ? coSuffixFromNumber(formData.name, parent) : null;
+      const claim = parent && suffix ? usedCoNamesForProject(parent).get(suffix) : undefined;
+      if (claim) {
+        setFormNotice({
+          type: 'warning',
+          message: language === 'es'
+            ? `El Change Order '${suffix}' ya está registrado (${describeCoNameClaim(claim)}). Solo se puede editar, no volver a registrar.`
+            : `Change Order '${suffix}' is already registered (${describeCoNameClaim(claim)}). It can only be edited, not registered again.`,
+        });
+        return;
+      }
+    }
+
     const endDate = calculateEndDate(formData.startDate, numberOfWeeks);
 
     // Build departmentStages from user input
@@ -286,29 +397,39 @@ export function ProjectsPage() {
     const editingProject = editingId ? projects.find((p) => p.id === editingId) : undefined;
 
     DEPARTMENTS.forEach((dept) => {
-      if (deptDurations[dept] > 0) {
-        const departmentStartDate = deptStartDates[dept] || formData.startDate!;
+      const entries: DepartmentStageConfig[] = [];
+
+      getSubphasesForDept(dept).forEach(({ key }) => {
+        const duration = deptDurations[dept]?.[key] || 0;
+        if (duration <= 0) return;
+
+        const departmentStartDate = deptStartDates[dept]?.[key] || formData.startDate!;
+        const stageValue = (key === DEFAULT_PHASE ? null : key) as Stage;
 
         // Preserve the originally saved relative start week when editing.
         // This keeps a stable baseline so CapacityMatrix can show "date shift"
         // as original vs current start date.
-        const existingDeptStage = editingProject?.departmentStages?.[dept]?.[0];
+        const existingDeptStage = editingProject?.departmentStages?.[dept]?.find(
+          (entry) => (entry.stage || null) === stageValue
+        );
         const existingWeekStart = Number(existingDeptStage?.weekStart);
         const hasExistingWeekStart = Number.isFinite(existingWeekStart) && existingWeekStart > 0;
 
         const weekStart = hasExistingWeekStart
           ? existingWeekStart
           : calculateRelativeWeek(departmentStartDate, formData.startDate!, selectedYear);
-        const weekEnd = weekStart + deptDurations[dept] - 1;
+        const weekEnd = weekStart + duration - 1;
 
-        calculatedDepartmentStages[dept] = [{
-          stage: null,
+        entries.push({
+          stage: stageValue,
           weekStart,
           weekEnd,
-          departmentStartDate, // Store the actual start date for this department
-          durationWeeks: deptDurations[dept], // Store the duration for this department
-        }];
-      }
+          departmentStartDate, // Store the actual start date for this sub-phase
+          durationWeeks: duration, // Store the duration for this sub-phase
+        });
+      });
+
+      calculatedDepartmentStages[dept] = entries;
     });
 
     const configuredDepartments = DEPARTMENTS.filter((dept) => {
@@ -334,6 +455,10 @@ export function ProjectsPage() {
         console.log('[ProjectsPage] Updating project with budget hours:', deptHoursAllocated);
         await updateProject(editingId, {
           ...formData,
+          // The "Project" field doubles as the Finance job number (see its "Ej: 3018"
+          // placeholder) -- mirrored into projectNumber so the Finance import can match
+          // this project by that code instead of silently creating an orphan duplicate.
+          projectNumber: formData.name,
           endDate,
           numberOfWeeks,
           projectManagerId: selectedProjectManagerId || undefined,
@@ -349,10 +474,36 @@ export function ProjectsPage() {
           type: 'success',
           message: language === 'es' ? 'Proyecto actualizado exitosamente.' : 'Project updated successfully.',
         });
+      } else if (promotingChangeOrder) {
+        await projectsApi.promoteChangeOrder(promotingChangeOrder.sourceProjectId, promotingChangeOrder.name, {
+          name: formData.name,
+          projectNumber: formData.name,
+          client: formData.client,
+          startDate: formData.startDate,
+          endDate,
+          facility: formData.facility,
+          numberOfWeeks,
+          projectManagerId: selectedProjectManagerId || undefined,
+          parentProjectId: parentProjectIdForNewProject || undefined,
+          isHighProbability: !!formData.isHighProbability,
+          departmentStages: calculatedDepartmentStages,
+          departmentHoursAllocated: deptHoursAllocated,
+          departmentCostAllocated: departmentCostPayload,
+          visibleInDepartments: visibilityScopesForSubmit,
+        });
+        await fetchProjects(true);
+        await reloadChangeOrders();
+        setPromotingChangeOrder(null);
+        setFormNotice({
+          type: 'success',
+          message: language === 'es' ? 'Change Order convertido en proyecto independiente.' : 'Change Order converted into its own project.',
+        });
       } else {
         const newProject: Project = {
           id: generateId(),
           name: formData.name,
+          // See the update branch above for why this mirrors the "Project" field.
+          projectNumber: formData.name,
         client: formData.client,
         startDate: formData.startDate,
         endDate,
@@ -410,12 +561,13 @@ export function ProjectsPage() {
       setFormData({ name: '', client: '', startDate: '', facility: 'AL' });
       setNumberOfWeeks(4);
       setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
-      setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
-      setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+      setDeptStartDates(emptyDeptPhaseDates());
+      setDeptDurations(emptyDeptPhaseDurations());
       setDeptCostAllocated({});
       setShowInGeneral(true);
       setIsFormOpen(false);
       setParentProjectIdForNewProject(null);
+      setPromotingChangeOrder(null);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       console.error('[ProjectsPage] Error saving project:', errorMsg);
@@ -429,6 +581,7 @@ export function ProjectsPage() {
   const handleEditProject = (proj: Project) => {
     if (!hasFullAccess) return;
     setParentProjectIdForNewProject(null);
+    setPromotingChangeOrder(null);
     setFormData(proj);
     setEditingId(proj.id);
     setNumberOfWeeks(proj.numberOfWeeks);
@@ -446,35 +599,33 @@ export function ProjectsPage() {
 
     setHoursPerDept(deptHoursMap);
 
-    // Populate department dates and durations from departmentStages
-    // Initialize with empty strings (no default date)
-    const newDeptStartDates: Record<Department, string> = {
-      PM: '',
-      MED: '',
-      HD: '',
-      MFG: '',
-      BUILD: '',
-      PRG: '',
-      PURCHASING: '',
-    };
-    const newDeptDurations: Record<Department, number> = { PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 };
+    // Populate department dates and durations from departmentStages, one slot per
+    // sub-phase (DEFAULT_PHASE for a department that isn't split into sub-phases).
+    const newDeptStartDates = emptyDeptPhaseDates();
+    const newDeptDurations = emptyDeptPhaseDurations();
 
     if (proj.departmentStages) {
       DEPARTMENTS.forEach((dept) => {
         const stages = proj.departmentStages?.[dept];
-        if (stages && stages.length > 0) {
-          const firstStage = stages[0];
+        if (!stages || stages.length === 0) return;
+
+        getSubphasesForDept(dept).forEach(({ key }, index) => {
+          const stageValue = key === DEFAULT_PHASE ? null : key;
+          let match = stages.find((entry) => (entry.stage || null) === stageValue);
+          if (!match && index === 0 && stageValue !== null) {
+            // Backward-compat: a project saved before this department had named
+            // sub-phases has a single stage=null row -- surface it in the first slot.
+            match = stages.find((entry) => !entry.stage);
+          }
+          if (!match) return;
+
           // Use the saved departmentStartDate if available, otherwise leave empty
-          if (firstStage.departmentStartDate) {
-            newDeptStartDates[dept] = firstStage.departmentStartDate;
+          if (match.departmentStartDate) {
+            newDeptStartDates[dept][key] = match.departmentStartDate;
           }
           // Use the saved durationWeeks if available, otherwise calculate from weekEnd - weekStart
-          if (firstStage.durationWeeks) {
-            newDeptDurations[dept] = firstStage.durationWeeks;
-          } else {
-            newDeptDurations[dept] = firstStage.weekEnd - firstStage.weekStart + 1;
-          }
-        }
+          newDeptDurations[dept][key] = match.durationWeeks || (match.weekEnd - match.weekStart + 1);
+        });
       });
     }
 
@@ -508,34 +659,116 @@ export function ProjectsPage() {
     setFormData({ name: '', client: '', startDate: '', facility: 'AL', isHighProbability: false });
     setNumberOfWeeks(4);
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
-    setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
-    setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptStartDates(emptyDeptPhaseDates());
+    setDeptDurations(emptyDeptPhaseDurations());
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptCostAllocated({});
     setSelectedProjectManagerId(null);
     setShowInGeneral(true);
     setFormNotice(null);
     setParentProjectIdForNewProject(null);
+    setPromotingChangeOrder(null);
   };
 
   // Change Order "Método 2": reuses the create-project form above, pre-filled with the parent's
   // client/facility (convenience, not a shortcut -- every other field still needs filling in)
   // and a parentProjectId that links the two once created.
+  // Suggests the next "{parent}-CO##" job number for a CO registered as its own project,
+  // following the convention the backend already expects project_number to use for Finance
+  // import matching (see ProjectChangeOrder/parent_project docs). Editable afterward -- this
+  // is just a starting point, not enforced.
+  const nextCoProjectNumber = (parentProject: Project): string => {
+    const base = (parentProject.projectNumber || parentProject.name || '').trim();
+    const pattern = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-CO(\\d+)$`, 'i');
+    const usedNumbers = projects
+      .map((p) => pattern.exec(p.name || ''))
+      .filter((m): m is RegExpExecArray => !!m)
+      .map((m) => parseInt(m[1], 10));
+    const next = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+    return `${base}-CO${String(next).padStart(2, '0')}`;
+  };
+
   const openCoAsNewProject = (project: Project) => {
     setCoChooserProjectId(null);
+    setPromotingChangeOrder(null);
     setParentProjectIdForNewProject(project.id);
     setEditingId(null);
-    setFormData({ name: '', client: project.client, startDate: '', facility: project.facility, isHighProbability: false });
+    setFormData({ name: nextCoProjectNumber(project), client: project.client, startDate: '', facility: project.facility, isHighProbability: false });
     setNumberOfWeeks(4);
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
-    setDeptStartDates({ PM: '', MED: '', HD: '', MFG: '', BUILD: '', PRG: '', PURCHASING: '' });
-    setDeptDurations({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptStartDates(emptyDeptPhaseDates());
+    setDeptDurations(emptyDeptPhaseDurations());
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptCostAllocated({});
     setSelectedProjectManagerId(null);
     setShowInGeneral(true);
     setFormNotice(null);
     setIsFormOpen(true);
+  };
+
+  // Promotes a Change Order currently merged into `project`'s budget (Método 1) into its
+  // own linked project (Método 2): opens the same create-project form, pre-filled with the
+  // CO's current hours/$ per department. On submit (handleSubmit), this calls
+  // projectsApi.promoteChangeOrder instead of a plain create, which atomically removes the
+  // merged rows so the CO ends up registered exactly once.
+  const openPromoteChangeOrder = (project: Project, name: string) => {
+    const rows = changeOrdersForProject(project.id).filter((co) => co.name === name);
+    const hours: Record<Department, number> = { PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 };
+    const cost: Partial<Record<Department, string>> = {};
+    rows.forEach((row) => {
+      hours[row.department] = row.hoursQuoted || 0;
+      if (row.costQuoted !== null && row.costQuoted !== undefined) cost[row.department] = String(row.costQuoted);
+    });
+
+    setCoExpandProjectId(null);
+    setCoChooserProjectId(null);
+    setPromotingChangeOrder({ sourceProjectId: project.id, name });
+    setParentProjectIdForNewProject(project.id);
+    setEditingId(null);
+    const base = (project.projectNumber || project.name || '').trim();
+    setFormData({ name: `${base}-${name}`, client: project.client, startDate: '', facility: project.facility, isHighProbability: false });
+    setNumberOfWeeks(4);
+    setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
+    setDeptStartDates(emptyDeptPhaseDates());
+    setDeptDurations(emptyDeptPhaseDurations());
+    setDeptHoursAllocated(hours);
+    setDeptCostAllocated(cost);
+    setSelectedProjectManagerId(null);
+    setShowInGeneral(true);
+    setFormNotice(null);
+    setIsFormOpen(true);
+  };
+
+  // Converts a Change Order registered as its own project back into a merged entry on its
+  // parent -- the inverse of promote. Destructive (migrates assignments/actuals and hides
+  // this project), so it's confirmed before calling the backend.
+  const handleMergeIntoParent = async (project: Project) => {
+    if (!project.parentProjectId) return;
+    const parentName = project.parentProjectName || project.parentProjectId;
+    const confirmMsg = language === 'es'
+      ? `Esto fusionará "${project.name}" de vuelta en el presupuesto de "${parentName}" (horas/$, asignaciones y horas reales se migran) y ocultará este proyecto. ¿Continuar?`
+      : `This will merge "${project.name}" back into "${parentName}"'s budget (hours/$, assignments and actuals are migrated) and hide this project. Continue?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsMergingProjectId(project.id);
+    try {
+      await projectsApi.mergeIntoParent(project.id);
+      await fetchProjects(true);
+      // The merge created new ProjectChangeOrder rows on the parent -- reload from the server.
+      await reloadChangeOrders();
+      setFormNotice({
+        type: 'success',
+        message: language === 'es' ? 'Change Order fusionado con el proyecto principal.' : 'Change Order merged back into the main project.',
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      setFormNotice({
+        type: 'error',
+        message: `${language === 'es' ? 'Error al fusionar' : 'Error merging'}: ${errorMsg}`,
+      });
+    } finally {
+      setIsMergingProjectId(null);
+    }
   };
 
   // Change Order "Método 1": widens an existing project's budget. One CO name can touch
@@ -582,6 +815,24 @@ export function ProjectsPage() {
         message: language === 'es' ? 'Indica un nombre para el Change Order.' : 'Enter a name for the Change Order.',
       });
       return;
+    }
+
+    // A brand-new CO name (not the one already loaded for editing) must not collide with
+    // one already claimed anywhere in this project's family -- renaming the CO currently
+    // being edited to its own name is fine, that's not a new registration.
+    const isNewRegistration = name.toUpperCase() !== (coEditingName || '').toUpperCase();
+    if (isNewRegistration) {
+      const project = projects.find((p) => p.id === coExpandProjectId);
+      const claim = project ? usedCoNamesForProject(project).get(name.toUpperCase()) : undefined;
+      if (claim) {
+        setFormNotice({
+          type: 'warning',
+          message: language === 'es'
+            ? `El Change Order '${name}' ya está registrado (${describeCoNameClaim(claim)}). Solo se puede editar, no volver a registrar.`
+            : `Change Order '${name}' is already registered (${describeCoNameClaim(claim)}). It can only be edited, not registered again.`,
+        });
+        return;
+      }
     }
 
     // Departments with an hours and/or $ value entered -- the ones this CO actually touches.
@@ -668,6 +919,47 @@ export function ProjectsPage() {
       });
     } finally {
       setIsSavingCo(false);
+    }
+  };
+
+  // Moves one department's quoted hours/$ from the CO currently being edited to a
+  // different CO name on the same project (point 3 of the CO conditions: moving between
+  // COs, never between projects).
+  const handleMoveDepartmentToOtherCo = async (dept: Department, targetName: string) => {
+    if (!coExpandProjectId || !coEditingName) return;
+    const row = changeOrders.find(
+      (co) => co.projectId === coExpandProjectId && co.name === coEditingName && co.department === dept
+    );
+    if (!row) return;
+
+    const confirmMsg = language === 'es'
+      ? `¿Mover ${dept} de "${coEditingName}" hacia "${targetName}"?`
+      : `Move ${dept} from "${coEditingName}" to "${targetName}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await changeOrdersApi.moveDepartment(row.id, targetName);
+      await reloadChangeOrders();
+      setCoHoursByDept((prev) => {
+        const next = { ...prev };
+        delete next[dept];
+        return next;
+      });
+      setCoCostByDept((prev) => {
+        const next = { ...prev };
+        delete next[dept];
+        return next;
+      });
+      setFormNotice({
+        type: 'success',
+        message: language === 'es' ? 'Departamento movido a la otra CO.' : 'Department moved to the other CO.',
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      setFormNotice({
+        type: 'error',
+        message: `${language === 'es' ? 'Error al mover' : 'Error moving'}: ${errorMsg}`,
+      });
     }
   };
 
@@ -1039,35 +1331,55 @@ export function ProjectsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {DEPARTMENTS.filter(dept => dept !== 'PM').map((dept) => {
                         const deptInfo = getDepartmentIcon(dept);
+                        const subphases = getSubphasesForDept(dept);
                         return (
                           <div key={dept} className="bg-white p-2.5 rounded-lg border border-indigo-200 flex flex-col gap-2">
                             <div className="flex items-center gap-1.5">
                               <span className={deptInfo.color}>{deptInfo.icon}</span>
                               <span className="font-semibold text-xs text-gray-800">{getDepartmentLabel(dept, t)}</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs font-medium mb-0.5 text-gray-600">{t.startDate}</label>
-                                <WeekNumberDatePicker
-                                  value={deptStartDates[dept]}
-                                  onChange={(date) => setDeptStartDates({ ...deptStartDates, [dept]: date })}
-                                  language={language}
-                                  compact
-                                  className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium mb-0.5 text-gray-600">{t.duration}</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="52"
-                                  value={deptDurations[dept] || ''}
-                                  onChange={(e) => setDeptDurations({ ...deptDurations, [dept]: parseInt(e.target.value) || 0 })}
-                                  className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
-                                  placeholder="0"
-                                />
-                              </div>
+                            <div className="flex flex-col gap-2">
+                              {subphases.map(({ key, label }) => (
+                                <div key={key}>
+                                  {label && (
+                                    <div className="text-[11px] font-semibold text-indigo-600 mb-1">{label}</div>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-xs font-medium mb-0.5 text-gray-600">{t.startDate}</label>
+                                      <WeekNumberDatePicker
+                                        value={deptStartDates[dept]?.[key] || ''}
+                                        onChange={(date) =>
+                                          setDeptStartDates({
+                                            ...deptStartDates,
+                                            [dept]: { ...deptStartDates[dept], [key]: date },
+                                          })
+                                        }
+                                        language={language}
+                                        compact
+                                        className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-0.5 text-gray-600">{t.duration}</label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="52"
+                                        value={deptDurations[dept]?.[key] || ''}
+                                        onChange={(e) =>
+                                          setDeptDurations({
+                                            ...deptDurations,
+                                            [dept]: { ...deptDurations[dept], [key]: parseInt(e.target.value) || 0 },
+                                          })
+                                        }
+                                        className="w-full border border-indigo-200 rounded px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         );
@@ -1188,18 +1500,31 @@ export function ProjectsPage() {
                     </label>
                     <div className="flex flex-wrap gap-1.5">
                       {existingNames.map((co) => (
-                        <button
-                          key={co.name}
-                          type="button"
-                          onClick={() => startEditingCoName(coExpandProjectId, co.name)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
-                            coEditingName === co.name
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {co.name} · {formatHours(co.totalHours)}h
-                        </button>
+                        <div key={co.name} className="inline-flex items-stretch rounded-full border overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => startEditingCoName(coExpandProjectId, co.name)}
+                            className={`px-2.5 py-1 text-xs font-semibold transition border-0 ${
+                              coEditingName === co.name
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {co.name} · {formatHours(co.totalHours)}h
+                          </button>
+                          <button
+                            type="button"
+                            title={language === 'es' ? 'Volver independiente (crear como proyecto nuevo)' : 'Make independent (create as a new project)'}
+                            onClick={() => openPromoteChangeOrder(project, co.name)}
+                            className={`px-1.5 text-xs border-l transition ${
+                              coEditingName === co.name
+                                ? 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <GitBranch size={11} />
+                          </button>
+                        </div>
                       ))}
                       {coEditingName && (
                         <button
@@ -1258,6 +1583,33 @@ export function ProjectsPage() {
                             className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400"
                           />
                         </div>
+                        {coEditingName && changeOrders.some(
+                          (co) => co.projectId === coExpandProjectId && co.name === coEditingName && co.department === dept
+                        ) && (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              e.target.value = '';
+                              if (!value) return;
+                              if (value === '__new__') {
+                                const typed = window.prompt(language === 'es' ? 'Nombre de la nueva CO' : 'New CO name');
+                                if (typed && typed.trim()) handleMoveDepartmentToOtherCo(dept, typed.trim());
+                              } else {
+                                handleMoveDepartmentToOtherCo(dept, value);
+                              }
+                            }}
+                            className="w-full mt-1 border border-gray-200 rounded px-1 py-0.5 text-[10px] text-gray-500 bg-white"
+                          >
+                            <option value="">{language === 'es' ? 'Mover a otra CO...' : 'Move to another CO...'}</option>
+                            {changeOrderNamesForProject(coExpandProjectId!)
+                              .filter((co) => co.name !== coEditingName)
+                              .map((co) => (
+                                <option key={co.name} value={co.name}>{co.name}</option>
+                              ))}
+                            <option value="__new__">+ {language === 'es' ? 'Nueva CO' : 'New CO'}</option>
+                          </select>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1394,6 +1746,20 @@ export function ProjectsPage() {
                       >
                         <ClipboardList size={18} />
                       </button>
+                      {proj.parentProjectId && (
+                        <button
+                          onClick={() => hasFullAccess && handleMergeIntoParent(proj)}
+                          disabled={!hasFullAccess || isMergingProjectId === proj.id}
+                          className={`project-action-btn p-2 rounded-lg transition transform shadow-sm ${
+                            hasFullAccess
+                              ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:scale-110 disabled:opacity-60'
+                              : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                          }`}
+                          title={language === 'es' ? 'Fusionar con el proyecto principal' : 'Merge back into the main project'}
+                        >
+                          <GitBranch size={18} className="rotate-180" />
+                        </button>
+                      )}
                       <button
                         onClick={async () => {
                           if (!hasFullAccess) return;

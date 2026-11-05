@@ -1,5 +1,5 @@
 import { useLanguage } from '../context/LanguageContext';
-import { BookOpen, Briefcase, Grid3x3, FileText, Shield, Key, Eye, Edit3, UserCheck, Lock } from 'lucide-react';
+import { BookOpen, Briefcase, Grid3x3, FileText, Shield, Key, Eye, Edit3, UserCheck, Lock, DollarSign, FileSpreadsheet } from 'lucide-react';
 
 type RoleCard = {
   title: string;
@@ -124,6 +124,12 @@ const WINDOWS: WindowCard[] = [
       'Zoom in/out con los botones +/-',
       'Click en una celda para editar/agregar horas de asignación',
       'Arrastrar celdas para copiar horas entre semanas (si el proyecto tiene etapas configuradas)',
+      'En departamentos con etapas (HD, MED, BUILD, PRG): varias fases distintas en la misma celda/semana con el botón "+ Agregar" dentro del modal de edición, cada una con su propio reparto de horas',
+      'Dividir la actividad de una fase en varias semanas consecutivas, con reparto equitativo o manual por semana (y por persona, si hay 2 o más seleccionadas)',
+      'Botón "Mover semanas" (dentro del modal de edición): mueve o combina las horas de una o varias semanas hacia una semana destino; permite fusionar o sobrescribir si el destino ya tiene datos',
+      'Botones "+ / − Personal" y "+ / − Personal Externo" en el panel del departamento: registran altas y bajas de personal interno (SCIO) y de proveedores externos/subcontratados a partir de una fecha (recalculan la capacidad semanal automáticamente)',
+      'Botón "$ Rates": define la tarifa por hora de cada proveedor externo/subcontratado, por fase/actividad, con historial de cambios (la fecha de vigencia puede ser retroactiva)',
+      'El resumen Qtd/Used/Fcst de cada proyecto muestra también el costo en $ estimado: horas internas a la tarifa general del departamento, horas de cada proveedor externo a su propia tarifa por fase',
       'Panel Global: resumen de capacidad por departamento con colores de utilización',
       'Exportación a Excel y PDF',
       'Vista móvil adaptada para pantallas pequeñas',
@@ -138,6 +144,12 @@ const WINDOWS: WindowCard[] = [
       'Zoom in/out with +/- buttons',
       'Click a cell to edit/add assignment hours',
       'Drag cells to copy hours between weeks (if project has stages configured)',
+      'Departments with stages (HD, MED, BUILD, PRG): multiple distinct stages in the same cell/week via the "+ Add" button inside the edit modal, each with its own hour breakdown',
+      'Split one stage\'s activity across several consecutive weeks, evenly or manually per week (and per person, once 2 or more are selected)',
+      '"Move weeks" button (inside the edit modal): moves or combines one or more weeks\' hours into a destination week; supports merging or overwriting when the destination already has data',
+      '"+ / − Staff" and "+ / − External Staff" buttons in the department panel: log hires/departures for internal (SCIO) staff and external/subcontracted providers effective from a date (weekly capacity recalculates automatically)',
+      '"$ Rates" button: sets each external/subcontracted provider\'s hourly rate, per stage/activity, with a change history (the effective date can be backdated)',
+      'Each project\'s Qtd/Used/Fcst summary also shows an estimated $ cost: internal hours at the department\'s flat rate, each external provider\'s hours at their own per-stage rate',
       'Global Panel: department capacity summary with utilization colors',
       'Export to Excel and PDF',
       'Mobile view adapted for small screens',
@@ -151,17 +163,18 @@ const WINDOWS: WindowCard[] = [
     title: 'Proyectos',
     titleEn: 'Projects',
     icon: <Briefcase size={18} />,
-    description: 'Gestión completa del ciclo de vida de proyectos. Permite crear, editar, importar y eliminar proyectos, configurar presupuestos por departamento, etapas, change orders, y visualizar métricas de utilización.',
-    descriptionEn: 'Complete project lifecycle management. Allows creating, editing, importing and deleting projects, configuring department budgets, stages, change orders, and viewing utilization metrics.',
+    description: 'Gestión completa del ciclo de vida de proyectos. Permite crear, editar, importar y eliminar proyectos, configurar presupuestos por departamento, etapas, Change Orders, y visualizar métricas de utilización.',
+    descriptionEn: 'Complete project lifecycle management. Allows creating, editing, importing and deleting projects, configuring department budgets, stages, Change Orders, and viewing utilization metrics.',
     features: [
       'Crear proyecto nuevo: nombre, cliente, fechas inicio/fin, facility, project manager',
-      'Configurar presupuesto de horas por departamento (horas cotizadas)',
+      'Configurar presupuesto de horas por departamento (horas cotizadas) y el monto cotizado en $',
       'Configurar etapas (stages) por departamento con fechas de inicio y duración',
       'Marcar proyecto como "alta probabilidad" para priorización visual',
       'Importar proyecto existente (hereda configuración de stages y presupuesto)',
       'Editar proyecto: modificar datos, stages, presupuestos',
+      'Cerrar/reabrir proyecto (solo cambia su estado; sigue visible y conserva su historial)',
       'Eliminar proyecto (soft-delete: se oculta pero conserva datos históricos)',
-      'Gestión de Change Orders por departamento con horas cotizadas',
+      'Botón "CO" en la columna de Acciones: registra un Change Order de dos formas — (1) "Ampliar presupuesto": agrega horas y $ a uno o más departamentos del proyecto ya existente, identificado por un nombre (p. ej. CO01), editable después; (2) "Registrar como proyecto nuevo": crea un proyecto completo (fechas, horas, $) vinculado al original, mostrado en la tabla con la etiqueta "CO de [proyecto]"',
       'Asignar Project Manager desde lista de empleados',
       'Filtro de visibilidad: elegir en qué departamentos se muestra el proyecto (General o específicos)',
       'Filtro de búsqueda por nombre, cliente o PM',
@@ -170,13 +183,14 @@ const WINDOWS: WindowCard[] = [
     ],
     featuresEn: [
       'Create new project: name, client, start/end dates, facility, project manager',
-      'Configure department hour budget (quoted hours)',
+      'Configure department hour budget (quoted hours) and the quoted $ amount',
       'Configure department stages with start dates and duration',
       'Mark project as "high probability" for visual prioritization',
       'Import existing project (inherits stage and budget configuration)',
       'Edit project: modify data, stages, budgets',
+      'Close/reopen a project (only changes its status; it stays visible and keeps its history)',
       'Delete project (soft-delete: hidden but preserves historical data)',
-      'Change Orders management by department with quoted hours',
+      '"CO" button in the Actions column: registers a Change Order two ways — (1) "Expand budget": adds hours and $ to one or more departments of the existing project, identified by a name (e.g. CO01), editable later; (2) "Register as a new project": creates a full project (dates, hours, $) linked back to the original, shown in the table with a "CO of [project]" tag',
       'Assign Project Manager from employee list',
       'Visibility filter: choose which departments see the project (General or specific)',
       'Search filter by name, client or PM',
@@ -234,15 +248,59 @@ const WINDOWS: WindowCard[] = [
       'Visible only for users with OTHER + BUSINESS_INTELLIGENCE role',
     ],
   },
+  {
+    title: 'Costo por Hora por Departamento',
+    titleEn: 'Department Hourly Cost',
+    icon: <DollarSign size={18} />,
+    description: 'Panel exclusivo para PM/Business Intelligence donde se define la tarifa general en $/hora de cada departamento, usada para estimar el costo de las horas internas en los resúmenes de proyecto.',
+    descriptionEn: 'Exclusive panel for PM/Business Intelligence to set each department\'s flat $/hour rate, used to estimate internal hours\' cost in project summaries.',
+    features: [
+      'Una casilla de $/hora por departamento (PM, MED, HD, MFG, BUILD, PRG, PURCHASING)',
+      'Los cambios no se guardan al escribir: quedan marcados como "sin guardar" hasta presionar "Guardar cambios"',
+      'Solo se envían al servidor los departamentos realmente modificados',
+      'Cada casilla muestra quién hizo el último cambio y cuándo',
+      'No afecta el costo de proveedores externos/subcontratados (esos usan su propia tarifa, ver "$ Rates" en la Matriz de Capacidad)',
+      'Visible solo para usuarios con acceso total (PM o Business Intelligence)',
+    ],
+    featuresEn: [
+      'One $/hour box per department (PM, MED, HD, MFG, BUILD, PRG, PURCHASING)',
+      'Changes are not saved as you type: fields are marked "unsaved" until you press "Save changes"',
+      'Only the departments actually changed are sent to the server',
+      'Each box shows who last changed it and when',
+      'Does not affect external/subcontracted provider cost (those use their own rate, see "$ Rates" in the Capacity Matrix)',
+      'Visible only to full-access users (PM or Business Intelligence)',
+    ],
+  },
+  {
+    title: 'Importación de Finanzas',
+    titleEn: 'Finance Import',
+    icon: <FileSpreadsheet size={18} />,
+    description: 'Panel exclusivo para administradores que carga el reporte acumulado de horas reales (actuals) de Finanzas, para rellenar las semanas pasadas con datos reales en vez de pronósticos manuales.',
+    descriptionEn: 'Admin-only panel that uploads Finance\'s cumulative actual-hours report, backfilling past weeks with real data instead of manual forecasts.',
+    features: [
+      'Selecciona un archivo .xlsx/.xls del reporte de Finanzas y lo procesa',
+      'Al terminar, muestra cuántas semanas se escribieron, qué proyectos nuevos se crearon, y advertencias si las hubo',
+      'Historial permanente de importaciones: fecha, archivo, quién lo subió, semanas escritas y proyectos creados',
+      'Las semanas anteriores a la actual quedan bloqueadas para edición manual en la Matriz de Capacidad; solo se actualizan por esta vía',
+      'Visible solo para usuarios con acceso total',
+    ],
+    featuresEn: [
+      'Pick an .xlsx/.xls Finance report file and process it',
+      'On completion, shows how many weeks were written, which new projects were created, and any warnings',
+      'Permanent import history: date, file name, uploader, weeks written and projects created',
+      'Weeks before the current one become locked to manual editing in the Capacity Matrix; they only update through this import',
+      'Visible only to full-access users',
+    ],
+  },
 ];
 
 const DEPARTMENT_INFO = [
   { code: 'PM', name: 'Project Manager', nameEn: 'Project Manager', desc: 'Gestión de proyectos, planificación y coordinación.', descEn: 'Project management, planning and coordination.' },
-  { code: 'MED', name: 'Mechanical Design', nameEn: 'Mechanical Design', desc: 'Diseño mecánico: etapas Concept y Detail Design.', descEn: 'Mechanical design: Concept and Detail Design stages.' },
-  { code: 'HD', name: 'Hardware Design', nameEn: 'Hardware Design', desc: 'Diseño de hardware: etapas Switch Layout Revision y Controls Design.', descEn: 'Hardware design: Switch Layout Revision and Controls Design stages.' },
-  { code: 'MFG', name: 'Manufacturing', nameEn: 'Manufacturing', desc: 'Manufactura. Puede editar BUILD y viceversa. No tiene etapas específicas.', descEn: 'Manufacturing. Can edit BUILD and vice versa. No specific stages.' },
-  { code: 'BUILD', name: 'Assembly', nameEn: 'Assembly', desc: 'Ensamblaje: etapas Cabinets/Frames, Overall Assembly, Fine Tuning, Commissioning. Soporta equipos subcontratados.', descEn: 'Assembly: Cabinets/Frames, Overall Assembly, Fine Tuning, Commissioning stages. Supports subcontracted teams.' },
-  { code: 'PRG', name: 'Programming PLC', nameEn: 'Programming PLC', desc: 'Programación PLC: etapas Offline, Online, Debug, Commissioning. Soporta equipos externos.', descEn: 'PLC Programming: Offline, Online, Debug, Commissioning stages. Supports external teams.' },
+  { code: 'MED', name: 'Mechanical Design', nameEn: 'Mechanical Design', desc: 'Diseño mecánico: etapas Concept y Detail Design. Admite equipos externos y varias fases por semana.', descEn: 'Mechanical design: Concept and Detail Design stages. Supports external teams and multiple stages per week.' },
+  { code: 'HD', name: 'Hardware Design', nameEn: 'Hardware Design', desc: 'Diseño de hardware: etapas Switch Layout Revision y Controls Design. Admite equipos externos y varias fases por semana.', descEn: 'Hardware design: Switch Layout Revision and Controls Design stages. Supports external teams and multiple stages per week.' },
+  { code: 'MFG', name: 'Manufacturing', nameEn: 'Manufacturing', desc: 'Manufactura. Puede editar BUILD y viceversa. No tiene etapas específicas, pero sí admite equipos externos.', descEn: 'Manufacturing. Can edit BUILD and vice versa. No specific stages, but does support external teams.' },
+  { code: 'BUILD', name: 'Assembly', nameEn: 'Assembly', desc: 'Ensamblaje: etapas Cabinets/Frames, Overall Assembly, Fine Tuning, Commissioning. Soporta equipos subcontratados (con tarifa propia por fase) y varias fases por semana.', descEn: 'Assembly: Cabinets/Frames, Overall Assembly, Fine Tuning, Commissioning stages. Supports subcontracted teams (with their own per-stage rate) and multiple stages per week.' },
+  { code: 'PRG', name: 'Programming PLC', nameEn: 'Programming PLC', desc: 'Programación PLC: etapas Offline, Online, Debug, Commissioning. Soporta equipos externos (con tarifa propia por fase) y varias fases por semana.', descEn: 'PLC Programming: Offline, Online, Debug, Commissioning stages. Supports external teams (with their own per-stage rate) and multiple stages per week.' },
 ];
 
 const OTHER_DEPARTMENTS = [
@@ -275,8 +333,8 @@ const CONCEPTS = [
   {
     title: 'Change Order (ProjectChangeOrder)',
     titleEn: 'Change Order',
-    desc: 'Órdenes de cambio que agregan horas cotizadas adicionales a un proyecto por departamento. Las asignaciones pueden vincularse a un Change Order específico.',
-    descEn: 'Change orders adding additional quoted hours to a project per department. Assignments can be linked to a specific Change Order.',
+    desc: 'Se registra desde "Proyectos" (botón CO), de dos formas: ampliando el presupuesto de horas/$ de un proyecto existente (un registro con nombre, p. ej. CO01, por cada departamento que toca) o como un proyecto nuevo completo vinculado al original. Ya no se vincula a horas individuales en la Matriz de Capacidad: solo amplía el presupuesto disponible del departamento.',
+    descEn: 'Registered from "Projects" (CO button), two ways: expanding an existing project\'s hours/$ budget (a named record, e.g. CO01, per department it touches) or as a brand-new project linked to the original. No longer linked to individual hours in the Capacity Matrix: it only widens the department\'s available budget.',
   },
   {
     title: 'SCIO Team Capacity',
@@ -291,10 +349,22 @@ const CONCEPTS = [
     descEn: 'Subcontracted personnel by company (AMI, VICER, ITAX, MCI, MG Electrical) and week for the BUILD department.',
   },
   {
-    title: 'PRG External Team Capacity',
-    titleEn: 'PRG External Team Capacity',
-    desc: 'Equipos externos de programación PLC por nombre de equipo y semana para el departamento PRG.',
-    descEn: 'External PLC programming teams by team name and week for the PRG department.',
+    title: 'Equipos Externos (MED, HD, MFG, PRG)',
+    titleEn: 'External Teams (MED, HD, MFG, PRG)',
+    desc: 'Personal de proveedores externos por nombre de equipo y semana, disponible en MED, HD, MFG y PRG (BUILD usa su propio sistema de subcontratados). Las altas/bajas se registran con el botón "+ / − Personal Externo" en la Matriz de Capacidad.',
+    descEn: 'External provider personnel by team name and week, available in MED, HD, MFG and PRG (BUILD uses its own subcontracted-team system). Hires/departures are logged with the "+ / − External Staff" button in the Capacity Matrix.',
+  },
+  {
+    title: 'Tarifa de Proveedor Externo (ExternalProviderRate)',
+    titleEn: 'External Provider Rate',
+    desc: 'Tarifa en $/hora de un proveedor externo o subcontratado, registrada por departamento y, si el departamento tiene etapas, por fase/actividad (puede ser distinta por fase). Puede cambiar con el tiempo: cada cambio queda guardado con su propia fecha de vigencia (que puede ser retroactiva), sin borrar el historial. Se administra con el botón "$ Rates" en la Matriz de Capacidad, y se usa para calcular el costo en $ de las horas externas en el resumen de proyectos.',
+    descEn: 'An external/subcontracted provider\'s $/hour rate, registered per department and, when the department has stages, per stage/activity (it can differ by stage). It can change over time: each change is saved with its own effective date (which can be backdated), without erasing history. Managed with the "$ Rates" button in the Capacity Matrix, and used to compute external hours\' $ cost in project summaries.',
+  },
+  {
+    title: 'Mover Semanas',
+    titleEn: 'Move Weeks',
+    desc: 'Herramienta dentro del modal de edición de celda que mueve o combina las horas registradas de una o varias semanas hacia una semana destino distinta. Permite elegir si se mueve toda la celda o solo una fase/persona específica, y si al llegar a una semana que ya tiene datos se deben sumar (fusionar) o reemplazar (sobrescribir).',
+    descEn: 'A tool inside the cell edit modal that moves or combines registered hours from one or more weeks into a different destination week. Lets you choose whether to move the whole cell or just one specific stage/person, and whether landing on a week that already has data should add (merge) or replace (overwrite) it.',
   },
 ];
 
@@ -302,6 +372,151 @@ const FACILITIES = [
   { code: 'AL', name: 'Facility A', nameEn: 'Facility A' },
   { code: 'MI', name: 'Facility B', nameEn: 'Facility B' },
   { code: 'MX', name: 'Facility C', nameEn: 'Facility C' },
+];
+
+type HowToGuide = {
+  title: string;
+  titleEn: string;
+  note?: string;
+  noteEn?: string;
+  steps: { es: string; en: string }[];
+};
+
+const HOW_TO_GUIDES: HowToGuide[] = [
+  {
+    title: 'Cargar horas en un proyecto',
+    titleEn: 'Load hours into a project',
+    steps: [
+      {
+        es: 'En la Matriz de Capacidad, selecciona el departamento y localiza la celda del proyecto y la semana donde quieres registrar horas.',
+        en: 'In the Capacity Matrix, select the department and find the project/week cell where you want to register hours.',
+      },
+      {
+        es: 'Haz doble clic en la celda para abrir el modal "Edit Assignment".',
+        en: 'Double-click the cell to open the "Edit Assignment" modal.',
+      },
+      {
+        es: 'Si el departamento tiene fases (HD, MED, BUILD, PRG): elige la fase e ingresa las horas (en BUILD/PRG se separan en SCIO Hours y Horas Externas). Usa "+ Agregar" si necesitas registrar más de una fase en esa misma semana.',
+        en: 'If the department has stages (HD, MED, BUILD, PRG): pick the stage and enter the hours (BUILD/PRG split into SCIO Hours and External Hours). Use "+ Add" if you need more than one stage in that same week.',
+      },
+      {
+        es: 'Si la actividad abarca varias semanas, usa "Dividir en semanas" para repartir las horas de forma equitativa o manual entre las semanas siguientes.',
+        en: 'If the activity spans several weeks, use "Split across weeks" to divide the hours evenly or manually across the following weeks.',
+      },
+      {
+        es: 'En "Available Resources" selecciona a la(s) persona(s) que harán el trabajo (ver tarea siguiente para repartir entre varias).',
+        en: 'In "Available Resources" select the person/people doing the work (see the next task for splitting across several).',
+      },
+      {
+        es: 'Presiona "Save". Las semanas anteriores a la actual aparecen bloqueadas (datos reales de Finanzas) y solo permiten cambiar la fase, no las horas.',
+        en: 'Press "Save". Weeks before the current one appear locked (real Finance data) and only let you relabel the stage, not the hours.',
+      },
+    ],
+  },
+  {
+    title: 'Asignar horas a una o varias personas',
+    titleEn: 'Assign hours to one or several people',
+    steps: [
+      {
+        es: 'Dentro del modal "Edit Assignment", la lista "Available Resources" incluye tanto personal interno como proveedores externos ya dados de alta (marcados "Interno" / "Externo").',
+        en: 'Inside the "Edit Assignment" modal, the "Available Resources" list includes both internal staff and already-registered external providers (tagged "Interno" / "Externo").',
+      },
+      {
+        es: 'Marca la casilla de cada persona que participará. Con una sola persona seleccionada, todas las horas de esa fase se le asignan a ella.',
+        en: 'Check the box for each person involved. With a single person selected, all of that stage\'s hours go to them.',
+      },
+      {
+        es: 'Con 2 o más personas seleccionadas en el mismo grupo (interno o externo), aparece una cuadrícula con una columna por persona y una fila por semana: ahí se define cuántas horas le tocan a cada quien, cada semana.',
+        en: 'With 2 or more people selected in the same pool (internal or external), a grid appears with one column per person and one row per week: that\'s where you set how many hours go to each person, each week.',
+      },
+      {
+        es: 'Esa cuadrícula se puede repartir de forma equitativa (automática) o manual (editando cada celda); el total siempre debe coincidir con las horas capturadas para esa fase.',
+        en: 'That grid can be split evenly (automatic) or manually (editing each cell); the total always has to match the hours captured for that stage.',
+      },
+      {
+        es: 'No se puede guardar sin al menos una persona seleccionada: el botón "Save" queda deshabilitado hasta elegir un recurso.',
+        en: 'You can\'t save without at least one person selected: the "Save" button stays disabled until a resource is chosen.',
+      },
+    ],
+  },
+  {
+    title: 'Agregar un proveedor externo nuevo',
+    titleEn: 'Add a new external provider',
+    note: 'Disponible en BUILD (botón propio) y en MED, HD, MFG, PRG.',
+    noteEn: 'Available in BUILD (its own button) and in MED, HD, MFG, PRG.',
+    steps: [
+      {
+        es: 'En la Matriz de Capacidad, con el departamento seleccionado, haz clic en "+ Externo" en el encabezado del panel del departamento.',
+        en: 'In the Capacity Matrix, with the department selected, click "+ External" in the department panel header.',
+      },
+      {
+        es: 'Escribe el nombre del proveedor (ej. "AMI") y, opcionalmente, cuánto personal tiene disponible desde ya.',
+        en: 'Type the provider\'s name (e.g. "AMI") and, optionally, how much staff it already has available.',
+      },
+      {
+        es: 'Ingresa la tarifa por hora ($/hr) para cada fase del departamento — es obligatorio capturar un valor en cada una antes de poder guardar (en departamentos sin fases, como MFG, es una sola tarifa general).',
+        en: 'Enter the hourly rate ($/hr) for each of the department\'s stages — a value is required in every one before you can save (departments with no stages, like MFG, just get one flat rate).',
+      },
+      {
+        es: 'Al guardar, el proveedor queda registrado con su capacidad inicial y sus tarifas, y ya aparece seleccionable (etiqueta "Externo") en el modal de asignar horas de ese departamento.',
+        en: 'On save, the provider is registered with its initial capacity and rates, and immediately becomes selectable (tagged "External") in that department\'s hour-assignment modal.',
+      },
+    ],
+  },
+  {
+    title: 'Dar de alta o baja personal, interno y externo',
+    titleEn: 'Add or remove staff, internal and external',
+    note: 'Las personas (empleados individuales) se crean desde el panel de administración del backend. Lo que se gestiona aquí es el conteo de personal disponible por semana.',
+    noteEn: 'Individual employee records are created from the backend admin panel. What\'s managed here is the headcount available per week.',
+    steps: [
+      {
+        es: 'Personal interno (SCIO): botón "+ / − Personal" en el panel del departamento. Indica la fecha de vigencia (puede ser una fecha pasada, para corregir el historial), el cambio (p. ej. +1 para una contratación, -2 para dos bajas) y un comentario opcional.',
+        en: 'Internal (SCIO) staff: "+ / − Staff" button in the department panel. Enter the effective date (can be a past date, to correct history), the change (e.g. +1 for a hire, -2 for two departures) and an optional comment.',
+      },
+      {
+        es: 'Personal externo: botón "+ / − Personal Externo". Elige primero el proveedor ya registrado, luego la fecha de vigencia (aquí no puede ser anterior a la semana actual) y el cambio de personal.',
+        en: 'External staff: "+ / − External Staff" button. First pick the already-registered provider, then the effective date (here it can\'t be before the current week) and the staff change.',
+      },
+      {
+        es: 'En ambos casos la capacidad semanal se recalcula automáticamente hacia adelante a partir de ese cambio; no hay que editar semana por semana.',
+        en: 'In both cases, weekly capacity is automatically recalculated forward from that change; there\'s no need to edit week by week.',
+      },
+      {
+        es: 'El historial de cada ledger se puede revisar (y un movimiento se puede borrar si fue un error) dentro del mismo modal.',
+        en: 'Each ledger\'s history can be reviewed (and a mistaken entry deleted) inside that same modal.',
+      },
+    ],
+  },
+  {
+    title: 'Mover información de una semana a otra',
+    titleEn: 'Move information from one week to another',
+    steps: [
+      {
+        es: 'Abre el modal de edición (doble clic) en cualquier semana del proyecto/departamento que ya tenga horas registradas, y haz clic en "Mover semanas".',
+        en: 'Open the edit modal (double-click) on any week of the project/department that already has hours registered, then click "Move weeks".',
+      },
+      {
+        es: 'Elige el alcance: toda la celda, o filtra por una fase y/o persona específica si solo quieres mover parte de lo registrado.',
+        en: 'Pick the scope: the whole cell, or filter to a specific stage and/or person if you only want to move part of what\'s registered.',
+      },
+      {
+        es: 'Marca en la lista las semanas de origen que quieres mover.',
+        en: 'Check the source weeks you want to move in the list.',
+      },
+      {
+        es: 'Define la semana destino para la primera marcada; las demás se autocompletan con el mismo desfase (ej. mover 35→40 hace que 36 se sugiera en 41), pero cada una se puede ajustar por separado para combinar varias semanas en un mismo destino.',
+        en: 'Set the destination week for the first one checked; the rest auto-fill with the same offset (e.g. moving 35→40 suggests 36→41), but each one can still be adjusted individually to combine several weeks into one destination.',
+      },
+      {
+        es: 'Presiona "Continuar". Si alguna semana destino ya tiene datos que coinciden (misma persona y fase), se muestra el conflicto y eliges "Combinar" (sumar horas) o "Sobrescribir".',
+        en: 'Press "Continue". If a destination week already has matching data (same person and stage), the conflict is shown and you choose "Merge" (add hours) or "Overwrite".',
+      },
+      {
+        es: 'Confirma el movimiento: las semanas de origen quedan vacías y las horas aparecen en la(s) semana(s) destino.',
+        en: 'Confirm the move: the source weeks are left empty and the hours appear in the destination week(s).',
+      },
+    ],
+  },
 ];
 
 export function GuidePage() {
@@ -548,6 +763,38 @@ export function GuidePage() {
           </div>
         </section>
 
+        {/* Section: Tareas comunes paso a paso */}
+        <section>
+          <h2 className="text-sm font-bold text-[#2e1a47] uppercase tracking-wide mb-3 flex items-center gap-2">
+            <Edit3 size={16} />
+            {l('Tareas Comunes Paso a Paso', 'Common Tasks Step-by-Step')}
+          </h2>
+          <div className="space-y-4">
+            {HOW_TO_GUIDES.map((guide, i) => (
+              <div key={i} className="bg-white border border-[#e5e0eb] rounded-lg overflow-hidden">
+                <div className="p-3 bg-[#faf8fc] border-b border-[#e5e0eb]">
+                  <span className="font-semibold text-sm text-[#2e1a47]">{l(guide.title, guide.titleEn)}</span>
+                  {guide.note && (
+                    <p className="text-[11px] text-[#6c6480] mt-1">{l(guide.note, guide.noteEn || guide.note)}</p>
+                  )}
+                </div>
+                <div className="p-3">
+                  <ol className="space-y-2.5">
+                    {guide.steps.map((step, j) => (
+                      <li key={j} className="flex items-start gap-3 text-xs text-[#4a4458]">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#ece6f5] text-[#2e1a47] text-[10px] font-bold flex items-center justify-center">
+                          {j + 1}
+                        </span>
+                        <span className="pt-0.5 leading-relaxed">{l(step.es, step.en)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Section: Sesiones */}
         <section>
           <h2 className="text-sm font-bold text-[#2e1a47] uppercase tracking-wide mb-3">
@@ -571,8 +818,8 @@ export function GuidePage() {
 
         <div className="text-center text-[10px] text-[#9ca3af] pt-4 border-t">
           {l(
-            'Capacity Planner v1.1 — Documentación generada automáticamente a partir del análisis del código fuente.',
-            'Capacity Planner v1.1 — Documentation automatically generated from source code analysis.'
+            'Capacity Planner v1.2 — Documentación generada automáticamente a partir del análisis del código fuente.',
+            'Capacity Planner v1.2 — Documentation automatically generated from source code analysis.'
           )}
         </div>
       </div>

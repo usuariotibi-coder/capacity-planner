@@ -108,6 +108,54 @@ class ProjectSoftDeleteTests(APITestCase):
         self.assertIn(str(self.assignment.id), all_ids)
 
 
+class ProjectCloseReopenTests(APITestCase):
+    """
+    get_queryset()'s `is_closed=False` default filter is meant for the LIST action (hide
+    closed projects from the table by default) -- it must NOT also apply to retrieve/update/
+    destroy, or a closed project's own detail lookup 404s on any write that doesn't pass
+    include_closed=true (which is every PATCH the frontend sends -- no query params on
+    /projects/{id}/), making it impossible to ever reopen, edit, or delete a closed project.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='close-reopen-admin', password='test-password', is_staff=True)
+        self.client.force_authenticate(user=self.user)
+        self.project = Project.objects.create(
+            name='Close Reopen Project',
+            client='Internal',
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=28),
+            facility=Facility.MX,
+            number_of_weeks=4,
+            is_closed=True,
+        )
+
+    def test_can_reopen_a_closed_project_without_include_closed_param(self):
+        response = self.client.patch(
+            reverse('project-detail', args=[self.project.id]),
+            {'is_closed': False},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.project.refresh_from_db()
+        self.assertFalse(self.project.is_closed)
+
+    def test_can_retrieve_a_closed_project_directly_by_id(self):
+        response = self.client.get(reverse('project-detail', args=[self.project.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_closed_projects_still_excluded_from_default_list(self):
+        response = self.client.get(reverse('project-list'))
+        ids = {str(item['id']) for item in self._extract_results(response)}
+        self.assertNotIn(str(self.project.id), ids)
+
+    @staticmethod
+    def _extract_results(response):
+        if isinstance(response.data, dict) and 'results' in response.data:
+            return response.data['results']
+        return response.data
+
+
 class ProjectDepartmentPermissionTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(

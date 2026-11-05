@@ -65,6 +65,7 @@ class Stage(models.TextChoices):
     DETAIL_DESIGN = 'DETAIL_DESIGN', 'Detail Design'
 
     # BUILD Stages
+    ASSEMBLY = 'ASSEMBLY', 'Assembly'
     CABINETS_FRAMES = 'CABINETS_FRAMES', 'Cabinets/Frames'
     OVERALL_ASSEMBLY = 'OVERALL_ASSEMBLY', 'Overall Assembly'
     FINE_TUNING = 'FINE_TUNING', 'Fine Tuning'
@@ -194,10 +195,10 @@ class DepartmentStageConfig(models.Model):
 
     class Meta:
         ordering = ['project', 'department', 'week_start']
-        unique_together = ['project', 'department']
+        unique_together = ['project', 'department', 'stage']
 
     def __str__(self):
-        return f"{self.project.name} - {self.department}"
+        return f"{self.project.name} - {self.department}" + (f" ({self.stage})" if self.stage else "")
 
 
 class Assignment(models.Model):

@@ -22,12 +22,13 @@ Version: 1.1.0 - Added upsert support for team capacity endpoints
 from datetime import datetime, timedelta
 from functools import reduce
 from operator import or_
+import re
 import uuid
 import logging
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import (
     Q, Sum, Count, F, Value, Case, When, CharField, FloatField,
     Avg, Max, Min, ExpressionWrapper, Prefetch
@@ -194,6 +195,82 @@ def _can_edit_department(user, department_code):
     if user_department in shared_departments and department_code in shared_departments:
         return True
     return user_department == department_code
+
+
+CO_SUFFIX_RE = re.compile(r'-(CO\d+)$', re.IGNORECASE)
+
+
+def _co_suffix_from_number(candidate, parent):
+    """
+    If `candidate` (a project_number/name) follows the "{parent}-CO##" naming
+    convention relative to `parent`, return the normalized "CO##" suffix;
+    otherwise None. Mirrors the frontend's nextCoProjectNumber() pattern.
+    """
+    base = (parent.project_number or parent.name or '').strip()
+    candidate = (candidate or '').strip()
+    if not base or not candidate:
+        return None
+    pattern = re.compile(rf'^{re.escape(base)}-(CO\d+)$', re.IGNORECASE)
+    match = pattern.match(candidate)
+    return match.group(1).upper() if match else None
+
+
+def _resolve_co_family_root(project):
+    """Walk parent_project pointers up to the ultimate root project of a CO family."""
+    seen_ids = set()
+    current = project
+    while current.parent_project_id and current.id not in seen_ids:
+        seen_ids.add(current.id)
+        current = current.parent_project
+    return current
+
+
+def _resolve_co_family_members(root):
+    """
+    BFS over the parent_project reverse relation from `root`, depth-limited --
+    covers the normal case (direct CO-as-project children of root) and any
+    unusual deeper nesting without risking an unbounded query.
+    """
+    members = {root.id: root}
+    frontier = [root]
+    for _ in range(5):
+        if not frontier:
+            break
+        next_frontier = []
+        for proj in frontier:
+            for child in proj.change_order_projects.all():
+                if child.id not in members:
+                    members[child.id] = child
+                    next_frontier.append(child)
+        frontier = next_frontier
+    return list(members.values())
+
+
+def _used_co_names_in_family(root):
+    """
+    Every Change Order name already claimed anywhere in this project's family
+    (the root project plus any project registered as a CO off of it), whether
+    it was registered merged into a project's budget (Método 1 -- a
+    ProjectChangeOrder row) or as its own project (Método 2 -- a child Project
+    whose number follows the "{parent}-CO##" convention).
+
+    Returns {normalized_name: {'kind': 'merged'|'project', 'project_id': str}}.
+    """
+    members = _resolve_co_family_members(root)
+    member_ids = [member.id for member in members]
+    used = {}
+
+    for co in ProjectChangeOrder.objects.filter(project_id__in=member_ids):
+        used.setdefault(co.name.strip().upper(), {'kind': 'merged', 'project_id': str(co.project_id)})
+
+    for member in members:
+        if member.id == root.id or not member.parent_project_id:
+            continue
+        suffix = _co_suffix_from_number(member.project_number or member.name, member.parent_project)
+        if suffix:
+            used.setdefault(suffix, {'kind': 'project', 'project_id': str(member.id)})
+
+    return used
 
 
 def _has_bi_management_access(user):
@@ -639,7 +716,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
             default=False,
         )
 
-        if not include_closed:
+        # Only applied to the LIST action: it's a display filter for "which projects show up
+        # in the table", not an access restriction. Applying it to retrieve/update/destroy too
+        # made a closed project's own detail lookup 404 when include_closed wasn't passed --
+        # which is every write the frontend sends (PATCH /projects/{id}/ carries no query
+        # params) -- so reopening (or editing, or deleting) an already-closed project failed
+        # with "No Project matches the given query" even though closing it worked fine.
+        if not include_closed and self.action == 'list':
             queryset = queryset.filter(is_closed=False)
 
         # Filter by date range if provided
@@ -975,8 +1058,34 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not _has_full_access(self.request.user):
             raise PermissionDenied("No permission to modify projects.")
 
+    def _ensure_co_name_available(self, parent_project, candidate_number):
+        """
+        A Change Order name (e.g. "CO02") can only be registered once across a
+        project's whole family -- merged into a budget (Método 1) or as its own
+        project (Método 2) -- never both, and never twice. Only checked when
+        `candidate_number` actually follows the "{parent}-CO##" convention;
+        a linked project with an unrelated number isn't claiming a CO slot.
+        """
+        suffix = _co_suffix_from_number(candidate_number, parent_project)
+        if not suffix:
+            return
+        root = _resolve_co_family_root(parent_project)
+        claim = _used_co_names_in_family(root).get(suffix)
+        if claim:
+            kind_label = 'fusionado en el presupuesto de otro proyecto' if claim['kind'] == 'merged' else 'como proyecto independiente'
+            raise ValidationError({
+                "project_number": f"El Change Order '{suffix}' ya está registrado ({kind_label}). "
+                                   "Solo se puede editar, no volver a registrar."
+            })
+
     def perform_create(self, serializer):
         self._ensure_project_create_permission()
+
+        parent_project = serializer.validated_data.get('parent_project')
+        if parent_project is not None:
+            candidate_number = self.request.data.get('project_number') or self.request.data.get('name')
+            self._ensure_co_name_available(parent_project, candidate_number)
+
         serializer.save()
 
     def perform_update(self, serializer):
@@ -990,6 +1099,126 @@ class ProjectViewSet(viewsets.ModelViewSet):
             instance.is_hidden = True
             instance.hidden_at = timezone.now()
             instance.save(update_fields=['is_hidden', 'hidden_at', 'updated_at'])
+
+    @action(detail=True, methods=['post'], url_path='promote-change-order')
+    def promote_change_order(self, request, pk=None):
+        """
+        Converts a Change Order currently merged into this project's budget
+        (Método 1) into its own linked project (Método 2) -- the inverse of
+        merge-into-parent. Atomic: creates the new project from the given
+        payload (same shape as a normal project create; parent_project_id is
+        implied as this project) and deletes the merged ProjectChangeOrder
+        rows for `name` on this project, so the CO ends up registered exactly
+        once instead of in both forms at the same time.
+
+        Body: same fields as POST /api/projects/ (including its own "name",
+        the new project's name/number), plus "change_order_name" -- the
+        merged Change Order's name to replace, e.g. "CO01".
+        """
+        source = self.get_object()
+        name = (request.data.get('change_order_name') or '').strip()
+        if not name:
+            raise ValidationError({"change_order_name": "This field is required."})
+
+        merged_rows = ProjectChangeOrder.objects.filter(project=source, name__iexact=name)
+        if not merged_rows.exists():
+            raise ValidationError({"change_order_name": f"No merged Change Order named '{name}' found on this project."})
+
+        self._ensure_project_create_permission()
+
+        payload = {k: v for k, v in request.data.items() if k != 'change_order_name'}
+        payload['parent_project_id'] = str(source.id)
+
+        serializer = self.get_serializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            new_project = serializer.save()
+            merged_rows.delete()
+
+        return Response(self.get_serializer(new_project).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='merge-into-parent')
+    def merge_into_parent(self, request, pk=None):
+        """
+        Converts a Change Order registered as its own project (Método 2) back
+        into a merged entry (Método 1) on its parent -- the inverse of
+        promote-change-order. Moves this project's department budgets into
+        ProjectChangeOrder rows on the parent (named after this project's
+        "-CO##" suffix), migrates its Assignments and Finance actuals onto the
+        parent (summed into whatever row the parent already has for the same
+        employee/week or department/week, rather than overwriting it), and
+        hides this project (same as a normal delete).
+        """
+        child = self.get_object()
+        parent = child.parent_project
+        if not parent:
+            raise ValidationError({"detail": "This project isn't linked to a parent project."})
+
+        self._ensure_full_access()
+
+        override_name = (request.data.get('name') or '').strip()
+        name = override_name.upper() if override_name else _co_suffix_from_number(
+            child.project_number or child.name, parent
+        )
+        if not name:
+            raise ValidationError({
+                "detail": "Couldn't determine a Change Order name from this project's number "
+                          f"(expected \"{(parent.project_number or parent.name)}-CO##\"). Pass 'name' explicitly."
+            })
+
+        root = _resolve_co_family_root(parent)
+        claim = _used_co_names_in_family(root).get(name)
+        if claim and claim['project_id'] != str(child.id):
+            kind_label = 'ya fusionado en el presupuesto' if claim['kind'] == 'merged' else 'como otro proyecto independiente'
+            raise ValidationError({"name": f"'{name}' ya está registrado ({kind_label})."})
+
+        with transaction.atomic():
+            for budget in child.budgets.all():
+                if not budget.hours_allocated and budget.cost_allocated is None:
+                    continue
+                ProjectChangeOrder.objects.update_or_create(
+                    project=parent, department=budget.department, name=name,
+                    defaults={
+                        'hours_quoted': budget.hours_allocated or 0,
+                        'cost_quoted': budget.cost_allocated,
+                    }
+                )
+
+            for assignment in child.assignments.all():
+                existing = Assignment.objects.filter(
+                    employee=assignment.employee, project=parent,
+                    week_start_date=assignment.week_start_date, stage=assignment.stage,
+                ).first()
+                if existing:
+                    existing.hours = (existing.hours or 0) + (assignment.hours or 0)
+                    if assignment.scio_hours:
+                        existing.scio_hours = (existing.scio_hours or 0) + assignment.scio_hours
+                    if assignment.external_hours:
+                        existing.external_hours = (existing.external_hours or 0) + assignment.external_hours
+                    existing.save()
+                    assignment.delete()
+                else:
+                    assignment.project = parent
+                    assignment.save(update_fields=['project', 'updated_at'])
+
+            for actual in child.weekly_actuals.all():
+                existing = ProjectDepartmentWeeklyActual.objects.filter(
+                    project=parent, department=actual.department, week_start_date=actual.week_start_date,
+                ).first()
+                if existing:
+                    existing.hours = (existing.hours or 0) + (actual.hours or 0)
+                    existing.save(update_fields=['hours', 'updated_at'])
+                    actual.delete()
+                else:
+                    actual.project = parent
+                    actual.save(update_fields=['project', 'updated_at'])
+
+            child.is_hidden = True
+            child.hidden_at = timezone.now()
+            child.save(update_fields=['is_hidden', 'hidden_at', 'updated_at'])
+
+        return Response(self.get_serializer(parent).data)
 
     @action(detail=True, methods=['get'])
     def statistics(self, request, pk=None):
@@ -2243,16 +2472,94 @@ class ProjectChangeOrderViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         department = serializer.validated_data.get('department') or self.request.data.get('department')
         self._ensure_change_order_permission(department)
+
+        project_id = self.request.data.get('project_id')
+        name = (serializer.validated_data.get('name') or self.request.data.get('name') or '').strip()
+        if project_id and name:
+            # The exact same (project, department, name) already exists -- this is the
+            # model's own unique_together, so without this check it falls through to an
+            # unhandled IntegrityError (500) instead of a clean validation error.
+            exact_duplicate = ProjectChangeOrder.objects.filter(
+                project_id=project_id, department=department, name__iexact=name,
+            ).first()
+            if exact_duplicate:
+                raise ValidationError({
+                    "name": f"{department} ya tiene un registro en '{name}' para este proyecto. "
+                            "Edítalo directamente en vez de volver a registrarlo."
+                })
+
+            # An existing row under this same name on this same project (different
+            # department) just means another department is being added to an
+            # already-registered CO -- that's an edit, not a new registration, allowed.
+            already_on_this_project = ProjectChangeOrder.objects.filter(
+                project_id=project_id, name__iexact=name,
+            ).exists()
+            if not already_on_this_project:
+                project = get_object_or_404(Project, id=project_id)
+                root = _resolve_co_family_root(project)
+                claim = _used_co_names_in_family(root).get(name.upper())
+                if claim:
+                    kind_label = 'en otro proyecto de esta familia' if claim['kind'] == 'merged' else 'como proyecto independiente'
+                    raise ValidationError({
+                        "name": f"El Change Order '{name}' ya está registrado ({kind_label}). "
+                                "Solo se puede editar, no volver a registrar."
+                    })
+
         serializer.save()
 
     def perform_update(self, serializer):
         department = serializer.validated_data.get('department') or serializer.instance.department
         self._ensure_change_order_permission(department)
+
+        new_name = serializer.validated_data.get('name')
+        if new_name:
+            new_name = new_name.strip()
+            if new_name.upper() != (serializer.instance.name or '').strip().upper():
+                already_on_this_project = ProjectChangeOrder.objects.filter(
+                    project_id=serializer.instance.project_id, name__iexact=new_name,
+                ).exclude(id=serializer.instance.id).exists()
+                if not already_on_this_project:
+                    root = _resolve_co_family_root(serializer.instance.project)
+                    claim = _used_co_names_in_family(root).get(new_name.upper())
+                    if claim:
+                        raise ValidationError({"name": f"El Change Order '{new_name}' ya está registrado."})
+
         serializer.save()
 
     def perform_destroy(self, instance):
         self._ensure_change_order_permission(instance.department)
         instance.delete()
+
+    @action(detail=True, methods=['post'], url_path='move-department')
+    def move_department(self, request, pk=None):
+        """
+        Moves this single department's quoted hours/$ from its current Change
+        Order name to a different one on the same project -- e.g. BUILD was
+        quoted under CO01, move it to CO03 instead. Never changes which
+        project the CO is registered on, only which CO name it's grouped
+        under.
+        """
+        co = self.get_object()
+        self._ensure_change_order_permission(co.department)
+
+        target_name = (request.data.get('target_name') or '').strip()
+        if not target_name:
+            raise ValidationError({"target_name": "This field is required."})
+        if target_name.upper() == (co.name or '').strip().upper():
+            raise ValidationError({"target_name": "Already registered under this Change Order."})
+
+        collision = ProjectChangeOrder.objects.filter(
+            project_id=co.project_id, department=co.department, name__iexact=target_name,
+        ).exclude(id=co.id).first()
+        if collision:
+            raise ValidationError({
+                "target_name": f"{co.get_department_display()} already has an entry under "
+                                f"'{target_name}'. Edit that one directly instead."
+            })
+
+        co.name = target_name
+        co.save(update_fields=['name', 'updated_at'])
+        return Response(ProjectChangeOrderSerializer(co).data)
 
 
 class ActivityLogViewSet(viewsets.ModelViewSet):

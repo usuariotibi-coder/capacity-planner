@@ -615,6 +615,25 @@ export const projectsApi = {
       body: JSON.stringify(transformKeysToSnake(budgetUpdate)),
     });
   },
+
+  // Converts a Change Order merged into `sourceProjectId`'s budget (Método 1) into its
+  // own linked project (Método 2): creates the project from `project` and atomically
+  // deletes the merged ProjectChangeOrder rows named `changeOrderName` on the source.
+  promoteChangeOrder: async (sourceProjectId: string, changeOrderName: string, project: any) => {
+    return apiFetch(`/api/projects/${sourceProjectId}/promote-change-order/`, {
+      method: 'POST',
+      body: JSON.stringify({ ...transformKeysToSnake(project), change_order_name: changeOrderName }),
+    });
+  },
+
+  // Converts a Change Order registered as its own project back into a merged entry
+  // (Método 1) on its parent, migrating its assignments/actuals and hiding the project.
+  mergeIntoParent: async (projectId: string, nameOverride?: string) => {
+    return apiFetch(`/api/projects/${projectId}/merge-into-parent/`, {
+      method: 'POST',
+      body: JSON.stringify(nameOverride ? { name: nameOverride } : {}),
+    });
+  },
 };
 
 // Assignments API
@@ -1066,6 +1085,15 @@ export const changeOrdersApi = {
   delete: async (id: string) => {
     return apiFetch(`/api/project-change-orders/${id}/`, {
       method: 'DELETE',
+    });
+  },
+
+  // Moves this single department's quoted hours/$ to a different Change Order name
+  // on the same project (e.g. BUILD was under CO01, move it to CO03).
+  moveDepartment: async (id: string, targetName: string) => {
+    return apiFetch(`/api/project-change-orders/${id}/move-department/`, {
+      method: 'POST',
+      body: JSON.stringify({ target_name: targetName }),
     });
   },
 };

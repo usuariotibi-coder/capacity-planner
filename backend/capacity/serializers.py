@@ -766,11 +766,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         """
         Save department stage configurations for a project.
 
+        A department can have more than one entry -- e.g. BUILD split into
+        Assembly/Commissioning, or PRG split into Offline/Online/Debug -- each
+        identified by its 'stage' value (None for a department that isn't split
+        into sub-phases). This is purely about how a department's weeks are
+        displayed/dated; it has no effect on department-level budget hours.
+
         Args:
             project: The Project instance
             department_stages: Dict with department keys and list of stage configs
         """
-        incoming_departments = set()
+        sent_departments = set(department_stages.keys())
+        incoming_keys = set()
 
         for dept, stages in department_stages.items():
             if not isinstance(stages, list):
@@ -788,29 +795,34 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if not week_end and week_end != 0:
                     continue
 
-                stage = stage_config.get('stage')
+                stage = stage_config.get('stage') or None
                 dept_start_date = stage_config.get('departmentStartDate') or stage_config.get('department_start_date')
                 duration_weeks = stage_config.get('durationWeeks') or stage_config.get('duration_weeks')
 
                 DepartmentStageConfig.objects.update_or_create(
                     project=project,
                     department=dept,
+                    stage=stage,
                     defaults={
-                        'stage': stage if stage else None,
                         'week_start': int(week_start),
                         'week_end': int(week_end),
                         'department_start_date': dept_start_date if dept_start_date else None,
                         'duration_weeks': int(duration_weeks) if duration_weeks else None,
                     }
                 )
-                incoming_departments.add(dept)
+                incoming_keys.add((dept, stage))
 
-        if incoming_departments:
-            DepartmentStageConfig.objects.filter(
-                project=project,
-            ).exclude(
-                department__in=incoming_departments,
-            ).delete()
+        # Full replacement per department sent: any existing row for a department
+        # present in this payload is dropped unless it matches a (department, stage)
+        # pair just written -- this is what clears a stale sub-phase, or a whole
+        # department's config when its list comes in empty.
+        if sent_departments:
+            stale_rows = DepartmentStageConfig.objects.filter(
+                project=project, department__in=sent_departments,
+            )
+            for row in stale_rows:
+                if (row.department, row.stage) not in incoming_keys:
+                    row.delete()
 
     def _save_department_budgets(self, project, department_hours):
         """
