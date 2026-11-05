@@ -9,9 +9,8 @@ class Migration(migrations.Migration):
         ('capacity', '0022_project_is_high_probability'),
     ]
 
-    operations = [
-        migrations.AlterUniqueTogether(
-            name='assignment',
-            unique_together={('employee', 'project', 'week_start_date')},
-        ),
-    ]
+    # NOTE: originally added unique_together=('employee', 'project', 'week_start_date'),
+    # but that's missing 'stage' (fixed in 0030) and fails against real data that has
+    # multiple stages per employee/project/week. Turned into a no-op so 0030 can set the
+    # correct constraint directly without ever enforcing this too-strict intermediate one.
+    operations = []
