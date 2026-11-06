@@ -1698,7 +1698,7 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         self._ensure_week_is_editable(instance.week_start_date)
         instance.delete()
 
-    @action(detail=False, methods=['get'], url_path='summary-by-project-dept')
+    @action(detail=False, methods=['get', 'post'], url_path='summary-by-project-dept')
     def summary_by_project_dept(self, request):
         """
         Return utilized/forecast hours aggregated by project + employee department.
@@ -1706,22 +1706,34 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         This is used by the frontend to calculate project metrics across ALL years
         without downloading every assignment row.
 
-        Query params:
-          - project_ids: comma-separated UUIDs (required)
-          - department: optional department code (e.g. MED) to filter
-          - current_week_start: optional ISO date (YYYY-MM-DD) to split used vs forecast
+        POST (preferred -- a full project roster's worth of UUIDs can exceed the
+        ~4KB request-line limit Railway's edge proxy enforces on GET query strings):
+          JSON body: {"project_ids": [...], "department": "MED", "current_week_start": "..."}
+        GET (kept for compatibility with small ID lists):
+          Query params: project_ids (comma-separated UUIDs, required), department, current_week_start
         """
-        project_ids_param = (request.query_params.get('project_ids') or '').strip()
-        if not project_ids_param:
+        if request.method == 'POST':
+            project_ids = request.data.get('project_ids') or []
+            if isinstance(project_ids, str):
+                project_ids = [pid.strip() for pid in project_ids.split(',') if pid.strip()]
+            department = (request.data.get('department') or '').strip() or None
+            current_week_start = request.data.get('current_week_start')
+        else:
+            project_ids_param = (request.query_params.get('project_ids') or '').strip()
+            if not project_ids_param:
+                return Response(
+                    {'detail': 'project_ids query param is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            project_ids = [pid.strip() for pid in project_ids_param.split(',') if pid.strip()]
+            department = (request.query_params.get('department') or '').strip() or None
+            current_week_start = request.query_params.get('current_week_start')
+
+        if not project_ids:
             return Response(
-                {'detail': 'project_ids query param is required.'},
+                {'detail': 'project_ids is required.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        project_ids = [pid.strip() for pid in project_ids_param.split(',') if pid.strip()]
-        department = (request.query_params.get('department') or '').strip() or None
-
-        current_week_start = request.query_params.get('current_week_start')
         if current_week_start:
             try:
                 split_date = datetime.strptime(current_week_start, '%Y-%m-%d').date()
@@ -3278,6 +3290,36 @@ class ProjectDepartmentWeeklyActualViewSet(viewsets.ReadOnlyModelViewSet):
             if project_ids:
                 queryset = queryset.filter(project_id__in=project_ids)
         return queryset
+
+    @action(detail=False, methods=['post'], url_path='search')
+    def search(self, request):
+        """
+        POST variant of the list endpoint: `project_ids`/`department` come from the
+        JSON body instead of the query string, so a full project roster's worth of
+        UUIDs doesn't exceed Railway's edge proxy's ~4KB GET request-line limit.
+
+        Body: {"project_ids": [...], "department": "MED"}
+        """
+        queryset = self.get_queryset()
+
+        project_ids = request.data.get('project_ids') or []
+        if isinstance(project_ids, str):
+            project_ids = [pid.strip() for pid in project_ids.split(',') if pid.strip()]
+        if project_ids:
+            queryset = queryset.filter(project_id__in=project_ids)
+
+        department = (request.data.get('department') or '').strip()
+        if department:
+            queryset = queryset.filter(department=department)
+
+        queryset = queryset.order_by(*self.ordering)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FinanceImportViewSet(viewsets.ReadOnlyModelViewSet):

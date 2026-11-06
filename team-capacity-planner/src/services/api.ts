@@ -683,15 +683,16 @@ export const assignmentsApi = {
     department?: string;
     currentWeekStart?: string;
   }) => {
-    const params = new URLSearchParams();
-    params.set('project_ids', options.projectIds.join(','));
-    if (options.department) {
-      params.set('department', options.department);
-    }
-    if (options.currentWeekStart) {
-      params.set('current_week_start', options.currentWeekStart);
-    }
-    return apiFetch(`/api/assignments/summary-by-project-dept/?${params.toString()}`);
+    // POST, not GET: a full project roster's worth of UUIDs in a query string can
+    // exceed the ~4KB request-line limit Railway's edge proxy enforces on GET.
+    return apiFetch('/api/assignments/summary-by-project-dept/', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_ids: options.projectIds,
+        department: options.department,
+        current_week_start: options.currentWeekStart,
+      }),
+    });
   },
 
   get: async (id: string) => {
@@ -1103,16 +1104,19 @@ export const changeOrdersApi = {
 // import endpoint below).
 export const projectDepartmentWeeklyActualsApi = {
   getAll: async (params: { projectIds?: string[]; department?: string } = {}) => {
-    const query = new URLSearchParams();
-    query.set('page_size', '500'); // server clamps to LargeResultsSetPagination's max_page_size
-    if (params.projectIds?.length) query.set('project_ids', params.projectIds.join(','));
-    if (params.department) query.set('department', params.department);
-
-    let endpoint = `/api/project-department-weekly-actuals/?${query.toString()}`;
+    // POST, not GET: a full project roster's worth of UUIDs in a query string can
+    // exceed the ~4KB request-line limit Railway's edge proxy enforces on GET.
+    let endpoint = '/api/project-department-weekly-actuals/search/?page_size=500';
     let allResults: any[] = [];
 
     while (endpoint) {
-      const data = await apiFetch(endpoint);
+      const data = await apiFetch(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({
+          project_ids: params.projectIds || [],
+          department: params.department,
+        }),
+      });
       if (data && Array.isArray(data.results)) {
         allResults = allResults.concat(data.results);
         endpoint = data.next ? toRelativeApiEndpoint(data.next) : '';
