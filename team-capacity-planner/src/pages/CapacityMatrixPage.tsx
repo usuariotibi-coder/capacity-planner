@@ -262,8 +262,16 @@ const CURRENT_WEEK_SOFT_CELL_CLASS = 'border-[3px] border-black relative z-[5]';
 const MONTH_HEADER_PRIMARY_CLASS = 'bg-gradient-to-b from-[#4f3a70] to-[#2e1a47] text-white border-[#2e1a47] shadow-md';
 const MONTH_HEADER_SECONDARY_CLASS = 'bg-yellow-300 text-yellow-900 border-yellow-400 shadow-md';
 const WEEK_COLUMN_WIDTH_CLASS = 'w-20 min-w-20';
-const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
-const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-14 min-w-14 max-w-14';
+// Wide enough to fit most project names in full (not just short job numbers) without
+// truncating -- widened from w-14 (56px) per explicit request after names like "3346-CO01..."
+// were getting cut off in the sticky project-identifier cell.
+const GENERAL_LEFT_COLUMN_WIDTH_CLASS = 'w-40 min-w-40 max-w-40';
+const DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS = 'w-40 min-w-40 max-w-40';
+// Fixed row height for every sticky header row (month row, week row, and each Capacity-bar
+// department row) in the unified General-view grid, so their `top` offsets can be stacked by
+// simple multiplication instead of measuring the DOM -- matches this file's existing
+// top-0/top-5 (20px) stacking convention for the month+week row pair.
+const UNIFIED_HEADER_ROW_HEIGHT_PX = 20;
 const TIMING_COMPACT_STICKY_WIDTHS = [72, 80, 56, 72, 56, 56, 56, 56] as const;
 // The per-project Summary section (Qtd/Used/Fcst/Util) is pinned to the right edge of the
 // table so it stays visible while scrolling through weeks. Each column is a fixed 60px so the
@@ -787,9 +795,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   const [isProviderRateModalOpen, setIsProviderRateModalOpen] = useState(false);
   const [providerRateVersion, setProviderRateVersion] = useState(0);
 
-  // Per-project zoom levels
-  const [projectZooms, setProjectZooms] = useState<Record<string, number>>({});
-
   // Change Orders (quoted hours/$ per project/department) are now registered from the
   // Projects page, not here -- this page only reads them (read-only) to fold their quoted
   // hours/$ into the Qtd totals shown in the Summary columns. See getQuotedChangeOrders.
@@ -829,7 +834,7 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   const [selectedVisibleProjectId, setSelectedVisibleProjectId] = useState('');
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
   const [isProjectSearchOpen, setIsProjectSearchOpen] = useState(false);
-  const [showAllVisibleProjects, setShowAllVisibleProjects] = useState(false);
+  // All open projects show by default now (no "show all" toggle needed).
   const [showClosedProjects, setShowClosedProjects] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
@@ -1634,13 +1639,12 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   const generalCapacityScrollRef = useRef<HTMLDivElement>(null);
   const importProjectSearchContainerRef = useRef<HTMLDivElement>(null);
   const projectSearchContainerRef = useRef<HTMLDivElement>(null);
-  const projectTableRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Keyed by project id -> that project's <tbody> in the unified capacity grid (see "Unified
+  // capacity grid" below); used only by the PDF export, which needs to capture each project's
+  // rows as a standalone image (see handleExportTimelinePdf).
+  const projectTableRefs = useRef<Map<string, HTMLTableSectionElement>>(new Map());
   const projectCellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
   const isPastingProjectCellRef = useRef(false);
-  const isSyncingHorizontalScrollRef = useRef(false);
-  const syncedBaseScrollProgressRef = useRef(0);
-  const activeSyncedProjectIdRef = useRef<string | null>(null);
-  const [activeSyncedProjectId, setActiveSyncedProjectId] = useState<string | null>(null);
 
   const allWeeksData = useMemo(() => getAllWeeksWithNextYear(selectedYear), [selectedYear]);
   const today = new Date();
@@ -2095,22 +2099,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     [allWeeksData, locale]
   );
 
-  // The per-project tables append the Summary columns (Qtd/Used/Fcst/Util, SUMMARY_TOTAL_WIDTH_PX total)
-  // after the week columns; the Capacity bar / Weekly Occupancy Total panel don't have those.
-  // Both use the same percentage-based horizontal scroll sync (see
-  // syncHorizontalScrollToCanonical), which only lines weeks up correctly when both scrollable
-  // containers have the exact same total width. This used to drop the last 4 weeks here to
-  // compensate, but 4 weeks (320px) never matched the Summary columns width (208px at the time) -- that gap
-  // between the two containers' widths is exactly what showed up as roughly one week of drift
-  // at a moderate scroll position. Fixed properly now: every week is kept (exact 1:1 week
-  // correspondence with allWeeksData), and the Capacity bar / Weekly Occupancy Total panel each
-  // carry their own matching SUMMARY_TOTAL_WIDTH_PX spacer instead.
-  const projectAllWeeksData = allWeeksData;
-  const projectMonthSpans = useMemo(
-    () => computeMonthSpans(projectAllWeeksData),
-    [projectAllWeeksData, locale]
-  );
-
   // Find the current week - it's the week that contains today's date
   const currentDateWeekIndex = allWeeksData.findIndex((w) => {
     const weekStart = parseISODate(w.date);
@@ -2431,29 +2419,23 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     return sortProjectsByStoredOrder(generalProjects, scopeKey);
   }, [generalProjects, projectOrderByScope]);
 
+  // All open (not showClosedProjects-excluded) projects show by default -- a specific
+  // selection via the search box narrows the list down to just that one project.
   const filteredDepartmentProjects = useMemo(() => {
-    if (showAllVisibleProjects) {
+    if (!selectedVisibleProjectId) {
       return orderedDepartmentProjects;
     }
 
-    if (!selectedVisibleProjectId) {
-      return [];
-    }
-
     return orderedDepartmentProjects.filter((proj) => proj.id === selectedVisibleProjectId);
-  }, [orderedDepartmentProjects, selectedVisibleProjectId, showAllVisibleProjects]);
+  }, [orderedDepartmentProjects, selectedVisibleProjectId]);
 
   const filteredGeneralProjects = useMemo(() => {
-    if (showAllVisibleProjects) {
+    if (!selectedVisibleProjectId) {
       return orderedGeneralProjects;
     }
 
-    if (!selectedVisibleProjectId) {
-      return [];
-    }
-
     return orderedGeneralProjects.filter((proj) => proj.id === selectedVisibleProjectId);
-  }, [orderedGeneralProjects, selectedVisibleProjectId, showAllVisibleProjects]);
+  }, [orderedGeneralProjects, selectedVisibleProjectId]);
 
   const orderedProjectsInCurrentView = useMemo(() => {
     return departmentFilter === 'General' ? orderedGeneralProjects : orderedDepartmentProjects;
@@ -2477,7 +2459,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   }, [departmentFilter, filteredDepartmentProjects, filteredGeneralProjects]);
 
   const hasActiveProjectListFilters =
-    showAllVisibleProjects ||
     selectedVisibleProjectId.length > 0 ||
     projectSearchTerm.trim().length > 0;
 
@@ -2544,18 +2525,14 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
   // several expanded project tables scroll-synced together makes horizontal
   // scrolling lag. (PDF export sets expandedProjects directly, so it can still
   // expand several at once.)
+  // Independent per-project toggle -- several projects can be expanded at once. This used to
+  // collapse every other project first (an accordion), which was a workaround for the
+  // horizontal-scroll lag that multiple open projects caused under the old per-project-table +
+  // JS scroll-sync design. The unified capacity grid (see "Unified capacity grid" in the
+  // General/department view render blocks) removes that lag at the root, so this restriction
+  // is no longer needed.
   const toggleProjectExpanded = (projectId: string) => {
-    setExpandedProjects((prev) => {
-      if (prev[projectId]) {
-        return { ...prev, [projectId]: false };
-      }
-      const next: Record<string, boolean> = {};
-      Object.keys(prev).forEach((id) => {
-        next[id] = false;
-      });
-      next[projectId] = true;
-      return next;
-    });
+    setExpandedProjects((prev) => ({ ...prev, [projectId]: !prev[projectId] }));
   };
 
   // Still matches legacy "DEPT Placeholder" employees that existing historical assignments may
@@ -2864,142 +2841,22 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
     );
   }, [departmentFilter, importProjectSearchTerm, projects]);
 
-  const getProjectZoom = (projectId: string): number => {
-    return projectZooms[projectId] || 100;
-  };
-
-  const setProjectZoom = (projectId: string, zoomLevel: number) => {
-    setProjectZooms((prev) => ({
-      ...prev,
-      [projectId]: zoomLevel,
-    }));
-  };
-
   const isGeneralView = departmentFilter === 'General';
 
-  // In department views, project zoom follows the global zoom control.
-  const getEffectiveProjectZoom = (projectId: string): number => {
-    if (isGeneralView) {
-      return getProjectZoom(projectId);
-    }
-    return zoom;
-  };
-
-  const updateProjectZoom = (projectId: string, zoomLevel: number) => {
-    const boundedZoom = Math.max(50, Math.min(200, zoomLevel));
-    if (isGeneralView) {
-      markProjectAsActiveSyncTarget(projectId);
-      setProjectZoom(projectId, boundedZoom);
-      return;
-    }
-    setZoom(boundedZoom);
-  };
-
-  const markProjectAsActiveSyncTarget = (projectId: string | null) => {
-    if (activeSyncedProjectIdRef.current === projectId) return;
-    activeSyncedProjectIdRef.current = projectId;
-    setActiveSyncedProjectId(projectId);
-  };
-
-  const getScrollProgress = (container: HTMLDivElement | null): number => {
-    if (!container) return 0;
-    const maxScrollLeft = container.scrollWidth - container.clientWidth;
-    if (maxScrollLeft <= 0) return 0;
-    return Math.max(0, Math.min(1, container.scrollLeft / maxScrollLeft));
-  };
-
-  const setScrollProgressIfNeeded = (container: HTMLDivElement | null, progress: number) => {
-    if (!container) return;
-    const maxScrollLeft = container.scrollWidth - container.clientWidth;
-    const targetScrollLeft = maxScrollLeft > 0 ? maxScrollLeft * progress : 0;
-    if (Math.abs(container.scrollLeft - targetScrollLeft) > 0.5) {
-      // The scroll containers have `scroll-behavior: smooth`, which makes a plain
-      // `scrollLeft = x` animate. In Chrome that animation fires its own scroll events
-      // that get synced back to the other table (dragging it toward the animating
-      // table's stale position), so the sync lags and fights the user's scroll.
-      // Programmatic sync writes must be instant.
-      container.scrollTo({ left: targetScrollLeft, behavior: 'instant' });
-    }
-  };
-
-  const resolveSyncProjectId = (preferredProjectId?: string | null): string | null => {
-    if (preferredProjectId && projectTableRefs.current.has(preferredProjectId)) {
-      return preferredProjectId;
-    }
-
-    const activeProjectId = activeSyncedProjectIdRef.current;
-    if (activeProjectId && projectTableRefs.current.has(activeProjectId)) {
-      return activeProjectId;
-    }
-
-    const visibleProjectId = projectsVisibleInCurrentView.find((proj) => projectTableRefs.current.has(proj.id))?.id;
-    if (visibleProjectId) {
-      return visibleProjectId;
-    }
-
-    const firstEntry = projectTableRefs.current.keys().next();
-    return firstEntry.done ? null : firstEntry.value;
-  };
-
-  const syncHorizontalScrollToCanonical = (
-    canonicalScrollProgress: number,
-    targetProjectId?: string | null
-  ) => {
-    const safeCanonicalProgress = Math.max(0, Math.min(1, canonicalScrollProgress));
-    syncedBaseScrollProgressRef.current = safeCanonicalProgress;
-
-    if (isGeneralView) {
-      setScrollProgressIfNeeded(generalCapacityScrollRef.current, safeCanonicalProgress);
-    } else {
-      setScrollProgressIfNeeded(departmentCapacityScrollRef.current, safeCanonicalProgress);
-    }
-
-    const syncProjectId = resolveSyncProjectId(targetProjectId);
-    if (!syncProjectId) return;
-    const container = projectTableRefs.current.get(syncProjectId);
-    if (container) {
-      setScrollProgressIfNeeded(container, safeCanonicalProgress);
-    }
-  };
-
-  const runSyncedHorizontalScroll = (
-    canonicalScrollProgress: number,
-    targetProjectId?: string | null
-  ) => {
-    if (isSyncingHorizontalScrollRef.current) return;
-
-    isSyncingHorizontalScrollRef.current = true;
-    syncHorizontalScrollToCanonical(canonicalScrollProgress, targetProjectId);
-
-    requestAnimationFrame(() => {
-      isSyncingHorizontalScrollRef.current = false;
-    });
-  };
-
-  const handleCapacityHorizontalScroll = (container: HTMLDivElement) => {
-    if (isSyncingHorizontalScrollRef.current) return;
-    const scrollProgress = getScrollProgress(container);
-    runSyncedHorizontalScroll(scrollProgress, resolveSyncProjectId());
-  };
-
-  const handleProjectHorizontalScroll = (projectId: string, container: HTMLDivElement) => {
-    if (isSyncingHorizontalScrollRef.current) return;
-    if (activeSyncedProjectIdRef.current !== projectId) {
-      markProjectAsActiveSyncTarget(projectId);
-    }
-    const scrollProgress = getScrollProgress(container);
-    runSyncedHorizontalScroll(scrollProgress, projectId);
-  };
-
-  // On entering the Capacity Matrix (and whenever the department filter changes), scroll all
-  // synced tables to start 3 weeks before the current week rather than the very first week.
-  // Requires a real DOM measurement (via data-week-index) rather than a known progress value.
-  // Projects/assignments still finish loading asynchronously after mount, and the resulting
-  // layout/width change makes the browser clamp scrollLeft back toward 0 — so this re-applies
-  // itself (recomputing fresh each time, not reusing a stale offset) across a few animation
-  // frames AND once real project/assignment data lands, instead of firing only once on mount.
+  // On entering the Capacity Matrix (and whenever the department filter changes), scroll the
+  // active view's single unified table to start 3 weeks before the current week rather than
+  // the very first week. Requires a real DOM measurement (via data-week-index) rather than a
+  // known offset. Projects/assignments still finish loading asynchronously after mount, and
+  // the resulting layout/width change makes the browser clamp scrollLeft back toward 0 -- so
+  // this re-applies itself (recomputing fresh each time) across a few animation frames AND
+  // once real project/assignment data lands, instead of firing only once on mount.
+  //
+  // There's only one scroll container per view now (General/department each have their own
+  // `overflow-auto` unified table -- see generalCapacityScrollRef/departmentCapacityScrollRef
+  // below), so this no longer needs to sync scroll position across multiple tables with JS;
+  // that cross-table sync was the root cause of the horizontal-scroll lag with more than one
+  // project open, which the unified table removes entirely.
   useEffect(() => {
-    markProjectAsActiveSyncTarget(null);
     const targetWeekIndex = currentDateWeekIndex >= 0 ? Math.max(0, currentDateWeekIndex - 3) : 0;
 
     const applyInitialScroll = () => {
@@ -3017,13 +2874,7 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
       const labelEl = container.querySelector<HTMLElement>('.sticky');
       const labelWidth = labelEl?.getBoundingClientRect().width ?? 0;
       const scrollLeftDelta = (targetRect.left - containerRect.left) - labelWidth;
-      const maxScrollLeft = container.scrollWidth - container.clientWidth;
-      const desiredScrollLeft = container.scrollLeft + scrollLeftDelta;
-      const progress = maxScrollLeft > 0
-        ? Math.max(0, Math.min(1, desiredScrollLeft / maxScrollLeft))
-        : 0;
-      syncedBaseScrollProgressRef.current = progress;
-      syncHorizontalScrollToCanonical(progress, resolveSyncProjectId());
+      container.scrollLeft += scrollLeftDelta;
     };
 
     const rafA = requestAnimationFrame(applyInitialScroll);
@@ -3035,42 +2886,6 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
       retryTimeouts.forEach(clearTimeout);
     };
   }, [departmentFilter, projects.length, assignments.length]);
-
-  // Keep alignment after zoom changes/re-renders.
-  useEffect(() => {
-    syncHorizontalScrollToCanonical(syncedBaseScrollProgressRef.current, resolveSyncProjectId());
-  }, [projectZooms, isGeneralView]);
-
-  // Keep alignment when language/locale changes (text reflow can shift layout widths).
-  useEffect(() => {
-    const syncProjectId = resolveSyncProjectId();
-    const scrollProgress = syncedBaseScrollProgressRef.current;
-    const rafA = requestAnimationFrame(() => {
-      syncHorizontalScrollToCanonical(scrollProgress, syncProjectId);
-    });
-    const rafB = requestAnimationFrame(() => {
-      syncHorizontalScrollToCanonical(scrollProgress, syncProjectId);
-    });
-
-    return () => {
-      cancelAnimationFrame(rafA);
-      cancelAnimationFrame(rafB);
-    };
-  }, [language, locale, isGeneralView]);
-
-  const activeProjectIdForCapacityZoom = useMemo(() => {
-    if (!isGeneralView) return null;
-    if (activeSyncedProjectId && projectsVisibleInCurrentView.some((proj) => proj.id === activeSyncedProjectId)) {
-      return activeSyncedProjectId;
-    }
-    return projectsVisibleInCurrentView[0]?.id || null;
-  }, [activeSyncedProjectId, isGeneralView, projectsVisibleInCurrentView]);
-
-  const generalCapacityZoom = useMemo(() => {
-    if (!isGeneralView) return 100;
-    if (!activeProjectIdForCapacityZoom) return 100;
-    return getEffectiveProjectZoom(activeProjectIdForCapacityZoom);
-  }, [activeProjectIdForCapacityZoom, isGeneralView, projectZooms]);
 
   // Get total hours and stage for a department in a week (optionally filtered by project)
   const getDepartmentWeekData = (department: Department, weekStart: string, projectId?: string) => {
@@ -7403,15 +7218,29 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
       };
 
       for (const project of targetProjects) {
-        const timelineContainer = projectTableRefs.current.get(project.id);
-        if (!timelineContainer) continue;
+        // Each project is one <tbody> in the shared unified table now (see "Unified capacity
+        // grid"), not its own standalone <table> -- so capturing it faithfully (with its
+        // column headers) means assembling a throwaway table from the live, shared <thead>
+        // plus this one project's <tbody>, off-screen, then discarding it after capture.
+        const projectTbody = projectTableRefs.current.get(project.id);
+        if (!projectTbody) continue;
+        const sourceTable = projectTbody.closest('table');
+        const sourceThead = sourceTable?.querySelector('thead');
+        if (!sourceTable || !sourceThead) continue;
 
-        const timelineTable = timelineContainer.querySelector('table') as HTMLTableElement | null;
-        if (!timelineTable) continue;
-        const captureWidth = Math.max(1, Math.ceil(timelineTable.scrollWidth));
-        const captureHeight = Math.max(1, Math.ceil(timelineTable.scrollHeight));
+        const captureTable = document.createElement('table');
+        captureTable.className = sourceTable.className;
+        captureTable.style.position = 'fixed';
+        captureTable.style.top = '-100000px';
+        captureTable.style.left = '-100000px';
+        captureTable.appendChild(sourceThead.cloneNode(true));
+        captureTable.appendChild(projectTbody.cloneNode(true));
+        document.body.appendChild(captureTable);
 
-        const canvas = await html2canvas(timelineTable, {
+        const captureWidth = Math.max(1, Math.ceil(captureTable.scrollWidth));
+        const captureHeight = Math.max(1, Math.ceil(captureTable.scrollHeight));
+
+        const canvas = await html2canvas(captureTable, {
           backgroundColor: '#ffffff',
           useCORS: true,
           scale: 2,
@@ -7421,8 +7250,10 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
           windowWidth: captureWidth,
           windowHeight: captureHeight,
           scrollX: 0,
-          scrollY: -window.scrollY,
+          scrollY: 0,
         });
+
+        document.body.removeChild(captureTable);
 
         const fitHeightScale = maxImageHeight / canvas.height;
         const upperScale = Math.min(fitHeightScale, MAX_TIMELINE_SCALE_MM_PER_PX);
@@ -9345,7 +9176,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     setSelectedVisibleProjectId('');
     setProjectSearchTerm('');
     setIsProjectSearchOpen(false);
-    setShowAllVisibleProjects(false);
   };
 
   const projectListSummaryText = projectSearchTerm.trim().length > 0
@@ -9359,7 +9189,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
   const handleProjectSearchSelect = (project: Project) => {
     setSelectedVisibleProjectId(project.id);
     setProjectSearchTerm(formatProjectSearchLabel(project));
-    setShowAllVisibleProjects(false);
     setIsProjectSearchOpen(false);
   };
 
@@ -9379,7 +9208,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             onChange={(e) => {
               setProjectSearchTerm(e.target.value);
               setSelectedVisibleProjectId('');
-              setShowAllVisibleProjects(false);
               setIsProjectSearchOpen(true);
             }}
             onKeyDown={(e) => {
@@ -9421,16 +9249,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
             </div>
           )}
         </div>
-      </label>
-
-      <label className="inline-flex h-[28px] w-[168px] items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={showAllVisibleProjects}
-          onChange={(e) => setShowAllVisibleProjects(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-        />
-        <span>{t.allVisibleProjects || (language === 'es' ? 'Todos los proyectos visibles' : 'All visible projects')}</span>
       </label>
 
       <label className="inline-flex h-[28px] w-[168px] items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 whitespace-nowrap">
@@ -9508,101 +9326,11 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
     <div className="brand-page-shell capacity-matrix-page h-full flex flex-col">
       {/* Edit Cell Modal */}
       {renderEditModal()}
-      {departmentFilter === 'General' && showGlobalPanel && (
-        <div className="capacity-bar-top flex-shrink-0 mx-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-none p-0.5 shadow-sm">
-          <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
-            <span>Capacity</span>
-            <button onClick={() => setShowGlobalPanel(false)} className="text-green-600 hover:text-green-800 font-bold text-[10px] cursor-pointer" title="Hide Capacity panel">\u2715</button>
-          </h2>
-          <div className="overflow-x-auto" ref={generalCapacityScrollRef} onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}>
-          <div className="inline-block min-w-full" style={{ zoom: `${generalCapacityZoom / 100}` }}>
-            <div className="flex gap-0 mb-0">
-              <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0`}></div>
-              {monthSpans.map((monthInfo: any, idx: number) => {
-                const span = monthInfo.endIdx - monthInfo.startIdx + 1;
-                return (
-                  <div
-                    key={`gen-capbar-month-${monthInfo.month}-${monthInfo.startIdx}`}
-                    className={`flex-shrink-0 text-center text-[9px] font-bold px-1 py-0.5 rounded-none border !border-black ${idx % 2 === 0 ? MONTH_HEADER_PRIMARY_CLASS : MONTH_HEADER_SECONDARY_CLASS}`}
-                    style={{ width: `${span * 5}rem`, minWidth: `${span * 5}rem` }}
-                  >
-                    {monthInfo.month}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex gap-0 mb-0">
-              <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 text-[9px] font-bold text-indigo-700 flex items-center justify-center`}>{t.people}</div>
-              {allWeeksData.map((weekData: any, idx: number) => {
-                const isCurrentWeek = idx === currentDateWeekIndex;
-                return (
-                  <div
-                    key={`gen-capbar-header-${weekData.date}`}
-                    data-week-index={idx}
-                    className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 text-center text-[9px] font-bold px-1 py-0.5 rounded-none border-1.5 border-black ${isCurrentWeek ? CURRENT_WEEK_HEADER_CLASS : 'bg-blue-100 text-blue-900'}`}
-                  >
-                    CW{weekData.weekNum}
-                  </div>
-                );
-              })}
-            </div>
-            {DEPARTMENTS.map((dept: Department) => (
-              <div key={`gen-capbar-${dept}`} className="flex gap-0 mb-0">
-                <div className={`${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center gap-0.5 text-xs text-gray-700 px-0.5 py-0 border border-gray-300 bg-gray-50 whitespace-nowrap overflow-hidden text-ellipsis`}>
-                  <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
-                    {getDepartmentIcon(dept).icon}
-                  </span>
-                  <span className="font-medium text-xs leading-none">{dept}</span>
-                </div>
-                {allWeeksData.map((weekData: any, idx: number) => {
-                  const isCurrentWeek = idx === currentDateWeekIndex;
-                  const deptWeekKey = `${dept}|${weekData.date}`;
-                  const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
-                  const isMFG = dept === 'MFG';
-                  const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
-                  const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
-                  const availableCapacity = totalCapacity - occupiedValue;
-                  const unit = isMFG ? 'h' : 'people';
-                  let bgColor = 'bg-gray-200'; let textColor = 'text-gray-700';
-                  const utilPct = totalCapacity > 0 ? (occupiedValue / totalCapacity) * 100 : 0;
-                  if (totalCapacity === 0) { bgColor = 'bg-gray-200'; textColor = 'text-gray-700'; }
-                  else if (totalCapacity < 0) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
-                  else if (utilPct >= 100) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
-                  else if (utilPct >= 90) { bgColor = 'bg-red-500'; textColor = 'text-white'; }
-                  else if (utilPct >= 70) { bgColor = 'bg-yellow-300'; textColor = 'text-yellow-900'; }
-                  else { bgColor = 'bg-green-300'; textColor = 'text-green-900'; }
-                  const displayTextColor = isCurrentWeek ? 'text-black' : textColor;
-                  const displayTextWeight = isCurrentWeek ? 'font-black' : 'font-bold';
-                  return (
-                    <div
-                      key={`gen-capbar-cell-${dept}-${weekData.date}`}
-                      className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center px-1 py-0.5 rounded-none border-1.5 border-black text-[9px] font-bold ${bgColor} ${isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''}`}
-                      title={`${t.capacityLabel} - CW${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
-                    >
-                      <div className={`${displayTextColor} ${displayTextWeight} text-[10px]`}>{availableCapacity.toFixed(2)}</div>
-                    </div>
-                  );
-                })}
-                {/* Invisible spacer matching the Projects table's trailing Summary
-                    columns (60px each -- see SUMMARY_TOTAL_WIDTH_PX).
-                    This bar doesn't have those columns, but the percentage-based
-                    horizontal scroll sync (syncHorizontalScrollToCanonical) only lines
-                    weeks up correctly when both scrollable containers have the exact
-                    same total width; this keeps them equal without touching that sync
-                    logic itself. */}
-                <div className="flex-shrink-0" style={{ width: SUMMARY_TOTAL_WIDTH_PX }} />
-              </div>
-            ))}
-          </div>
-          </div>
-        </div>
-      )}
-
-      {departmentFilter === 'General' && !showGlobalPanel && (
-        <button onClick={() => setShowGlobalPanel(true)} className="mx-2 mt-1 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-lg transition flex-shrink-0">
-          Show Capacity
-        </button>
-      )}
+      {/* The Capacity bar used to live here as its own flex-shrink-0 section with its own
+          horizontal scroll, JS-synced to every open project's table. It's now rendered as the
+          sticky top rows of the single unified table below (see "Unified capacity grid"),
+          which is what makes it stay visible while scrolling down through many open projects
+          without any JS scroll syncing. The show/hide toggle moved to the sticky toolbar. */}
 
       {/* Year selector, current-week badge, and export buttons live in the sidebar now (after
           the department selector) to free up the top toolbar's horizontal space -- portaled
@@ -9759,6 +9487,54 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
               <span className="hidden sm:inline">{t.importProject || 'Import'}</span>
             </button>
           )}
+
+          {/* Single zoom control for the whole matrix (capacity bar + every project row share
+              one column grid now, so they need one shared zoom level -- see `zoom`/`setZoom`). */}
+          {projectsVisibleInCurrentView.length > 0 && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d5d1da] bg-[#f4f1f8] flex-shrink-0">
+              <span className="text-[9px] font-semibold text-[#2e1a47]">Z:</span>
+              <button
+                onClick={() => setZoom(Math.max(50, zoom - 10))}
+                className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                title="Zoom Out"
+              >
+                <ZoomOut size={10} />
+              </button>
+              <input
+                type="range"
+                min="50"
+                max="200"
+                step="10"
+                value={zoom}
+                onChange={(e) => setZoom(parseInt(e.target.value))}
+                className="w-12 cursor-pointer h-1"
+              />
+              <button
+                onClick={() => setZoom(Math.min(200, zoom + 10))}
+                className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
+                title="Zoom In"
+              >
+                <ZoomIn size={10} />
+              </button>
+              <span className="text-[9px] font-semibold text-[#2e1a47]">{zoom}%</span>
+            </div>
+          )}
+
+          {isGeneralView && (
+            <button
+              onClick={() => setShowGlobalPanel((prev) => !prev)}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold rounded transition flex-shrink-0 border ${
+                showGlobalPanel
+                  ? 'bg-green-500 hover:bg-green-600 text-white border-green-600'
+                  : 'bg-[#f4f1f8] hover:bg-[#ebe6f2] text-[#2e1a47] border-[#d5d1da]'
+              }`}
+              title={language === 'es' ? 'Mostrar/ocultar la barra de Capacity' : 'Show/hide the Capacity bar'}
+            >
+              {showGlobalPanel
+                ? (language === 'es' ? 'Ocultar Capacity' : 'Hide Capacity')
+                : (language === 'es' ? 'Mostrar Capacity' : 'Show Capacity')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -9845,8 +9621,6 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                   {showDepartmentPanel && (
                     <div
                       className="overflow-x-auto"
-                      ref={departmentCapacityScrollRef}
-                      onScroll={(e) => handleCapacityHorizontalScroll(e.currentTarget)}
                     >
                     <div className="inline-block min-w-full">
                       {/* Month headers row */}
@@ -10326,349 +10100,210 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
               </div>
             )}
 
-            {filteredDepartmentProjects.map((proj) => {
-              const dept = departmentFilter as Department;
-              const scopeKey = getProjectOrderScopeKey(departmentFilter);
-              const isHighProbabilityProject = !!proj.isHighProbability;
-              const projectHeaderClass = isHighProbabilityProject
-                ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 border-b border-amber-300'
-                : 'bg-gray-100 hover:bg-gray-200 border-b border-gray-300';
-
-              return (
-                <div
-                  key={proj.id}
-                  className={`capacity-project-card relative mb-2 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
-                    dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : (isHighProbabilityProject ? 'border-amber-400' : 'border-gray-300')
-                  } ${
-                    dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
-                      ? 'opacity-75 shadow-lg'
-                      : ''
-                  }`}
-                  onDragOver={(e) => {
-                    handleProjectDragOver(e);
-                    updateDragOverPosition(e, proj.id, scopeKey);
-                  }}
-                  onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedDepartmentProjects)}
-                >
-                  {dragOverState?.projectId === proj.id &&
-                    dragOverState?.scopeKey === scopeKey &&
-                    dragState?.projectId !== proj.id && (
-                      <div
-                        className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
-                          dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
-                        }`}
-                      />
-                    )}
-                  {/* Project header - Includes metrics for department view */}
-                  <div className={`capacity-project-header cursor-pointer ${projectHeaderClass}`} onClick={() => toggleProjectExpanded(proj.id)}>
-                    {/* Row 1: Project info */}
-                    <div className="p-1 flex items-center gap-1">
-                      <button
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
-                        onDragEnd={() => {
-                          setDragState(null);
-                          setDragOverState(null);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
-                          dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
-                        }`}
-                        title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
-                      >
-                        <GripVertical size={12} />
-                      </button>
-                      {expandedProjects[proj.id] ? (
-                        <ChevronUp size={14} className="text-gray-600 flex-shrink-0" />
-                      ) : (
-                        <ChevronDown size={14} className="text-gray-600 flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
-                          <span className="font-bold">{proj.name}</span>
-                          {proj.isClosed && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0 text-[9px] font-bold text-red-700">
-                              <XCircle size={10} />
-                              {language === 'es' ? 'Cerrado' : 'Closed'}
-                            </span>
-                          )}
-                          <span className="text-gray-400">|</span>
-                          <span className="text-gray-600">{proj.client}</span>
-                          <span className="text-gray-400">|</span>
-                          <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
-                            {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
-                          </span>
-                          {isHighProbabilityProject && (
-                            <>
-                              <span className="text-gray-400">|</span>
-                              <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                {language === 'es' ? 'High Probability' : 'High Probability'}
-                              </span>
-                              {canEditDepartment(dept) && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleClearHighProbabilityFromDepartment(proj);
-                                  }}
-                                  className="bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded text-[10px] font-semibold hover:bg-rose-200 transition"
-                                  title={language === 'es' ? 'Quitar etiqueta High Probability' : 'Remove High Probability label'}
-                                >
-                                  {language === 'es' ? 'Quitar HP' : 'Clear HP'}
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {proj.projectManagerId && (
-                            <>
-                              <span className="text-gray-400">|</span>
-                              <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                PM: {projectManagerNameById.get(proj.id) || 'PM'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {/* Desktop: Zoom controls inline */}
-                      <div className="hidden md:flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-[9px] font-semibold text-indigo-900">Z:</span>
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom Out"
-                        >
-                          <ZoomOut size={10} />
-                        </button>
-                        <input
-                          type="range"
-                          min="50"
-                          max="200"
-                          step="10"
-                          value={getEffectiveProjectZoom(proj.id)}
-                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
-                          className="w-12 cursor-pointer h-1"
-                        />
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom In"
-                        >
-                          <ZoomIn size={10} />
-                        </button>
-                        <span className="text-[9px] font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
-                      </div>
-                    </div>
-                    {/* Row 2: Mobile only - Metrics and Zoom in separate row */}
-                    <div className="md:hidden px-1 pb-1 flex items-center justify-end gap-1 border-t border-gray-200 pt-1" onClick={(e) => e.stopPropagation()}>
-                      {/* Zoom controls */}
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[8px] font-semibold text-indigo-900">Z:</span>
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom Out"
-                        >
-                          <ZoomOut size={10} />
-                        </button>
-                        <input
-                          type="range"
-                          min="50"
-                          max="200"
-                          step="10"
-                          value={getEffectiveProjectZoom(proj.id)}
-                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
-                          className="w-10 cursor-pointer h-1"
-                        />
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom In"
-                        >
-                          <ZoomIn size={10} />
-                        </button>
-                        <span className="text-[8px] font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Per-project zoom controls and summary */}
-                  <div className="flex items-center justify-between gap-3 p-1.5 bg-indigo-50 border-b border-indigo-200 flex-wrap hidden">
-                    {/* Per-project summary panel - FIRST (left side) */}
-                    {(() => {
-                      const dept = departmentFilter as Department;
-                      const quotedHoursValue = getQuotedHours(dept, proj.id);
-                      const utilizedHoursValue = getUtilizedHours(dept, proj.id);
-                      const forecastedHoursValue = getForecastedHours(dept, proj.id);
-                      const utilizationPercent = getUtilizationPercent(dept, proj.id);
-                      const utilizationColorInfo = getUtilizationColor(utilizationPercent);
-
-                      return (
-                        <div className="flex items-center gap-1 px-2 border-r border-indigo-300">
-                          {/* Quoted Hours (budget) */}
-                          <div className="bg-slate-100 rounded px-1.5 py-0.5 border border-slate-300 text-center min-w-fit">
-                            <div className="text-xs text-slate-700 font-bold">{t.quotedLabel}</div>
-                            <div className="text-xs font-black text-slate-700">{formatHours(quotedHoursValue)}h</div>
-                          </div>
-
-                          {/* Used Hours (calculated) */}
-                          <div className="bg-slate-100 rounded px-2 py-0.5 border border-slate-300 min-w-fit">
-                            <div className="text-center">
-                              <div className="text-xs text-slate-700 font-bold">{t.usedLabel}</div>
-                              <div className="text-xs font-black text-slate-700">{formatHours(utilizedHoursValue)}h</div>
-                            </div>
-                          </div>
-
-                          {/* Forecasted Hours (calculated) */}
-                          <div className="bg-slate-100 rounded px-2 py-0.5 border border-slate-300 min-w-fit">
-                            <div className="text-center">
-                              <div className="text-xs text-slate-700 font-bold">{t.pronosticado}</div>
-                              <div className="text-xs font-black text-slate-700">{formatHours(forecastedHoursValue)}h</div>
-                            </div>
-                          </div>
-
-                          {/* Utilization % = (Used + Forecasted) / (Quoted + Change Orders) * 100 */}
-                          <div className={`rounded px-1.5 py-0.5 border text-center min-w-fit ${utilizationColorInfo.bg}`}>
-                            <div className={`text-xs font-bold ${utilizationColorInfo.text}`}>{t.utilizationLabel}</div>
-                            <div className={`text-xs font-black ${utilizationColorInfo.text}`}>{utilizationPercent}%</div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Zoom controls */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-semibold text-indigo-900">Z:</span>
-                      <button
-                        onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
-                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                        title="Zoom Out"
-                      >
-                        <ZoomOut size={12} />
-                      </button>
-                      <input
-                        type="range"
-                        min="50"
-                        max="200"
-                        step="10"
-                        value={getEffectiveProjectZoom(proj.id)}
-                        onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
-                        className="w-12 cursor-pointer h-1.5"
-                      />
-                      <button
-                        onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
-                        className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                        title="Zoom In"
-                      >
-                        <ZoomIn size={12} />
-                      </button>
-                      <span className="text-xs font-semibold text-indigo-900">{getEffectiveProjectZoom(proj.id)}%</span>
-                    </div>
-
-                    {/* Collapse/Expand toggle */}
-                    <button
-                      onClick={() => toggleProjectExpanded(proj.id)}
-                      className="p-1 text-indigo-600 hover:text-indigo-800 font-bold text-lg cursor-pointer transition"
-                      title={expandedProjects[proj.id] ? 'Hide project' : 'Show project'}
-                    >
-                      {expandedProjects[proj.id] ? '▼' : '▶'}
-                    </button>
-                  </div>
-
-                  {expandedProjects[proj.id] && (
-                    <div style={{ zoom: `${(isGeneralView ? getEffectiveProjectZoom(proj.id) : 100) / 100}` }}>
-                      <div
-                        className="capacity-project-table-shell overflow-x-auto border border-gray-300 bg-white"
-                        style={{ scrollBehavior: 'smooth' }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
-                        ref={(el) => {
-                          if (el) {
-                            projectTableRefs.current.set(proj.id, el);
-                            if (!activeSyncedProjectIdRef.current) {
-                              markProjectAsActiveSyncTarget(proj.id);
-                            }
-                            const targetScrollProgress = syncedBaseScrollProgressRef.current;
-                            setScrollProgressIfNeeded(el, targetScrollProgress);
-                          } else {
-                            projectTableRefs.current.delete(proj.id);
-                            if (activeSyncedProjectIdRef.current === proj.id) {
-                              markProjectAsActiveSyncTarget(null);
-                            }
-                          }
-                        }}
-                      >
-                      <table className="border-collapse text-xs table-fixed w-max min-w-full">
-                        <thead>
-                        {/* Month row */}
-                        <tr className="bg-gray-200 text-gray-700">
-                          <th className={`border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-10 text-xs ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}></th>
-                          {projectMonthSpans.map((monthInfo, idx) => {
-                            const isEven = idx % 2 === 0;
-                            return (
-                              <th
-                                key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                colSpan={monthInfo.endIdx - monthInfo.startIdx + 1}
-                                className={`border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
-                                  isEven
-                                    ? MONTH_HEADER_PRIMARY_CLASS
-                                    : MONTH_HEADER_SECONDARY_CLASS
-                                }`}
-                              >
-                                {monthInfo.month}
-                              </th>
-                            );
-                          })}
+            {/* Unified grid: every open project shares ONE scroll container and ONE column
+                grid with the month/week header, same approach as the General view above --
+                see its comment for why (removes the JS scroll-sync that caused the lag with
+                more than one project open). The Weekly Occupancy panel above stays separate
+                (different concept: editable SCIO/PTO/Training capacity, not project hours). */}
+            {projectsVisibleInCurrentView.length > 0 && (
+              <div ref={departmentCapacityScrollRef} className="overflow-auto border border-gray-300 rounded-lg bg-white" style={{ maxHeight: 'calc(100vh - 150px)' }}>
+                <table className="border-collapse text-xs table-fixed w-max min-w-full">
+                  <thead>
+                    {/* Month row */}
+                    <tr className="bg-gray-200 text-gray-700">
+                      <th
+                        className={`sticky z-40 border border-gray-300 px-1 py-0 text-left font-bold bg-gray-200 text-xs ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}
+                        style={{ top: 0, left: 0 }}
+                      ></th>
+                      {monthSpans.map((monthInfo, idx) => {
+                        const isEven = idx % 2 === 0;
+                        const span = monthInfo.endIdx - monthInfo.startIdx + 1;
+                        return (
                           <th
-                            colSpan={SUMMARY_COLUMNS.length}
-                            className={`border-2 px-2 py-0.5 text-center font-bold text-xs ${MONTH_HEADER_PRIMARY_CLASS} sticky right-0 z-20`}
-                            style={{ width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX }}
+                            key={`unified-dept-month-${monthInfo.month}-${monthInfo.startIdx}`}
+                            colSpan={span}
+                            className={`sticky z-30 border-2 px-2 py-0.5 text-center font-bold text-xs transition-all ${
+                              isEven ? MONTH_HEADER_PRIMARY_CLASS : MONTH_HEADER_SECONDARY_CLASS
+                            }`}
+                            style={{ top: 0, width: `${span * 5}rem`, minWidth: `${span * 5}rem` }}
                           >
-                            {language === 'es' ? 'Resumen' : 'Summary'}
+                            {monthInfo.month}
                           </th>
-                        </tr>
-                        {/* Week row */}
-                        <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                          <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-10 uppercase text-xs whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
-                            {proj.name}
+                        );
+                      })}
+                      <th
+                        colSpan={SUMMARY_COLUMNS.length}
+                        className={`sticky z-40 border-2 px-2 py-0.5 text-center font-bold text-xs ${MONTH_HEADER_PRIMARY_CLASS}`}
+                        style={{ top: 0, right: 0, width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX }}
+                      >
+                        {language === 'es' ? 'Resumen' : 'Summary'}
+                      </th>
+                    </tr>
+                    {/* Week row */}
+                    <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                      <th
+                        className={`sticky z-40 border border-blue-500 px-1 py-0.5 text-left font-bold bg-blue-600 uppercase text-xs whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}
+                        style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX, left: 0 }}
+                      >
+                        {t.people}
+                      </th>
+                      {allWeeksData.map((weekData, idx) => {
+                        const isCurrentWeek = idx === currentDateWeekIndex;
+                        return (
+                          <th
+                            key={`unified-dept-week-${weekData.date}`}
+                            data-week-index={idx}
+                            className={`sticky z-30 border px-0.5 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} relative transition-all text-xs ${
+                              isCurrentWeek
+                                ? CURRENT_WEEK_STRONG_HEADER_CLASS
+                                : weekData.isNextYear
+                                  ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
+                                  : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
+                            }`}
+                            style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX }}
+                          >
+                            <div className="font-bold text-xs leading-none">CW{weekData.weekNum}</div>
                           </th>
-                          {projectAllWeeksData.map((weekData, idx) => {
-                            const isCurrentWeek = idx === currentDateWeekIndex;
-                            return (
-                              <th
-                                key={weekData.date}
-                                data-week-index={idx}
-                                className={`border px-0.5 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} relative transition-all text-xs ${
-                                  isCurrentWeek
-                                    ? CURRENT_WEEK_STRONG_HEADER_CLASS
-                                    : weekData.isNextYear
-                                      ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
-                                      : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
+                        );
+                      })}
+                      {SUMMARY_COLUMNS.map(({ key, rightOffset }) => (
+                        <th
+                          key={key}
+                          className="sticky z-40 border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px]"
+                          style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX, right: rightOffset }}
+                        >
+                          {SUMMARY_COLUMN_LABELS[key][language]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  {filteredDepartmentProjects.map((proj) => {
+                    const dept = departmentFilter as Department;
+                    const scopeKey = getProjectOrderScopeKey(departmentFilter);
+                    const isHighProbabilityProject = !!proj.isHighProbability;
+                    const totalGridColumns = 1 + allWeeksData.length + SUMMARY_COLUMNS.length;
+                    const projectHeaderClass = isHighProbabilityProject
+                      ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200'
+                      : 'bg-gray-100 hover:bg-gray-200';
+                    return (
+                    <tbody
+                      key={proj.id}
+                      ref={(el) => {
+                        if (el) projectTableRefs.current.set(proj.id, el);
+                        else projectTableRefs.current.delete(proj.id);
+                      }}
+                      className={`border-t-4 ${isHighProbabilityProject ? 'border-amber-400' : 'border-gray-400'}`}
+                    >
+                      {/* Project header row -- spans the whole grid, not sticky (scrolls away with the body) */}
+                      <tr
+                        className={`relative cursor-pointer transition ${projectHeaderClass} ${
+                          dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey ? 'ring-2 ring-blue-400' : ''
+                        } ${dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'opacity-60' : ''}`}
+                        onClick={() => toggleProjectExpanded(proj.id)}
+                        onDragOver={(e) => {
+                          handleProjectDragOver(e);
+                          updateDragOverPosition(e, proj.id, scopeKey);
+                        }}
+                        onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedDepartmentProjects)}
+                      >
+                        {/* Sticky identifier cell: stays pinned on the left like the department
+                            row below it, so the project is still identifiable after scrolling
+                            right through the weeks. */}
+                        <td
+                          className={`sticky z-20 left-0 ${projectHeaderClass} border-r border-gray-300 px-1 py-1 ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}
+                          title={proj.name}
+                        >
+                          <div className="flex items-center gap-0.5">
+                            {expandedProjects[proj.id] ? (
+                              <ChevronUp size={12} className="text-gray-600 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown size={12} className="text-gray-600 flex-shrink-0" />
+                            )}
+                            <span className="font-bold text-xs truncate">{proj.name}</span>
+                          </div>
+                        </td>
+                        <td colSpan={totalGridColumns - 1} className="relative p-1">
+                          {dragOverState?.projectId === proj.id &&
+                            dragOverState?.scopeKey === scopeKey &&
+                            dragState?.projectId !== proj.id && (
+                              <div
+                                className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
+                                  dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
                                 }`}
-                              >
-                                <div className={`font-bold text-xs leading-none`}>CW{weekData.weekNum}</div>
-                              </th>
-                            );
-                          })}
-                          {SUMMARY_COLUMNS.map(({ key, rightOffset }) => (
-                            <th
-                              key={key}
-                              style={{ right: rightOffset }}
-                              className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px] sticky z-20"
+                              />
+                            )}
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
+                              onDragEnd={() => {
+                                setDragState(null);
+                                setDragOverState(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
+                                dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
+                              }`}
+                              title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
                             >
-                              {SUMMARY_COLUMN_LABELS[key][language]}
-                            </th>
-                          ))}
-                        </tr>
-                    </thead>
-                    <tbody>
+                              <GripVertical size={12} />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
+                                {proj.isClosed && (
+                                  <span className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0 text-[9px] font-bold text-red-700">
+                                    <XCircle size={10} />
+                                    {language === 'es' ? 'Cerrado' : 'Closed'}
+                                  </span>
+                                )}
+                                <span className="text-gray-600">{proj.client}</span>
+                                <span className="text-gray-400">|</span>
+                                <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
+                                  {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
+                                </span>
+                                {isHighProbabilityProject && (
+                                  <>
+                                    <span className="text-gray-400">|</span>
+                                    <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                      {language === 'es' ? 'High Probability' : 'High Probability'}
+                                    </span>
+                                    {canEditDepartment(dept) && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void handleClearHighProbabilityFromDepartment(proj);
+                                        }}
+                                        className="bg-rose-100 text-rose-700 border border-rose-300 px-1.5 py-0.5 rounded text-[10px] font-semibold hover:bg-rose-200 transition"
+                                        title={language === 'es' ? 'Quitar etiqueta High Probability' : 'Remove High Probability label'}
+                                      >
+                                        {language === 'es' ? 'Quitar HP' : 'Clear HP'}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                                {proj.projectManagerId && (
+                                  <>
+                                    <span className="text-gray-400">|</span>
+                                    <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                      PM: {projectManagerNameById.get(proj.id) || 'PM'}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedProjects[proj.id] && (
+                        <>
                       {/* Project-relative week row (thin): 1..N from project start to end */}
                       <tr>
-                        <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
+                        <td className={`sticky z-20 left-0 border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           {t.projectWeek || 'Project Week'}
                         </td>
-                        {projectAllWeeksData.map((weekData, weekIdx) => {
+                        {allWeeksData.map((weekData, weekIdx) => {
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
                           // Project Week must always reflect the project global timeline,
                           // not the current department timing shift.
@@ -10698,7 +10333,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
 
                       {/* Department row for this project */}
                       <tr className="hover:bg-gray-50">
-                        <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
+                        <td className={`sticky z-20 left-0 border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${DEPARTMENT_LEFT_COLUMN_WIDTH_CLASS}`}>
                           <div className="flex items-center justify-between gap-0.5">
                             <div className="flex items-center gap-0.5">
                               <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
@@ -10709,7 +10344,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
 
                           </div>
                         </td>
-                        {projectAllWeeksData.map((weekData, weekIdx) => {
+                        {allWeeksData.map((weekData, weekIdx) => {
                           const week = weekData.date;
                           const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
                           const isLocked = isWeekLocked(week);
@@ -10784,194 +10419,20 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                         })}
                         {renderProjectDepartmentSummaryCells(proj.id, dept)}
                       </tr>
+                        </>
+                      )}
                     </tbody>
-                    </table>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
+                    );
+                  })}
+                </table>
+              </div>
+            )}
             </div>
         )}
 
         {/* Projects Table - Only in General View */}
         {departmentFilter === 'General' && (
           <div style={{ zoom: `${zoom / 100}` }}>
-            {/* Global Capacity Summary Panel - hidden, shown in capacity bar above */}
-            <div className="hidden">
-            {showGlobalPanel && (
-              <div className="sticky top-0 z-40 mb-0.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-none p-0.5 shadow-sm">
-                <h2 className="text-[10px] font-bold mb-0.5 text-green-800 flex items-center gap-0.5 justify-between">
-                  <div className="flex items-center gap-0.5">
-                    <span>Capacity</span>
-                  </div>
-                  <button
-                    onClick={() => setShowGlobalPanel(false)}
-                    className="text-green-600 hover:text-green-800 font-bold text-[10px] cursor-pointer"
-                    title="Hide Capacity panel"
-                  >
-                    ✕
-                  </button>
-                </h2>
-
-              {/* Vertical calendar layout - weeks as columns, departments as rows */}
-              <div
-                className="overflow-x-auto"
-              >
-                <div className="inline-block min-w-full" style={{ zoom: `${generalCapacityZoom / 100}` }}>
-                  {/* Month headers row */}
-                  <div className="flex gap-0 mb-0">
-                    {/* Empty cell for department names column */}
-                    <div className={`${GENERAL_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0`}></div>
-
-                    {monthSpans.map((monthInfo, idx) => {
-                      const span = monthInfo.endIdx - monthInfo.startIdx + 1;
-                      return (
-                        <div
-                          key={`general-month-${monthInfo.month}-${monthInfo.startIdx}`}
-                          className={`flex-shrink-0 text-center text-[9px] font-bold p-0.5 rounded-none border !border-black ${
-                            idx % 2 === 0
-                              ? MONTH_HEADER_PRIMARY_CLASS
-                              : MONTH_HEADER_SECONDARY_CLASS
-                          }`}
-                          style={{
-                            width: `${span * 5}rem`,
-                            minWidth: `${span * 5}rem`,
-                          }}
-                        >
-                          {monthInfo.month}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Week headers row */}
-                  <div className="flex gap-0 mb-0">
-                    {/* Empty cell for department names column */}
-                    <div className={`${GENERAL_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0`}></div>
-
-                    {/* Week number headers */}
-                    {allWeeksData.map((weekData, idx) => {
-                      const isCurrentWeek = idx === currentDateWeekIndex;
-                      return (
-                        <div
-                          key={`header-${weekData.date}`}
-                          className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 text-center text-[9px] font-bold p-0.5 rounded-none border border-black ${
-                            isCurrentWeek
-                              ? CURRENT_WEEK_HEADER_CLASS
-                              : 'bg-blue-100 text-blue-900'
-                          }`}
-                        >
-                          CW{weekData.weekNum}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Department rows */}
-                  {DEPARTMENTS.map((dept) => {
-                    const deptIcon = getDepartmentIcon(dept);
-                    return (
-                      <div key={`dept-${dept}`} className="flex gap-0 mb-0">
-                        {/* Department name column */}
-                        <div className={`${GENERAL_LEFT_COLUMN_WIDTH_CLASS} flex-shrink-0 sticky left-0 z-10 flex items-center justify-center text-[9px] font-bold p-0.5 rounded-none border border-black ${deptIcon.color} bg-white`}>
-                          <span title={dept}>{dept}</span>
-                        </div>
-
-                        {/* Week cells for this department */}
-                        {allWeeksData.map((weekData, idx) => {
-                          const isCurrentWeek = idx === currentDateWeekIndex;
-
-                          // Calculate total hours occupied for this department this week
-                          const deptWeekKey = `${dept}|${weekData.date}`;
-                          const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
-
-                          // For MFG: use hours directly. For other departments: convert to people
-                          const isMFG = dept === 'MFG';
-                          const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
-
-                          const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
-
-                          const availableCapacity = totalCapacity - occupiedValue;
-                          const unit = isMFG ? 'h' : 'people';
-
-                          // Determine color based on utilization percentage
-                          let bgColor = 'bg-gray-200';
-                          let textColor = 'text-gray-700';
-                          const utilizationPercentForCapacity = totalCapacity > 0
-                            ? (occupiedValue / totalCapacity) * 100
-                            : 0;
-
-                          // If no capacity set, show gray
-                          if (totalCapacity === 0) {
-                            bgColor = 'bg-gray-200';
-                            textColor = 'text-gray-700';
-                          } else if (totalCapacity < 0) {
-                            // Negative base capacity (e.g. PTO/Training exceeding SCIO Team Members): critical
-                            bgColor = 'bg-red-700 animate-pulse';
-                            textColor = 'text-white';
-                          } else if (utilizationPercentForCapacity >= 100) {
-                            // Critical: 100%+ utilization
-                            bgColor = 'bg-red-700 animate-pulse';
-                            textColor = 'text-white';
-                          } else if (utilizationPercentForCapacity >= 90) {
-                            // High: 90-99%
-                            bgColor = 'bg-red-500';
-                            textColor = 'text-white';
-                          } else if (utilizationPercentForCapacity >= 70) {
-                            // Moderate: 70-89%
-                            bgColor = 'bg-yellow-300';
-                            textColor = 'text-yellow-900';
-                          } else {
-                            // Healthy: <70%
-                            bgColor = 'bg-green-300';
-                            textColor = 'text-green-900';
-                          }
-
-                          const displayTextColor = isCurrentWeek ? 'text-black' : textColor;
-                          const displayTextWeight = isCurrentWeek ? 'font-black' : 'font-bold';
-
-                          return (
-                            <div
-                              key={`${dept}-${weekData.date}`}
-                              className={`${WEEK_COLUMN_WIDTH_CLASS} flex-shrink-0 flex flex-col items-center justify-center p-0.5 rounded-none border border-black text-[8px] font-semibold ${bgColor} ${
-                                isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''
-                              }`}
-                              title={`${dept} - CW${weekData.weekNum}${weekData.isNextYear ? ` (${selectedYear + 1})` : ''}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
-                            >
-                              {totalCapacity > 0 ? (
-                                <div className={`${displayTextColor} ${displayTextWeight} text-[8px]`}>
-                                  {availableCapacity.toFixed(2)}
-                                </div>
-                              ) : (
-                                <div className={`${displayTextColor} ${displayTextWeight} text-[7px]`}>—</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-            )}
-
-            {/* Toggle button to show Global panel when hidden */}
-            {!showGlobalPanel && (
-              <button
-                onClick={() => setShowGlobalPanel(true)}
-                className="mb-2 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold rounded-lg transition"
-                title="Show Capacity panel"
-              >
-                Show Capacity
-              </button>
-            )}
-            </div>
-
             {renderProjectListFilters()}
 
             <div className="capacity-projects-section-banner mt-2 mb-1 rounded-md border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-2 py-1">
@@ -10989,225 +10450,253 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                 </div>
               )}
 
-              {filteredGeneralProjects.map((proj) => {
-                const scopeKey = getProjectOrderScopeKey('General');
-                const isHighProbabilityProject = !!proj.isHighProbability;
-                const projectHeaderClass = isHighProbabilityProject
-                  ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 border-b border-amber-300'
-                  : 'bg-gray-100 hover:bg-gray-200 border-b border-gray-300';
-                return (
-                <div
-                  key={proj.id}
-                  className={`capacity-project-card relative mb-1 border rounded-lg shadow-sm bg-white overflow-hidden transition ${
-                    dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : (isHighProbabilityProject ? 'border-amber-400' : 'border-gray-300')
-                  } ${
-                    dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey
-                      ? 'opacity-75 shadow-lg'
-                      : ''
-                  }`}
-                  onDragOver={(e) => {
-                    handleProjectDragOver(e);
-                    updateDragOverPosition(e, proj.id, scopeKey);
-                  }}
-                  onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedGeneralProjects)}
-                >
-                  {dragOverState?.projectId === proj.id &&
-                    dragOverState?.scopeKey === scopeKey &&
-                    dragState?.projectId !== proj.id && (
-                      <div
-                        className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
-                          dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
-                        }`}
-                      />
-                    )}
-                  {/* Project header */}
-                  <div className={`capacity-project-header cursor-pointer p-1 ${projectHeaderClass}`} onClick={() => toggleProjectExpanded(proj.id)}>
-                    <div className="flex items-center justify-between gap-1">
-                      <button
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
-                        onDragEnd={() => {
-                          setDragState(null);
-                          setDragOverState(null);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
-                          dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
-                        }`}
-                        title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
-                      >
-                        <GripVertical size={12} />
-                      </button>
-                      {expandedProjects[proj.id] ? (
-                        <ChevronUp size={14} className="text-gray-600" />
-                      ) : (
-                        <ChevronDown size={14} className="text-gray-600" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
-                          <span className="font-bold">{proj.name}</span>
-                          {proj.isClosed && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0 text-[9px] font-bold text-red-700">
-                              <XCircle size={10} />
-                              {language === 'es' ? 'Cerrado' : 'Closed'}
-                            </span>
-                          )}
-                          <span className="text-gray-400">|</span>
-                          <span className="text-gray-600">{proj.client}</span>
-                          <span className="text-gray-400">|</span>
-                          <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
-                            {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
-                          </span>
-                          {isHighProbabilityProject && (
-                            <>
-                              <span className="text-gray-400">|</span>
-                              <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                {language === 'es' ? 'High Probability' : 'High Probability'}
-                              </span>
-                            </>
-                          )}
-                          {proj.projectManagerId && (
-                            <>
-                              <span className="text-gray-400">|</span>
-                              <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                PM: {projectManagerNameById.get(proj.id) || 'PM'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Zoom controls */}
-                      <div className="flex items-center gap-0.5 ml-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-xs font-semibold text-indigo-900">Z:</span>
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.max(50, getEffectiveProjectZoom(proj.id) - 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom Out"
-                        >
-                          <ZoomOut size={12} />
-                        </button>
-                        <input
-                          type="range"
-                          min="50"
-                          max="200"
-                          step="10"
-                          value={getEffectiveProjectZoom(proj.id)}
-                          onChange={(e) => updateProjectZoom(proj.id, parseInt(e.target.value))}
-                          className="w-12 cursor-pointer h-1.5"
-                        />
-                        <button
-                          onClick={() => updateProjectZoom(proj.id, Math.min(200, getEffectiveProjectZoom(proj.id) + 10))}
-                          className="p-0.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded transition"
-                          title="Zoom In"
-                        >
-                          <ZoomIn size={12} />
-                        </button>
-                        <span className="text-xs font-semibold text-indigo-900 ml-0.5">{getEffectiveProjectZoom(proj.id)}%</span>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Expandable content - includes hours panel AND table */}
-                  {expandedProjects[proj.id] && (
-                    <>
-
-                      <div
-                        className="overflow-x-auto"
-                        style={{ scrollBehavior: 'smooth', zoom: `${getEffectiveProjectZoom(proj.id) / 100}` }}
-                        onScroll={(e) => handleProjectHorizontalScroll(proj.id, e.currentTarget)}
-                        ref={(el) => {
-                          if (el) {
-                            projectTableRefs.current.set(proj.id, el);
-                            if (!activeSyncedProjectIdRef.current) {
-                              markProjectAsActiveSyncTarget(proj.id);
-                            }
-                            const targetScrollProgress = syncedBaseScrollProgressRef.current;
-                            setScrollProgressIfNeeded(el, targetScrollProgress);
-                          } else {
-                            projectTableRefs.current.delete(proj.id);
-                            if (activeSyncedProjectIdRef.current === proj.id) {
-                              markProjectAsActiveSyncTarget(null);
-                            }
-                          }
-                        }}
-                      >
-                      <table className="border-collapse text-xs table-fixed w-max min-w-full">
-                        <thead>
-                          {/* Month row */}
-                          <tr className="bg-gray-200 text-gray-700 sticky top-0 z-20">
-                            <th className={`border border-gray-300 px-1 py-0 text-left font-bold sticky left-0 bg-gray-200 z-30 text-[9px] ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}></th>
-                            {projectMonthSpans.map((monthInfo, idx) => {
-                              const isEven = idx % 2 === 0;
-                              const span = monthInfo.endIdx - monthInfo.startIdx + 1;
-                              return (
-                                <th
-                                  key={`${monthInfo.month}-${monthInfo.startIdx}`}
-                                  colSpan={span}
-                                  className={`border-2 px-2 py-0.5 text-center font-bold text-[9px] transition-all ${
-                                    isEven
-                                      ? MONTH_HEADER_PRIMARY_CLASS
-                                      : MONTH_HEADER_SECONDARY_CLASS
-                                  }`}
-                                  style={{ width: `${span * 5}rem`, minWidth: `${span * 5}rem` }}
-                                >
-                                  {monthInfo.month}
-                                </th>
-                              );
-                            })}
+              {/* Unified capacity grid: Capacity bar + every open project share ONE scroll
+                  container (both axes) and ONE column grid, so the month/week header and the
+                  Capacity-per-department rows can use plain CSS `position: sticky` to stay
+                  pinned on top while scrolling down through many projects, and the
+                  department/project-name column stays pinned on the left while scrolling
+                  through weeks -- all handled natively by the browser, no JS scroll-sync. */}
+              {projectsVisibleInCurrentView.length > 0 && (
+                <div ref={generalCapacityScrollRef} className="overflow-auto border border-gray-300 rounded-lg bg-white" style={{ maxHeight: 'calc(100vh - 150px)' }}>
+                  <table className="border-collapse text-xs table-fixed w-max min-w-full">
+                    <thead>
+                      {/* Month row. Every sticky header cell below gets an explicit pixel
+                          `height` (not just padding/line-height) so UNIFIED_HEADER_ROW_HEIGHT_PX
+                          stacking math is exact -- without it, small per-row differences in
+                          padding/border compound across the 9 stacked sticky rows and the last
+                          few (and the first project rows right under them) start overlapping as
+                          you scroll. */}
+                      <tr className="bg-gray-200 text-gray-700">
+                        <th
+                          className={`sticky border border-gray-300 px-1 py-0 text-left font-bold bg-gray-200 text-[9px] overflow-hidden ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}
+                          style={{ top: 0, left: 0, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 50 }}
+                        ></th>
+                        {monthSpans.map((monthInfo, idx) => {
+                          const isEven = idx % 2 === 0;
+                          const span = monthInfo.endIdx - monthInfo.startIdx + 1;
+                          return (
                             <th
-                              colSpan={SUMMARY_COLUMNS.length}
-                              className={`border-2 px-2 py-0.5 text-center font-bold text-[9px] ${MONTH_HEADER_PRIMARY_CLASS} sticky right-0 z-20`}
-                              style={{ width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX }}
+                              key={`unified-month-${monthInfo.month}-${monthInfo.startIdx}`}
+                              colSpan={span}
+                              className={`sticky border-2 px-2 py-0.5 text-center font-bold text-[9px] transition-all overflow-hidden ${
+                                isEven ? MONTH_HEADER_PRIMARY_CLASS : MONTH_HEADER_SECONDARY_CLASS
+                              }`}
+                              style={{ top: 0, width: `${span * 5}rem`, minWidth: `${span * 5}rem`, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 40 }}
                             >
-                              {language === 'es' ? 'Resumen' : 'Summary'}
+                              {monthInfo.month}
                             </th>
-                          </tr>
-                          {/* Week row */}
-                          <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-5 z-20">
-                            <th className={`border border-blue-500 px-1 py-0.5 text-left font-bold sticky left-0 bg-blue-600 z-30 uppercase text-[9px] whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
-                              Dpto
+                          );
+                        })}
+                        <th
+                          colSpan={SUMMARY_COLUMNS.length}
+                          className={`sticky border-2 px-2 py-0.5 text-center font-bold text-[9px] overflow-hidden ${MONTH_HEADER_PRIMARY_CLASS}`}
+                          style={{ top: 0, right: 0, width: SUMMARY_TOTAL_WIDTH_PX, minWidth: SUMMARY_TOTAL_WIDTH_PX, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 50 }}
+                        >
+                          {language === 'es' ? 'Resumen' : 'Summary'}
+                        </th>
+                      </tr>
+                      {/* Week row */}
+                      <tr className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                        <th
+                          className={`sticky border border-blue-500 px-1 py-0.5 text-left font-bold bg-blue-600 uppercase text-[9px] whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}
+                          style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX, left: 0, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 50 }}
+                        >
+                          {t.people}
+                        </th>
+                        {allWeeksData.map((weekData, idx) => {
+                          const isCurrentWeek = idx === currentDateWeekIndex;
+                          return (
+                            <th
+                              key={`unified-week-${weekData.date}`}
+                              data-week-index={idx}
+                              className={`sticky border px-1 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} max-w-20 relative transition-all text-[9px] overflow-hidden ${
+                                isCurrentWeek
+                                  ? CURRENT_WEEK_STRONG_HEADER_CLASS
+                                  : weekData.isNextYear
+                                    ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
+                                    : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
+                              }`}
+                              style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 40 }}
+                            >
+                              <div className="font-bold text-[9px] leading-none">CW{weekData.weekNum}</div>
                             </th>
-                            {projectAllWeeksData.map((weekData, idx) => {
+                          );
+                        })}
+                        {SUMMARY_COLUMNS.map(({ key, rightOffset }) => (
+                          <th
+                            key={key}
+                            className="sticky border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px] overflow-hidden"
+                            style={{ top: UNIFIED_HEADER_ROW_HEIGHT_PX, right: rightOffset, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 50 }}
+                          >
+                            {SUMMARY_COLUMN_LABELS[key][language]}
+                          </th>
+                        ))}
+                      </tr>
+                      {/* Capacity-per-department rows (toggle: "Mostrar/Ocultar Capacity" in the toolbar) */}
+                      {showGlobalPanel && DEPARTMENTS.map((dept, deptIdx) => {
+                        const deptIcon = getDepartmentIcon(dept);
+                        const rowTop = UNIFIED_HEADER_ROW_HEIGHT_PX * 2 + deptIdx * UNIFIED_HEADER_ROW_HEIGHT_PX;
+                        return (
+                          <tr key={`unified-capbar-${dept}`}>
+                            <th
+                              className={`sticky border border-gray-300 px-0.5 py-0 text-left font-bold bg-gray-50 text-[9px] whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}
+                              style={{ top: rowTop, left: 0, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 50 }}
+                            >
+                              <span className="inline-flex items-center gap-0.5">
+                                <span className={`text-xs ${deptIcon.color}`}>{deptIcon.icon}</span>
+                                <span className="leading-none">{dept}</span>
+                              </span>
+                            </th>
+                            {allWeeksData.map((weekData, idx) => {
                               const isCurrentWeek = idx === currentDateWeekIndex;
+                              const deptWeekKey = `${dept}|${weekData.date}`;
+                              const totalWeekHours = assignmentIndex.deptWeekTotals.get(deptWeekKey) || 0;
+                              const isMFG = dept === 'MFG';
+                              const occupiedValue = isMFG ? totalWeekHours : totalWeekHours / 45;
+                              const totalCapacity = getDepartmentTotalCapacityForWeek(dept, weekData.date);
+                              const availableCapacity = totalCapacity - occupiedValue;
+                              const unit = isMFG ? 'h' : 'people';
+                              let bgColor = 'bg-gray-200'; let textColor = 'text-gray-700';
+                              const utilPct = totalCapacity > 0 ? (occupiedValue / totalCapacity) * 100 : 0;
+                              if (totalCapacity === 0) { bgColor = 'bg-gray-200'; textColor = 'text-gray-700'; }
+                              else if (totalCapacity < 0) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
+                              else if (utilPct >= 100) { bgColor = 'bg-red-700 animate-pulse'; textColor = 'text-white'; }
+                              else if (utilPct >= 90) { bgColor = 'bg-red-500'; textColor = 'text-white'; }
+                              else if (utilPct >= 70) { bgColor = 'bg-yellow-300'; textColor = 'text-yellow-900'; }
+                              else { bgColor = 'bg-green-300'; textColor = 'text-green-900'; }
+                              const displayTextColor = isCurrentWeek ? 'text-black' : textColor;
+                              const displayTextWeight = isCurrentWeek ? 'font-black' : 'font-bold';
                               return (
-                                <th
-                                  key={weekData.date}
-                                  data-week-index={idx}
-                                  className={`border px-1 py-0.5 text-center font-bold ${WEEK_COLUMN_WIDTH_CLASS} max-w-20 relative transition-all text-[9px] ${
-                                    isCurrentWeek
-                                      ? CURRENT_WEEK_STRONG_HEADER_CLASS
-                                      : weekData.isNextYear
-                                        ? 'bg-gradient-to-b from-slate-300 to-slate-400 border-slate-500 text-slate-900'
-                                        : 'bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white'
-                                  }`}
+                                <td
+                                  key={`unified-capbar-cell-${dept}-${weekData.date}`}
+                                  className={`sticky border-1.5 border-black text-[9px] font-bold text-center overflow-hidden ${bgColor} ${isCurrentWeek ? CURRENT_WEEK_RING_CLASS : ''}`}
+                                  style={{ top: rowTop, height: UNIFIED_HEADER_ROW_HEIGHT_PX, maxHeight: UNIFIED_HEADER_ROW_HEIGHT_PX, zIndex: 30 }}
+                                  title={`${t.capacityLabel} - CW${weekData.weekNum}: ${totalCapacity.toFixed(2)} ${unit} (Available: ${availableCapacity.toFixed(2)})`}
                                 >
-                                  <div className="font-bold text-[9px] leading-none">CW{weekData.weekNum}</div>
-                                </th>
+                                  <div className={`${displayTextColor} ${displayTextWeight} text-[10px]`}>{availableCapacity.toFixed(2)}</div>
+                                </td>
                               );
                             })}
-                            {SUMMARY_COLUMNS.map(({ key, rightOffset }) => (
-                              <th
-                                key={key}
-                                style={{ right: rightOffset }}
-                                className="border px-1 py-0.5 text-center font-bold text-[10px] bg-gradient-to-b from-blue-600 to-blue-700 border-blue-500 text-white whitespace-nowrap w-[60px] min-w-[60px] max-w-[60px] sticky z-20"
-                              >
-                                {SUMMARY_COLUMN_LABELS[key][language]}
-                              </th>
-                            ))}
+                            {/* No trailing Summary columns here on purpose -- Qtd/Used/Fcst/Util
+                                is per-project data and this row is department capacity, not a
+                                project, so there's nothing to show there. */}
                           </tr>
-                        </thead>
-                        <tbody>
+                        );
+                      })}
+                    </thead>
+                    {filteredGeneralProjects.map((proj) => {
+                        const scopeKey = getProjectOrderScopeKey('General');
+                        const isHighProbabilityProject = !!proj.isHighProbability;
+                        const totalGridColumns = 1 + allWeeksData.length + SUMMARY_COLUMNS.length;
+                        const projectHeaderClass = isHighProbabilityProject
+                          ? 'bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200'
+                          : 'bg-gray-100 hover:bg-gray-200';
+                        return (
+                        <tbody
+                      key={proj.id}
+                      ref={(el) => {
+                        if (el) projectTableRefs.current.set(proj.id, el);
+                        else projectTableRefs.current.delete(proj.id);
+                      }}
+                      className={`border-t-4 ${isHighProbabilityProject ? 'border-amber-400' : 'border-gray-400'}`}
+                    >
+                          {/* Project header row -- spans the whole grid, not sticky (scrolls away with the body) */}
+                          <tr
+                            className={`relative cursor-pointer transition ${projectHeaderClass} ${
+                              dragOverState?.projectId === proj.id && dragOverState?.scopeKey === scopeKey ? 'ring-2 ring-blue-400' : ''
+                            } ${dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'opacity-60' : ''}`}
+                            onClick={() => toggleProjectExpanded(proj.id)}
+                            onDragOver={(e) => {
+                              handleProjectDragOver(e);
+                              updateDragOverPosition(e, proj.id, scopeKey);
+                            }}
+                            onDrop={(e) => handleProjectDrop(e, proj.id, scopeKey, orderedGeneralProjects)}
+                          >
+                            {/* Sticky identifier cell: stays pinned on the left like the
+                                department rows below it, so the project is still identifiable
+                                after scrolling right through the weeks. */}
+                            <td
+                              className={`sticky z-20 left-0 ${projectHeaderClass} border-r border-gray-300 px-1 py-1 ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}
+                              title={proj.name}
+                            >
+                              <div className="flex items-center gap-0.5">
+                                {expandedProjects[proj.id] ? (
+                                  <ChevronUp size={12} className="text-gray-600 flex-shrink-0" />
+                                ) : (
+                                  <ChevronDown size={12} className="text-gray-600 flex-shrink-0" />
+                                )}
+                                <span className="font-bold text-xs truncate">{proj.name}</span>
+                              </div>
+                            </td>
+                            <td colSpan={totalGridColumns - 1} className="relative p-1">
+                              {dragOverState?.projectId === proj.id &&
+                                dragOverState?.scopeKey === scopeKey &&
+                                dragState?.projectId !== proj.id && (
+                                  <div
+                                    className={`absolute left-2 right-2 h-1 rounded-full bg-blue-500 shadow-md z-20 ${
+                                      dragOverState.position === 'before' ? 'top-0' : 'bottom-0'
+                                    }`}
+                                  />
+                                )}
+                              <div className="flex items-center justify-between gap-1">
+                                <button
+                                  type="button"
+                                  draggable
+                                  onDragStart={(e) => handleProjectDragStart(e, proj.id, scopeKey)}
+                                  onDragEnd={() => {
+                                    setDragState(null);
+                                    setDragOverState(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`p-0.5 text-gray-500 hover:text-blue-600 cursor-grab active:cursor-grabbing transition ${
+                                    dragState?.projectId === proj.id && dragState?.scopeKey === scopeKey ? 'text-blue-600' : ''
+                                  }`}
+                                  title={language === 'es' ? 'Arrastrar para reordenar' : 'Drag to reorder'}
+                                >
+                                  <GripVertical size={12} />
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs leading-tight flex items-center flex-wrap gap-1">
+                                    {proj.isClosed && (
+                                      <span className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0 text-[9px] font-bold text-red-700">
+                                        <XCircle size={10} />
+                                        {language === 'es' ? 'Cerrado' : 'Closed'}
+                                      </span>
+                                    )}
+                                    <span className="text-gray-600">{proj.client}</span>
+                                    <span className="text-gray-400">|</span>
+                                    <span className="bg-blue-100 text-blue-700 px-1 py-0 rounded text-xs font-semibold">
+                                      {(projectDurationWeeksById.get(proj.id) ?? proj.numberOfWeeks)} weeks
+                                    </span>
+                                    {isHighProbabilityProject && (
+                                      <>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="bg-amber-200 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                          {language === 'es' ? 'High Probability' : 'High Probability'}
+                                        </span>
+                                      </>
+                                    )}
+                                    {proj.projectManagerId && (
+                                      <>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                          PM: {projectManagerNameById.get(proj.id) || 'PM'}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          {expandedProjects[proj.id] && (
+                            <>
                           {/* Project-relative week row (thin): 1..N from project start to end */}
                           <tr>
-                            <td className={`border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 sticky left-0 z-10 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
+                            <td className={`sticky z-20 left-0 border border-gray-300 px-1 py-0 text-[9px] font-semibold text-slate-700 bg-slate-100 uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
                               {t.projectWeek || 'Project Week'}
                             </td>
-                            {projectAllWeeksData.map((weekData, weekIdx) => {
+                            {allWeeksData.map((weekData, weekIdx) => {
                               const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
                               const projectWeekNumber = getProjectWeekNumber(proj, weekData.date);
                               return (
@@ -11237,7 +10726,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                           {DEPARTMENTS.map((dept) => {
                             return (
                               <tr key={`${proj.id}-${dept}`} className="hover:bg-gray-50">
-                                <td className={`border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 sticky left-0 z-10 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
+                                <td className={`sticky z-20 left-0 border border-gray-300 px-0.5 py-0 text-xs text-gray-700 bg-gray-50 pl-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${GENERAL_LEFT_COLUMN_WIDTH_CLASS}`}>
                                   <div className="flex items-center gap-0.5">
                                     <span className={`text-xs ${getDepartmentIcon(dept).color}`}>
                                       {getDepartmentIcon(dept).icon}
@@ -11245,7 +10734,7 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                                     <span className="font-medium text-xs leading-none">{dept}</span>
                                   </div>
                                 </td>
-                                {projectAllWeeksData.map((weekData, weekIdx) => {
+                                {allWeeksData.map((weekData, weekIdx) => {
                                   const week = weekData.date;
                                   const isCurrentWeekColumn = weekIdx === currentDateWeekIndex;
 
@@ -11442,13 +10931,14 @@ ${t.utilizationLabel}: ${currentUtilizationPercent}% → ${utilizationPercent}% 
                               </tr>
                             );
                           })}
+                            </>
+                          )}
                         </tbody>
-                      </table>
-                      </div>
-                    </>
-                  )}
+                        );
+                      })}
+                  </table>
                 </div>
-              )})}
+              )}
             </div>
         )}
       </div>
