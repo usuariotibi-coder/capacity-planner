@@ -1473,6 +1473,31 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
 
+    @action(detail=False, methods=['post'], url_path='parse-timing')
+    def parse_timing(self, request):
+        """
+        Parse an uploaded Timing .xlsx file and return proposed department
+        dates + project date range, without saving anything. Used both when
+        creating a new project (pre-fill the form) and when re-uploading a
+        revised Timing file for an existing project (the caller decides what
+        to keep from the preview before submitting the normal save).
+        """
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response({'detail': "No file uploaded (expected multipart field 'file')."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from capacity.timing_import import parse_timing_file, TimingParseError
+
+        try:
+            result = parse_timing_file(uploaded_file)
+        except TimingParseError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Timing file parse failed")
+            return Response({'detail': f'No se pudo procesar el archivo: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result)
+
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     """

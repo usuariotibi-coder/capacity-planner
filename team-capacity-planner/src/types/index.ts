@@ -84,6 +84,33 @@ export interface DepartmentStageConfig {
   weekEnd: number;   // 1-based week number relative to project start
   departmentStartDate?: string; // ISO format YYYY-MM-DD - actual start date for this specific department
   durationWeeks?: number; // Duration in weeks for this department
+  originalStartDate?: string | null; // Read-only: first-ever recorded start date, frozen after being set once
+  originalDurationWeeks?: number | null; // Read-only: first-ever recorded duration, frozen after being set once
+}
+
+/**
+ * Result of parsing an uploaded Timing .xlsx schedule file (see
+ * projectsApi.parseTimingFile). Nothing is saved by the parse itself -- this
+ * is shown as an editable preview before the user confirms.
+ */
+export interface TimingParseDateRange {
+  start: string | null;
+  end: string | null;
+}
+export interface TimingParseResult {
+  projectStartDate: string | null;
+  projectEndDate: string | null;
+  numberOfWeeks: number | null;
+  departments: {
+    MED?: TimingParseDateRange;
+    HD?: TimingParseDateRange;
+    MFG?: TimingParseDateRange;
+    PURCHASING?: TimingParseDateRange;
+    PM?: TimingParseDateRange;
+    BUILD?: Partial<Record<'ASSEMBLY' | 'COMMISSIONING', TimingParseDateRange>>;
+    PRG?: Partial<Record<'OFFLINE' | 'ONLINE' | 'DEBUG', TimingParseDateRange>>;
+  };
+  warnings: string[];
 }
 
 /**
@@ -106,6 +133,8 @@ export interface Project {
   client: string;
   startDate: string; // ISO format YYYY-MM-DD
   endDate: string;   // ISO format YYYY-MM-DD
+  originalStartDate?: string | null; // Read-only: first-ever recorded project start date, frozen after being set once
+  originalEndDate?: string | null; // Read-only: first-ever recorded project end date, frozen after being set once
   facility: Facility;
   numberOfWeeks: number;
   projectManagerId?: string; // ID of the assigned Project Manager (PM department)

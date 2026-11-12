@@ -145,6 +145,14 @@ class Project(models.Model):
     client = models.CharField(max_length=255)
     start_date = models.DateField()
     end_date = models.DateField()
+    original_start_date = models.DateField(
+        null=True, blank=True,
+        help_text="First-ever recorded project start date. Frozen the first time it's set; later edits (e.g. re-uploading a Timing file) only update start_date/end_date.",
+    )
+    original_end_date = models.DateField(
+        null=True, blank=True,
+        help_text="First-ever recorded project end date. Frozen the first time it's set; later edits (e.g. re-uploading a Timing file) only update start_date/end_date.",
+    )
     facility = models.CharField(max_length=10, choices=Facility.choices)
     number_of_weeks = models.IntegerField(validators=[MinValueValidator(1)])
     project_manager = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL, related_name='managed_projects')
@@ -176,6 +184,28 @@ class Project(models.Model):
             models.Index(fields=['start_date', 'end_date']),
         ]
 
+    def save(self, *args, **kwargs):
+        # Freeze original_start_date/original_end_date the first time they're
+        # set, and backfill them from the pre-save value for legacy rows that
+        # never had one recorded, so later edits (e.g. re-uploading a Timing
+        # file with revised dates) never move them again.
+        previous = None
+        if self.pk:
+            previous = Project.objects.filter(pk=self.pk).first()
+
+        if previous is None:
+            if self.original_start_date is None:
+                self.original_start_date = self.start_date
+            if self.original_end_date is None:
+                self.original_end_date = self.end_date
+        else:
+            if self.original_start_date is None:
+                self.original_start_date = previous.original_start_date or previous.start_date
+            if self.original_end_date is None:
+                self.original_end_date = previous.original_end_date or previous.end_date
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
@@ -190,12 +220,40 @@ class DepartmentStageConfig(models.Model):
     week_end = models.IntegerField(validators=[MinValueValidator(1)], help_text="1-based week number")
     department_start_date = models.DateField(null=True, blank=True, help_text="Actual start date for this specific department")
     duration_weeks = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1)])
+    original_start_date = models.DateField(
+        null=True, blank=True,
+        help_text="First-ever recorded start date for this department/stage. Frozen the first time it's set; later edits (e.g. re-uploading a Timing file) only update department_start_date/duration_weeks.",
+    )
+    original_duration_weeks = models.IntegerField(
+        null=True, blank=True,
+        help_text="First-ever recorded duration in weeks for this department/stage. Frozen the first time it's set.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['project', 'department', 'week_start']
         unique_together = ['project', 'department', 'stage']
+
+    def save(self, *args, **kwargs):
+        # Same freeze-on-first-set/backfill-from-previous behavior as
+        # Project.original_start_date/original_end_date -- see there for why.
+        previous = None
+        if self.pk:
+            previous = DepartmentStageConfig.objects.filter(pk=self.pk).first()
+
+        if previous is None:
+            if self.original_start_date is None:
+                self.original_start_date = self.department_start_date
+            if self.original_duration_weeks is None:
+                self.original_duration_weeks = self.duration_weeks
+        else:
+            if self.original_start_date is None:
+                self.original_start_date = previous.original_start_date or previous.department_start_date
+            if self.original_duration_weeks is None:
+                self.original_duration_weeks = previous.original_duration_weeks or previous.duration_weeks
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.project.name} - {self.department}" + (f" ({self.stage})" if self.stage else "")

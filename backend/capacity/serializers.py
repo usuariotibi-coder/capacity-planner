@@ -528,6 +528,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'client',
             'start_date',
             'end_date',
+            'original_start_date',
+            'original_end_date',
             'facility',
             'facility_display',
             'number_of_weeks',
@@ -553,6 +555,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             'id', 'created_at', 'updated_at', 'assignment_count',
+            'original_start_date', 'original_end_date',
             'active_assignments', 'department_stages',
             'department_hours_allocated', 'department_cost_allocated',
             'department_hours_utilized',
@@ -622,6 +625,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 'weekEnd': config.week_end,
                 'departmentStartDate': config.department_start_date.isoformat() if config.department_start_date else None,
                 'durationWeeks': config.duration_weeks or (config.week_end - config.week_start + 1),
+                'originalStartDate': config.original_start_date.isoformat() if config.original_start_date else None,
+                'originalDurationWeeks': config.original_duration_weeks,
             })
         return result
 
@@ -1374,6 +1379,8 @@ class DepartmentStageConfigSerializer(serializers.ModelSerializer):
             'week_end',
             'department_start_date',
             'duration_weeks',
+            'original_start_date',
+            'original_duration_weeks',
             'created_at',
             'updated_at',
         )
@@ -1384,6 +1391,8 @@ class DepartmentStageConfigSerializer(serializers.ModelSerializer):
             'department_display',
             'stage_display',
             'duration_weeks',
+            'original_start_date',
+            'original_duration_weeks',
         )
 
     def get_duration_weeks(self, obj):

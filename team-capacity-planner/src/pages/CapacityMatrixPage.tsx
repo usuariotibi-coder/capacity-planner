@@ -1894,12 +1894,19 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
       DEPARTMENTS.forEach((dept) => {
         let deptStartDate: string | undefined;
         let deptDuration = 0;
-        let minConfiguredWeekStart: number | null = null;
-        let maxConfiguredWeekEnd: number | null = null;
+        // "Original" (fixed-calendar) range, as frozen server-side the first time
+        // each department/stage's dates were ever set -- independent of the
+        // relative-week bookkeeping above, and never moves on a later edit or a
+        // Timing file re-upload (see Project.original_start_date/original_end_date
+        // and DepartmentStageConfig.original_start_date/original_duration_weeks).
+        let minOriginalStartDate: string | undefined;
+        let maxOriginalEndDate: string | undefined;
 
         if (dept === 'PM') {
           deptStartDate = proj.startDate;
           deptDuration = proj.numberOfWeeks || 0;
+          minOriginalStartDate = proj.originalStartDate || undefined;
+          maxOriginalEndDate = proj.originalEndDate || undefined;
         } else {
           const deptStages = proj.departmentStages?.[dept];
           if (deptStages && deptStages.length > 0) {
@@ -1921,12 +1928,25 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
               if (weekEndNum > maxWeekEnd) {
                 maxWeekEnd = weekEndNum;
               }
+
+              if (stageCfg.originalStartDate) {
+                if (!minOriginalStartDate || stageCfg.originalStartDate < minOriginalStartDate) {
+                  minOriginalStartDate = stageCfg.originalStartDate;
+                }
+                const originalDuration = stageCfg.originalDurationWeeks || (weekEndNum - weekStartNum + 1);
+                if (Number.isFinite(originalDuration) && originalDuration > 0) {
+                  const originalEnd = parseISODate(stageCfg.originalStartDate);
+                  originalEnd.setDate(originalEnd.getDate() + (originalDuration * 7) - 1);
+                  const originalEndIso = formatToISO(originalEnd);
+                  if (!maxOriginalEndDate || originalEndIso > maxOriginalEndDate) {
+                    maxOriginalEndDate = originalEndIso;
+                  }
+                }
+              }
             });
 
             deptStartDate = minWeekStartDate;
             if (Number.isFinite(minWeekStart) && Number.isFinite(maxWeekEnd)) {
-              minConfiguredWeekStart = minWeekStart;
-              maxConfiguredWeekEnd = maxWeekEnd;
               deptDuration = Math.max(0, maxWeekEnd - minWeekStart + 1);
             }
 
@@ -1947,17 +1967,8 @@ export function CapacityMatrixPage({ departmentFilter, sidebarToolbarContainer, 
 
         const effectiveStartDate = deptStartDate || proj.startDate;
         const effectiveEndDate = deptEndDate || proj.endDate || proj.startDate;
-        let expectedStartDate = proj.startDate;
-        let expectedEndDate = proj.endDate || proj.startDate;
-        if (proj.startDate && minConfiguredWeekStart !== null && maxConfiguredWeekEnd !== null) {
-          const expectedStart = parseISODate(proj.startDate);
-          expectedStart.setDate(expectedStart.getDate() + ((minConfiguredWeekStart - 1) * 7));
-          expectedStartDate = formatToISO(expectedStart);
-
-          const expectedEnd = parseISODate(proj.startDate);
-          expectedEnd.setDate(expectedEnd.getDate() + (maxConfiguredWeekEnd * 7) - 1);
-          expectedEndDate = formatToISO(expectedEnd);
-        }
+        const expectedStartDate = minOriginalStartDate || effectiveStartDate;
+        const expectedEndDate = maxOriginalEndDate || effectiveEndDate;
         const deptDisplayDate = deptStartDate
           ? new Date(deptStartDate).toLocaleDateString(locale)
           : t.notConfigured;

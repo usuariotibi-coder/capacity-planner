@@ -3,11 +3,11 @@ import { useProjectStore } from '../stores/projectStore';
 import { useMemo } from 'react';
 import { useAssignmentStore } from '../stores/assignmentStore';
 import { useEmployeeStore } from '../stores/employeeStore';
-import type { Project, Department, DepartmentStageConfig, ProjectChangeOrder, ProjectVisibilityScope, Stage } from '../types';
+import type { Project, Department, DepartmentStageConfig, ProjectChangeOrder, ProjectVisibilityScope, Stage, TimingParseResult, TimingParseDateRange } from '../types';
 import { generateId } from '../utils/id';
 import { getDepartmentIcon, getDepartmentLabel } from '../utils/departmentIcons';
 import { getAllWeeksWithNextYear, formatToISO, parseISODate } from '../utils/dateUtils';
-import { CheckCircle2, ClipboardList, GitBranch, Plus, Trash2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ClipboardList, GitBranch, Plus, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslation } from '../utils/translations';
 import { useAuth } from '../context/AuthContext';
@@ -123,6 +123,8 @@ export function ProjectsPage() {
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState<string | null>(null);
   const [showInGeneral, setShowInGeneral] = useState<boolean>(true);
   const [formNotice, setFormNotice] = useState<{ type: FormNoticeType; message: string } | null>(null);
+  const [isParsingTiming, setIsParsingTiming] = useState(false);
+  const [timingUploadWarnings, setTimingUploadWarnings] = useState<string[]>([]);
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
   // Set while the create/edit form is open specifically to register a Change Order as its own
   // full project ("Método 2") -- included in the create payload as parentProjectId so it links
@@ -304,6 +306,74 @@ export function ProjectsPage() {
     }
 
     return weekStarts;
+  };
+
+  // Parses an uploaded Timing .xlsx schedule file and pre-fills the department
+  // start date/duration fields below (plus the project's own start date/weeks
+  // when the file carries them) -- nothing is saved yet, the form itself is
+  // the editable preview. Works the same way whether creating a new project
+  // or re-uploading a revised Timing file for an existing one: only the
+  // "current" dates get overwritten here, since original_start_date/
+  // original_duration_weeks are frozen server-side the first time they're set.
+  const handleTimingFileUpload = async (file: File) => {
+    setIsParsingTiming(true);
+    try {
+      const result: TimingParseResult = await projectsApi.parseTimingFile(file);
+
+      if (result.projectStartDate) {
+        setFormData((prev) => ({ ...prev, startDate: result.projectStartDate! }));
+      }
+      if (result.numberOfWeeks) {
+        setNumberOfWeeks(result.numberOfWeeks);
+      }
+
+      const nextStartDates: Record<Department, Record<string, string>> = { ...deptStartDates };
+      const nextDurations: Record<Department, Record<string, number>> = { ...deptDurations };
+
+      const applyRange = (dept: Department, key: string, range?: TimingParseDateRange) => {
+        if (!range || !range.start || !range.end) return;
+        const start = parseISODate(range.start);
+        const end = parseISODate(range.end);
+        const weeks = Math.max(1, Math.round((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+        nextStartDates[dept] = { ...nextStartDates[dept], [key]: range.start };
+        nextDurations[dept] = { ...nextDurations[dept], [key]: weeks };
+      };
+
+      const dep = result.departments || {};
+      applyRange('MED', DEFAULT_PHASE, dep.MED);
+      applyRange('HD', DEFAULT_PHASE, dep.HD);
+      applyRange('MFG', DEFAULT_PHASE, dep.MFG);
+      applyRange('PURCHASING', DEFAULT_PHASE, dep.PURCHASING);
+      if (dep.BUILD) {
+        applyRange('BUILD', 'ASSEMBLY', dep.BUILD.ASSEMBLY);
+        applyRange('BUILD', 'COMMISSIONING', dep.BUILD.COMMISSIONING);
+      }
+      if (dep.PRG) {
+        applyRange('PRG', 'OFFLINE', dep.PRG.OFFLINE);
+        applyRange('PRG', 'ONLINE', dep.PRG.ONLINE);
+        applyRange('PRG', 'DEBUG', dep.PRG.DEBUG);
+      }
+
+      setDeptStartDates(nextStartDates);
+      setDeptDurations(nextDurations);
+      setTimingUploadWarnings(result.warnings || []);
+      setFormNotice({
+        type: 'success',
+        message: language === 'es'
+          ? 'Fechas detectadas del archivo Timing. Revisa y ajusta antes de guardar.'
+          : 'Dates detected from the Timing file. Review and adjust before saving.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setFormNotice({
+        type: 'error',
+        message: language === 'es'
+          ? `No se pudo leer el archivo Timing: ${message}`
+          : `Could not read the Timing file: ${message}`,
+      });
+    } finally {
+      setIsParsingTiming(false);
+    }
   };
 
   /**
@@ -563,6 +633,7 @@ export function ProjectsPage() {
       setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
       setDeptStartDates(emptyDeptPhaseDates());
       setDeptDurations(emptyDeptPhaseDurations());
+      setTimingUploadWarnings([]);
       setDeptCostAllocated({});
       setShowInGeneral(true);
       setIsFormOpen(false);
@@ -585,6 +656,7 @@ export function ProjectsPage() {
     setFormData(proj);
     setEditingId(proj.id);
     setNumberOfWeeks(proj.numberOfWeeks);
+    setTimingUploadWarnings([]);
 
     // Calculate hours per department from assignments
     const projAssignments = assignments.filter((a: any) => a.projectId === proj.id);
@@ -661,6 +733,7 @@ export function ProjectsPage() {
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptStartDates(emptyDeptPhaseDates());
     setDeptDurations(emptyDeptPhaseDurations());
+    setTimingUploadWarnings([]);
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptCostAllocated({});
     setSelectedProjectManagerId(null);
@@ -698,6 +771,7 @@ export function ProjectsPage() {
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptStartDates(emptyDeptPhaseDates());
     setDeptDurations(emptyDeptPhaseDurations());
+    setTimingUploadWarnings([]);
     setDeptHoursAllocated({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptCostAllocated({});
     setSelectedProjectManagerId(null);
@@ -731,6 +805,7 @@ export function ProjectsPage() {
     setHoursPerDept({ PM: 0, MED: 0, HD: 0, MFG: 0, BUILD: 0, PRG: 0, PURCHASING: 0 });
     setDeptStartDates(emptyDeptPhaseDates());
     setDeptDurations(emptyDeptPhaseDurations());
+    setTimingUploadWarnings([]);
     setDeptHoursAllocated(hours);
     setDeptCostAllocated(cost);
     setSelectedProjectManagerId(null);
@@ -1320,14 +1395,57 @@ export function ProjectsPage() {
 
                   {/* Configuration by Department - Compact */}
                   <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-lg border-l-4 border-indigo-600">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                       <h3 className="font-semibold text-sm text-indigo-900">{t.configByDepartment}</h3>
-                      {formData.startDate && (
-                        <span className="text-xs text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full font-medium">
-                          {t.startDate}: {formatDateDayFirst(formData.startDate)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {formData.startDate && (
+                          <span className="text-xs text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full font-medium">
+                            {t.startDate}: {formatDateDayFirst(formData.startDate)}
+                          </span>
+                        )}
+                        <label className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-white border border-indigo-300 rounded-full px-3 py-1.5 cursor-pointer hover:bg-indigo-50">
+                          <Upload size={13} />
+                          {isParsingTiming
+                            ? (language === 'es' ? 'Leyendo…' : 'Reading…')
+                            : editingId
+                              ? (language === 'es' ? 'Volver a subir Timing' : 'Re-upload Timing')
+                              : (language === 'es' ? 'Subir Timing (.xlsx)' : 'Upload Timing (.xlsx)')}
+                          <input
+                            type="file"
+                            accept=".xlsx"
+                            className="hidden"
+                            disabled={isParsingTiming}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = '';
+                              if (file) handleTimingFileUpload(file);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
+                    {timingUploadWarnings.length > 0 && (
+                      <div className="mb-2 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2 text-xs text-amber-900">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-semibold">
+                            {language === 'es' ? 'Revisa estos puntos del archivo Timing:' : 'Review these points from the Timing file:'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setTimingUploadWarnings([])}
+                            className="text-amber-700 hover:bg-amber-100 rounded p-0.5 shrink-0"
+                            aria-label="Close"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <ul className="list-disc list-inside mt-1 space-y-0.5">
+                          {timingUploadWarnings.map((warning, idx) => (
+                            <li key={idx}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {DEPARTMENTS.filter(dept => dept !== 'PM').map((dept) => {
                         const deptInfo = getDepartmentIcon(dept);

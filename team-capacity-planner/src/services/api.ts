@@ -634,6 +634,16 @@ export const projectsApi = {
       body: JSON.stringify(nameOverride ? { name: nameOverride } : {}),
     });
   },
+
+  // Parses an uploaded Timing .xlsx schedule file and returns proposed department
+  // dates + project date range for the caller to show as an editable preview --
+  // nothing is saved by this call. Used both for a brand-new project and to
+  // re-propose dates for an existing one after its schedule changes.
+  parseTimingFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiFetchMultipart('/api/projects/parse-timing/', formData);
+  },
 };
 
 // Assignments API
